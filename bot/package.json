@@ -1,0 +1,27 @@
+{
+  "name": "bot_hermaphrodite",
+  "version": "1.0.0",
+  "description": "Ceci est un bot cool",
+  "main": "bot.js",
+  "scripts": {
+    "start": "npx tsc && node bot.js",
+    "watch": "npx tsc -w",
+    "build": "npx tsc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AutoCoderr/bot_discord_hermaphrodite.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/AutoCoderr/bot_discord_hermaphrodite/issues"
+  },
+  "homepage": "https://github.com/AutoCoderr/bot_discord_hermaphrodite#readme",
+  "devDependencies": {
+    "typescript": "^4.0.5"
+  },
+  "dependencies": {
+    "mongoose": "^5.10.13"
+  }
+}

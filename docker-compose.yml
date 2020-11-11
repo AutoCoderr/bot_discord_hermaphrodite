@@ -1,0 +1,31 @@
+version: '3'
+services:
+  bot:
+    image: node:14
+    ports :
+      - "80:80"
+    volumes:
+      - ./bot:/bot
+    working_dir: /bot
+    command: npm start
+    depends_on:
+      - mongodb
+
+  mongodb:
+    image: mongo:latest
+    volumes:
+      - ./mongodb/mongod.conf:/etc/mongod.conf
+      - ./mongodb/data/db/:/data/db/
+      - ./mongodb/data/log/:/var/log/mongodb/
+      - ./mongodb/initdb.d/:/docker-entrypoint-initdb.d/
+    env_file:
+      - .env
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE}
+    ports:
+      - "27017:27017"
+    #command: [ "-f", "/etc/mongod.conf" ]
+    #command: ["--help"]
+
