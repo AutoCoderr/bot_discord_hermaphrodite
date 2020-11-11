@@ -32,7 +32,7 @@ export const connect = () => {
         console.log("Error connecting to database");
         database = undefined;
         nbRetry += 1;
-        connect();
+        setTimeout(connect, 250);
     });
 
     return mongoose;
