@@ -2,7 +2,7 @@ import Emote, { IEmote } from "./Models/Emote";
 
 console.log("COUCOU JE SUIS UN BOT");
 
-setTimeout(async () => {
+(async () => {
     let emotes = await Emote.find({});
     if (emotes.length == 0) { // Créer une emote, s'il n'en trouve pas
         const date = new Date();
@@ -17,6 +17,4 @@ setTimeout(async () => {
         emotes = await Emote.find({});
     }
     console.log(emotes);
-}, 1000);
-
-
+})();

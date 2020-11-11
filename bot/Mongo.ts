@@ -2,9 +2,19 @@ import mongoose from "mongoose";
 // @ts-ignore
 const config = require("./config");
 
+let nbRetry = 0;
+const nbRetryMax = 10;
+
 let database: mongoose.Connection;
 
 export const connect = () => {
+
+    if (nbRetry >= nbRetryMax) {
+        console.log("Connexion impossible");
+        return;
+    } else if (nbRetry > 0) {
+        console.log("Re try to connect")
+    }
 
     if (database) return;
 
@@ -20,6 +30,9 @@ export const connect = () => {
 
     database.on("error", () => {
         console.log("Error connecting to database");
+        database = undefined;
+        nbRetry += 1;
+        connect();
     });
 
     return mongoose;
