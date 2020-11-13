@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 const config = require("./config");
 
 let nbRetry = 0;
-const nbRetryMax = 10;
+const nbRetryMax = 20;
 
 let database: mongoose.Connection;
 
