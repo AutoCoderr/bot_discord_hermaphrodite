@@ -1,6 +1,5 @@
 import mongoose from "mongoose";
-// @ts-ignore
-const config = require("./config");
+import config from "./config";
 
 let nbRetry = 0;
 const nbRetryMax = 20;
