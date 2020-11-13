@@ -18,6 +18,9 @@
            - Copiez bot/config.example.js dans bot/config.js
            - Vous pouvez modifier les informations de connexion dans les
              deux fichiers, tout en faisant en sorte que ça corresponde
+           - Dans le config.js, je vous invite à mettre le token pour votre application
+           - Et à mettre un prefix, que ne sois pas le même que celui de quelqu'un d'autre
+             faisant des tests sur le même server
 ##### Lancer le projet :
            - Lancer : docker-compose up
            - Ou bien : docker-compose -d pour le lancer en tache de fond
