@@ -1,6 +1,6 @@
 import config from "../config";
-import * as Discord from "discord.js";
 import Command from "../Classes/Command";
+import { extractEmoteName } from "../Classes/OtherFunctions";
 
 interface iNotifyOnReact extends Document {
     listen: Array<string>;
@@ -87,24 +87,34 @@ export default class NotifyOnReact extends Command {
             this.sendErrors(message,errors);
             return;
         }
-        console.log("channelToListen => "+channelToListen.name);
-        console.log("messageToListen => "+messageToListen.content);
-        console.log("messageToWrite => "+messageToWrite);
-        console.log("channelToWrite => "+channelToWrite.name);
-        console.log("emoteToReact => "+emoteToReact);
 
-        message.channel.send("Get all datas successfull !");
+        this.reactingAndNotifyOnMessage(messageToListen, channelToWrite, messageToWrite, extractEmoteName(emoteToReact));
+
+        message.channel.send("Command sucessfully executed, all reactions to this message will be notified");
     }
 
-    static awaitReact(message) {
-        message.awaitReactions(() => true, { max: 1, time: 60000, errors: ['time'] })
+    static async reactingAndNotifyOnMessage(messageToListen, channelToWrite, messageToWrite, emoteName) {
+        let userWhoReact;
+        const filter = (reaction, user) => {
+            userWhoReact = user;
+            return reaction.emoji.name == emoteName;
+        };
+        messageToListen.awaitReactions(filter, { max: 1 })
             .then(collected => {
-                console.log("detect react");
-                message.reply("Coucou");
-                this.awaitReact(message);
+                const variables: Object = {
+                    user: userWhoReact.username
+                }
+                let toWrite = messageToWrite;
+                for (let key in variables) {
+                    const regex = new RegExp("\\$( )*"+key+"( )*\\$");
+                    toWrite = toWrite.replace(regex, variables[key]);
+                }
+                channelToWrite.send(toWrite);
+
+                this.reactingAndNotifyOnMessage(messageToListen, channelToWrite, messageToWrite, emoteName);
             })
             .catch(collected => {
-                message.reply('you reacted with neither a thumbs up, nor a thumbs down.');
+                console.log("Catch event in reactingAndNotifyOnMessage() function");
             });
     }
 }
