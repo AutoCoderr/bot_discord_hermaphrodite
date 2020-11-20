@@ -5,12 +5,13 @@ import config from "./config";
 import * as Discord from "discord.js";
 
 import HelloWorld from "./Commands/HelloWorld";
+import NotifyOnReact from "./Commands/NotifyOnReact";
 
 
 
 const bot = new Discord.Client();
 
-const commands = [ HelloWorld ];
+const commands = [ HelloWorld, NotifyOnReact ];
 
 // check all commands
 bot.on('message', message => {
@@ -21,23 +22,13 @@ bot.on('message', message => {
     }
 });
 
-(async () => {
-    console.log("TEST AJOUT EMOTE DANS MONGODB");
-    let emotes = await Emote.find({});
-    if (emotes.length == 0) { // Créer une emote, s'il n'en trouve pas
-        const date = new Date();
-        // Ajoute une emote de test pour les stats dans la bdd
-        const emote: IEmote = {
-            userName: "Toto",
-            emoteName: ":ahego:",
-            dateTime: date.getFullYear() + "-" + (date.getMonth() + 1) + "-" + date.getDate() + " " + date.getHours() + ":" + date.getMinutes() + ":" + date.getSeconds()
-        }
-
-        await Emote.create(emote);
-        emotes = await Emote.find({});
-    }
-    console.log("Les emotes");
-    console.log(emotes);
-})();
-
 bot.login(config.token);
+
+// @ts-ignore
+String.prototype.replaceAll = function (A,B) {
+    let str = this.valueOf();
+    while (str.replace(A,B) != str) {
+        str = str.replace(A,B);
+    }
+    return str;
+}

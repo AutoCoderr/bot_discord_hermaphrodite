@@ -1,7 +1,9 @@
 import config from "../config";
+import Command from "../Classes/Command";
 import * as Discord from "discord.js";
 
-export default class HelloWorld {
+export default class HelloWorld extends Command {
+
     static match(message) {
         return message.content.startsWith(config.command_prefix+"hello");
     }
