@@ -17,7 +17,6 @@ export default class NotifyOnReact extends Command {
     static async action(message, bot) { // notifyOnReact --listen #channel/messageId --message '$user$ a réagit à ce message' :yoyo: --writeChannel #channelB
         const args: iNotifyOnReact = this.parseCommand(message);
         if (!args) return;
-        console.log(args);
         let errors: Array<Object> = [];
 
         let channelToListen;
@@ -84,7 +83,7 @@ export default class NotifyOnReact extends Command {
         }
 
         if (errors.length > 0) {
-            this.sendErrors(message,errors);
+            this.sendErrors(message,errors,this.help);
             return;
         }
 
@@ -116,5 +115,19 @@ export default class NotifyOnReact extends Command {
             .catch(collected => {
                 console.log("Catch event in reactingAndNotifyOnMessage() function");
             });
+    }
+
+    static help(Embed) {
+        Embed.
+        addFields({
+            name: "Arguments :",
+            value: "--listen, Indique le channel et le message à écouter, séparés d'un '/', ainsi que l'emote à laquelle réagir\n"+
+                "--message, Le message à afficher dés qu'un réaction sur le message est detectée\n"+
+                "--writeChannel, le channel sur lequel écrire le message à chaque réaction"
+        })
+            .addFields({
+            name: "Exemple :",
+            value: config.command_prefix+"notifyOnReact --listen #ChannelAEcouter/IdDuMessageAEcouter :emoteAEcouter: --message '$user$ a réagit à ce message' --writeChannel #channelSurLequelEcrire"
+        });
     }
 }

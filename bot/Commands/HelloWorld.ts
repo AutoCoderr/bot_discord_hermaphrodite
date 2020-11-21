@@ -1,6 +1,5 @@
 import config from "../config";
 import Command from "../Classes/Command";
-import * as Discord from "discord.js";
 
 export default class HelloWorld extends Command {
 

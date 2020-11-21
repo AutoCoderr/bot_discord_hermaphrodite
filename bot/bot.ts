@@ -1,5 +1,3 @@
-import Emote, { IEmote } from "./Models/Emote";
-
 import config from "./config";
 
 import * as Discord from "discord.js";

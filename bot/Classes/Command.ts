@@ -1,7 +1,7 @@
 import * as Discord from "discord.js";
 
 export default class Command {
-    static sendErrors(message, errors){
+    static sendErrors(message, errors, help: null|Function = null){
         const commandName = message.content.split(" ")[0];
         let Embed = new Discord.MessageEmbed()
             .setColor('#0099ff')
@@ -15,6 +15,9 @@ export default class Command {
             Embed.addFields(
                 error,
             )
+        }
+        if (help) {
+            help(Embed);
         }
 
         message.channel.send(Embed);
