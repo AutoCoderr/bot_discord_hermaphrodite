@@ -26,7 +26,7 @@ export default class NotifyOnReact extends Command {
         let emoteToReact;
 
 
-        if (typeof(args.listen) != "object") {
+        if (typeof(args.listen) == "undefined") {
             errors.push({name: "--listen missing", value: "--listen missing in your command"});
         } else if (!(args.listen instanceof Array) || args.listen.length != 2) {
             errors.push({name: "--listen incorrect", value: "--listen must be in '#channel/idDuMessage :emote:' format"})
