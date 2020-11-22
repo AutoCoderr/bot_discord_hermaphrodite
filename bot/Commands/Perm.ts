@@ -19,7 +19,7 @@ export default class Perm extends Command {
         if (typeof(args[0]) == "undefined" || (args[0] != "add" && args[0] != "set" && args[0] != "show")) {
             this.sendErrors(message, {
                 name: "Incorrect parametter",
-                value: "Incorrect parametter, please type 'add' or 'set'"
+                value: "Incorrect parametter, please type 'add', 'set' or 'show'"
             }, this.help);
             return;
         }
