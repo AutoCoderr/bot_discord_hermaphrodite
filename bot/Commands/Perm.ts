@@ -16,6 +16,8 @@ export default class Perm extends Command {
 
     static async action(message, bot) { //%perm set commandName @role
         const args: IPerm = this.parseCommand(message);
+
+        // check if arguments are correctly filled
         if (typeof(args[0]) == "undefined" || (args[0] != "add" && args[0] != "set" && args[0] != "show")) {
             this.sendErrors(message, {
                 name: "Incorrect parametter",
@@ -43,7 +45,7 @@ export default class Perm extends Command {
 
         const commandName = args[1];
 
-        if (action == "show") {
+        if (action == "show") { // show the roles which are allowed to execude the specified command
             const permissions = await Permissions.find({command: commandName, serverId: message.guild.id});
 
             let Embed = new Discord.MessageEmbed()
@@ -78,20 +80,26 @@ export default class Perm extends Command {
             return;
         }
 
-        if (typeof(args[2]) == "undefined") {
+
+
+        if (typeof(args[2]) == "undefined") { // check if the roles to attibute to that command are correctly filled
             this.sendErrors(message, {
                 name: "Roles missing",
                 value: "The roles are not specified"
             }, this.help);
             return;
         }
+
+
+        // attribute or add the specified roles to the specified command
         const specifiedRoles = args[2].split(",");
         let rolesId: Array<string> = [];
 
-        for (let aRole of specifiedRoles) {
+        for (let specifiedRole of specifiedRoles) {
             // @ts-ignore
-            let roleId: string = aRole.replaceAll(" ","")
-            roleId = args[2].split("<@&")[1];
+            let roleId: string = specifiedRole.replaceAll(" ","")
+            roleId = roleId.split("<@&")[1];
+
             if (roleId == undefined) {
                 this.sendErrors(message, {
                     name: "Role badly specified",
@@ -130,7 +138,7 @@ export default class Perm extends Command {
                     if (permission.roles.includes(roleId)) {
                         this.sendErrors(message, {
                             name: "Role already added",
-                            value: "That role is already attributed for this command"
+                            value: "That role is already attributed for that command"
                         }, this.help);
                         return;
                     }
