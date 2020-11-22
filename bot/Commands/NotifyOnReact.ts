@@ -101,7 +101,7 @@ export default class NotifyOnReact extends Command {
         messageToListen.awaitReactions(filter, { max: 1 })
             .then(collected => {
                 const variables: Object = {
-                    user: userWhoReact.username
+                    user: "<@"+userWhoReact.id+">"
                 }
                 let toWrite = messageToWrite;
                 for (let key in variables) {
