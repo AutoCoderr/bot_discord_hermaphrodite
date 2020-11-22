@@ -7,7 +7,7 @@ export interface IEmote extends Document {
     userName: string;
     emoteName: string;
     dateTime: string;
-    serverId: string
+    serverId: string;
 }
 
 const EmoteSchema: Schema = new Schema({

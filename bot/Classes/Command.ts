@@ -35,9 +35,13 @@ export default class Command {
         }
 
         for (let i=0;i<args.length;i++) {
-            if (i < args.length-1 && args[i]+args[i+1] == "--") {
+            if (args[i] == "-") {
                 let attr = "";
-                i += 2;
+                if (args[i]+args[i+1] == "--")
+                    i += 2;
+                else
+                    i += 1;
+
                 while (i < args.length && args[i] != " ") {
                     attr += args[i];
                     i += 1;
@@ -45,35 +49,48 @@ export default class Command {
                 while (i < args.length && args[i] == " ") {
                     i += 1;
                 }
-                let values: Array<string> = [];
-                while (i < args.length && args[i] != "-") {
-                    if (i < args.length && (args[i] == "'" || args[i] == '"')) {
-                        let quote = args[i];
-                        let value = "";
-                        i += 1;
-                        while (i < args.length && args[i] != quote) {
-                            value += args[i];
-                            i += 1;
-                        }
-                        values.push(value);
-                    } else if (args[i] != " ") {
-                        let value = "";
-                        while (i < args.length && args[i] != " ") {
-                            value += args[i];
-                            i += 1;
-                        }
-                        values.push(value);
-                    }
+                if (i < args.length && (args[i] == "'" || args[i] == '"')) {
+                    let quote = args[i];
+                    let value = "";
                     i += 1;
-                }
-                if (values.length == 0) {
+                    while (i < args.length && args[i] != quote) {
+                        value += args[i];
+                        i += 1;
+                    }
+                    argsObject[attr] = value;
+                } else if (i < args.length && (args[i]+args[i+1] == "--")) {
                     this.sendErrors(message, [{
                         name: "Error syntax", value: "You cannot put an argument directly after another argument"
                     }]);
                     return false;
+                } else {
+                    let value = "";
+                    while (i < args.length && args[i] != " ") {
+                        value += args[i];
+                        i += 1;
+                    }
+                    argsObject[attr] = value;
                 }
-                argsObject[attr] = values.length == 1 ? values[0] : values;
-                i -=1;
+            } else if (args[i] != " ") {
+                let value = "";
+                if (i < args.length && (args[i] == "'" || args[i] == '"')) {
+                    let quote = args[i];
+                    i += 1;
+                    while (i < args.length && args[i] != quote) {
+                        value += args[i];
+                        i += 1;
+                    }
+                } else {
+                    while (i < args.length && args[i] != " ") {
+                        value += args[i];
+                        i += 1;
+                    }
+                }
+                let j = 0;
+                while (typeof(argsObject[j]) != "undefined") {
+                    j += 1;
+                }
+                argsObject[j] = value;
             }
         }
         return argsObject;

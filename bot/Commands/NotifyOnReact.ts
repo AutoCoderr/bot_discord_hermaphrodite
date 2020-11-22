@@ -3,9 +3,10 @@ import Command from "../Classes/Command";
 import { extractEmoteName } from "../Classes/OtherFunctions";
 
 interface iNotifyOnReact extends Document {
-    listen: Array<string>;
+    listen: string;
     message: string;
     writeChannel: string;
+    e: string; // emote
 }
 
 export default class NotifyOnReact extends Command {
@@ -14,7 +15,7 @@ export default class NotifyOnReact extends Command {
         return message.content.startsWith(config.command_prefix+"notifyOnReact");
     }
 
-    static async action(message, bot) { // notifyOnReact --listen #channel/messageId --message '$user$ a réagit à ce message' :yoyo: --writeChannel #channelB
+    static async action(message, bot) { // notifyOnReact --listen #channel/messageId --message '$user$ a réagit à ce message' -e :yoyo: --writeChannel #channelB
         const args: iNotifyOnReact = this.parseCommand(message);
         if (!args) return;
         let errors: Array<Object> = [];
@@ -28,14 +29,11 @@ export default class NotifyOnReact extends Command {
 
         if (typeof(args.listen) == "undefined") {
             errors.push({name: "--listen missing", value: "--listen missing in your command"});
-        } else if (!(args.listen instanceof Array) || args.listen.length != 2) {
-            errors.push({name: "--listen incorrect", value: "--listen must be in '#channel/idDuMessage :emote:' format"})
-        } else if (args.listen[0].split("/").length != 2) {
-            errors.push({name: "--listen incorrect", value: "--listen must be in '#channel/idDuMessage :emote' format"})
+        } else if (args.listen.split("/").length != 2) {
+            errors.push({name: "--listen incorrect", value: "--listen must be in '#channel/idDuMessage' format"})
         } else {
-            emoteToReact = args.listen[1];
             // @ts-ignore
-            let channelId = args.listen[0].split("/")[0].replaceAll(" ","");
+            let channelId = args.listen.split("/")[0].replaceAll(" ","");
             channelId = channelId.split("<#")[1];
             if (channelId == undefined) {
                 errors.push([{name: "Channel to listen not found", value: "Specified channel to listen does not exists"}]);
@@ -47,11 +45,10 @@ export default class NotifyOnReact extends Command {
                     errors.push([{name: "Channel to listen not found", value: "Specified channel to listen does not exists"}]);
                 } else {
                     // @ts-ignore
-                    let messageId = args.listen[0].split("/")[1].replaceAll(" ","");
+                    let messageId = args.listen.split("/")[1].replaceAll(" ","");
                     try {
                         messageToListen = await channelToListen.messages.fetch(messageId);
                     } catch(e) {
-                        //errors.push([{name: "Message to listen not found", value: "Specified message to listen does not exists"}]);
                     }
                     if (messageToListen == undefined) {
                         errors.push([{name: "Message to listen not found", value: "Specified message to listen does not exists"}]);
@@ -59,6 +56,12 @@ export default class NotifyOnReact extends Command {
                 }
 
             }
+        }
+
+        if (typeof(args.e) == "undefined") { // check emote
+            errors.push([{name: "-e missing", value: "mention -e of emote missing"}]);
+        } else {
+            emoteToReact = args.e;
         }
 
         if (typeof(args.message) == "undefined") {
@@ -121,13 +124,14 @@ export default class NotifyOnReact extends Command {
         Embed.
         addFields({
             name: "Arguments :",
-            value: "--listen, Indique le channel et le message à écouter, séparés d'un '/', ainsi que l'emote à laquelle réagir\n"+
+            value: "--listen, Indique le channel et le message à écouter, séparés d'un '/'\n"+
+                "-e, Indique l'emote à laquelle réagir\n"+
                 "--message, Le message à afficher dés qu'un réaction sur le message est detectée\n"+
                 "--writeChannel, le channel sur lequel écrire le message à chaque réaction"
         })
             .addFields({
             name: "Exemple :",
-            value: config.command_prefix+"notifyOnReact --listen #ChannelAEcouter/IdDuMessageAEcouter :emoteAEcouter: --message '$user$ a réagit à ce message' --writeChannel #channelSurLequelEcrire"
+            value: config.command_prefix+"notifyOnReact --listen #ChannelAEcouter/IdDuMessageAEcouter -e :emoteAEcouter: --message '$user$ a réagit à ce message' --writeChannel #channelSurLequelEcrire"
         });
     }
 }
