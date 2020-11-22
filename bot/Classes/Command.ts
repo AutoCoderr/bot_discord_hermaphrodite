@@ -1,7 +1,12 @@
 import * as Discord from "discord.js";
 
 export default class Command {
-    static sendErrors(message, errors, help: null|Function = null){
+    static existingCommands = ["notifyOnReact"];
+
+    static sendErrors(message, errors: Object|Array<Object>, help: null|Function = null){
+        if (!(errors instanceof Array)) {
+            errors = [errors];
+        }
         const commandName = message.content.split(" ")[0];
         let Embed = new Discord.MessageEmbed()
             .setColor('#0099ff')
@@ -11,9 +16,10 @@ export default class Command {
             //.setThumbnail('https://image.noelshack.com/fichiers/2020/34/7/1598188353-icons8-jason-voorhees-500.png')
             .setTimestamp()
 
+        // @ts-ignore
         for (let error of errors) {
             Embed.addFields(
-                error,
+                error
             )
         }
         if (help) {
