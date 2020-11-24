@@ -45,7 +45,7 @@ export default class Perm extends Command {
 
         const commandName = args[1];
 
-        if (action == "show") { // show the roles which are allowed to execude the specified command
+        if (action == "show") { // Show the roles which are allowed to execute the specified command
             const permissions = await Permissions.find({command: commandName, serverId: message.guild.id});
 
             let Embed = new Discord.MessageEmbed()
@@ -91,7 +91,7 @@ export default class Perm extends Command {
         }
 
 
-        // attribute or add the specified roles to the specified command
+        // Attribute or add the specified allowed roles to the specified command
         const specifiedRoles = args[2].split(",");
         let rolesId: Array<string> = [];
 

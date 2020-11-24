@@ -15,9 +15,7 @@ const commands = [ HelloWorld, NotifyOnReact, Perm ];
 // check all commands
 bot.on('message', message => {
     for (let command of commands) {
-        if (command.match(message)) {
-            command.action(message, bot);
-        }
+        command.check(message, bot);
     }
 });
 

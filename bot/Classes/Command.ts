@@ -1,7 +1,9 @@
+import config from "../config";
 import * as Discord from "discord.js";
+import Permissions, { IPermissions } from "../Models/Permissions";
 
 export default class Command {
-    static existingCommands = ["notifyOnReact"];
+    static existingCommands = ["notifyOnReact", "perm"];
 
     static sendErrors(message, errors: Object|Array<Object>, help: null|Function = null){
         if (!(errors instanceof Array)) {
@@ -27,6 +29,33 @@ export default class Command {
         }
 
         message.channel.send(Embed);
+    }
+
+    static async check(message,bot) { // @ts-ignore
+        if (this.match(message) && await this.checkPermissions(message)) { // @ts-ignore
+            this.action(message, bot);
+        }
+    }
+
+    static async checkPermissions(message) {
+        const commandName = message.content.split(" ")[0];
+
+        if(config.roots.includes(message.author.id) || message.member.hasPermission("ADMINISTRATOR")) return true;
+
+        const permission: IPermissions = await Permissions.findOne({serverId: message.guild.id, command: commandName.slice(1)});
+        if (permission != null) {
+            for (let roleId of message.member._roles) {
+                if (permission.roles.includes(roleId)) return true;
+            }
+        }
+
+        let Embed = new Discord.MessageEmbed()
+            .setColor('#0099ff')
+            .setTitle('Permission denied')
+            .setDescription("Vous n'avez pas le droit d'executer la commande '"+commandName+"'")
+            .setTimestamp();
+        message.channel.send(Embed);
+        return false;
     }
 
     static parseCommand(message): any {
