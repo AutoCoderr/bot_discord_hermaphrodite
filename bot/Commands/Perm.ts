@@ -10,6 +10,7 @@ interface IPerm {
 }
 
 export default class Perm extends Command {
+
     static match(message) {
         return message.content.split(" ")[0] == config.command_prefix+"perm";
     }
@@ -18,11 +19,16 @@ export default class Perm extends Command {
         const args: IPerm = this.parseCommand(message);
 
         // check if arguments are correctly filled
-        if (typeof(args[0]) == "undefined" || (args[0] != "add" && args[0] != "set" && args[0] != "show")) {
+        if (typeof(args[0]) == "undefined" || (args[0] != "add" && args[0] != "set" && args[0] != "show" && args[0] != "help")) {
             this.sendErrors(message, {
                 name: "Incorrect parametter",
-                value: "Incorrect parametter, please type 'add', 'set' or 'show'"
-            }, this.help);
+                value: "Incorrect parametter, please type 'add', 'set', 'show', or 'help'"
+            });
+            return;
+        }
+
+        if (args[0] == "help") {
+            this.displayHelp(message);
             return;
         }
 
@@ -32,14 +38,14 @@ export default class Perm extends Command {
             this.sendErrors(message, {
                 name: "Command name missing",
                 value: "The command name is not specified"
-            }, this.help);
+            });
             return;
         }
-        if (!this.existingCommands.includes(args[1])) {
+        if (!Object.keys(this.existingCommands).includes(args[1])) {
             this.sendErrors(message, {
                 name: "Command name doesn't exist",
                 value: "The command '"+args[1]+"' doesn't exist"
-            }, this.help);
+            });
             return;
         }
 
@@ -86,7 +92,7 @@ export default class Perm extends Command {
             this.sendErrors(message, {
                 name: "Roles missing",
                 value: "The roles are not specified"
-            }, this.help);
+            });
             return;
         }
 
@@ -104,7 +110,7 @@ export default class Perm extends Command {
                 this.sendErrors(message, {
                     name: "Role badly specified",
                     value: "You to specified an existing role, with the '@'"
-                }, this.help);
+                });
                 return;
             }
 
@@ -114,7 +120,7 @@ export default class Perm extends Command {
                 this.sendErrors(message, {
                     name: "Role doesn't exist",
                     value: "A specified role doesn't exist"
-                }, this.help);
+                });
                 return;
             }
             rolesId.push(roleId);
@@ -139,7 +145,7 @@ export default class Perm extends Command {
                         this.sendErrors(message, {
                             name: "Role already added",
                             value: "That role is already attributed for that command"
-                        }, this.help);
+                        });
                         return;
                     }
                 }

@@ -26,6 +26,10 @@ export default class NotifyOnReact extends Command {
         let channelToWrite;
         let emoteToReact;
 
+        if (args[0] == "help") {
+            this.displayHelp(message);
+            return;
+        }
 
         if (typeof(args.listen) == "undefined") {
             errors.push({name: "--listen missing", value: "--listen missing in your command"});
@@ -86,7 +90,7 @@ export default class NotifyOnReact extends Command {
         }
 
         if (errors.length > 0) {
-            this.sendErrors(message,errors,this.help);
+            this.sendErrors(message,errors);
             return;
         }
 
