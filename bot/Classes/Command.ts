@@ -1,26 +1,80 @@
+import config from "../config";
 import * as Discord from "discord.js";
+import Permissions, { IPermissions } from "../Models/Permissions";
 
 export default class Command {
-    static sendErrors(message, errors, help: null|Function = null){
+    static existingCommands = {
+        notifyOnReact : "Pour envoyer un message sur un channel indiqué, quand une réaction à été detectée sur un autre message\n"+config.command_prefix+"notifyOnReact help",
+        perm: "Pour configurer les permissions\n"+config.command_prefix+"perm help"
+    };
+
+    static sendErrors(message, errors: Object|Array<Object>, displayHelp: boolean = true){
+        if (!(errors instanceof Array)) {
+            errors = [errors];
+        }
         const commandName = message.content.split(" ")[0];
         let Embed = new Discord.MessageEmbed()
             .setColor('#0099ff')
             .setTitle('Error in '+commandName)
-            //.setAuthor('Forbid', 'https://image.noelshack.com/fichiers/2020/34/7/1598188353-icons8-jason-voorhees-500.png')
             .setDescription("There is some errors in your command")
-            //.setThumbnail('https://image.noelshack.com/fichiers/2020/34/7/1598188353-icons8-jason-voorhees-500.png')
             .setTimestamp()
 
+        // @ts-ignore
         for (let error of errors) {
             Embed.addFields(
-                error,
+                error
             )
         }
-        if (help) {
-            help(Embed);
+        if (displayHelp) {
+            this.help(Embed);
         }
 
         message.channel.send(Embed);
+    }
+
+    static displayHelp(message) {
+        const commandName = message.content.split(" ")[0];
+        let Embed = new Discord.MessageEmbed()
+            .setColor('#0099ff')
+            .setTitle('Aide pour la commande '+commandName)
+            .setTimestamp()
+        this.help(Embed);
+        message.channel.send(Embed);
+    }
+
+    static help(Embed) {} // To be overloaded
+
+    static async check(message,bot) {
+        if (this.match(message) && await this.checkPermissions(message, message.content.split(" ")[0].slice(1))) {
+            this.action(message, bot);
+        }
+    }
+
+    static action(message, bot) {} // To be overloaded
+
+    static match(message) { // To be overloaded
+        return true;
+    }
+
+    static async checkPermissions(message, commandName, displayMsg = true) {
+
+        if(config.roots.includes(message.author.id) || message.member.hasPermission("ADMINISTRATOR")) return true;
+
+        const permission: IPermissions = await Permissions.findOne({serverId: message.guild.id, command: commandName});
+        if (permission != null) {
+            for (let roleId of message.member._roles) {
+                if (permission.roles.includes(roleId)) return true;
+            }
+        }
+        if (displayMsg) {
+            let Embed = new Discord.MessageEmbed()
+                .setColor('#0099ff')
+                .setTitle('Permission denied')
+                .setDescription("Vous n'avez pas le droit d'executer la commande '" + commandName + "'")
+                .setTimestamp();
+            message.channel.send(Embed);
+        }
+        return false;
     }
 
     static parseCommand(message): any {
@@ -35,9 +89,13 @@ export default class Command {
         }
 
         for (let i=0;i<args.length;i++) {
-            if (i < args.length-1 && args[i]+args[i+1] == "--") {
+            if (args[i] == "-") {
                 let attr = "";
-                i += 2;
+                if (args[i]+args[i+1] == "--")
+                    i += 2;
+                else
+                    i += 1;
+
                 while (i < args.length && args[i] != " ") {
                     attr += args[i];
                     i += 1;
@@ -45,35 +103,48 @@ export default class Command {
                 while (i < args.length && args[i] == " ") {
                     i += 1;
                 }
-                let values: Array<string> = [];
-                while (i < args.length && args[i] != "-") {
-                    if (i < args.length && (args[i] == "'" || args[i] == '"')) {
-                        let quote = args[i];
-                        let value = "";
-                        i += 1;
-                        while (i < args.length && args[i] != quote) {
-                            value += args[i];
-                            i += 1;
-                        }
-                        values.push(value);
-                    } else if (args[i] != " ") {
-                        let value = "";
-                        while (i < args.length && args[i] != " ") {
-                            value += args[i];
-                            i += 1;
-                        }
-                        values.push(value);
-                    }
+                if (i < args.length && (args[i] == "'" || args[i] == '"')) {
+                    let quote = args[i];
+                    let value = "";
                     i += 1;
-                }
-                if (values.length == 0) {
+                    while (i < args.length && args[i] != quote) {
+                        value += args[i];
+                        i += 1;
+                    }
+                    argsObject[attr] = value;
+                } else if (i < args.length && (args[i]+args[i+1] == "--")) {
                     this.sendErrors(message, [{
                         name: "Error syntax", value: "You cannot put an argument directly after another argument"
-                    }]);
+                    }], false);
                     return false;
+                } else {
+                    let value = "";
+                    while (i < args.length && args[i] != " ") {
+                        value += args[i];
+                        i += 1;
+                    }
+                    argsObject[attr] = value;
                 }
-                argsObject[attr] = values.length == 1 ? values[0] : values;
-                i -=1;
+            } else if (args[i] != " ") {
+                let value = "";
+                if (i < args.length && (args[i] == "'" || args[i] == '"')) {
+                    let quote = args[i];
+                    i += 1;
+                    while (i < args.length && args[i] != quote) {
+                        value += args[i];
+                        i += 1;
+                    }
+                } else {
+                    while (i < args.length && args[i] != " ") {
+                        value += args[i];
+                        i += 1;
+                    }
+                }
+                let j = 0;
+                while (typeof(argsObject[j]) != "undefined") {
+                    j += 1;
+                }
+                argsObject[j] = value;
             }
         }
         return argsObject;

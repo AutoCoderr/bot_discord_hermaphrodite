@@ -4,19 +4,19 @@ import * as Discord from "discord.js";
 
 import HelloWorld from "./Commands/HelloWorld";
 import NotifyOnReact from "./Commands/NotifyOnReact";
+import Perm from "./Commands/Perm";
+import Help from "./Commands/Help";
 
 
 
 const bot = new Discord.Client();
 
-const commands = [ HelloWorld, NotifyOnReact ];
+const commands = [ HelloWorld, NotifyOnReact, Perm, Help ];
 
 // check all commands
 bot.on('message', message => {
     for (let command of commands) {
-        if (command.match(message)) {
-            command.action(message, bot);
-        }
+        command.check(message, bot);
     }
 });
 
