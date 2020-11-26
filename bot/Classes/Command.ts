@@ -5,7 +5,8 @@ import Permissions, { IPermissions } from "../Models/Permissions";
 export default class Command {
     static existingCommands = {
         notifyOnReact : "Pour envoyer un message sur un channel indiqué, quand une réaction à été detectée sur un autre message\n"+config.command_prefix+"notifyOnReact help",
-        perm: "Pour configurer les permissions\n"+config.command_prefix+"perm help"
+        perm: "Pour configurer les permissions\n"+config.command_prefix+"perm help",
+        history: "Pour accéder à l'historique des commandes\n"+config.command_prefix+"history help"
     };
 
     static sendErrors(message, errors: Object|Array<Object>, displayHelp: boolean = true){
@@ -103,27 +104,26 @@ export default class Command {
                 while (i < args.length && args[i] == " ") {
                     i += 1;
                 }
-                if (i < args.length && (args[i] == "'" || args[i] == '"')) {
-                    let quote = args[i];
-                    let value = "";
-                    i += 1;
-                    while (i < args.length && args[i] != quote) {
-                        value += args[i];
+                if (args[i] != "-") {
+                    if (i < args.length && (args[i] == "'" || args[i] == '"')) {
+                        let quote = args[i];
+                        let value = "";
                         i += 1;
+                        while (i < args.length && args[i] != quote) {
+                            value += args[i];
+                            i += 1;
+                        }
+                        argsObject[attr] = value != "" ? value : true;
+                    } else {
+                        let value = "";
+                        while (i < args.length && args[i] != " ") {
+                            value += args[i];
+                            i += 1;
+                        }
+                        argsObject[attr] = value != "" ? value : true;
                     }
-                    argsObject[attr] = value;
-                } else if (i < args.length && (args[i]+args[i+1] == "--")) {
-                    this.sendErrors(message, [{
-                        name: "Error syntax", value: "You cannot put an argument directly after another argument"
-                    }], false);
-                    return false;
                 } else {
-                    let value = "";
-                    while (i < args.length && args[i] != " ") {
-                        value += args[i];
-                        i += 1;
-                    }
-                    argsObject[attr] = value;
+                    argsObject[attr] = true;
                 }
             } else if (args[i] != " ") {
                 let value = "";

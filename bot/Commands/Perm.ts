@@ -167,7 +167,7 @@ export default class Perm extends Command {
                     "Troisième argument : Le ou les rôles autorisés à taper cette commande"
             })
             .addFields({
-               name: "Exemple :",
+               name: "Exemples :",
                value: config.command_prefix+"perm add notifyOnReact @Admins\n"+
                     "Ou "+config.command_prefix+"perm set notifyOnReact '@Admins, @Maintainers'\n"+
                     "Ou "+config.command_prefix+"perm show notifyOnReact"

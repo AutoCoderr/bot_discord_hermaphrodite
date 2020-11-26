@@ -6,12 +6,13 @@ import HelloWorld from "./Commands/HelloWorld";
 import NotifyOnReact from "./Commands/NotifyOnReact";
 import Perm from "./Commands/Perm";
 import Help from "./Commands/Help";
+import HistoryCmd from "./Commands/HistoryCmd";
 
 
 
 const bot = new Discord.Client();
 
-const commands = [ HelloWorld, NotifyOnReact, Perm, Help ];
+const commands = [ HelloWorld, NotifyOnReact, Perm, Help, HistoryCmd ];
 
 // check all commands
 bot.on('message', message => {
