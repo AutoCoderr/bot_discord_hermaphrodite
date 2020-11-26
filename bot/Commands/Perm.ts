@@ -11,7 +11,7 @@ interface IPerm {
 
 export default class Perm extends Command {
     static match(message) {
-        return message.content.startsWith(config.command_prefix+"perm");
+        return message.content.split(" ")[0] == config.command_prefix+"perm";
     }
 
     static async action(message, bot) { //%perm set commandName @role

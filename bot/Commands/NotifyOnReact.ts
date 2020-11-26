@@ -12,7 +12,7 @@ interface iNotifyOnReact extends Document {
 export default class NotifyOnReact extends Command {
 
     static match(message) {
-        return message.content.startsWith(config.command_prefix+"notifyOnReact");
+        return message.content.split(" ")[0] == config.command_prefix+"notifyOnReact";
     }
 
     static async action(message, bot) { // notifyOnReact --listen #channel/messageId --message '$user$ a réagit à ce message' -e :yoyo: --writeChannel #channelB

@@ -4,7 +4,7 @@ import Command from "../Classes/Command";
 export default class HelloWorld extends Command {
 
     static match(message) {
-        return message.content.startsWith(config.command_prefix+"hello");
+        return message.content.split(" ")[0] == config.command_prefix+"hello";
     }
 
     static action(message, bot) {
