@@ -27,9 +27,9 @@ export default class Help extends Command {
         } else {
             for (let commandName of allowedCommands) {
                 Embed.addFields({
-                    name: config.command_prefix+"commandName :",
+                    name: config.command_prefix+commandName+" :",
                     value: this.existingCommands[commandName]
-                })
+                });
             }
         }
         message.channel.send(Embed);
