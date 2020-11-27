@@ -7,7 +7,8 @@ export interface IHistory extends Document {
     commandName: string;
     command: string;
     dateTime: string;
-    channelId: string
+    channelId: string;
+    userId: string;
     serverId: string;
 }
 
@@ -16,6 +17,7 @@ const HistorySchema: Schema = new Schema({
     command: { type: String, required: true},
     dateTime: { type: String, required: true},
     channelId: { type: String, required: true},
+    userId: { type: String, required: true},
     serverId: { type: String, required: true}
 });
 

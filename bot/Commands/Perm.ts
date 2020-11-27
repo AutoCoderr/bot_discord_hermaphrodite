@@ -24,12 +24,12 @@ export default class Perm extends Command {
                 name: "Incorrect parametter",
                 value: "Incorrect parametter, please type 'add', 'set', 'show', or 'help'"
             });
-            return;
+            return false;
         }
 
         if (args[0] == "help") {
             this.displayHelp(message);
-            return;
+            return true;
         }
 
         const action = args[0];
@@ -39,14 +39,14 @@ export default class Perm extends Command {
                 name: "Command name missing",
                 value: "The command name is not specified"
             });
-            return;
+            return false;
         }
         if (!Object.keys(this.existingCommands).includes(args[1])) {
             this.sendErrors(message, {
                 name: "Command name doesn't exist",
                 value: "The command '"+args[1]+"' doesn't exist"
             });
-            return;
+            return false;
         }
 
         const commandName = args[1];
@@ -83,7 +83,7 @@ export default class Perm extends Command {
                 });
             }
             message.channel.send(Embed);
-            return;
+            return true;
         }
 
 
@@ -93,7 +93,7 @@ export default class Perm extends Command {
                 name: "Roles missing",
                 value: "The roles are not specified"
             });
-            return;
+            return false;
         }
 
 
@@ -111,7 +111,7 @@ export default class Perm extends Command {
                     name: "Role badly specified",
                     value: "You to specified an existing role, with the '@'"
                 });
-                return;
+                return false;
             }
 
             roleId = roleId.split(">")[0];
@@ -121,7 +121,7 @@ export default class Perm extends Command {
                     name: "Role doesn't exist",
                     value: "A specified role doesn't exist"
                 });
-                return;
+                return false;
             }
             rolesId.push(roleId);
         }
@@ -146,7 +146,7 @@ export default class Perm extends Command {
                             name: "Role already added",
                             value: "That role is already attributed for that command"
                         });
-                        return;
+                        return false;
                     }
                 }
                 permission.roles = [...permission.roles, ...rolesId]
@@ -156,6 +156,7 @@ export default class Perm extends Command {
             await permission.save();
         }
         message.channel.send("Permission added or setted successfully!");
+        return true;
     }
 
     static help(Embed) {

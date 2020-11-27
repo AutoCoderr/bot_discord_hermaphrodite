@@ -17,7 +17,7 @@ export default class NotifyOnReact extends Command {
 
     static async action(message, bot) { // notifyOnReact --listen #channel/messageId --message '$user$ a réagit à ce message' -e :yoyo: --writeChannel #channelB
         const args: iNotifyOnReact = this.parseCommand(message);
-        if (!args) return;
+        if (!args) return false;
         let errors: Array<Object> = [];
 
         let channelToListen;
@@ -28,7 +28,7 @@ export default class NotifyOnReact extends Command {
 
         if (args[0] == "help") {
             this.displayHelp(message);
-            return;
+            return true;
         }
 
         if (typeof(args.listen) == "undefined") {
@@ -91,12 +91,13 @@ export default class NotifyOnReact extends Command {
 
         if (errors.length > 0) {
             this.sendErrors(message,errors);
-            return;
+            return false;
         }
 
         this.reactingAndNotifyOnMessage(messageToListen, channelToWrite, messageToWrite, extractEmoteName(emoteToReact));
 
         message.channel.send("Command sucessfully executed, all reactions to this message will be notified");
+        return true;
     }
 
     static async reactingAndNotifyOnMessage(messageToListen, channelToWrite, messageToWrite, emoteName) {

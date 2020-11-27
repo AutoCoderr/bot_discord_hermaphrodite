@@ -6,8 +6,9 @@ export default class HistoryCmd extends Command {
         return message.content.split(" ")[0] == config.command_prefix+"history";
     }
 
-    static action(message, bot) {
+    static async action(message, bot) {
         this.displayHelp(message);
+        return true;
     }
 
     static help(Embed) {
@@ -22,4 +23,6 @@ export default class HistoryCmd extends Command {
                 value: config.command_prefix+"history --command notifyOnReact -l 10 --channel #blabla"
             })
     }
+
+    static async saveHistory(message) {} // overload saveHistory of Command class to save nothing in the history
 }

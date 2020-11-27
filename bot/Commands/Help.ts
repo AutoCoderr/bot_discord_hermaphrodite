@@ -33,7 +33,10 @@ export default class Help extends Command {
             }
         }
         message.channel.send(Embed);
+        return true;
     }
+
+    static async saveHistory(message) {} // overload saveHistory of Command class to save nothing in the history
 
     static async checkPermissions(message) { // overload checkPermission of Command class to permit all users to execute the help command
         return true;

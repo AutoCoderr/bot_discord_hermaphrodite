@@ -1,6 +1,7 @@
 import config from "../config";
 import * as Discord from "discord.js";
 import Permissions, { IPermissions } from "../Models/Permissions";
+import History, {IHistory} from "../Models/History";
 
 export default class Command {
     static existingCommands = {
@@ -43,15 +44,41 @@ export default class Command {
         message.channel.send(Embed);
     }
 
-    static help(Embed) {} // To be overloaded
-
     static async check(message,bot) {
         if (this.match(message) && await this.checkPermissions(message, message.content.split(" ")[0].slice(1))) {
-            this.action(message, bot);
+            if (await this.action(message, bot)) {
+                this.saveHistory(message);
+            }
         }
     }
 
-    static action(message, bot) {} // To be overloaded
+    static saveHistory(message) {
+        const date = new Date();
+
+        const commandName = message.content.slice(1).split(" ")[0],
+            command = message.content,
+            dateTime = date.getFullYear()+"-"+(date.getMonth()+1)+"-"+date.getDate()+" "+date.getHours()+":"+date.getMinutes()+":"+date.getSeconds(),
+            channelId = message.channel.id,
+            userId = message.member.id,
+            serverId = message.guild.id;
+
+        const history: IHistory = {
+            commandName,
+            command,
+            dateTime,
+            channelId,
+            userId,
+            serverId
+        }
+
+        History.create(history);
+    }
+
+    static help(Embed) {} // To be overloaded
+
+    static async action(message, bot) { // To be overloaded
+        return true;
+    }
 
     static match(message) { // To be overloaded
         return true;
