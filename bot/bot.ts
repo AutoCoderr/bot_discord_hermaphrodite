@@ -1,22 +1,18 @@
 import config from "./config";
 
+import { existingCommands } from "./Classes/CommandsDescription";
+
 import * as Discord from "discord.js";
 
-import HelloWorld from "./Commands/HelloWorld";
-import NotifyOnReact from "./Commands/NotifyOnReact";
-import Perm from "./Commands/Perm";
-import Help from "./Commands/Help";
-import HistoryCmd from "./Commands/HistoryCmd";
 
 
 
 const bot = new Discord.Client();
 
-const commands = [ HelloWorld, NotifyOnReact, Perm, Help, HistoryCmd ];
-
 // check all commands
 bot.on('message', message => {
-    for (let command of commands) {
+    for (let commandName in existingCommands) {
+        const command = existingCommands[commandName].commandClass;
         command.check(message, bot);
     }
 });

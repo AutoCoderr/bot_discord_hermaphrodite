@@ -1,11 +1,10 @@
 import Command from "../Classes/Command";
+import { existingCommands } from "../Classes/CommandsDescription";
 import * as Discord from "discord.js";
 import config from "../config";
 
-export default class Help extends Command {
-    static match(message) {
-        return message.content.split(" ")[0] == config.command_prefix+"help"
-    }
+export class Help extends Command {
+    static commandName = "help";
 
     static async action(message,bot) {
         let Embed = new Discord.MessageEmbed()
@@ -14,8 +13,8 @@ export default class Help extends Command {
             .setDescription("Liste de toutes les commandes :")
             .setTimestamp()
         let allowedCommands: Array<string> = [];
-        for (let commandName in this.existingCommands) {
-            if (await super.checkPermissions(message,commandName,false)) {
+        for (let commandName in existingCommands) {
+            if (existingCommands[commandName].display && await existingCommands[commandName].commandClass.checkPermissions(message,false)) {
                 allowedCommands.push(commandName);
             }
         }
@@ -28,8 +27,8 @@ export default class Help extends Command {
             for (let commandName of allowedCommands) {
                 Embed.addFields({
                     name: config.command_prefix+commandName+" :",
-                    value: this.existingCommands[commandName]
-                })
+                    value: existingCommands[commandName].msg
+                });
             }
         }
         message.channel.send(Embed);
@@ -38,7 +37,7 @@ export default class Help extends Command {
 
     static async saveHistory(message) {} // overload saveHistory of Command class to save nothing in the history
 
-    static async checkPermissions(message, commandName, displayMsg) { // overload checkPermission of Command class to permit all users to execute the help command
+    static async checkPermissions(message, displayMsg) { // overload checkPermission of Command class to permit all users to execute the help command
         return true;
     }
 }

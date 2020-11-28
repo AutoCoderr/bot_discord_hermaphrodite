@@ -1,11 +1,10 @@
 import config from "../config";
 import Command from "../Classes/Command";
+import { existingCommands } from "../Classes/CommandsDescription";
 import History, { IHistory } from "../Models/History";
 
-export default class HistoryCmd extends Command {
-    static match(message) {
-        return message.content.split(" ")[0] == config.command_prefix+"history";
-    }
+export class HistoryCmd extends Command {
+    static commandName = "history"
 
     static async action(message, bot) {
         const args = this.parseCommand(message);
@@ -21,9 +20,9 @@ export default class HistoryCmd extends Command {
             errors.push({name: "-c or --command", value: "Please use -c or --command but not the both"});
         } else if (typeof(args.c) != "undefined" || typeof(args.command) != "undefined") {
             commandName = typeof(args.c) != "undefined" ? args.c : args.command;
-            if (!Object.keys(this.existingCommands).includes(<string>commandName)) {
+            if (!Object.keys(existingCommands).includes(<string>commandName) || !existingCommands[<string>commandName].display) {
                 errors.push({name: "That command can't be grepped", value: "'"+config.command_prefix+commandName+"' command can't be grepped in "+config.command_prefix+"history"});
-            } else if (!await super.checkPermissions(message,commandName,false)) {
+            } else if (!await existingCommands[<string>commandName].commandClass.checkPermissions(message,false)) {
                 errors.push({name: "You are not allowed", value: "You are not allowed to check '"+config.command_prefix+commandName+"'"});
             }
         }
@@ -119,8 +118,8 @@ export default class HistoryCmd extends Command {
             where.commandName = commandName;
         } else {
             where.commandName = { $nin: [] };
-            for (let aCommand in this.existingCommands) {
-                if (!await super.checkPermissions(message,aCommand,false)) {
+            for (let aCommand in existingCommands) {
+                if (!await existingCommands[aCommand].commandClass.checkPermissions(message,false)) {
                     where.commandName.$nin.push(aCommand);
                 }
             }
@@ -154,7 +153,7 @@ export default class HistoryCmd extends Command {
 
     static async saveHistory(message) {} // overload saveHistory of Command class to save nothing in the history
 
-    static async checkPermissions(message, commandName, displayMsg) { // overload checkPermission of Command class to permit all users to execute the help command
+    static async checkPermissions(message, displayMsg) { // overload checkPermission of Command class to permit all users to execute the help command
         return true;
     }
 }

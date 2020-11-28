@@ -1,5 +1,6 @@
 import config from "../config";
 import Command from "../Classes/Command";
+import { existingCommands } from "../Classes/CommandsDescription";
 import Permissions, { IPermissions } from "../Models/Permissions";
 import Discord from "discord.js";
 
@@ -9,11 +10,8 @@ interface IPerm {
     2: string; // role to add or set
 }
 
-export default class Perm extends Command {
-
-    static match(message) {
-        return message.content.split(" ")[0] == config.command_prefix+"perm";
-    }
+export class Perm extends Command {
+    static commandName = "perm";
 
     static async action(message, bot) { //%perm set commandName @role
         const args: IPerm = this.parseCommand(message);
@@ -41,7 +39,7 @@ export default class Perm extends Command {
             });
             return false;
         }
-        if (!Object.keys(this.existingCommands).includes(args[1])) {
+        if (!Object.keys(existingCommands).includes(args[1]) || !existingCommands[args[1]].display) {
             this.sendErrors(message, {
                 name: "Command name doesn't exist",
                 value: "The command '"+args[1]+"' doesn't exist"

@@ -9,11 +9,8 @@ interface iNotifyOnReact extends Document {
     e: string; // emote
 }
 
-export default class NotifyOnReact extends Command {
-
-    static match(message) {
-        return message.content.split(" ")[0] == config.command_prefix+"notifyOnReact";
-    }
+export class NotifyOnReact extends Command {
+    static commandName = "notifyOnReact";
 
     static async action(message, bot) { // notifyOnReact --listen #channel/messageId --message '$user$ a réagit à ce message' -e :yoyo: --writeChannel #channelB
         const args: iNotifyOnReact = this.parseCommand(message);

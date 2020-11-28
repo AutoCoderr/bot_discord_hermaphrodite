@@ -5,11 +5,13 @@ import Permissions, { IPermissions } from "../Models/Permissions";
 import History, {IHistory} from "../Models/History";
 
 export default class Command {
-    static existingCommands = {
-        notifyOnReact : "Pour envoyer un message sur un channel indiqué, quand une réaction à été detectée sur un autre message\n"+config.command_prefix+"notifyOnReact help",
-        perm: "Pour configurer les permissions\n"+config.command_prefix+"perm help",
-        history: "Pour accéder à l'historique des commandes\n"+config.command_prefix+"history help"
-    };
+
+    static commandName: string|null = null;
+
+    static match(message) {
+        if (this.commandName == null) return false;
+        return message.content.split(" ")[0] == config.command_prefix+this.commandName;
+    }
 
     static sendErrors(message, errors: Object|Array<Object>, displayHelp: boolean = true){
         if (!(errors instanceof Array)) {
@@ -46,7 +48,7 @@ export default class Command {
     }
 
     static async check(message,bot) {
-        if (this.match(message) && await this.checkPermissions(message, message.content.split(" ")[0].slice(1))) {
+        if (this.match(message) && await this.checkPermissions(message)) {
             if (await this.action(message, bot)) {
                 this.saveHistory(message);
             }
@@ -82,7 +84,8 @@ export default class Command {
         History.create(history);
     }
 
-    static async checkPermissions(message, commandName, displayMsg = true) {
+    static async checkPermissions(message, displayMsg = true) {
+        const commandName = this.commandName;
 
         if(config.roots.includes(message.author.id) || message.member.hasPermission("ADMINISTRATOR")) return true;
 
@@ -178,10 +181,6 @@ export default class Command {
     static help(Embed) {} // To be overloaded
 
     static async action(message, bot) { // To be overloaded
-        return true;
-    }
-
-    static match(message) { // To be overloaded
         return true;
     }
 }
