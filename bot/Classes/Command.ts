@@ -1,5 +1,6 @@
 import config from "../config";
 import * as Discord from "discord.js";
+import { addMissingZero } from "./OtherFunctions";
 import Permissions, { IPermissions } from "../Models/Permissions";
 import History, {IHistory} from "../Models/History";
 
@@ -55,9 +56,16 @@ export default class Command {
     static saveHistory(message) {
         const date = new Date();
 
+        const year = addMissingZero(date.getFullYear(), 4),
+            month = addMissingZero(date.getMonth()+1),
+            day = addMissingZero(date.getDate()),
+            hour = addMissingZero(date.getHours()),
+            minute = addMissingZero(date.getMinutes()),
+            seconds = addMissingZero(date.getSeconds());
+
         const commandName = message.content.slice(1).split(" ")[0],
             command = message.content,
-            dateTime = date.getFullYear()+"-"+(date.getMonth()+1)+"-"+date.getDate()+" "+date.getHours()+":"+date.getMinutes()+":"+date.getSeconds(),
+            dateTime = year+"-"+month+"-"+day+" "+hour+":"+minute+":"+seconds,
             channelId = message.channel.id,
             userId = message.member.id,
             serverId = message.guild.id;
@@ -72,16 +80,6 @@ export default class Command {
         }
 
         History.create(history);
-    }
-
-    static help(Embed) {} // To be overloaded
-
-    static async action(message, bot) { // To be overloaded
-        return true;
-    }
-
-    static match(message) { // To be overloaded
-        return true;
     }
 
     static async checkPermissions(message, commandName, displayMsg = true) {
@@ -175,5 +173,15 @@ export default class Command {
             }
         }
         return argsObject;
+    }
+
+    static help(Embed) {} // To be overloaded
+
+    static async action(message, bot) { // To be overloaded
+        return true;
+    }
+
+    static match(message) { // To be overloaded
+        return true;
     }
 }
