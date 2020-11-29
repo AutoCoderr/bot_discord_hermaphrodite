@@ -2,6 +2,7 @@ import config from "../config";
 import Command from "../Classes/Command";
 import { existingCommands } from "../Classes/CommandsDescription";
 import History, { IHistory } from "../Models/History";
+import Discord from "discord.js";
 
 export class HistoryCmd extends Command {
     static commandName = "history"
@@ -101,13 +102,8 @@ export class HistoryCmd extends Command {
             this.sendErrors(message,errors);
             return false;
         }
-        console.log("\n\ncommandName => "+(commandName == null ? "all" : commandName));
-        console.log("sort => "+sort);
-        console.log("limit => "+limit);
-        console.log("channel => "+(channelId == null ? 'all' : channelId));
-        console.log("user => "+(userId == null ? 'all' : userId));
 
-        let where:any = {};
+        let where:any = {serverId: message.guild.id};
         if (userId != null) {
             where.userId = userId
         }
@@ -125,15 +121,33 @@ export class HistoryCmd extends Command {
             }
         }
 
-        console.log(where);
-
         const histories:Array<IHistory> = await History.find(where).limit(limit).sort({dateTime: sort});
 
-        console.log(histories);
+        let Embed = new Discord.MessageEmbed()
+            .setColor('#0099ff')
+            .setTitle("L'historique des commands :")
+            .setDescription("Liste des commandes qui ont été tapées :")
+            .setTimestamp();
+        if (histories.length > 0) {
+            for (let history of histories) {
+                const user = message.guild.members.cache.get(history.userId);
+                const channel = message.guild.channels.cache.get(history.channelId);
 
-        message.channel.send("Command correctly typed");
+                const userName = user != undefined ? user.nickname : "unknown";
+                const channelName = channel != undefined ? channel.name : "unknown"
 
-
+                Embed.addFields({
+                    name: "[" + history.dateTime + "] ("+history.commandName+") "+userName+" sur #"+channelName+" :",
+                    value: history.command
+                });
+            }
+        } else {
+            Embed.addFields({
+                name: "Aucun historique",
+                value: "Aucun élément n'a été trouvé dans l'historique"
+            })
+        }
+        message.channel.send(Embed);
         return true;
     }
 
@@ -152,8 +166,4 @@ export class HistoryCmd extends Command {
     }
 
     static async saveHistory(message) {} // overload saveHistory of Command class to save nothing in the history
-
-    static async checkPermissions(message, displayMsg) { // overload checkPermission of Command class to permit all users to execute the help command
-        return true;
-    }
 }
