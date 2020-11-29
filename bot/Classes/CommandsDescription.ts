@@ -2,6 +2,7 @@ import config from "../config";
 import { NotifyOnReact } from "../Commands/NotifyOnReact";
 import { Perm } from "../Commands/Perm";
 import { HistoryCmd } from "../Commands/HistoryCmd";
+import { HistoryExec } from "../Commands/HistoryExec";
 import { HelloWorld } from "../Commands/HelloWorld";
 import { Help } from "../Commands/Help";
 
@@ -19,6 +20,11 @@ export const existingCommands = {
     history: {
         msg: "Pour accéder à l'historique des commandes\n"+config.command_prefix+"history help",
         commandClass: HistoryCmd,
+        display: true
+    },
+    historyExec: {
+        msg: "Pour executer des commandes de l'historique\n"+config.command_prefix+"historyExec help",
+        commandClass: HistoryExec,
         display: true
     },
     hello: {
