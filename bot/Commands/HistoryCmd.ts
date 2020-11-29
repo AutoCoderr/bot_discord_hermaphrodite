@@ -1,6 +1,6 @@
 import config from "../config";
 import Command from "../Classes/Command";
-import { getHistoru } from "../Classes/OtherFunctions";
+import { getHistory } from "../Classes/OtherFunctions";
 import Discord from "discord.js";
 
 export class HistoryCmd extends Command {
@@ -14,7 +14,7 @@ export class HistoryCmd extends Command {
             return true;
         }
 
-        const response = await getHistoru(message,args);
+        const response = await getHistory(message,args);
 
         if (response.errors.length > 0) {
             this.sendErrors(message, response.errors);
@@ -38,7 +38,7 @@ export class HistoryCmd extends Command {
                 const channelName = channel != undefined ? channel.name : "unknown"
 
                 Embed.addFields({
-                    name: "[" + history.dateTime + "] ("+history.commandName+") "+userName+" sur #"+channelName+" :",
+                    name: "[" + history.dateTime + "] "+userName+" sur #"+channelName+" :",
                     value: history.command
                 });
             }

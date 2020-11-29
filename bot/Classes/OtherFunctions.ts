@@ -14,7 +14,7 @@ export function addMissingZero(number, n = 2) {
     return number;
 }
 
-export async function getHistoru(message,args) {
+export async function getHistory(message,args) {
     let errors: Array<Object> = [];
 
     let commandName: null|string = null;
