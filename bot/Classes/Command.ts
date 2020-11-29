@@ -1,12 +1,17 @@
 import config from "../config";
 import * as Discord from "discord.js";
+import { addMissingZero } from "./OtherFunctions";
 import Permissions, { IPermissions } from "../Models/Permissions";
+import History, {IHistory} from "../Models/History";
 
 export default class Command {
-    static existingCommands = {
-        notifyOnReact : "Pour envoyer un message sur un channel indiqué, quand une réaction à été detectée sur un autre message\n"+config.command_prefix+"notifyOnReact help",
-        perm: "Pour configurer les permissions\n"+config.command_prefix+"perm help"
-    };
+
+    static commandName: string|null = null;
+
+    static match(message) {
+        if (this.commandName == null) return false;
+        return message.content.split(" ")[0] == config.command_prefix+this.commandName;
+    }
 
     static sendErrors(message, errors: Object|Array<Object>, displayHelp: boolean = true){
         if (!(errors instanceof Array)) {
@@ -42,21 +47,45 @@ export default class Command {
         message.channel.send(Embed);
     }
 
-    static help(Embed) {} // To be overloaded
-
     static async check(message,bot) {
-        if (this.match(message) && await this.checkPermissions(message, message.content.split(" ")[0].slice(1))) {
-            this.action(message, bot);
+        if (this.match(message) && await this.checkPermissions(message)) {
+            if (await this.action(message, bot)) {
+                this.saveHistory(message);
+            }
         }
     }
 
-    static action(message, bot) {} // To be overloaded
+    static saveHistory(message) {
+        const date = new Date();
 
-    static match(message) { // To be overloaded
-        return true;
+        const year = addMissingZero(date.getFullYear(), 4),
+            month = addMissingZero(date.getMonth()+1),
+            day = addMissingZero(date.getDate()),
+            hour = addMissingZero(date.getHours()),
+            minute = addMissingZero(date.getMinutes()),
+            seconds = addMissingZero(date.getSeconds());
+
+        const commandName = message.content.slice(1).split(" ")[0],
+            command = message.content,
+            dateTime = year+"-"+month+"-"+day+" "+hour+":"+minute+":"+seconds,
+            channelId = message.channel.id,
+            userId = message.member.id,
+            serverId = message.guild.id;
+
+        const history: IHistory = {
+            commandName,
+            command,
+            dateTime,
+            channelId,
+            userId,
+            serverId
+        }
+
+        History.create(history);
     }
 
-    static async checkPermissions(message, commandName, displayMsg = true) {
+    static async checkPermissions(message, displayMsg = true) {
+        const commandName = this.commandName;
 
         if(config.roots.includes(message.author.id) || message.member.hasPermission("ADMINISTRATOR")) return true;
 
@@ -103,27 +132,26 @@ export default class Command {
                 while (i < args.length && args[i] == " ") {
                     i += 1;
                 }
-                if (i < args.length && (args[i] == "'" || args[i] == '"')) {
-                    let quote = args[i];
-                    let value = "";
-                    i += 1;
-                    while (i < args.length && args[i] != quote) {
-                        value += args[i];
+                if (args[i] != "-") {
+                    if (i < args.length && (args[i] == "'" || args[i] == '"')) {
+                        let quote = args[i];
+                        let value = "";
                         i += 1;
+                        while (i < args.length && args[i] != quote) {
+                            value += args[i];
+                            i += 1;
+                        }
+                        argsObject[attr] = value != "" ? value : true;
+                    } else {
+                        let value = "";
+                        while (i < args.length && args[i] != " ") {
+                            value += args[i];
+                            i += 1;
+                        }
+                        argsObject[attr] = value != "" ? value : true;
                     }
-                    argsObject[attr] = value;
-                } else if (i < args.length && (args[i]+args[i+1] == "--")) {
-                    this.sendErrors(message, [{
-                        name: "Error syntax", value: "You cannot put an argument directly after another argument"
-                    }], false);
-                    return false;
                 } else {
-                    let value = "";
-                    while (i < args.length && args[i] != " ") {
-                        value += args[i];
-                        i += 1;
-                    }
-                    argsObject[attr] = value;
+                    argsObject[attr] = true;
                 }
             } else if (args[i] != " ") {
                 let value = "";
@@ -148,5 +176,11 @@ export default class Command {
             }
         }
         return argsObject;
+    }
+
+    static help(Embed) {} // To be overloaded
+
+    static async action(message, bot) { // To be overloaded
+        return true;
     }
 }

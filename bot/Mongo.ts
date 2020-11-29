@@ -4,7 +4,7 @@ import config from "./config";
 let nbRetry = 0;
 const nbRetryMax = 20;
 
-let database: mongoose.Connection;
+let database;
 
 export const connect = () => {
 
@@ -15,26 +15,26 @@ export const connect = () => {
         console.log("Re try to connect")
     }
 
-    if (database) return;
+    if (database) return database;
 
     const url = 'mongodb://' + config.username_mongo + ':' + config.password_mongo + '@' + config.host_mongo + ':27017/' + config.database_mongo;
 
     mongoose.connect(url, {useNewUrlParser: true});
 
-    database = mongoose.connection;
+    database = mongoose;
 
-    database.once("open", () => {
+    database.connection.once("open", () => {
         console.log("Connected to database");
     });
 
-    database.on("error", () => {
+    database.connection.on("error", () => {
         console.log("Error connecting to database");
         database = undefined;
         nbRetry += 1;
         setTimeout(connect, 250);
     });
 
-    return mongoose;
+    return database;
 };
 
 export const disconnect = () => {
