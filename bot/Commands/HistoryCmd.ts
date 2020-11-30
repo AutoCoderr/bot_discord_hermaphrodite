@@ -39,7 +39,7 @@ export class HistoryCmd extends Command {
 
                 Embed.addFields({
                     name: "[" + history.dateTime + "] "+userName+" sur #"+channelName+" :",
-                    value: history.command
+                    value: config.command_prefix+history.command
                 });
             }
         } else {
