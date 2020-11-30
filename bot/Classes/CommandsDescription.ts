@@ -1,5 +1,6 @@
 import config from "../config";
 import { NotifyOnReact } from "../Commands/NotifyOnReact";
+import { CancelNotifyOnReact } from "../Commands/CancelNotifyOnReact";
 import { Perm } from "../Commands/Perm";
 import { HistoryCmd } from "../Commands/HistoryCmd";
 import { HistoryExec } from "../Commands/HistoryExec";
@@ -10,6 +11,11 @@ export const existingCommands = {
     notifyOnReact : {
         msg: "Pour envoyer un message sur un channel indiqué, quand une réaction à été detectée sur un autre message\n"+config.command_prefix+"notifyOnReact help",
         commandClass: NotifyOnReact,
+        display: true
+    },
+    cancelNotifyOnReact : {
+        msg: "Pour désactiver l'écoute d'une réaction sur un ou plusieurs messages\n"+config.command_prefix+"cancelNotifyOnReact help",
+        commandClass: CancelNotifyOnReact,
         display: true
     },
     perm: {
