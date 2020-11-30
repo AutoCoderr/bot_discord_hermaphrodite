@@ -41,11 +41,11 @@ export class HistoryExec extends Command {
     static help(Embed) {
         Embed.addFields({
             name: "Arguments :",
-            value: "-c ou --command, la commande dont on souhaite voir l'historique\n"+
+            value: "-c ou --command, la commande dont on souhaite executer l'historique\n"+
                 "-s ou --sort, 'asc' ou 'desc/dsc' ('asc' par défaut) pour trier du debut à la fin ou de la fin au début dans l'ordre chronologique\n"+
-                "-l ou --limit, Pour afficher les n dernières commandes de la listes\n"+
-                "-ch ou --channel, Pour afficher les commandes executées dans un channel spécifique\n"+
-                "-u ou --user, Pour afficher les commandes executées par un utilisateur spécifique"
+                "-l ou --limit, Pour executer les n premières commandes de la listes\n"+
+                "-ch ou --channel, Pour éxecuté les commandes ayant été executées dans un channel spécifique\n"+
+                "-u ou --user, Pour éxecuter les commandes ayant été executées par un utilisateur spécifique"
         }).addFields({
             name: "Exemples :",
             value: config.command_prefix+"historyExec --command notifyOnReact -l 10 --channel #blabla"
