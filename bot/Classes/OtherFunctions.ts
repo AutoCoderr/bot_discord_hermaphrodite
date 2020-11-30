@@ -86,10 +86,13 @@ export async function getHistory(message,args) {
             errors.push({name: "Bad argument for user", value: "Specified user is incorrect"});
         } else { // @ts-ignore
             userId = userId.replaceAll(" ",""); // @ts-ignore
-            userId = userId.split("<@!")[1];
+            userId = userId.split("<@")[1];
             if (userId == undefined) {
                 errors.push({name: "Bad argument for channel", value: "Specified channel is incorrect"});
             } else {
+                if (userId[0] == "!") {
+                    userId = userId.slice(1)
+                }
                 userId = userId.substring(0,userId.length-1);
                 let user = message.guild.members.cache.get(userId);
                 if (user == undefined) {
