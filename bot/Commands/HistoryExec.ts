@@ -27,7 +27,7 @@ export class HistoryExec extends Command {
 
         if (histories.length > 0) {
             for (let history of histories) {
-                message.channel.send(history.command);
+                message.channel.send(config.command_prefix+history.command);
             }
         } else {
             message.channel.send("Aucune commande trouvée")

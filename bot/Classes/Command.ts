@@ -56,6 +56,8 @@ export default class Command {
     }
 
     static saveHistory(message) {
+        if (message.author.bot) return; // Do nothing if the message is typed by a bot
+
         const date = new Date();
 
         const year = addMissingZero(date.getFullYear(), 4),
@@ -66,7 +68,7 @@ export default class Command {
             seconds = addMissingZero(date.getSeconds());
 
         const commandName = message.content.slice(1).split(" ")[0],
-            command = message.content,
+            command = message.content.slice(1),
             dateTime = year+"-"+month+"-"+day+" "+hour+":"+minute+":"+seconds,
             channelId = message.channel.id,
             userId = message.member.id,
