@@ -98,8 +98,8 @@ export class Perm extends Command {
         // Attribute or add the specified allowed roles to the specified command
         const specifiedRoles = args[2].split(",");
         let rolesId: Array<string> = [];
-
         for (let specifiedRole of specifiedRoles) {
+            if (specifiedRole == '') continue;
             // @ts-ignore
             let roleId: string = specifiedRole.replaceAll(" ","")
             roleId = roleId.split("<@&")[1];

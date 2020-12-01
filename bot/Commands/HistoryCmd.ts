@@ -57,7 +57,7 @@ export class HistoryCmd extends Command {
             name: "Arguments :",
             value: "-c ou --command, la commande dont on souhaite voir l'historique\n"+
                 "-s ou --sort, 'asc' ou 'desc/dsc' ('asc' par défaut) pour trier du debut à la fin ou de la fin au début dans l'ordre chronologique\n"+
-                "-l ou --limit, Pour afficher les n dernières commandes de la listes\n"+
+                "-l ou --limit, Pour afficher les n premières commandes de la listes\n"+
                 "-ch ou --channel, Pour afficher les commandes executées dans un channel spécifique\n"+
                 "-u ou --user, Pour afficher les commandes executées par un utilisateur spécifique"
         }).addFields({
