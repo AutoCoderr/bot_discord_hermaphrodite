@@ -13,7 +13,7 @@ export default class Command {
         return message.content.split(" ")[0] == config.command_prefix+this.commandName;
     }
 
-    static sendErrors(message, errors: Object|Array<Object>, displayHelp: boolean = true){
+    static sendErrors(message, errors: any, displayHelp: boolean = true){
         if (!(errors instanceof Array)) {
             errors = [errors];
         }

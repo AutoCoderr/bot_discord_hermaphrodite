@@ -5,6 +5,7 @@ import { HistoryCmd } from "../Commands/HistoryCmd";
 import { HistoryExec } from "../Commands/HistoryExec";
 import { HelloWorld } from "../Commands/HelloWorld";
 import { Help } from "../Commands/Help";
+import { Vote } from "../Commands/Vote";
 
 export const existingCommands = {
     notifyOnReact : {
@@ -34,5 +35,10 @@ export const existingCommands = {
     help: {
         commandClass: Help,
         display: false
+    },
+    vote: {
+        msg: "Pour créer facilement un message de vote avec les réactions automatiques\n"+config.command_prefix+"vote help",
+        commandClass: Vote,
+        display: true
     }
 };
