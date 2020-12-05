@@ -12,6 +12,17 @@ interface iNotifyOnReact extends Document {
 export class NotifyOnReact extends Command {
     static commandName = "notifyOnReact";
 
+    static listenings = {}; /* example : {
+        775091491592601640: // id d'un channel  {
+                320314338290434049: //id d'un message {
+                    yoyo: true // une emote (écoute activée),
+                    nod: false // une autre emote (écoute désactivée)
+                }
+            }
+        }
+
+     */
+
     static async action(message, bot) { // notifyOnReact --listen #channel/messageId --message '$user$ a réagit à ce message' -e :yoyo: --writeChannel #channelB
         const args: iNotifyOnReact = this.parseCommand(message);
         if (!args) return false;
@@ -91,13 +102,21 @@ export class NotifyOnReact extends Command {
             return false;
         }
 
-        this.reactingAndNotifyOnMessage(messageToListen, channelToWrite, messageToWrite, extractEmoteName(emoteToReact));
+        this.reactingAndNotifyOnMessage(messageToListen, channelToWrite, messageToWrite, extractEmoteName(emoteToReact), channelToListen);
 
         message.channel.send("Command sucessfully executed, all reactions to this message will be notified");
         return true;
     }
 
-    static async reactingAndNotifyOnMessage(messageToListen, channelToWrite, messageToWrite, emoteName) {
+    static async reactingAndNotifyOnMessage(messageToListen, channelToWrite, messageToWrite, emoteName, channelToListen) {
+        if (typeof(this.listenings[channelToListen.id]) == "undefined") {
+            this.listenings[channelToListen.id] = {};
+        }
+        if (typeof(this.listenings[channelToListen.id][messageToListen.id]) == "undefined") {
+            this.listenings[channelToListen.id][messageToListen.id] = {};
+        }
+        this.listenings[channelToListen.id][messageToListen.id][emoteName] = true;
+
         let userWhoReact;
         const filter = (reaction, user) => {
             userWhoReact = user;
@@ -105,6 +124,7 @@ export class NotifyOnReact extends Command {
         };
         messageToListen.awaitReactions(filter, { max: 1 })
             .then(collected => {
+                if (!this.listenings[channelToListen.id][messageToListen.id][emoteName]) return;
                 const variables: Object = {
                     user: "<@"+userWhoReact.id+">"
                 }
@@ -115,7 +135,7 @@ export class NotifyOnReact extends Command {
                 }
                 channelToWrite.send(toWrite);
 
-                this.reactingAndNotifyOnMessage(messageToListen, channelToWrite, messageToWrite, emoteName);
+                this.reactingAndNotifyOnMessage(messageToListen, channelToWrite, messageToWrite, emoteName, channelToListen);
             })
             .catch(collected => {
                 console.log("Catch event in reactingAndNotifyOnMessage() function");
