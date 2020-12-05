@@ -14,6 +14,16 @@ export function addMissingZero(number, n = 2) {
     return number;
 }
 
+export function extractChannelId(channelMention) {
+    let channelId = channelMention.split("<#")[1];
+    if (channelId == undefined) return false;
+    if (channelId[channelId.length-1] != ">") return false;
+    channelId = channelId.substring(0,channelId.length-1);
+    if (channelId.length != 18) return false;
+    return channelId;
+}
+
+
 export async function getHistory(message,args) {
     let errors: Array<Object> = [];
 

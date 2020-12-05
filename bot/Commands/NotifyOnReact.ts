@@ -13,15 +13,13 @@ export class NotifyOnReact extends Command {
     static commandName = "notifyOnReact";
 
     static listenings = {}; /* example : {
-        775091491592601640: // id d'un channel  {
-                320314338290434049: //id d'un message {
-                    yoyo: true // une emote (écoute activée),
+        "775101704638169148": { // id d'un channel
+                "784849560765464586": { //id d'un message
+                    yoyo: true, // une emote (écoute activée)
                     nod: false // une autre emote (écoute désactivée)
                 }
             }
-        }
-
-     */
+        }*/
 
     static async action(message, bot) { // notifyOnReact --listen #channel/messageId --message '$user$ a réagit à ce message' -e :yoyo: --writeChannel #channelB
         const args: iNotifyOnReact = this.parseCommand(message);
@@ -115,7 +113,7 @@ export class NotifyOnReact extends Command {
         if (typeof(this.listenings[channelToListen.id][messageToListen.id]) == "undefined") {
             this.listenings[channelToListen.id][messageToListen.id] = {};
         }
-        this.listenings[channelToListen.id][messageToListen.id][emoteName] = true;
+        this.listenings[channelToListen.id][messageToListen.id][emoteName] = true; // Set the key of that reaction listener in the listenings Object
 
         let userWhoReact;
         const filter = (reaction, user) => {
@@ -124,7 +122,16 @@ export class NotifyOnReact extends Command {
         };
         messageToListen.awaitReactions(filter, { max: 1 })
             .then(collected => {
-                if (!this.listenings[channelToListen.id][messageToListen.id][emoteName]) return;
+                if (!this.listenings[channelToListen.id][messageToListen.id][emoteName])  { // Detect if the listening on the message has been disabled
+                    delete this.listenings[channelToListen.id][messageToListen.id][emoteName]; // And delete the useless keys in the listenings object
+                    if (Object.keys(this.listenings[channelToListen.id][messageToListen.id]).length == 0) {
+                        delete this.listenings[channelToListen.id][messageToListen.id];
+                    }
+                    if (Object.keys(this.listenings[channelToListen.id]).length === 0) {
+                        delete this.listenings[channelToListen.id];
+                    }
+                    return;
+                }
                 const variables: Object = {
                     user: "<@"+userWhoReact.id+">"
                 }
