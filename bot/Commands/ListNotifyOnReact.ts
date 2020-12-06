@@ -85,9 +85,14 @@ export class ListNotifyOnReact extends Command {
             .setDescription("Ceci est la liste dess écoutes de réactions :")
             .setTimestamp();
 
-        const listenings = existingCommands.notifyOnReact.commandClass.listenings;
+        let listenings = existingCommands.notifyOnReact.commandClass.listenings[message.guild.id];
 
-        if (channelId != null) {
+        if (typeof(listenings) == "undefined") {
+            Embed.addFields({
+                name: "Aucune réaction",
+                value: "Il n'y a aucune réaction sur ce serveur"
+            });
+        } else if (channelId != null) {
             if (typeof(listenings[channelId]) != "undefined") {
                 if (messageId != null) {
                     let nbListeneds = 0;

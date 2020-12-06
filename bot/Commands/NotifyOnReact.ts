@@ -13,12 +13,14 @@ export class NotifyOnReact extends Command {
     static commandName = "notifyOnReact";
 
     static listenings = {}; /* example : {
+    "773657730388852746": { // id d'un serveur
         "775101704638169148": { // id d'un channel
                 "784849560765464586": { //id d'un message
                     yoyo: true, // une emote (écoute activée)
                     nod: false // une autre emote (écoute désactivée)
                 }
             }
+         }
         }*/
 
     static async action(message, bot) { // notifyOnReact --listen #channel/messageId --message '$user$ a réagit à ce message' -e :yoyo: --writeChannel #channelB
@@ -107,13 +109,17 @@ export class NotifyOnReact extends Command {
     }
 
     static async reactingAndNotifyOnMessage(messageToListen, channelToWrite, messageToWrite, emoteName, channelToListen) {
-        if (typeof(this.listenings[channelToListen.id]) == "undefined") {
-            this.listenings[channelToListen.id] = {};
+        const serverId = messageToListen.guild.id;
+        if (typeof(this.listenings[serverId]) == "undefined") {
+            this.listenings[serverId] = {};
         }
-        if (typeof(this.listenings[channelToListen.id][messageToListen.id]) == "undefined") {
-            this.listenings[channelToListen.id][messageToListen.id] = {};
+        if (typeof(this.listenings[serverId][channelToListen.id]) == "undefined") {
+            this.listenings[serverId][channelToListen.id] = {};
         }
-        this.listenings[channelToListen.id][messageToListen.id][emoteName] = true; // Set the key of that reaction listener in the listenings Object
+        if (typeof(this.listenings[serverId][channelToListen.id][messageToListen.id]) == "undefined") {
+            this.listenings[serverId][channelToListen.id][messageToListen.id] = {};
+        }
+        this.listenings[serverId][channelToListen.id][messageToListen.id][emoteName] = true; // Set the key of that reaction listener in the listenings Object
 
         let userWhoReact;
         const filter = (reaction, user) => {
@@ -122,13 +128,16 @@ export class NotifyOnReact extends Command {
         };
         messageToListen.awaitReactions(filter, { max: 1 })
             .then(collected => {
-                if (!this.listenings[channelToListen.id][messageToListen.id][emoteName])  { // Detect if the listening on the message has been disabled
-                    delete this.listenings[channelToListen.id][messageToListen.id][emoteName]; // And delete the useless keys in the listenings object
-                    if (Object.keys(this.listenings[channelToListen.id][messageToListen.id]).length == 0) {
-                        delete this.listenings[channelToListen.id][messageToListen.id];
+                if (!this.listenings[serverId][channelToListen.id][messageToListen.id][emoteName])  { // Detect if the listening on the message has been disabled
+                    delete this.listenings[serverId][channelToListen.id][messageToListen.id][emoteName]; // And delete the useless keys in the listenings object
+                    if (Object.keys(this.listenings[serverId][channelToListen.id][messageToListen.id]).length == 0) {
+                        delete this.listenings[serverId][channelToListen.id][messageToListen.id];
                     }
-                    if (Object.keys(this.listenings[channelToListen.id]).length === 0) {
-                        delete this.listenings[channelToListen.id];
+                    if (Object.keys(this.listenings[serverId][channelToListen.id]).length === 0) {
+                        delete this.listenings[serverId][channelToListen.id];
+                    }
+                    if (Object.keys(this.listenings[serverId]).length === 0) {
+                        delete this.listenings[serverId];
                     }
                     return;
                 }
