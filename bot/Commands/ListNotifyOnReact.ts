@@ -15,7 +15,6 @@ export class ListNotifyOnReact extends Command {
             return true;
         }
 
-        //{errors, channelId, channel, messageId, contentMessage}
         const checked = await checkArgumentsNotifyOnReact(message, args)
 
         let errors = checked.errors,
@@ -34,10 +33,10 @@ export class ListNotifyOnReact extends Command {
         let Embed = new Discord.MessageEmbed()
             .setColor('#0099ff')
             .setTitle('Listes des écoutes de réactions :')
-            .setDescription("Ceci est la liste dess écoutes de réactions :")
+            .setDescription("Ceci est la liste des écoutes de réactions :")
             .setTimestamp();
 
-        await forEachNotifyOnReact((found, channel, contentMessage, emote) => {
+        await forEachNotifyOnReact((found, channel, messageId, contentMessage, emote) => {
             if (found) {
                 Embed.addFields({
                     name: "Sur '#" + channel.name + "' (" + contentMessage + ") :" + emote + ":",
@@ -49,7 +48,7 @@ export class ListNotifyOnReact extends Command {
                     value: "Aucune réaction n'a été trouvée"
                 });
             }
-        }, channelId, channel, messageId, contentMessage, message, message.guild.id);
+        }, channelId, channel, messageId, contentMessage, message);
 
         message.channel.send(Embed);
         return true;

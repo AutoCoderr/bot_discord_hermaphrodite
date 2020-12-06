@@ -2,8 +2,11 @@ import { existingCommands } from "./CommandsDescription";
 import History, {IHistory} from "../Models/History";
 import config from "../config";
 
-export function extractEmoteName(emoteName) {
-    return emoteName.split(":")[1]
+export function extractEmoteName(emote) {
+    let regex = new RegExp("\\<\\:[a-zA-Z0-9]{2,18}\\:[0-9]{18}\\>");
+    if (!regex.test(emote)) return false;
+    let emoteName = emote.split("<:")[1].split(":")[0];
+    return emoteName != undefined ? emoteName : false;
 }
 
 export function addMissingZero(number, n = 2) {
@@ -135,6 +138,7 @@ export async function getHistory(message,args) {
     }
 
     const histories:Array<IHistory> = await History.find(where).limit(limit).sort({dateTime: sort});
+    console.log('history length => '+histories.length);
 
     return {errors: [], histories: histories};
 }
@@ -197,7 +201,8 @@ export async function checkArgumentsNotifyOnReact(message,args) {  // Vérifie l
     return {errors, channelId, channel, messageId, contentMessage};
 }
 
-export async function forEachNotifyOnReact(callback, channelId, channel, messageId, contentMessage, messageCommand, serverId) {
+export async function forEachNotifyOnReact(callback, channelId, channel, messageId, contentMessage, messageCommand) {
+    const serverId = messageCommand.guild.id;
     let listenings = existingCommands.notifyOnReact.commandClass.listenings[serverId];
 
     if (typeof(listenings) == "undefined") {
@@ -210,7 +215,7 @@ export async function forEachNotifyOnReact(callback, channelId, channel, message
                     // @ts-ignore
                     for (let emote in listenings[channelId][messageId]) {
                         if (listenings[channelId][messageId][emote]) {
-                            callback(true, channel, contentMessage, emote);
+                            callback(true, channel, messageId, contentMessage, emote);
                             nbListeneds += 1;
                         }
                     }
@@ -232,7 +237,7 @@ export async function forEachNotifyOnReact(callback, channelId, channel, message
                     for (let emote in listenings[channelId][messageId]) {
                         if (listenings[channelId][messageId][emote]) {
                             nbListeneds += 1;
-                            callback(true, channel, contentMessage, emote);
+                            callback(true, channel, messageId, contentMessage, emote);
                         }
                     }
                 }
@@ -260,7 +265,7 @@ export async function forEachNotifyOnReact(callback, channelId, channel, message
                 for (let emote in listenings[channelId][messageId]) {
                     if (listenings[channelId][messageId][emote]) {
                         nbListeneds += 1;
-                        callback(true, channel, contentMessage, emote);
+                        callback(true, channel, messageId, contentMessage, emote);
                     }
                 }
             }

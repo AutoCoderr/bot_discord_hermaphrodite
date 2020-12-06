@@ -97,12 +97,17 @@ export class NotifyOnReact extends Command {
             }
         }
 
+        const emoteName = extractEmoteName(emoteToReact);
+        if (!emoteName) {
+            errors.push([{name: "Invalid emote", value: "Specified emote is invalid"}]);
+        }
+
         if (errors.length > 0) {
             this.sendErrors(message,errors);
             return false;
         }
 
-        this.reactingAndNotifyOnMessage(messageToListen, channelToWrite, messageToWrite, extractEmoteName(emoteToReact), channelToListen);
+        this.reactingAndNotifyOnMessage(messageToListen, channelToWrite, messageToWrite, emoteName, channelToListen);
 
         message.channel.send("Command sucessfully executed, all reactions to this message will be notified");
         return true;
