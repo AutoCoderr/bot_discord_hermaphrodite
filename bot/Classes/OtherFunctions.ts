@@ -138,3 +138,135 @@ export async function getHistory(message,args) {
 
     return {errors: [], histories: histories};
 }
+
+export async function checkArgumentsNotifyOnReact(message,args) {  // Vérifie la validité des arguments passés pour récupérer les écoutes de réactions
+    let channelId = null;
+    let channel;
+
+    let errors: Array<Object> = [];
+
+    if (typeof(args.channel) != "undefined" && typeof(args.ch) != "undefined") {
+        errors.push({
+            name: "--channel or -ch",
+            value: "--channel or -ch but not the both"
+        });
+    } else if (typeof(args.channel) != "undefined" || typeof(args.ch) != "undefined") {
+        channelId = extractChannelId(typeof(args.channel) != "undefined" ? args.channel : args.ch);
+        if (!channelId) {
+            errors.push({
+                name: "Channel invalide",
+                value: "Mention de channel indiqué invalide"
+            });
+        } else {
+            channel = message.guild.channels.cache.get(channelId);
+            if (channel == undefined) {
+                errors.push( {
+                    name: "Channel inexistant",
+                    value: "Mention de channel indiqué inexistant"
+                });
+            }
+        }
+    }
+
+    let messageId = null;
+    let contentMessage;
+    if (typeof(args.message) != "undefined" && typeof(args.m) != "undefined") {
+        errors.push({
+            name: "--message or -m",
+            value: "--message or -m but not the both"
+        });
+    } else if (typeof(args.message) != "undefined" || typeof(args.m) != "undefined") {
+        if (channelId == null || channel == undefined) {
+            errors.push({
+                name: "Spécifiez un channel",
+                value: "Vous devez spécifier un channel, avant de spécifier un message"
+            });
+        } else {
+            let messageListened
+            messageId = typeof (args.message) != "undefined" ? args.message : args.m;
+            try {
+                messageListened = await channel.messages.fetch(messageId);
+            } catch (e) {
+            }
+            contentMessage = messageListened != undefined ?
+                messageListened.content.substring(0, Math.min(20, messageListened.content.length)) + "..."
+                : messageId;
+        }
+    }
+
+    return {errors, channelId, channel, messageId, contentMessage};
+}
+
+export async function forEachNotifyOnReact(callback, channelId, channel, messageId, contentMessage, messageCommand, serverId) {
+    let listenings = existingCommands.notifyOnReact.commandClass.listenings[serverId];
+
+    if (typeof(listenings) == "undefined") {
+        callback(false);
+    } else if (channelId != null) {
+        if (typeof(listenings[channelId]) != "undefined") {
+            if (messageId != null) {
+                let nbListeneds = 0;
+                if (typeof(listenings[channelId][messageId]) != "undefined") { // Si un channel et un message ont été spécifiés, regarde dans le message
+                    // @ts-ignore
+                    for (let emote in listenings[channelId][messageId]) {
+                        if (listenings[channelId][messageId][emote]) {
+                            callback(true, channel, contentMessage, emote);
+                            nbListeneds += 1;
+                        }
+                    }
+                }
+                if (nbListeneds == 0) {
+                    callback(false);
+                }
+            } else { // Si un channel a été spécififié, mais pas de message, regarde tout les messages de ce channel
+                let nbListeneds = 0; // @ts-ignore
+                for (let messageId in listenings[channelId]) {
+                    let messageListened;
+                    try {
+                        messageListened = await channel.messages.fetch(messageId);
+                    } catch(e) {
+                    }
+                    const contentMessage = messageListened != undefined ?
+                        messageListened.content.substring(0, Math.min(20,messageListened.content.length)) + "..."
+                        : messageId; // @ts-ignore
+                    for (let emote in listenings[channelId][messageId]) {
+                        if (listenings[channelId][messageId][emote]) {
+                            nbListeneds += 1;
+                            callback(true, channel, contentMessage, emote);
+                        }
+                    }
+                }
+                if (nbListeneds == 0) {
+                    callback(false);
+                }
+
+            }
+        } else {
+            callback(false);
+        }
+    } else { // Si rien n'a été spécifié en argument, regarde sur tout les messaqes de tout les channels
+        let nbListeneds = 0;
+        for (let channelId in listenings) {
+            let channel = messageCommand.guild.channels.cache.get(channelId);
+            for (let messageId in listenings[channelId]) {
+                let messageListened;
+                try {
+                    messageListened = await channel.messages.fetch(messageId);
+                } catch (e) {
+                }
+                const contentMessage = messageListened != undefined ?
+                    messageListened.content.substring(0, Math.min(20,messageListened.content.length)) + "..."
+                    : messageId;
+                for (let emote in listenings[channelId][messageId]) {
+                    if (listenings[channelId][messageId][emote]) {
+                        nbListeneds += 1;
+                        callback(true, channel, contentMessage, emote);
+                    }
+                }
+            }
+        }
+        if (nbListeneds == 0) {
+            callback(false);
+        }
+    }
+}
