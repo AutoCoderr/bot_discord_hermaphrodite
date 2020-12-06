@@ -138,9 +138,8 @@ export async function getHistory(message,args) {
     }
 
     const histories:Array<IHistory> = await History.find(where).limit(limit).sort({dateTime: sort});
-    console.log('history length => '+histories.length);
 
-    return {errors: [], histories: histories};
+    return {errors: [], histories: histories, limit: limit};
 }
 
 export async function checkArgumentsNotifyOnReact(message,args) {  // Vérifie la validité des arguments passés pour récupérer les écoutes de réactions
