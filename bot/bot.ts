@@ -1,6 +1,7 @@
 import config from "./config";
 
 import { existingCommands } from "./Classes/CommandsDescription";
+import StoredNotifyOnReact, { IStoredNotifyOnReact } from "./Models/StoredNotifyOnReact";
 
 import * as Discord from "discord.js";
 
@@ -18,6 +19,10 @@ bot.on('message', message => {
 });
 
 bot.login(config.token);
+
+setTimeout(() => { // Detect stored notifyOnReacts storeds in the database and apply them
+    existingCommands.notifyOnReact.commandClass.applyNotifyOnReactAtStarting(bot);
+}, 5000);
 
 // @ts-ignore
 String.prototype.replaceAll = function (A,B) {

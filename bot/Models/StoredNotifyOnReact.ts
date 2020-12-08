@@ -8,7 +8,7 @@ export interface IStoredNotifyOnReact extends Document {
     channelToListenId: string;
     messageToListenId: string;
     messageToWrite: string;
-    ChannelToWriteId: string;
+    channelToWriteId: string;
     serverId: string;
 }
 
@@ -17,7 +17,7 @@ const StoredNotifyOnReactSchema: Schema = new Schema({
     channelToListenId: { type: String, required: true },
     messageToListenId: { type: String, required: true},
     messageToWrite: { type: String, required: true},
-    ChannelToWriteId: { type: String, required: true},
+    channelToWriteId: { type: String, required: true},
     serverId: { type: String, required: true}
 });
 
