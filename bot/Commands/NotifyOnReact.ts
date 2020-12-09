@@ -182,6 +182,7 @@ export class NotifyOnReact extends Command {
     }
 
     static async applyNotifyOnReactAtStarting(bot) { // Detect notifyOnReacts storeds in the database and apply them
+        const channels = {};
         const storedNotifyOnReacts: Array<IStoredNotifyOnReact> = await StoredNotifyOnReact.find({});
         for (let i=0;i<storedNotifyOnReacts.length;i++) {
             const storedNotifyOnReact = storedNotifyOnReacts[i];
@@ -212,13 +213,9 @@ export class NotifyOnReact extends Command {
 
             NotifyOnReact.reactingAndNotifyOnMessage(messageToListen, channelToWrite, storedNotifyOnReact.messageToWrite, storedNotifyOnReact.emoteName, channelToListen);
 
-            if (i == 0) {
-                setTimeout(() => {
-                    // @ts-ignore
-                    channelToWrite.send("NotifyonReactHere")/*.then(messageSent => {
-                        messageSent.delete();
-                    })*/;
-                }, 1000);
+            if (!channels[channelToWrite.id]) {
+                channels[channelToWrite.id] = true; // @ts-ignore
+                channelToWrite.send("Le serveur du bot a redémarré. Une écoute de réaction sera notifiée sur ce channel");
             }
         }
     }

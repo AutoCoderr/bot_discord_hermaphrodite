@@ -1,7 +1,8 @@
 import config from "../config";
 import Command from "../Classes/Command";
 import { checkArgumentsNotifyOnReact, extractEmoteName, forEachNotifyOnReact } from "../Classes/OtherFunctions";
-import {existingCommands} from "../Classes/CommandsDescription";
+import { existingCommands } from "../Classes/CommandsDescription";
+import StoredNotifyOnReact, { IStoredNotifyOnReact } from "../Models/StoredNotifyOnReact";
 import Discord from "discord.js";
 
 export class CancelNotifyOnReact extends Command {
@@ -54,6 +55,7 @@ export class CancelNotifyOnReact extends Command {
         if (emote == null) {
             await forEachNotifyOnReact((found, channel, messageId, contentMessage, emote) => {
                 if (found) {
+                    this.deleteNotifyOnReactInBdd(message.guild.id,channel.id,messageId,emote);
                     listenings[channel.id][messageId][emote] = false;
                     Embed.addFields({
                         name: "Supprimée : sur '#" + channel.name + "' (" + contentMessage + ") :" + emote + ":",
@@ -68,6 +70,7 @@ export class CancelNotifyOnReact extends Command {
             }, channelId, channel, messageId, contentMessage, message);
         } else {
             if (typeof(listenings[channel.id][messageId][emote]) != "undefined") {
+                this.deleteNotifyOnReactInBdd(message.guild.id,channel.id,messageId,emote);
                 listenings[channel.id][messageId][emote] = false;
                 Embed.addFields({
                     name: "sur '#" + channel.name + "' (" + contentMessage + ") :" + emote + ":",
@@ -83,6 +86,15 @@ export class CancelNotifyOnReact extends Command {
 
         message.channel.send(Embed);
         return true;
+    }
+
+    static async deleteNotifyOnReactInBdd(serverId,channelId,messageId,emoteName) {
+        await StoredNotifyOnReact.deleteOne({
+            serverId: serverId,
+            channelToListenId: channelId,
+            messageToListenId: messageId,
+            emoteName: emoteName
+        });
     }
 
     static help(Embed) {
