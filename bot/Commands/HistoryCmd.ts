@@ -23,14 +23,20 @@ export class HistoryCmd extends Command {
 
         const histories = response.histories;
 
-        let Embed = new Discord.MessageEmbed()
-            .setColor('#0099ff')
-            .setTitle("L'historique des commands :")
-            .setDescription("Liste des commandes qui ont été tapées :")
-            .setTimestamp();
+        let Embeds: Array<any> = [];
+        let Embed;
 
         if (histories.length > 0) {
-            for (let history of histories) {
+            for (let i=0;i<histories.length;i++) {
+                if (i % 50 == 0) {
+                    Embed = new Discord.MessageEmbed()
+                        .setColor('#0099ff')
+                        .setTitle("L'historique des commandes (Partie "+((i/50)+1)+") (limité à "+response.limit+") :")
+                        .setDescription("Liste des commandes qui ont été tapées :")
+                        .setTimestamp();
+                    Embeds.push(Embed);
+                }
+                const history = histories[i];
                 const user = message.guild.members.cache.get(history.userId);
                 const channel = message.guild.channels.cache.get(history.channelId);
 
@@ -43,12 +49,19 @@ export class HistoryCmd extends Command {
                 });
             }
         } else {
-            Embed.addFields({
-                name: "Aucun historique",
-                value: "Aucun élément n'a été trouvé dans l'historique"
-            })
+            Embeds.push(new Discord.MessageEmbed()
+                .setColor('#0099ff')
+                .setTitle("L'historique des commandes :")
+                .setDescription("Liste des commandes qui ont été tapées :")
+                .setTimestamp()
+                .addFields({
+                    name: "Aucun historique",
+                    value: "Aucun élément n'a été trouvé dans l'historique"
+                }));
         }
-        message.channel.send(Embed);
+        for (let Embed of Embeds) {
+            message.channel.send(Embed);
+        }
         return true;
     }
 

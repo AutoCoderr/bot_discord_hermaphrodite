@@ -1,6 +1,8 @@
 import config from "../config";
 import Command from "../Classes/Command";
 import { extractEmoteName } from "../Classes/OtherFunctions";
+import StoredNotifyOnReact, { IStoredNotifyOnReact } from "../Models/StoredNotifyOnReact";
+import {existingCommands} from "../Classes/CommandsDescription";
 
 interface iNotifyOnReact extends Document {
     listen: string;
@@ -11,6 +13,17 @@ interface iNotifyOnReact extends Document {
 
 export class NotifyOnReact extends Command {
     static commandName = "notifyOnReact";
+
+    static listenings = {}; /* example : {
+    "773657730388852746": { // id d'un serveur
+        "775101704638169148": { // id d'un channel
+                "784849560765464586": { //id d'un message
+                    yoyo: true, // une emote (écoute activée)
+                    nod: false // une autre emote (écoute désactivée)
+                }
+            }
+         }
+        }*/
 
     static async action(message, bot) { // notifyOnReact --listen #channel/messageId --message '$user$ a réagit à ce message' -e :yoyo: --writeChannel #channelB
         const args: iNotifyOnReact = this.parseCommand(message);
@@ -86,18 +99,38 @@ export class NotifyOnReact extends Command {
             }
         }
 
+        const emoteName = extractEmoteName(emoteToReact);
+        if (!emoteName) {
+            errors.push([{name: "Invalid emote", value: "Specified emote is invalid"}]);
+        }
+
         if (errors.length > 0) {
             this.sendErrors(message,errors);
             return false;
         }
+        const serverId = messageToListen.guild.id;
 
-        this.reactingAndNotifyOnMessage(messageToListen, channelToWrite, messageToWrite, extractEmoteName(emoteToReact));
+        if (typeof(this.listenings[serverId]) == "undefined") {
+            this.listenings[serverId] = {};
+        }
+        if (typeof(this.listenings[serverId][channelToListen.id]) == "undefined") {
+            this.listenings[serverId][channelToListen.id] = {};
+        }
+        if (typeof(this.listenings[serverId][channelToListen.id][messageToListen.id]) == "undefined") {
+            this.listenings[serverId][channelToListen.id][messageToListen.id] = {};
+        }
+        this.listenings[serverId][channelToListen.id][messageToListen.id][emoteName] = true; // Set the key of that reaction listener in the listenings Object
+
+        this.saveNotifyOnReact(messageToListen, channelToWrite, messageToWrite, emoteName, channelToListen);
+        this.reactingAndNotifyOnMessage(messageToListen, channelToWrite, messageToWrite, emoteName, channelToListen);
 
         message.channel.send("Command sucessfully executed, all reactions to this message will be notified");
         return true;
     }
 
-    static async reactingAndNotifyOnMessage(messageToListen, channelToWrite, messageToWrite, emoteName) {
+    static async reactingAndNotifyOnMessage(messageToListen, channelToWrite, messageToWrite, emoteName, channelToListen) {
+        const serverId = messageToListen.guild.id;
+
         let userWhoReact;
         const filter = (reaction, user) => {
             userWhoReact = user;
@@ -105,6 +138,19 @@ export class NotifyOnReact extends Command {
         };
         messageToListen.awaitReactions(filter, { max: 1 })
             .then(collected => {
+                if (!this.listenings[serverId][channelToListen.id][messageToListen.id][emoteName])  { // Detect if the listening on the message has been disabled
+                    delete this.listenings[serverId][channelToListen.id][messageToListen.id][emoteName]; // And delete the useless keys in the listenings object
+                    if (Object.keys(this.listenings[serverId][channelToListen.id][messageToListen.id]).length == 0) {
+                        delete this.listenings[serverId][channelToListen.id][messageToListen.id];
+                    }
+                    if (Object.keys(this.listenings[serverId][channelToListen.id]).length === 0) {
+                        delete this.listenings[serverId][channelToListen.id];
+                    }
+                    if (Object.keys(this.listenings[serverId]).length === 0) {
+                        delete this.listenings[serverId];
+                    }
+                    return;
+                }
                 const variables: Object = {
                     user: "<@"+userWhoReact.id+">"
                 }
@@ -115,11 +161,63 @@ export class NotifyOnReact extends Command {
                 }
                 channelToWrite.send(toWrite);
 
-                this.reactingAndNotifyOnMessage(messageToListen, channelToWrite, messageToWrite, emoteName);
+                this.reactingAndNotifyOnMessage(messageToListen, channelToWrite, messageToWrite, emoteName, channelToListen);
             })
             .catch(collected => {
                 console.log("Catch event in reactingAndNotifyOnMessage() function");
             });
+    }
+
+    static saveNotifyOnReact(messageToListen, channelToWrite, messageToWrite, emoteName, channelToListen) {
+        const storedNotifyOnReact: IStoredNotifyOnReact = {
+            emoteName: emoteName,
+            channelToListenId: channelToListen.id,
+            messageToListenId: messageToListen.id,
+            messageToWrite: messageToWrite,
+            channelToWriteId: channelToWrite.id,
+            serverId: messageToListen.guild.id
+        };
+
+        StoredNotifyOnReact.create(storedNotifyOnReact);
+    }
+
+    static async applyNotifyOnReactAtStarting(bot) { // Detect notifyOnReacts storeds in the database and apply them
+        const channels = {};
+        const storedNotifyOnReacts: Array<IStoredNotifyOnReact> = await StoredNotifyOnReact.find({});
+        for (let i=0;i<storedNotifyOnReacts.length;i++) {
+            const storedNotifyOnReact = storedNotifyOnReacts[i];
+            const serverId = storedNotifyOnReact.serverId;
+
+            const server = bot.guilds.cache.get(serverId);
+            if (server == undefined) continue;
+
+            const channelToListen = server.channels.cache.get(storedNotifyOnReact.channelToListenId);
+            if (channelToListen == undefined) continue;
+            // @ts-ignore
+            const messageToListen = await channelToListen.messages.fetch(storedNotifyOnReact.messageToListenId);
+            if (messageToListen == undefined) continue;
+
+            const channelToWrite = server.channels.cache.get(storedNotifyOnReact.channelToWriteId);
+            if (channelToWrite == undefined) continue;
+
+            if (typeof (this.listenings[serverId]) == "undefined") {
+                this.listenings[serverId] = {};
+            }
+            if (typeof (this.listenings[serverId][channelToListen.id]) == "undefined") {
+                this.listenings[serverId][channelToListen.id] = {};
+            }
+            if (typeof (this.listenings[serverId][channelToListen.id][messageToListen.id]) == "undefined") {
+                this.listenings[serverId][channelToListen.id][messageToListen.id] = {};
+            }
+            this.listenings[serverId][channelToListen.id][messageToListen.id][storedNotifyOnReact.emoteName] = true; // Set the key of that reaction listener in the listenings Object
+
+            NotifyOnReact.reactingAndNotifyOnMessage(messageToListen, channelToWrite, storedNotifyOnReact.messageToWrite, storedNotifyOnReact.emoteName, channelToListen);
+
+            if (!channels[channelToWrite.id]) {
+                channels[channelToWrite.id] = true; // @ts-ignore
+                channelToWrite.send("Le serveur du bot a redémarré. Une écoute de réaction sera notifiée sur ce channel");
+            }
+        }
     }
 
     static help(Embed) {
