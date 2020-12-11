@@ -2,6 +2,7 @@ import config from "../config";
 import { NotifyOnReact } from "../Commands/NotifyOnReact";
 import { ListNotifyOnReact } from "../Commands/ListNotifyOnReact";
 import { CancelNotifyOnReact } from "../Commands/CancelNotifyOnReact";
+import { ConfigPMToNews } from "../Commands/ConfigPMToNews";
 import { Perm } from "../Commands/Perm";
 import { HistoryCmd } from "../Commands/HistoryCmd";
 import { HistoryExec } from "../Commands/HistoryExec";
@@ -22,6 +23,11 @@ export const existingCommands = {
     cancelNotifyOnReact : {
         msg: "Pour désactiver l'écoute d'une réaction sur un ou plusieurs messages\n"+config.command_prefix+CancelNotifyOnReact.commandName+" help",
         commandClass: CancelNotifyOnReact,
+        display: true
+    },
+    configPMToNews: {
+        msg: "Pour activer, désactiver, ou définir le message privé à envoyer automatiquement aux nouveaux arrivants\n"+config.command_prefix+ConfigPMToNews.commandName+" help",
+        commandClass: ConfigPMToNews,
         display: true
     },
     perm: {
