@@ -14,7 +14,7 @@ export class CancelNotifyOnReact extends Command {
 
         if (typeof(args[0]) != "undefined" && args[0] == "help") {
             this.displayHelp(message);
-            return true;
+            return false;
         }
 
         const checked = await checkArgumentsNotifyOnReact(message, args)
