@@ -1,7 +1,7 @@
 import config from "./config";
 
 import { existingCommands } from "./Classes/CommandsDescription";
-import PMToNews, {IPMToNews} from "./Models/PMToNews";
+import WelcomeMessage, {IWelcomeMessage} from "./Models/WelcomeMessage";
 
 import * as Discord from "discord.js";
 
@@ -18,9 +18,9 @@ bot.on('message', async message => {
     }
 
     if (message.type == "GUILD_MEMBER_JOIN") { // @ts-ignore
-        const pmToNews: IPMToNews = await PMToNews.findOne({serverId: message.guild.id, enabled: true});
-        if (pmToNews != null) {
-            message.author.send(pmToNews.message);
+        const welcomeMessage: IWelcomeMessage = await WelcomeMessage.findOne({serverId: message.guild.id, enabled: true});
+        if (welcomeMessage != null) {
+            message.author.send(welcomeMessage.message);
         }
     }
 });
