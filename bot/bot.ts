@@ -1,7 +1,7 @@
 import config from "./config";
 
 import { existingCommands } from "./Classes/CommandsDescription";
-import StoredNotifyOnReact, { IStoredNotifyOnReact } from "./Models/StoredNotifyOnReact";
+import PMToNews, {IPMToNews} from "./Models/PMToNews";
 
 import * as Discord from "discord.js";
 
@@ -11,10 +11,17 @@ import * as Discord from "discord.js";
 const bot = new Discord.Client();
 
 // check all commands
-bot.on('message', message => {
+bot.on('message', async message => {
     for (let commandName in existingCommands) {
         const command = existingCommands[commandName].commandClass;
         command.check(message, bot);
+    }
+
+    if (message.type == "GUILD_MEMBER_JOIN") { // @ts-ignore
+        const pmToNews: IPMToNews = await PMToNews.findOne({serverId: message.guild.id, enabled: true});
+        if (pmToNews != null) {
+            message.author.send(pmToNews.message);
+        }
     }
 });
 
