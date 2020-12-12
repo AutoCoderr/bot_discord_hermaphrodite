@@ -1,9 +1,9 @@
 import config from "../config";
 import Command from "../Classes/Command";
-import PMToNews, {IPMToNews} from "../Models/PMToNews";
+import WelcomeMessage, {IWelcomeMessage} from "../Models/WelcomeMessage";
 
-export class ConfigPMToNews extends Command {
-    static commandName = "configPMToNews";
+export class ConfigWelcome extends Command {
+    static commandName = "configWelcome";
 
     static async action(message,bot) {
         let args = this.parseCommand(message);
@@ -16,7 +16,7 @@ export class ConfigPMToNews extends Command {
             });
             return false;
         }
-        let pmToNews: IPMToNews;
+        let welcomeMessage: IWelcomeMessage;
         switch(args[0]) {
             case "help":
                 this.displayHelp(message);
@@ -26,19 +26,19 @@ export class ConfigPMToNews extends Command {
                     .then(sentMessage => {
                         const listener = async response => {
                             if (response.author.id == message.author.id) {
-                                let pmToNews: IPMToNews = await PMToNews.findOne({serverId: message.guild.id});
+                                let welcomeMessage: IWelcomeMessage = await WelcomeMessage.findOne({serverId: message.guild.id});
                                 let create = false;
-                                if (pmToNews == null) {
+                                if (welcomeMessage == null) {
                                     create = true;
-                                    pmToNews = {
+                                    welcomeMessage = {
                                         enabled: true,
                                         message: response.content,
                                         serverId: message.guild.id
                                     };
-                                    PMToNews.create(pmToNews);
+                                    WelcomeMessage.create(welcomeMessage);
                                 } else {
-                                    pmToNews.message = response.content; // @ts-ignore
-                                    pmToNews.save();
+                                    welcomeMessage.message = response.content; // @ts-ignore
+                                    welcomeMessage.save();
                                 }
                                 message.channel.send("Votre message a été enregistré et sera envoyé en MP aux nouveaux arrivants de ce serveur"+
                                                         (create ?  "\n(L'envoie de MP aux nouveaux a été activé)" : ""));
@@ -49,30 +49,30 @@ export class ConfigPMToNews extends Command {
                     });
                 return true;
             case "show":
-                pmToNews = await PMToNews.findOne({serverId: message.guild.id});
-                if (pmToNews == null) {
+                welcomeMessage = await WelcomeMessage.findOne({serverId: message.guild.id});
+                if (welcomeMessage == null) {
                     message.channel.send("Il n'y a pas de message définit, vous pouvez le définir avec : "+config.command_prefix+this.commandName+" set");
                 } else {
-                    message.channel.send("Message définit : \n\n---------------------------------\n\n"+pmToNews.message);
+                    message.channel.send("Message définit : \n\n---------------------------------\n\n"+welcomeMessage.message);
                 }
                 return true;
             case "disable":
-                pmToNews = await PMToNews.findOne({serverId: message.guild.id});
-                if (pmToNews == null) {
+                welcomeMessage = await WelcomeMessage.findOne({serverId: message.guild.id});
+                if (welcomeMessage == null) {
                     message.channel.send("Il n'y a pas de message définit, vous pouvez le définir avec : "+config.command_prefix+this.commandName+" set");
                 } else {
-                    pmToNews.enabled = false; // @ts-ignore
-                    pmToNews.save();
+                    welcomeMessage.enabled = false; // @ts-ignore
+                    welcomeMessage.save();
                     message.channel.send("L'envoie de MP aux nouveaux a été désactivé.");
                 }
                 return true;
             case "enable":
-                pmToNews = await PMToNews.findOne({serverId: message.guild.id});
-                if (pmToNews == null) {
+                welcomeMessage = await WelcomeMessage.findOne({serverId: message.guild.id});
+                if (welcomeMessage == null) {
                     message.channel.send("Il n'y a pas de message définit, vous pouvez le définir avec : "+config.command_prefix+this.commandName+" set");
                 } else {
-                    pmToNews.enabled = true; // @ts-ignore
-                    pmToNews.save();
+                    welcomeMessage.enabled = true; // @ts-ignore
+                    welcomeMessage.save();
                     message.channel.send("L'envoie de MP aux nouveaux a été activé, faite '"+config.command_prefix+this.commandName+" show' pour voir le MP qui sera envoyé aux nouveaux");
                 }
                 return true;

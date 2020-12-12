@@ -3,13 +3,13 @@ import { connect } from "../Mongo";
 
 const db = connect();
 
-export interface IPMToNews extends Document {
+export interface IWelcomeMessage extends Document {
     enabled: boolean;
     message: string
     serverId: string;
 }
 
-const PMToNewsSchema: Schema = new Schema({
+const WelcomeMessageSchema: Schema = new Schema({
     enabled: { type: Boolean, required: true },
     message: { type: String, required: true },
     serverId: { type: String, required: true}
@@ -17,4 +17,4 @@ const PMToNewsSchema: Schema = new Schema({
 
 // Export the model and return your IUser interface
 // @ts-ignore
-export default db.model<IPMToNews>('PMToNews', PMToNewsSchema);
+export default db.model<IWelcomeMessage>('WelcomeMessage', WelcomeMessageSchema);
