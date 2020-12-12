@@ -38,7 +38,7 @@ export class NotifyOnReact extends Command {
 
         if (args[0] == "help") {
             this.displayHelp(message);
-            return true;
+            return false;
         }
 
         if (typeof(args.listen) == "undefined") {

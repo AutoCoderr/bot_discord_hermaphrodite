@@ -11,7 +11,7 @@ export class HistoryCmd extends Command {
 
         if (args[0] == "help") {
             this.displayHelp(message);
-            return true;
+            return false;
         }
 
         const response = await getHistory(message,args);
