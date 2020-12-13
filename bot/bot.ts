@@ -17,10 +17,16 @@ bot.on('message', async message => {
         command.check(message, bot);
     }
 
-    if (message.type == "GUILD_MEMBER_JOIN") { // @ts-ignore
+    if (message.type == "GUILD_MEMBER_JOIN" && message.author.id == "786701129559965706") { // @ts-ignore
         const welcomeMessage: IWelcomeMessage = await WelcomeMessage.findOne({serverId: message.guild.id, enabled: true});
         if (welcomeMessage != null) {
-            message.author.send(welcomeMessage.message);
+            try {
+                await message.author.send(welcomeMessage.message);
+            } catch (e) {
+                if (e.message == "Cannot send messages to this user") {
+                    message.channel.send("<@"+message.author.id+"> \n\n"+welcomeMessage.message);
+                }
+            }
         }
     }
 });
