@@ -89,7 +89,7 @@ export default class Command {
     static async checkPermissions(message, displayMsg = true) {
         const commandName = this.commandName;
 
-        if(config.roots.includes(message.author.id) || message.member.hasPermission("ADMINISTRATOR")) return true;
+        if(message.channel.type == "dm" || config.roots.includes(message.author.id) || message.member.hasPermission("ADMINISTRATOR")) return true;
 
         const permission: IPermissions = await Permissions.findOne({serverId: message.guild.id, command: commandName});
         if (permission != null) {

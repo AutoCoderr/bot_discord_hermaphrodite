@@ -7,6 +7,7 @@ import { Perm } from "../Commands/Perm";
 import { HistoryCmd } from "../Commands/HistoryCmd";
 import { HistoryExec } from "../Commands/HistoryExec";
 import { ConfigTicket } from "../Commands/ConfigTicket";
+import { CommunicateTicket } from "../Commands/CommunicateTicket";
 import { HelloWorld } from "../Commands/HelloWorld";
 import { Help } from "../Commands/Help";
 
@@ -50,6 +51,10 @@ export const existingCommands = {
         msg: "Pour définir la catégorie pour les channels des tickets, activer, ou désactiver les ticket\n"+config.command_prefix+ConfigTicket.commandName+" help",
         commandClass: ConfigTicket,
         display: true
+    },
+    communicateTicket: {
+        commandClass: CommunicateTicket,
+        display: false
     },
     hello: {
         commandClass: HelloWorld,
