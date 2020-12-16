@@ -7,7 +7,7 @@ import { Perm } from "../Commands/Perm";
 import { HistoryCmd } from "../Commands/HistoryCmd";
 import { HistoryExec } from "../Commands/HistoryExec";
 import { ConfigTicket } from "../Commands/ConfigTicket";
-import { CommunicateTicket } from "../Commands/CommunicateTicket";
+import { CommunicateTicketClientSide } from "../Commands/CommunicateTicketClientSide";
 import { HelloWorld } from "../Commands/HelloWorld";
 import { Help } from "../Commands/Help";
 
@@ -52,8 +52,8 @@ export const existingCommands = {
         commandClass: ConfigTicket,
         display: true
     },
-    communicateTicket: {
-        commandClass: CommunicateTicket,
+    communicateTicketClientSide: {
+        commandClass: CommunicateTicketClientSide,
         display: false
     },
     hello: {

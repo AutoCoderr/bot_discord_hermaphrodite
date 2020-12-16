@@ -8,15 +8,15 @@ export interface ITicketCommunication extends Document {
     ticketChannelId: string|null;
     DMChannelId: string;
     usedByUser: boolean;
-    latestUtilisation: number;
+    lastUse: number;
 }
 
 const TicketCommunicationSchema: Schema = new Schema({
     serverId: { type: String, required: true },
-    ticketChannelId: { type: String, required: true },
+    ticketChannelId: { type: String },
     DMChannelId: { type: String, required: true},
     usedByUser: { type: Boolean, required: true},
-    latestUtilisation: { type: Number, required: true}
+    lastUse: { type: Number, required: true}
 });
 
 // Export the model and return your IUser interface
