@@ -8,7 +8,7 @@ export default class Command {
 
     static commandName: string|null = null;
 
-    static match(message) {
+    static async match(message) {
         if (this.commandName == null) return false;
         return message.content.split(" ")[0] == config.command_prefix+this.commandName;
     }
@@ -48,7 +48,7 @@ export default class Command {
     }
 
     static async check(message,bot) {
-        if (this.match(message) && await this.checkPermissions(message)) {
+        if (await this.match(message) && await this.checkPermissions(message)) {
             if (await this.action(message, bot)) {
                 this.saveHistory(message);
             }

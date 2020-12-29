@@ -3,7 +3,7 @@ import { connect } from "../Mongo";
 
 const db = connect();
 
-export interface ITicketConfig extends Document {
+export interface ITicketConfig {
     enabled: boolean;
     categoryId: string
     serverId: string;

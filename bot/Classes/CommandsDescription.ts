@@ -10,6 +10,7 @@ import { ConfigTicket } from "../Commands/ConfigTicket";
 import { CommunicateTicketClientSide } from "../Commands/CommunicateTicketClientSide";
 import { HelloWorld } from "../Commands/HelloWorld";
 import { Help } from "../Commands/Help";
+import {CommunicateTicketModeratorSide} from "../Commands/CommunicateTicketModeratorSide";
 
 export const existingCommands = {
     notifyOnReact : {
@@ -54,6 +55,10 @@ export const existingCommands = {
     },
     communicateTicketClientSide: {
         commandClass: CommunicateTicketClientSide,
+        display: false
+    },
+    communicateTicketModeratorSide: {
+        commandClass: CommunicateTicketModeratorSide,
         display: false
     },
     hello: {

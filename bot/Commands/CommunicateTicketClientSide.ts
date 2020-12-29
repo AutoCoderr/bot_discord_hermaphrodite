@@ -5,7 +5,7 @@ import TicketConfig, {ITicketConfig} from "../Models/TicketConfig";
 export class CommunicateTicketClientSide extends Command {
     static usersInPrompt = {};
 
-    static match(message) {
+    static async match(message) {
         return message.channel.type == "dm" && !message.author.bot && !this.usersInPrompt[message.author.id];
     }
 
@@ -21,7 +21,7 @@ export class CommunicateTicketClientSide extends Command {
         }
 
         const ticketCommunications: Array<ITicketCommunication> = await TicketCommunication.find({
-            DMChannelId: message.channel.id,
+            customerId: message.author.id,
             serverId: { $in: serverIds }
         });
 
@@ -100,7 +100,7 @@ export class CommunicateTicketClientSide extends Command {
             usedCommunication = {
                 serverId: ticketConfig.serverId,
                 ticketChannelId: null,
-                DMChannelId: message.channel.id,
+                customerId: message.author.id,
                 usedByUser: true,
                 lastUse: (new Date()).getTime()
             };
@@ -125,6 +125,7 @@ export class CommunicateTicketClientSide extends Command {
         if (usedCommunication.ticketChannelId == null) {
             channelToWrite = await server.channels.create("Ticket de " + message.author.username + " [" + message.author.id.substring(0, 4) + "]", 'text')
             await channelToWrite.setParent(categoryChannel.id);
+            channelToWrite.send("Ce ticket a été créé par <@"+message.author.id+">");
             usedCommunication.ticketChannelId = channelToWrite.id; // @ts-ignore
             usedCommunication.save();
         }

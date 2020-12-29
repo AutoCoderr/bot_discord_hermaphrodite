@@ -3,10 +3,10 @@ import { connect } from "../Mongo";
 
 const db = connect();
 
-export interface ITicketCommunication extends Document {
+export interface ITicketCommunication {
     serverId: string;
     ticketChannelId: string|null;
-    DMChannelId: string;
+    customerId: string;
     usedByUser: boolean;
     lastUse: number;
 }
@@ -14,7 +14,7 @@ export interface ITicketCommunication extends Document {
 const TicketCommunicationSchema: Schema = new Schema({
     serverId: { type: String, required: true },
     ticketChannelId: { type: String },
-    DMChannelId: { type: String, required: true},
+    customerId: { type: String, required: true},
     usedByUser: { type: Boolean, required: true},
     lastUse: { type: Number, required: true}
 });
