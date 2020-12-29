@@ -3,7 +3,7 @@ import { connect } from "../Mongo";
 
 const db = connect();
 
-export interface IEmote extends Document {
+export interface IEmote {
     userName: string;
     emoteName: string;
     dateTime: string;

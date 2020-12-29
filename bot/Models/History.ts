@@ -3,7 +3,7 @@ import { connect } from "../Mongo";
 
 const db = connect();
 
-export interface IHistory extends Document {
+export interface IHistory {
     commandName: string;
     command: string;
     dateTime: string;
