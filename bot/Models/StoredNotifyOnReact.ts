@@ -3,7 +3,7 @@ import { connect } from "../Mongo";
 
 const db = connect();
 
-export interface IStoredNotifyOnReact extends Document {
+export interface IStoredNotifyOnReact {
     emoteName: string;
     channelToListenId: string;
     messageToListenId: string;

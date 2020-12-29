@@ -3,7 +3,7 @@ import { connect } from "../Mongo";
 
 const db = connect();
 
-export interface IPermissions extends Document {
+export interface IPermissions {
     command: string;
     roles: Array<string>;
     serverId: string;

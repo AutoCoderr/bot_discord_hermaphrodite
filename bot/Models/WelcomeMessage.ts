@@ -3,7 +3,7 @@ import { connect } from "../Mongo";
 
 const db = connect();
 
-export interface IWelcomeMessage extends Document {
+export interface IWelcomeMessage {
     enabled: boolean;
     message: string
     serverId: string;
