@@ -15,7 +15,7 @@ export class CommunicateTicketModeratorSide extends Command {
 
         const userToWrite = getUserFromCache(userCommunication.customerId,bot);
         if (userToWrite == null) {
-            message.channel.send("L'utilisateur auteur de ce ticket n'est pas présent dans le cache et ne peux donc pas être contacté'");
+            message.channel.send("L'utilisateur auteur de ce ticket n'est pas présent dans le cache et ne peux donc pas être contacté");
             return false;
         }
 
@@ -26,7 +26,11 @@ export class CommunicateTicketModeratorSide extends Command {
         userCommunication.lastUse = currentTime.getTime(); // @ts-ignore
         userCommunication.save();
         userToWrite.send(message.content);
-        message.channel.send("Votre message a été envoyé");
+        message.channel.send("Votre message a été envoyé").then(sentMessage => {
+            setTimeout(() => {
+                sentMessage.delete();
+            }, 5000)
+        })
 
         return false;
     }
