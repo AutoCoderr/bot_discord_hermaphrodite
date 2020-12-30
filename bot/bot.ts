@@ -4,7 +4,8 @@ import { existingCommands } from "./Classes/CommandsDescription";
 import WelcomeMessage, {IWelcomeMessage} from "./Models/WelcomeMessage";
 
 import * as Discord from "discord.js";
-import {setUserInCache} from "./Classes/OtherFunctions";
+import {setUserInCache} from "./Classes/Cache";
+import init from "./init";
 
 
 
@@ -33,14 +34,17 @@ bot.on('message', async message => {
 
     if (!message.author.bot) {
         setUserInCache(message.author);
+        for (const mentionArray of message.mentions.users) {
+            const mentionnedUser = mentionArray[1];
+            setUserInCache(mentionnedUser);
+        }
     }
 });
 
 bot.login(config.token);
 
-setTimeout(() => { // Detect stored notifyOnReacts storeds in the database and apply them
-    existingCommands.notifyOnReact.commandClass.applyNotifyOnReactAtStarting(bot);
-}, 5000);
+init(bot);
+
 
 // @ts-ignore
 String.prototype.replaceAll = function (A,B) {

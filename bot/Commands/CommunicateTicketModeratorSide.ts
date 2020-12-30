@@ -1,6 +1,6 @@
 import Command from "../Classes/Command";
 import TicketCommunication, { ITicketCommunication } from "../Models/TicketCommunication";
-import {getUserFromCache} from "../Classes/OtherFunctions";
+import {getUserFromCache} from "../Classes/Cache";
 
 export class CommunicateTicketModeratorSide extends Command {
     static ticketCommunication = {};
