@@ -134,7 +134,7 @@ export class CommunicateTicketClientSide extends Command {
         message.channel.send("Votre message a été envoyé sur le serveur '"+server.name+"'").then(sentMessage => {
             setTimeout(() => {
                 sentMessage.delete();
-            }, 5000);
+            }, 1000);
         })
     }
 }

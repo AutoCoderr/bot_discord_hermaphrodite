@@ -29,7 +29,7 @@ export class CommunicateTicketModeratorSide extends Command {
         message.channel.send("Votre message a été envoyé").then(sentMessage => {
             setTimeout(() => {
                 sentMessage.delete();
-            }, 5000)
+            }, 1000)
         })
 
         return false;
