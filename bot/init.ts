@@ -14,17 +14,19 @@ export default function init(bot) {
             const server = bot.guilds.cache.get(ticketCommunication.serverId);
             const ticketChannel = server.channels.cache.get(ticketCommunication.ticketChannelId);
 
-            const messages = await ticketChannel.messages.fetch();
+            if (ticketChannel != undefined) {
+                const messages = await ticketChannel.messages.fetch();
 
-            for (const messageArray of messages) {
-                const message = messageArray[1];
-                for (const mentionArray of message.mentions.users) {
-                    const mentionnedUser = mentionArray[1];
-                    setUserInCache(mentionnedUser);
+                for (const messageArray of messages) {
+                    const message = messageArray[1];
+                    for (const mentionArray of message.mentions.users) {
+                        const mentionnedUser = mentionArray[1];
+                        setUserInCache(mentionnedUser);
+                    }
+                    setUserInCache(message.author);
+                    checkeds += 1;
+                    console.log(checkeds + " messages checked");
                 }
-                setUserInCache(message.author);
-                checkeds += 1;
-                console.log(checkeds+" messages checked");
             }
         }
         console.log("All ticket messages checked and "+Object.keys(userCache).length+" users stored in the cache");

@@ -1,6 +1,7 @@
 import Command from "../Classes/Command";
 import TicketCommunication, {ITicketCommunication} from "../Models/TicketCommunication";
 import TicketConfig, {ITicketConfig} from "../Models/TicketConfig";
+import config from "../config";
 
 export class CommunicateTicketClientSide extends Command {
     static usersInPrompt = {};
@@ -25,6 +26,15 @@ export class CommunicateTicketClientSide extends Command {
             serverId: { $in: serverIds }
         });
 
+        if (message.content == config.command_prefix+"server") {
+            if (ticketConfigs.length == 1) {
+                message.channel.send("Le seul serveur disponible est déjà utilisé par défaut");
+            } else {
+                this.selectServer(ticketConfigs, ticketCommunications, serverIds, message, bot);
+            }
+            return false;
+        }
+
         let usedCommunication: null|ITicketCommunication = null;
         for (let ticketCommunication of ticketCommunications) {
             if (ticketCommunication.usedByUser) {
@@ -44,33 +54,7 @@ export class CommunicateTicketClientSide extends Command {
             if (ticketConfigs.length == 1) {
                 this.getOrCreateTicketCommunication(bot, message, ticketCommunications, ticketConfigs[0]);
             } else {
-                let serversToChooseString = "";
-                for (let i = 0; i < ticketConfigs.length; i++) {
-                    const ticketConfig = ticketConfigs[i];
-                    const serverId = ticketConfig.serverId;
-                    const server = bot.guilds.cache.get(serverId);
-                    if (i > 0) {
-                        serversToChooseString += ", ";
-                    }
-                    serversToChooseString += "[" + i + "] " + server.name;
-                }
-                message.channel.send("Veuillez choisir un des serveurs suivant, pour envoyer le ticket :");
-                message.channel.send(serversToChooseString).then(sentMessage => {
-                    const listener = response => {
-                        if (response.author.bot) return;
-                        if (response.author.id == message.author.id && response.channel.id == message.channel.id) {
-                            if (typeof(serverIds[parseInt(response.content)]) == "undefined") {
-                                message.channel.send("Veuillez rentrer le numéro d'un des serveurs ci dessus pour lui envoyer le ticket");
-                            } else {
-                                this.getOrCreateTicketCommunication(bot, message, ticketCommunications, ticketConfigs[parseInt(response.content)]);
-                                delete this.usersInPrompt[message.author.id];
-                                bot.off("message", listener);
-                            }
-                        }
-                    };
-                    this.usersInPrompt[message.author.id] = true;
-                    bot.on("message", listener);
-                });
+                this.selectServer(ticketConfigs, ticketCommunications, serverIds, message, bot);
             }
         } else {
             for (let ticketConfig of ticketConfigs) {
@@ -83,7 +67,37 @@ export class CommunicateTicketClientSide extends Command {
         return false;
     }
 
-    static getOrCreateTicketCommunication(bot, message, ticketCommunications, ticketConfig: ITicketConfig) {
+    static selectServer(ticketConfigs: Array<ITicketConfig>, ticketCommunications: Array<ITicketCommunication>, serverIds, message, bot) {
+        let serversToChooseString = "";
+        for (let i = 0; i < ticketConfigs.length; i++) {
+            const ticketConfig = ticketConfigs[i];
+            const serverId = ticketConfig.serverId;
+            const server = bot.guilds.cache.get(serverId);
+            if (i > 0) {
+                serversToChooseString += ", ";
+            }
+            serversToChooseString += "[" + i + "] " + server.name;
+        }
+        message.channel.send("Veuillez choisir un des serveurs suivant, pour envoyer le ticket :");
+        message.channel.send(serversToChooseString).then(sentMessage => {
+            const listener = response => {
+                if (response.author.bot) return;
+                if (response.author.id == message.author.id && response.channel.id == message.channel.id) {
+                    if (typeof(serverIds[parseInt(response.content)]) == "undefined") {
+                        message.channel.send("Veuillez rentrer le numéro d'un des serveurs ci dessus pour lui envoyer le ticket");
+                    } else {
+                        this.getOrCreateTicketCommunication(bot, message, ticketCommunications, ticketConfigs[parseInt(response.content)]);
+                        delete this.usersInPrompt[message.author.id];
+                        bot.off("message", listener);
+                    }
+                }
+            };
+            this.usersInPrompt[message.author.id] = true;
+            bot.on("message", listener);
+        });
+    }
+
+    static async getOrCreateTicketCommunication(bot, message, ticketCommunications, ticketConfig: ITicketConfig) {
         let usedCommunication: ITicketCommunication|null = null;
         for (let ticketCommunication of ticketCommunications) {
             if (ticketCommunication.serverId == ticketConfig.serverId) {
@@ -94,8 +108,7 @@ export class CommunicateTicketClientSide extends Command {
         if (usedCommunication != null) {
             usedCommunication.usedByUser = true;
             usedCommunication.lastUse = (new Date()).getTime(); // @ts-ignore
-            usedCommunication.save();
-            this.sendTicket(bot, message, usedCommunication, ticketConfig);
+            await usedCommunication.save();
         } else {
             usedCommunication = {
                 serverId: ticketConfig.serverId,
@@ -104,9 +117,18 @@ export class CommunicateTicketClientSide extends Command {
                 usedByUser: true,
                 lastUse: (new Date()).getTime()
             };
-            TicketCommunication.create(usedCommunication).then(usedCommunication => {
-                this.sendTicket(bot,message, usedCommunication, ticketConfig);
-            });
+            usedCommunication = await TicketCommunication.create(usedCommunication);
+        }
+        for (let ticketCommunication of ticketCommunications) {
+            if (ticketCommunication.customerId == message.author.id && ticketCommunication.serverId != ticketConfig.serverId) {
+                ticketCommunication.usedByUser = false;
+                ticketCommunication.save();
+            }
+        }
+        if (message.content == config.command_prefix+"server") {
+            message.channel.send("Le serveur a été sélectionné");
+        } else {
+            this.sendTicket(bot, message, <ITicketCommunication>usedCommunication, ticketConfig);
         }
     }
 
