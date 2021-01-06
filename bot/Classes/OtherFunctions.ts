@@ -26,6 +26,48 @@ export function extractChannelId(channelMention) {
     return channelId;
 }
 
+export function extractRoleId(roleMention) {
+    let roleId = roleMention.split("<@&")[1];
+    if (roleId == undefined) return false;
+    if (roleId[roleId.length-1] != ">") return false;
+    roleId = roleId.substring(0,roleId.length-1);
+    if (roleId.length != 18) return false;
+    return roleId;
+}
+
+export function getRolesFromList(specifiedRoles, message) {
+    let rolesId: Array<string> = [];
+    let roles: Array<any> = [];
+    for (let specifiedRole of specifiedRoles) {
+        if (specifiedRole == '') continue;
+        let roleId: string = specifiedRole.replaceAll(" ","")
+        roleId = extractRoleId(roleId);
+
+        if (!roleId) {
+            return { success: false, errors: [{
+                name: "Role badly specified",
+                value: "You to specified an existing role, with the '@'"
+            }]};
+        }
+        let role = message.guild.roles.cache.get(roleId)
+        if (role == undefined) {
+            return { success: false, errors: [{
+                name: "Role doesn't exist",
+                value: "A specified role doesn't exist"
+            }]};
+        }
+        if (rolesId.includes(roleId)) {
+            return { success: false, errors: [{
+                    name: "Same role specified to time",
+                    value: "A same role is specified many times"
+                }]};
+        }
+        roles.push(role);
+        rolesId.push(roleId);
+    }
+    return { success: true, rolesId, roles }
+}
+
 
 export async function getHistory(message,args) {
     let errors: Array<Object> = [];

@@ -2,6 +2,7 @@ import Command from "../Classes/Command";
 import config from "../config";
 import TicketConfig, {ITicketConfig} from "../Models/TicketConfig";
 import WelcomeMessage from "../Models/WelcomeMessage";
+import {extractRoleId, getRolesFromList} from "../Classes/OtherFunctions";
 
 export class ConfigTicket extends Command {
     static commandName = "configTicket";
@@ -75,6 +76,28 @@ export class ConfigTicket extends Command {
                         }
                         message.channel.send("Ce sera dorénavant dans la catégorie '"+category.name+"' que seront gérés les tickets"+
                             (create ?  "\n(La fonctionnalité des tickets a été activée)" : ""));
+                        return true;
+                    case "permissions":
+                        const specifiedRoles = args[2].split(",");
+                        const rolesResponse: any = getRolesFromList(specifiedRoles, message);
+                        if (!rolesResponse.success) {
+                            this.sendErrors(message, rolesResponse.errors);
+                            return false;
+                        }
+                        const { rolesId } = rolesResponse;
+
+                        ticketConfig = await TicketConfig.findOne({serverId: message.guild.id});
+                        if (ticketConfig == null) {
+                            this.sendErrors(message, {
+                                name: "Nothing config for the tickets",
+                                value: "You need to create a ticket config for this server, with '"+config.command_prefix+"'"
+                            });
+                            return false;
+                        }
+                        ticketConfig.roles = rolesId // @ts-ignore
+                        ticketConfig.save();
+
+                        message.channel.send("Roles who can access to the tickets defined");
                         return true;
                     default:
                         this.sendErrors(message, {
