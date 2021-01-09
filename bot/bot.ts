@@ -19,7 +19,7 @@ bot.on('message', async message => {
         command.check(message, bot);
     }
 
-    if (message.type == "GUILD_MEMBER_JOIN" && message.author.id == "786701129559965706") { // @ts-ignore
+    if (message.type == "GUILD_MEMBER_JOIN") { // @ts-ignore
         const welcomeMessage: IWelcomeMessage = await WelcomeMessage.findOne({serverId: message.guild.id, enabled: true});
         if (welcomeMessage != null) {
             try {
