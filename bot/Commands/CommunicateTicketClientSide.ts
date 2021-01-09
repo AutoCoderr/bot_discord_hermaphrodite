@@ -119,12 +119,15 @@ export class CommunicateTicketClientSide extends Command {
             };
             usedCommunication = await TicketCommunication.create(usedCommunication);
         }
-        for (let ticketCommunication of ticketCommunications) {
-            if (ticketCommunication.customerId == message.author.id && ticketCommunication.serverId != ticketConfig.serverId) {
-                ticketCommunication.usedByUser = false;
-                ticketCommunication.save();
-            }
-        }
+        TicketCommunication.updateMany(
+            {
+                customerId: message.author.id,
+                serverId: { $ne: ticketConfig.serverId }
+            },
+            {
+                $set: { usedByUser: false }
+            }).then(_ => {});
+
         if (message.content == config.command_prefix+"server") {
             message.channel.send("Le serveur a été sélectionné");
         } else {
