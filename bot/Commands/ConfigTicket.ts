@@ -1,8 +1,8 @@
 import Command from "../Classes/Command";
 import config from "../config";
 import TicketConfig, {ITicketConfig} from "../Models/TicketConfig";
-import WelcomeMessage from "../Models/WelcomeMessage";
-import {extractRoleId, getRolesFromList} from "../Classes/OtherFunctions";
+import {getRolesFromList} from "../Classes/OtherFunctions";
+import Discord from "discord.js";
 
 export class ConfigTicket extends Command {
     static commandName = "configTicket";
@@ -114,24 +114,102 @@ export class ConfigTicket extends Command {
                     });
                     return false;
                 }
+                ticketConfig = await TicketConfig.findOne({serverId: message.guild.id});
+                if (ticketConfig == null) {
+                    message.channel.send("On dirait que vous n'avez pas encore configuré les tickets sur ce serveur, vous pouvez en définissant la catégorie via : "+config.command_prefix+this.commandName+" set idDeLaCategorie")
+                    return true;
+                }
                 switch(args[1]) {
                     case "category":
-                        ticketConfig = await TicketConfig.findOne({serverId: message.guild.id});
-                        if (ticketConfig == null) {
-                            message.channel.send("Il n'y a pas de categorie définie pour les tickets, vous pouvez la définir avec : "+config.command_prefix+this.commandName+" set idDeLaCategorie");
+                        category = message.guild.channels.cache.get(ticketConfig.categoryId);
+                        if (category == undefined) {
+                            message.channel.send("On dirait que la catégorie que vous aviez définie n'existe plus, vous pouvez la redéfinir avec : "+config.command_prefix+this.commandName+" set idDeLaCategorie");
                         } else {
-                            category = message.guild.channels.cache.get(ticketConfig.categoryId);
-                            if (category == undefined) {
-                                message.channel.send("On dirait que la catégorie que vous aviez définie n'existe plus, vous pouvez la redéfinir avec : "+config.command_prefix+this.commandName+" set idDeLaCategorie");
-                            } else {
-                                message.channel.send("Catégorie utilisée pour les tickers : "+category.name);
-                            }
+                            message.channel.send("Catégorie utilisée pour les tickers : "+category.name);
                         }
+                        return true;
+                    case "permissions":
+                        const rolesId = ticketConfig.roles;
+
+                        let Embed = new Discord.MessageEmbed()
+                            .setColor('#0099ff')
+                            .setTitle("Rôles ayant accès aux tickets :")
+                            .setDescription("Liste des rôles pour les tickets")
+                            .setTimestamp();
+
+                        if (rolesId.length == 0) {
+                            Embed.addFields({
+                                name: "Aucun rôle",
+                                value: "Aucun rôle n'as été parramétré pour avoir accès aux tickets, donc tout le monde y a accès par défaut."
+                            })
+                        } else {
+                            let roles: Array<string> = [];
+                            for (let roleId of rolesId) {
+                                let role = message.guild.roles.cache.get(roleId);
+                                let roleName: string;
+                                if (role == undefined) {
+                                    roleName = "unknown";
+                                } else {
+                                    roleName = role.name;
+                                }
+                                roles.push('@'+roleName);
+                            }
+                            Embed.addFields({
+                                name: "Les roles :",
+                                value: roles.join(",")
+                            });
+                        }
+                        message.channel.send(Embed);
                         return true;
                     default:
                         this.sendErrors(message, {
                             name: "Bad argument",
                             value: "Do you want to show 'category' or 'permissions'"
+                        });
+                        return false;
+                }
+            case "add":
+                if (typeof(args[1]) == "undefined") {
+                    this.sendErrors(message, {
+                        name: "Argument missing",
+                        value: "You need to specify if you want to add some permissions"
+                    });
+                    return false;
+                }
+                switch(args[1]) {
+                    case "permissions":
+                        ticketConfig = await TicketConfig.findOne({serverId: message.guild.id});
+                        if (ticketConfig == null) {
+                            message.channel.send("On dirait que vous n'avez pas encore configuré les tickets sur ce serveur, vous pouvez en définissant la catégorie via : "+config.command_prefix+this.commandName+" set idDeLaCategorie")
+                            return true;
+                        }
+
+                        const specifiedRoles = args[2].split(",");
+                        const rolesResponse: any = getRolesFromList(specifiedRoles, message);
+                        if (!rolesResponse.success) {
+                            this.sendErrors(message, rolesResponse.errors);
+                            return false;
+                        }
+                        const { rolesId } = rolesResponse;
+
+                        for (let roleId of rolesId) {
+                            if (ticketConfig.roles.includes(roleId)) {
+                                this.sendErrors(message, {
+                                    name: "Role already added",
+                                    value: "That role is already attributed for that command"
+                                });
+                                return false;
+                            }
+                        }
+
+                        ticketConfig.roles = [ ...ticketConfig.roles, ...rolesId ]; // @ts-ignore
+                        ticketConfig.save();
+                        message.channel.send("Roles définits avec succès!");
+                        return true;
+                    default:
+                        this.sendErrors(message, {
+                            name: "Bad argument",
+                            value: "You need to specify 'permissions'"
                         });
                         return false;
                 }
@@ -169,13 +247,19 @@ export class ConfigTicket extends Command {
         Embed.addFields({
             name: "Arguments :",
             value: "set category, définir l'id de la catégorie dans laquelle apparaitrons les tickets\n"+
-                   "show category, pour voir la catégorie qui a été définit\n"+
+                   "set permissions, définir les rôles qui auront accès aux tickets sur ce serveur\n"+
+                   "show category, pour voir la catégorie qui a été définie\n"+
+                   "show permissions, pour voir les rôles qui ont accès aux tickets\n"+
+                   "add permissions, pour ajouter des rôles qui auront accès aux tickets\n"+
                    "enable, pour activer les tickets sur ce serveur\n"+
                    "disable, pour désactiver les tickets sur ce serveur"
         }).addFields({
             name: "Exemples :",
             value: config.command_prefix+this.commandName+" set category 475435899654125637\n"+
+                   config.command_prefix+this.commandName+" set permissions '@moderateurs,@admins'\n"+
                    config.command_prefix+this.commandName+" show category\n"+
+                   config.command_prefix+this.commandName+" show permissions\n"+
+                   config.command_prefix+this.commandName+" add permissions @moderateurs2\n"+
                    config.command_prefix+this.commandName+" enable\n"+
                    config.command_prefix+this.commandName+" disable"
         })
