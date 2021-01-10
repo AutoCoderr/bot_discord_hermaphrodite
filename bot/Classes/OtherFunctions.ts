@@ -46,7 +46,7 @@ export function getRolesFromList(specifiedRoles, message) {
         if (!roleId) {
             return { success: false, errors: [{
                 name: "Role badly specified",
-                value: "You to specified an existing role, with the '@'"
+                value: "You need to specified an existing role, with the '@'"
             }]};
         }
         let role = message.guild.roles.cache.get(roleId)

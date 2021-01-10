@@ -97,7 +97,7 @@ export class ConfigTicket extends Command {
                         ticketConfig.roles = rolesId // @ts-ignore
                         ticketConfig.save();
 
-                        message.channel.send("Roles who can access to the tickets defined");
+                        message.channel.send("Roles définis avec succès! Vous pouvez les voir avec : "+config.command_prefix+this.commandName+" show permissions");
                         return true;
                     default:
                         this.sendErrors(message, {
@@ -204,7 +204,7 @@ export class ConfigTicket extends Command {
 
                         ticketConfig.roles = [ ...ticketConfig.roles, ...rolesId ]; // @ts-ignore
                         ticketConfig.save();
-                        message.channel.send("Roles définits avec succès!");
+                        message.channel.send("Roles définis avec succès! Vous pouvez les voir avec : "+config.command_prefix+this.commandName+" show permissions");
                         return true;
                     default:
                         this.sendErrors(message, {
@@ -226,11 +226,11 @@ export class ConfigTicket extends Command {
             case "enable":
                 ticketConfig = await TicketConfig.findOne({serverId: message.guild.id});
                 if (ticketConfig == null) {
-                    message.channel.send("Il n'y a pas de categorie définie pour les tickets, vous pouvez la définir avec : "+config.command_prefix+this.commandName+" set idDeLaCategorie");
+                    message.channel.send("Il n'y a pas de categorie définie pour les tickets, vous pouvez la définir avec : "+config.command_prefix+this.commandName+" set category idDeLaCategorie");
                 } else {
                     ticketConfig.enabled = true; // @ts-ignore
                     ticketConfig.save();
-                    message.channel.send("La fonctionalité des tickets a été activée, faite '"+config.command_prefix+this.commandName+" show' pour voir le nom de la catégorie dans laquelle apparaitrons les tickets");
+                    message.channel.send("La fonctionalité des tickets a été activée. \nFaite '"+config.command_prefix+this.commandName+" show [category ou permissions]' pour voir le nom de la catégorie dans laquelle apparaitrons les tickets, ou bien les rôles autorisés à accéder aux tickets");
                 }
                 return true;
 
