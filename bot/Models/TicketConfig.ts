@@ -7,14 +7,12 @@ export interface ITicketConfig {
     enabled: boolean;
     categoryId: string
     serverId: string;
-    roles: Array<string>;
 }
 
 const TicketConfigSchema: Schema = new Schema({
     enabled: { type: Boolean, required: true },
     categoryId: { type: String, required: true },
-    serverId: { type: String, required: true },
-    roles: { type: Array, required: true }
+    serverId: { type: String, required: true }
 });
 
 // Export the model and return your IUser interface

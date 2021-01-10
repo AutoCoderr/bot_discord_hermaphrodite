@@ -148,8 +148,8 @@ export class CommunicateTicketClientSide extends Command {
             if (channelToWrite == undefined) usedCommunication.ticketChannelId = null;
         }
         if (usedCommunication.ticketChannelId == null) {
-            channelToWrite = await server.channels.create("Ticket de " + message.author.username + " [" + message.author.id.substring(0, 4) + "]", 'text')
-            await channelToWrite.setParent(categoryChannel.id);
+            channelToWrite = await server.channels.create("Ticket de " + message.author.username + " [" + message.author.id.substring(0, 4) + "]", "text");
+            channelToWrite.setParent(categoryChannel.id);
             channelToWrite.send("Ce ticket a été créé par <@"+message.author.id+">");
             usedCommunication.ticketChannelId = channelToWrite.id; // @ts-ignore
             usedCommunication.save();
