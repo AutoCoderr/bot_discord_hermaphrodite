@@ -6,6 +6,7 @@ import WelcomeMessage, {IWelcomeMessage} from "./Models/WelcomeMessage";
 import * as Discord from "discord.js";
 import {setUserInCache} from "./Classes/Cache";
 import init from "./init";
+import TicketConfig, {ITicketConfig} from "./Models/TicketConfig";
 
 
 
@@ -19,20 +20,35 @@ bot.on('message', async message => {
         command.check(message, bot);
     }
 
-    if (message.type == "GUILD_MEMBER_JOIN") { // @ts-ignore
-        const welcomeMessage: IWelcomeMessage = await WelcomeMessage.findOne({serverId: message.guild.id, enabled: true});
-        if (welcomeMessage != null) {
-            try {
-                await message.author.send(welcomeMessage.message);
-            } catch (e) {
-                if (e.message == "Cannot send messages to this user") {
-                    message.channel.send("<@"+message.author.id+"> \n\n"+welcomeMessage.message);
+    if (!message.author.bot) {
+
+        if (message.type == "GUILD_MEMBER_JOIN") { // @ts-ignore
+            const welcomeMessage: IWelcomeMessage = await WelcomeMessage.findOne({serverId: message.guild.id, enabled: true});
+            if (welcomeMessage != null) {
+                try {
+                    await message.author.send(welcomeMessage.message);
+                } catch (e) {
+                    if (e.message == "Cannot send messages to this user") {
+                        message.channel.send("<@"+message.author.id+"> \n\n"+welcomeMessage.message);
+                    }
                 }
+            }// @ts-ignore
+            let ticketConfig: ITicketConfig = await TicketConfig.findOne({serverId: message.guild.id})
+            if (ticketConfig == null) {
+                ticketConfig = {
+                    enabled: false,
+                    categoryId: null,
+                    blacklist: [],
+                    whitelist: [message.author.id], // @ts-ignore
+                    serverId: message.guild.id
+                };
+                TicketConfig.create(ticketConfig);
+            } else if (!ticketConfig.whitelist.includes(message.author.id)) {
+                ticketConfig.whitelist.push(message.author.id);// @ts-ignore
+                ticketConfig.save();
             }
         }
-    }
 
-    if (!message.author.bot) {
         setUserInCache(message.author);
         for (const mentionArray of message.mentions.users) {
             const mentionnedUser = mentionArray[1];

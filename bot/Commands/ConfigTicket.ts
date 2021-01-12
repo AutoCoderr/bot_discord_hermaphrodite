@@ -51,39 +51,45 @@ export class ConfigTicket extends Command {
                     return false;
                 }
                 ticketConfig = await TicketConfig.findOne({serverId: message.guild.id});
-                let create = false;
+                let toEnable = false;
                 if (ticketConfig == null) {
-                    create = true;
+                    toEnable = true;
                     ticketConfig = {
                         enabled: true,
                         categoryId: categoryId,
-                        serverId: message.guild.id
+                        serverId: message.guild.id,
+                        blacklist: [],
+                        whitelist: []
                     }
                     TicketConfig.create(ticketConfig);
                 } else {
+                    if (ticketConfig.categoryId == null)  {
+                        toEnable = true;
+                        ticketConfig.enabled = true;
+                    }
                     ticketConfig.categoryId = categoryId; // @ts-ignore
                     ticketConfig.save();
                 }
                 message.channel.send("Ce sera dorénavant dans la catégorie '"+category.name+"' que seront gérés les tickets"+
-                    (create ?  "\n(La fonctionnalité des tickets a été activée)" : ""));
+                    (toEnable ?  "\n(La fonctionnalité des tickets a été activée)" : ""));
                 return true;
             case "show":
-                ticketConfig = await TicketConfig.findOne({serverId: message.guild.id});
+                ticketConfig = await TicketConfig.findOne({serverId: message.guild.id, categoryId: { $ne: null }});
                 if (ticketConfig == null) {
-                    message.channel.send("On dirait que vous n'avez pas encore configuré les tickets sur ce serveur, vous pouvez en définissant la catégorie via : "+config.command_prefix+this.commandName+" set idDeLaCategorie")
-                    return true;
-                }
-                category = message.guild.channels.cache.get(ticketConfig.categoryId);
-                if (category == undefined) {
-                    message.channel.send("On dirait que la catégorie que vous aviez définie n'existe plus, vous pouvez la redéfinir avec : "+config.command_prefix+this.commandName+" set idDeLaCategorie");
+                    message.channel.send("On dirait que vous n'avez pas encore configuré les tickets sur ce serveur, vous pouvez le faire en définissant la catégorie via : "+config.command_prefix+this.commandName+" set idDeLaCategorie")
                 } else {
-                    message.channel.send("Catégorie utilisée pour les tickers : "+category.name);
+                    category = message.guild.channels.cache.get(ticketConfig.categoryId);
+                    if (category == undefined) {
+                        message.channel.send("On dirait que la catégorie que vous aviez définie n'existe plus, vous pouvez la redéfinir avec : " + config.command_prefix + this.commandName + " set idDeLaCategorie");
+                    } else {
+                        message.channel.send("Catégorie utilisée pour les tickers : " + category.name);
+                    }
                 }
                 return true;
             case "disable":
-                ticketConfig = await TicketConfig.findOne({serverId: message.guild.id});
+                ticketConfig = await TicketConfig.findOne({serverId: message.guild.id, categoryId: { $ne: null }});
                 if (ticketConfig == null) {
-                    message.channel.send("Il n'y a pas de categorie définie pour les tickets, vous pouvez la définir avec : "+config.command_prefix+this.commandName+" set idDeLaCategorie");
+                    message.channel.send("On dirait que vous n'avez pas encore configuré les tickets sur ce serveur, vous pouvez le faire en définissant la catégorie via : "+config.command_prefix+this.commandName+" set idDeLaCategorie")
                 } else {
                     ticketConfig.enabled = false; // @ts-ignore
                     ticketConfig.save();
@@ -91,13 +97,13 @@ export class ConfigTicket extends Command {
                 }
                 return true;
             case "enable":
-                ticketConfig = await TicketConfig.findOne({serverId: message.guild.id});
+                ticketConfig = await TicketConfig.findOne({serverId: message.guild.id, categoryId: { $ne: null }});
                 if (ticketConfig == null) {
-                    message.channel.send("Il n'y a pas de categorie définie pour les tickets, vous pouvez la définir avec : "+config.command_prefix+this.commandName+" set category idDeLaCategorie");
+                    message.channel.send("On dirait que vous n'avez pas encore configuré les tickets sur ce serveur, vous pouvez le faire en définissant la catégorie via : "+config.command_prefix+this.commandName+" set idDeLaCategorie")
                 } else {
                     ticketConfig.enabled = true; // @ts-ignore
                     ticketConfig.save();
-                    message.channel.send("La fonctionalité des tickets a été activée. \nFaite '"+config.command_prefix+this.commandName+" show [category ou permissions]' pour voir le nom de la catégorie dans laquelle apparaitrons les tickets, ou bien les rôles autorisés à accéder aux tickets");
+                    message.channel.send("La fonctionalité des tickets a été activée. \nFaite '"+config.command_prefix+this.commandName+" show ' pour voir le nom de la catégorie dans laquelle apparaitrons les tickets");
                 }
                 return true;
 
