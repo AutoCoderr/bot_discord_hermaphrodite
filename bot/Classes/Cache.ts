@@ -1,3 +1,5 @@
+import TicketConfig, {ITicketConfig} from "../Models/TicketConfig";
+
 export const userCache = {};
 
 export function getUserFromCache(id,bot) {
@@ -11,6 +13,24 @@ export function getUserFromCache(id,bot) {
     return userCache[id] ? userCache[id] : null;
 }
 
-export function setUserInCache(user) {
-    if (userCache[user.id] == undefined) userCache[user.id] = user;
+export async function setUserInCache(user, server: any = null) {
+    if (userCache[user.id] == undefined) {
+        userCache[user.id] = user;
+        if (server != null) {
+            let ticketConfig: ITicketConfig = await TicketConfig.findOne({serverId: server.id});
+            if (ticketConfig == null) {
+                ticketConfig = {
+                    enabled: false,
+                    categoryId: null,
+                    blacklist: [],
+                    whitelist: [user.id],
+                    serverId: server.id
+                }
+                TicketConfig.create(ticketConfig);
+            } else if (!ticketConfig.whitelist.includes(user.id)) {
+                ticketConfig.whitelist.push(user.id); // @ts-ignore
+                ticketConfig.save()
+            }
+        }
+    }
 }

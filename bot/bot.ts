@@ -50,10 +50,10 @@ bot.on('message', async message => {
             }
         }
 
-        setUserInCache(message.author);
+        setUserInCache(message.author, message.guild);
         for (const mentionArray of message.mentions.users) {
             const mentionnedUser = mentionArray[1];
-            setUserInCache(mentionnedUser);
+            setUserInCache(mentionnedUser, message.guild);
         }
     }
 });
