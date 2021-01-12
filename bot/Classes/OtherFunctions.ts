@@ -35,6 +35,16 @@ export function extractRoleId(roleMention) {
     return roleId;
 }
 
+export function extractUserId(userMention) {
+    let userId = userMention.split("<@")[1];
+    if (userId == undefined) return false;
+    if (userId[0] == "!") userId = userId.substring(1);
+    if (userId[userId.length-1] != ">") return false;
+    userId = userId.substring(0,userId.length-1);
+    if (userId.length != 18) return false;
+    return userId;
+}
+
 export function getRolesFromList(specifiedRoles, message) {
     let rolesId: Array<string> = [];
     let roles: Array<any> = [];

@@ -78,7 +78,7 @@ export class Perm extends Command {
                 }
                 Embed.addFields({
                     name: "Les roles :",
-                    value: roles.join(",")
+                    value: roles.join(", ")
                 });
             }
             message.channel.send(Embed);

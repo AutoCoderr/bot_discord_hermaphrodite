@@ -11,7 +11,12 @@ export class CommunicateTicketClientSide extends Command {
     }
 
     static async action(message,bot) {
-        const ticketConfigs: Array<ITicketConfig> = await TicketConfig.find({enabled: true});
+        const ticketConfigs: Array<ITicketConfig> = await TicketConfig.find(
+            {
+                enabled: true,
+                blacklist: { $ne: message.author.id },
+                whitelist: message.author.id
+            });
         if (ticketConfigs.length == 0) {
             message.channel.send("Il n'y aucun serveur avec la fonctionnalité ticket activée de disponible");
             return false;
