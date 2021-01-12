@@ -31,15 +31,19 @@ export default function init(bot) {
                         const message = messageArray[1];
                         for (const mentionArray of message.mentions.users) {
                             const mentionnedUser = mentionArray[1];
-                            if (!ticketConfig.whitelist.includes(mentionnedUser.id))
-                                ticketConfig.whitelist.push(mentionnedUser.id);
-                            setUserInCache(mentionnedUser);
+                            if (!mentionnedUser.bot) {
+                                if (!ticketConfig.whitelist.includes(mentionnedUser.id))
+                                    ticketConfig.whitelist.push(mentionnedUser.id);
+                                setUserInCache(mentionnedUser);
+                            }
                         }
-                        if (!ticketConfig.whitelist.includes(message.author.id))
-                            ticketConfig.whitelist.push(message.author.id);
+                        if (!message.author.bot) {
+                            if (!ticketConfig.whitelist.includes(message.author.id))
+                                ticketConfig.whitelist.push(message.author.id);
+                            checkeds += 1;
+                            setUserInCache(message.author);
+                        }
 
-                        setUserInCache(message.author);
-                        checkeds += 1;
                         console.log(checkeds+" messages checked");
                     }
                 }

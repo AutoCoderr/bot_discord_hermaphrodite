@@ -48,12 +48,12 @@ bot.on('message', async message => {
                 ticketConfig.whitelist.push(message.author.id);// @ts-ignore
                 ticketConfig.save();
             }
-        }
 
-        setUserInCache(message.author, message.guild);
-        for (const mentionArray of message.mentions.users) {
-            const mentionnedUser = mentionArray[1];
-            setUserInCache(mentionnedUser, message.guild);
+            setUserInCache(message.author, message.guild);
+            for (const mentionArray of message.mentions.users) {
+                const mentionnedUser = mentionArray[1];
+                setUserInCache(mentionnedUser, message.guild);
+            }
         }
     }
 });

@@ -224,33 +224,59 @@ export class ConfigTicket extends Command {
     static async showUsersInList(bot, message, serverId, blacklist = false) {
         let ticketConfig: ITicketConfig = await TicketConfig.findOne({serverId: serverId});
 
-        let Embed = new Discord.MessageEmbed()
+        let Embeds = [new Discord.MessageEmbed()
             .setColor('#0099ff')
             .setTitle("Les utilisateurs de la "+(blacklist ? "blacklist" : "whitelist")+" :")
             .setDescription("Liste des utilisateurs de la "+(blacklist ? "blacklist" : "whitelist"))
-            .setTimestamp();
+            .setTimestamp()];
 
         if (ticketConfig == null ||
             (blacklist && ticketConfig.blacklist.length == 0) ||
             (!blacklist && ticketConfig.whitelist.length == 0)) {
-            Embed.addFields({
+            Embeds[0].addFields({
                 name: "Aucun utilisateur",
                 value: "Il n'y a aucun utilisateur dans la "+(blacklist ? "blacklist" : "whitelist")
             });
         } else {
             const list = blacklist ? ticketConfig.blacklist : ticketConfig.whitelist;
-            const users: Array<string> = [];
+            let users: Array<any> = [];
 
-            for (let userId of list) {
+            for (const userId of list) {
                 const user = getUserFromCache(userId,bot);
-                users.push("@"+(user != null ? user.username : "unknown"));
+                users.push(user);
             }
-            Embed.addFields({
-                name: "Les utilisateurs :",
-                value: users.join(", ")
+            users.sort((user1: any, user2: any) => {
+                return user1.username.toLowerCase() > user2.username.toLowerCase() ? 1 : -1;
             });
+
+            const linePerMessage = 5;
+            const userDisplayedPerLine = 10;
+
+            for  (let msg=0; msg*linePerMessage*userDisplayedPerLine < users.length; msg ++) {
+                if (msg > 0) {
+                    Embeds.push(new Discord.MessageEmbed()
+                        .setColor('#0099ff')
+                        .setTitle("Les utilisateurs de la "+(blacklist ? "blacklist" : "whitelist")+" (Partie "+(msg+1)+") :")
+                        .setDescription("Liste des utilisateurs de la "+(blacklist ? "blacklist" : "whitelist"))
+                        .setTimestamp());
+                }
+                let Embed = Embeds[Embeds.length-1];
+                for (let line = 0; line < linePerMessage && msg*linePerMessage*userDisplayedPerLine + line*userDisplayedPerLine < users.length; line++) {
+                    let usersNames: Array<string> = [];
+                    for (let userIndex=0;userIndex < userDisplayedPerLine && msg*linePerMessage*userDisplayedPerLine + line*userDisplayedPerLine + userIndex < users.length;userIndex++) {
+                        const user = users[msg*linePerMessage*userDisplayedPerLine + line*userDisplayedPerLine + userIndex];
+                        usersNames.push("@"+(user != null ? user.username : "unknown"));
+                    }
+                    Embed.addFields({
+                        name: "Les utilisateurs :",
+                        value: usersNames.join(", ")
+                    });
+                }
+            }
         }
-        message.channel.send(Embed);
+        for (let Embed of Embeds) {
+            message.channel.send(Embed);
+        }
         return true;
     }
 
