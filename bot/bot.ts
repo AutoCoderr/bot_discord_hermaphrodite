@@ -15,6 +15,7 @@ const bot = new Discord.Client();
 
 // check all commands
 bot.on('message', async message => {
+    //console.log(message.content)
     for (let commandName in existingCommands) {
         const command = existingCommands[commandName].commandClass;
         command.check(message, bot);

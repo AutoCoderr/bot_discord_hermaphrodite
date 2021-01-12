@@ -53,6 +53,9 @@ export class CommunicateTicketClientSide extends Command {
                 usedCommunication.usedByUser = false;// @ts-ignore
                 usedCommunication.save();
                 usedCommunication = null;
+            } else {
+                usedCommunication.lastUse = date.getTime();// @ts-ignore
+                usedCommunication.save();
             }
         }
         if (usedCommunication == null) {
@@ -134,17 +137,17 @@ export class CommunicateTicketClientSide extends Command {
             }).then(_ => {});
 
         if (message.content == config.command_prefix+"server") {
-            message.channel.send("Le serveur a été sélectionné");
+            message.channel.send("*Serveur configuré*");
         } else {
-            this.sendTicket(bot, message, <ITicketCommunication>usedCommunication, ticketConfig);
+            this.sendTicket(bot, message, <ITicketCommunication>usedCommunication, ticketConfig, true);
         }
     }
 
-    static async sendTicket(bot, message, usedCommunication: ITicketCommunication, ticketConfig: ITicketConfig) {
+    static async sendTicket(bot, message, usedCommunication: ITicketCommunication, ticketConfig: ITicketConfig, displayInfo = false) {
         const server = bot.guilds.cache.get(usedCommunication.serverId);
         const categoryChannel = server.channels.cache.get(ticketConfig.categoryId);
         if (categoryChannel == undefined || categoryChannel.type != "category") {
-            message.channel.send("On dirait que la catégorie configurée sur le serveur n'est pas correcte");
+            message.channel.send("*On dirait que la catégorie configurée sur le serveur n'est pas correcte*");
             return;
         }
         let channelToWrite;
@@ -161,10 +164,6 @@ export class CommunicateTicketClientSide extends Command {
         }
 
         channelToWrite.send(message.content);
-        message.channel.send("Votre message a été envoyé sur le serveur '"+server.name+"'").then(sentMessage => {
-            setTimeout(() => {
-                sentMessage.delete();
-            }, 1000);
-        })
+        if (displayInfo) message.channel.send("*Votre message a été envoyé sur le serveur '"+server.name+"'*")
     }
 }
