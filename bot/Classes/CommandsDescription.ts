@@ -6,8 +6,11 @@ import { ConfigWelcome } from "../Commands/ConfigWelcome";
 import { Perm } from "../Commands/Perm";
 import { HistoryCmd } from "../Commands/HistoryCmd";
 import { HistoryExec } from "../Commands/HistoryExec";
+import { ConfigTicket } from "../Commands/ConfigTicket";
+import { CommunicateTicketClientSide } from "../Commands/CommunicateTicketClientSide";
 import { HelloWorld } from "../Commands/HelloWorld";
 import { Help } from "../Commands/Help";
+import {CommunicateTicketModeratorSide} from "../Commands/CommunicateTicketModeratorSide";
 
 export const existingCommands = {
     notifyOnReact : {
@@ -44,6 +47,19 @@ export const existingCommands = {
         msg: "Pour executer des commandes de l'historique\n"+config.command_prefix+HistoryExec.commandName+" help",
         commandClass: HistoryExec,
         display: true
+    },
+    configTicket: {
+        msg: "Pour définir la catégorie pour les channels des tickets, activer, ou désactiver les ticket\n"+config.command_prefix+ConfigTicket.commandName+" help",
+        commandClass: ConfigTicket,
+        display: true
+    },
+    communicateTicketClientSide: {
+        commandClass: CommunicateTicketClientSide,
+        display: false
+    },
+    communicateTicketModeratorSide: {
+        commandClass: CommunicateTicketModeratorSide,
+        display: false
     },
     hello: {
         commandClass: HelloWorld,

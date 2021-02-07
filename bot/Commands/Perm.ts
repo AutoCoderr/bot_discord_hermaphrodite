@@ -3,6 +3,7 @@ import Command from "../Classes/Command";
 import { existingCommands } from "../Classes/CommandsDescription";
 import Permissions, { IPermissions } from "../Models/Permissions";
 import Discord from "discord.js";
+import {getRolesFromList} from "../Classes/OtherFunctions";
 
 interface IPerm {
     0: string; // set or add
@@ -77,7 +78,7 @@ export class Perm extends Command {
                 }
                 Embed.addFields({
                     name: "Les roles :",
-                    value: roles.join(",")
+                    value: roles.join(", ")
                 });
             }
             message.channel.send(Embed);
@@ -97,32 +98,12 @@ export class Perm extends Command {
 
         // Attribute or add the specified allowed roles to the specified command
         const specifiedRoles = args[2].split(",");
-        let rolesId: Array<string> = [];
-        for (let specifiedRole of specifiedRoles) {
-            if (specifiedRole == '') continue;
-            // @ts-ignore
-            let roleId: string = specifiedRole.replaceAll(" ","")
-            roleId = roleId.split("<@&")[1];
-
-            if (roleId == undefined) {
-                this.sendErrors(message, {
-                    name: "Role badly specified",
-                    value: "You to specified an existing role, with the '@'"
-                });
-                return false;
-            }
-
-            roleId = roleId.split(">")[0];
-            let role = message.guild.roles.cache.get(roleId)
-            if (role == undefined) {
-                this.sendErrors(message, {
-                    name: "Role doesn't exist",
-                    value: "A specified role doesn't exist"
-                });
-                return false;
-            }
-            rolesId.push(roleId);
+        const rolesResponse: any = getRolesFromList(specifiedRoles, message);
+        if (!rolesResponse.success) {
+            this.sendErrors(message, rolesResponse.errors);
+            return false;
         }
+        const { rolesId } = rolesResponse;
 
         const serverId = message.guild.id;
 
