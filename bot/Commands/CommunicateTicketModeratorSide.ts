@@ -18,24 +18,30 @@ export class CommunicateTicketModeratorSide extends Command {
             message.channel.send("*L'utilisateur auteur de ce ticket n'est pas présent dans le cache et ne peux donc pas être contacté*");
             return false;
         }
-
-        const currentTime = new Date();
-        if (currentTime.getTime() - usedCommunication.lastUse > 5 * 60 * 1000 || !usedCommunication.usedByUser) {
-            userToWrite.send("*Un modérateur de '"+message.guild.name+"' vous répond :*");
-            usedCommunication.usedByUser = true;
-            TicketCommunication.updateMany(
+        try {
+            const currentTime = new Date();
+            if (currentTime.getTime() - usedCommunication.lastUse > 5 * 60 * 1000 || !usedCommunication.usedByUser) {
+                await userToWrite.send("*Un modérateur de '" + message.guild.name + "' vous répond :*");
+                usedCommunication.usedByUser = true;
+                TicketCommunication.updateMany(
                     {
                         customerId: usedCommunication.customerId,
                         serverId: { $ne: usedCommunication.serverId }
                     },
                     {
                         $set: { usedByUser: false }
-                    }).then(_ => {});
-        }
-        usedCommunication.lastUse = currentTime.getTime(); // @ts-ignore
+                    }).then(_ => {
+                });
+            }
+            usedCommunication.lastUse = currentTime.getTime();
+            await userToWrite.send(message.content);
+        } catch(e) {
+            if (e.message == "Cannot send messages to this user") {
+                message.channel.send("Cet utilisateur n'accepte pas les messages privés")
+            }
+            return false;
+        }// @ts-ignore
         usedCommunication.save();
-        userToWrite.send(message.content);
-
         return false;
     }
 
