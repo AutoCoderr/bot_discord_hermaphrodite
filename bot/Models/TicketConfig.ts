@@ -7,7 +7,6 @@ export interface ITicketConfig {
     enabled: boolean;
     categoryId: string|null;
     blacklist: Array<string>;
-    whitelist: Array<string>;
     serverId: string;
 }
 
@@ -15,7 +14,6 @@ const TicketConfigSchema: Schema = new Schema({
     enabled: { type: Boolean, required: true },
     categoryId: { type: String },
     blacklist: { type: Array },
-    whitelist: { type: Array },
     serverId: { type: String, required: true }
 });
 

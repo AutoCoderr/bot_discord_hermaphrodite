@@ -1,6 +1,5 @@
 import Command from "../Classes/Command";
 import TicketCommunication, { ITicketCommunication } from "../Models/TicketCommunication";
-import {getUserFromCache} from "../Classes/Cache";
 
 export class CommunicateTicketModeratorSide extends Command {
     static ticketCommunication = {};
@@ -13,8 +12,10 @@ export class CommunicateTicketModeratorSide extends Command {
         const usedCommunication: ITicketCommunication = await TicketCommunication.findOne({ticketChannelId: message.channel.id});
         if (usedCommunication == null) return false;
 
-        const userToWrite = getUserFromCache(usedCommunication.customerId,bot);
-        if (userToWrite == null) {
+        let userToWrite;
+        try {
+            userToWrite = await message.guild.members.fetch(usedCommunication.customerId);
+        } catch(e) {
             message.channel.send("*L'utilisateur auteur de ce ticket n'est pas présent dans le cache et ne peux donc pas être contacté*");
             return false;
         }
