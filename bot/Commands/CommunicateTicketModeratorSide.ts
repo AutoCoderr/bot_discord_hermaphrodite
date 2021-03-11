@@ -1,5 +1,6 @@
 import Command from "../Classes/Command";
 import TicketCommunication, { ITicketCommunication } from "../Models/TicketCommunication";
+import TicketConfig, {ITicketConfig} from "../Models/TicketConfig";
 
 export class CommunicateTicketModeratorSide extends Command {
     static ticketCommunication = {};
@@ -9,14 +10,29 @@ export class CommunicateTicketModeratorSide extends Command {
     }
 
     static async action(message, bot) {
+        const ticketConfig: ITicketConfig = await TicketConfig.findOne({
+            serverId: message.guild.id,
+            enabled: true
+        });
+
+        if (ticketConfig == null) {
+            message.channel.send("*Ce message ne peut être envoyé, car les tickets ne sont pas correctement configurés sur ce serveur*");
+            return false;
+        }
+
         const usedCommunication: ITicketCommunication = await TicketCommunication.findOne({ticketChannelId: message.channel.id});
         if (usedCommunication == null) return false;
+
+        if (ticketConfig.blacklist.includes(usedCommunication.customerId)) {
+            message.channel.send("*Ce message ne peut être envoyé, car l'utilisateur de ce ticket se trouve dans la blacklist*");
+            return false;
+        }
 
         let userToWrite;
         try {
             userToWrite = await message.guild.members.fetch(usedCommunication.customerId);
         } catch(e) {
-            message.channel.send("*L'utilisateur auteur de ce ticket n'est pas présent dans le cache et ne peux donc pas être contacté*");
+            message.channel.send("*L'utilisateur auteur de ce ticket n'est pas présent sur ce serveur et ne peut donc pas être contacté*");
             return false;
         }
 

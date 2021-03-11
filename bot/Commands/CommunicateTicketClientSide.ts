@@ -18,8 +18,16 @@ export class CommunicateTicketClientSide extends Command {
             });
 
         let serverIds: Array<string> = [];
-        for (let ticketConfig of ticketConfigs) { // Récupère les id des serveurs sur lesquels les tickets sont activés
-            serverIds.push(ticketConfig.serverId);
+        for (let i=0;i<ticketConfigs.length;i++) { // Récupère les id des serveurs sur lesquels les tickets sont activés
+            const ticketConfig = ticketConfigs[i];
+            try {
+                const guild = await bot.guilds.fetch(ticketConfig.serverId);
+                await guild.members.fetch(message.author.id);
+                serverIds.push(ticketConfig.serverId);
+            } catch(e) {
+                ticketConfigs.splice(i,1);
+                i -= 1;
+            }
         }
 
         if (ticketConfigs.length == 0) {
