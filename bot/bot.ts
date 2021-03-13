@@ -4,9 +4,7 @@ import { existingCommands } from "./Classes/CommandsDescription";
 import WelcomeMessage, {IWelcomeMessage} from "./Models/WelcomeMessage";
 
 import * as Discord from "discord.js";
-import {setUserInCache} from "./Classes/Cache";
 import init from "./init";
-import TicketConfig, {ITicketConfig} from "./Models/TicketConfig";
 
 
 
@@ -33,26 +31,6 @@ bot.on('message', async message => {
                         message.channel.send("<@"+message.author.id+"> \n\n"+welcomeMessage.message);
                     }
                 }
-            }// @ts-ignore
-            let ticketConfig: ITicketConfig = await TicketConfig.findOne({serverId: message.guild.id})
-            if (ticketConfig == null) {
-                ticketConfig = {
-                    enabled: false,
-                    categoryId: null,
-                    blacklist: [],
-                    whitelist: [message.author.id], // @ts-ignore
-                    serverId: message.guild.id
-                };
-                TicketConfig.create(ticketConfig);
-            } else if (!ticketConfig.whitelist.includes(message.author.id)) {
-                ticketConfig.whitelist.push(message.author.id);// @ts-ignore
-                ticketConfig.save();
-            }
-
-            setUserInCache(message.author, message.guild);
-            for (const mentionArray of message.mentions.users) {
-                const mentionnedUser = mentionArray[1];
-                setUserInCache(mentionnedUser, message.guild);
             }
         }
     }

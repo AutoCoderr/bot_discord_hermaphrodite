@@ -14,16 +14,25 @@ export class CommunicateTicketClientSide extends Command {
         const ticketConfigs: Array<ITicketConfig> = await TicketConfig.find(
             {
                 enabled: true,
-                blacklist: { $ne: message.author.id },
-                whitelist: message.author.id
+                blacklist: { $ne: message.author.id }
             });
+
+        let serverIds: Array<string> = [];
+        for (let i=0;i<ticketConfigs.length;i++) { // Récupère les id des serveurs sur lesquels les tickets sont activés
+            const ticketConfig = ticketConfigs[i];
+            try {
+                const guild = await bot.guilds.fetch(ticketConfig.serverId);
+                await guild.members.fetch(message.author.id);
+                serverIds.push(ticketConfig.serverId);
+            } catch(e) {
+                ticketConfigs.splice(i,1);
+                i -= 1;
+            }
+        }
+
         if (ticketConfigs.length == 0) {
             message.channel.send("Il n'y aucun serveur avec la fonctionnalité ticket activée de disponible");
             return false;
-        }
-        let serverIds: Array<string> = [];
-        for (let ticketConfig of ticketConfigs) { // Récupère les id des serveurs sur lesquels les tickets sont activés
-            serverIds.push(ticketConfig.serverId);
         }
 
         const ticketCommunications: Array<ITicketCommunication> = await TicketCommunication.find({
@@ -51,11 +60,11 @@ export class CommunicateTicketClientSide extends Command {
             const date = new Date();
             if (date.getTime()-usedCommunication.lastUse > 60*60*1000) { // Si le dernier ticket date de plus d'une heure, on se ne se base pas dessus
                 usedCommunication.usedByUser = false;// @ts-ignore
-                usedCommunication.save();
+                await usedCommunication.save();
                 usedCommunication = null;
             } else {
                 usedCommunication.lastUse = date.getTime();// @ts-ignore
-                usedCommunication.save();
+                await usedCommunication.save();
             }
         }
         if (usedCommunication == null) {
