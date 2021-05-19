@@ -3,7 +3,7 @@ import History, {IHistory} from "../Models/History";
 import config from "../config";
 
 export function extractEmoteName(emote) {
-    let regex = new RegExp("\\<(a)?\\:[a-zA-Z0-9]{2,18}\\:[0-9]{18}\\>");
+    let regex = new RegExp("\<(a)?\:[a-zA-Z0-9_-]{2,18}\\:[0-9]{18}\\>");
     if (!regex.test(emote)) return false;
     let emoteName = emote.split(":")[1].split(":")[0];
     return emoteName != undefined ? emoteName : false;
