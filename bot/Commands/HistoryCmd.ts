@@ -1,23 +1,36 @@
 import config from "../config";
 import Command from "../Classes/Command";
 import { getHistory } from "../Classes/OtherFunctions";
-import Discord from "discord.js";
+import Discord, {Message} from "discord.js";
 
 export class HistoryCmd extends Command {
-    static commandName = "history"
 
-    static async action(message, bot) {
-        const args = this.parseCommand(message);
+    static staticCommandName = "history";
+
+    constructor(message: Message) {
+        super(message, HistoryCmd.staticCommandName);
+    }
+
+    async action(bot) {
+        const args = this.parseCommand();
 
         if (args[0] == "help") {
-            this.displayHelp(message);
+            this.displayHelp();
             return false;
         }
 
-        const response = await getHistory(message,args);
+        if (this.message.guild == null) {
+            this.sendErrors({
+                name: "Guild missing",
+                value: "We cannot find the message guild"
+            });
+            return false;
+        }
+
+        const response = await getHistory(this.message,args);
 
         if (response.errors.length > 0) {
-            this.sendErrors(message, response.errors);
+            this.sendErrors(response.errors);
             return false;
         }
 
@@ -31,14 +44,14 @@ export class HistoryCmd extends Command {
                 if (i % 50 == 0) {
                     Embed = new Discord.MessageEmbed()
                         .setColor('#0099ff')
-                        .setTitle("L'historique des commandes (Partie "+((i/50)+1)+") (limité à "+response.limit+") :")
+                        .setTitle("L'historique des commandes (Partie "+((i/50)+1)+") "+(<number>response.limit > 0 ? "(limité à "+response.limit+")" : "(Sans limite)")+" :")
                         .setDescription("Liste des commandes qui ont été tapées :")
                         .setTimestamp();
                     Embeds.push(Embed);
                 }
                 const history = histories[i];
-                const user = message.guild.members.cache.get(history.userId);
-                const channel = message.guild.channels.cache.get(history.channelId);
+                const user = this.message.guild.members.cache.get(history.userId);
+                const channel = this.message.guild.channels.cache.get(history.channelId);
 
                 const userName = user != undefined ? user.nickname : "unknown";
                 const channelName = channel != undefined ? channel.name : "unknown"
@@ -60,12 +73,12 @@ export class HistoryCmd extends Command {
                 }));
         }
         for (let Embed of Embeds) {
-            message.channel.send(Embed);
+            this.message.channel.send(Embed);
         }
         return true;
     }
 
-    static help(Embed) {
+    help(Embed) {
         Embed.addFields({
             name: "Arguments :",
             value: "-c ou --command, la commande dont on souhaite voir l'historique\n"+
@@ -79,5 +92,5 @@ export class HistoryCmd extends Command {
             })
     }
 
-    static async saveHistory(message) {} // overload saveHistory of Command class to save nothing in the history
+    saveHistory() {} // overload saveHistory of Command class to save nothing in the history
 }

@@ -2,7 +2,7 @@ import config from "../config";
 import Command from "../Classes/Command";
 import { existingCommands } from "../Classes/CommandsDescription";
 import Permissions, { IPermissions } from "../Models/Permissions";
-import Discord from "discord.js";
+import Discord, {Message} from "discord.js";
 import {getRolesFromList} from "../Classes/OtherFunctions";
 
 interface IPerm {
@@ -12,14 +12,18 @@ interface IPerm {
 }
 
 export class Perm extends Command {
-    static commandName = "perm";
+    static staticCommandName = "perm";
 
-    static async action(message, bot) { //%perm set commandName @role
-        const args: IPerm = this.parseCommand(message);
+    constructor(message: Message) {
+        super(message, Perm.staticCommandName);
+    }
+
+    async action(bot) { //%perm set commandName @role
+        const args: IPerm = this.parseCommand();
 
         // check if arguments are correctly filled
         if (typeof(args[0]) == "undefined" || (args[0] != "add" && args[0] != "set" && args[0] != "show" && args[0] != "help")) {
-            this.sendErrors(message, {
+            this.sendErrors({
                 name: "Incorrect parametter",
                 value: "Incorrect parametter, please type 'add', 'set', 'show', or 'help'"
             });
@@ -27,21 +31,29 @@ export class Perm extends Command {
         }
 
         if (args[0] == "help") {
-            this.displayHelp(message);
+            this.displayHelp();
+            return false;
+        }
+
+        if (this.message.guild == null) {
+            this.sendErrors({
+                name: "Guild missing",
+                value: "We cannot find the message guild"
+            });
             return false;
         }
 
         const action = args[0];
 
         if (typeof(args[1]) == "undefined") {
-            this.sendErrors(message, {
+            this.sendErrors({
                 name: "Command name missing",
                 value: "The command name is not specified"
             });
             return false;
         }
         if (!Object.keys(existingCommands).includes(args[1]) || !existingCommands[args[1]].display) {
-            this.sendErrors(message, {
+            this.sendErrors({
                 name: "Command name doesn't exist",
                 value: "The command '"+args[1]+"' doesn't exist"
             });
@@ -51,7 +63,7 @@ export class Perm extends Command {
         const commandName = args[1];
 
         if (action == "show") { // Show the roles which are allowed to execute the specified command
-            const permissions = await Permissions.find({command: commandName, serverId: message.guild.id});
+            const permissions = await Permissions.find({command: commandName, serverId: this.message.guild.id});
 
             let Embed = new Discord.MessageEmbed()
                 .setColor('#0099ff')
@@ -67,7 +79,7 @@ export class Perm extends Command {
             } else {
                 let roles: Array<string> = [];
                 for (let roleId of permissions[0].roles) {
-                    let role = message.guild.roles.cache.get(roleId);
+                    let role = this.message.guild.roles.cache.get(roleId);
                     let roleName: string;
                     if (role == undefined) {
                         roleName = "unknown";
@@ -81,14 +93,14 @@ export class Perm extends Command {
                     value: roles.join(", ")
                 });
             }
-            message.channel.send(Embed);
+            this.message.channel.send(Embed);
             return true;
         }
 
 
 
         if (typeof(args[2]) == "undefined") { // check if the roles to attibute to that command are correctly filled
-            this.sendErrors(message, {
+            this.sendErrors({
                 name: "Roles missing",
                 value: "The roles are not specified"
             });
@@ -98,14 +110,14 @@ export class Perm extends Command {
 
         // Attribute or add the specified allowed roles to the specified command
         const specifiedRoles = args[2].split(",");
-        const rolesResponse: any = getRolesFromList(specifiedRoles, message);
+        const rolesResponse: any = getRolesFromList(specifiedRoles, this.message);
         if (!rolesResponse.success) {
-            this.sendErrors(message, rolesResponse.errors);
+            this.sendErrors(rolesResponse.errors);
             return false;
         }
         const { rolesId } = rolesResponse;
 
-        const serverId = message.guild.id;
+        const serverId = this.message.guild.id;
 
         const permissions = await Permissions.find({serverId: serverId, command: commandName});
 
@@ -121,7 +133,7 @@ export class Perm extends Command {
             if (action == "add") {
                 for (let roleId of rolesId) {
                     if (permission.roles.includes(roleId)) {
-                        this.sendErrors(message, {
+                        this.sendErrors({
                             name: "Role already added",
                             value: "That role is already attributed for that command"
                         });
@@ -134,11 +146,11 @@ export class Perm extends Command {
             }
             await permission.save();
         }
-        message.channel.send("Permission added or setted successfully!");
+        this.message.channel.send("Permission added or setted successfully!");
         return true;
     }
 
-    static help(Embed) {
+    help(Embed) {
         Embed
             .addFields({
                 name: "Arguments :",

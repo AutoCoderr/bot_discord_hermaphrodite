@@ -3,21 +3,32 @@ import * as Discord from "discord.js";
 import { addMissingZero } from "./OtherFunctions";
 import Permissions, { IPermissions } from "../Models/Permissions";
 import History, {IHistory} from "../Models/History";
+import {isNumber} from "./OtherFunctions";
+import {Message} from "discord.js";
 
 export default class Command {
 
-    static commandName: string|null = null;
+    static staticCommandName: null|string = null;
 
-    static async match(message) {
-        if (this.commandName == null) return false;
-        return message.content.split(" ")[0] == config.command_prefix+this.commandName;
+    commandName: null|string;
+    message: Message;
+
+    constructor(message: Message, commandName: null|string) {
+        this.message = message;
+        this.commandName = commandName
     }
 
-    static sendErrors(message, errors: Object|Array<Object>, displayHelp: boolean = true){
+
+    async match() {
+        if (this.commandName == null) return false;
+        return this.message.content.split(" ")[0] == config.command_prefix+this.commandName;
+    }
+
+    sendErrors(errors: Object|Array<Object>, displayHelp: boolean = true){
         if (!(errors instanceof Array)) {
             errors = [errors];
         }
-        const commandName = message.content.split(" ")[0];
+        const commandName = this.message.content.split(" ")[0];
         let Embed = new Discord.MessageEmbed()
             .setColor('#0099ff')
             .setTitle('Error in '+commandName)
@@ -34,29 +45,29 @@ export default class Command {
             this.help(Embed);
         }
 
-        message.channel.send(Embed);
+        this.message.channel.send(Embed);
     }
 
-    static displayHelp(message) {
-        const commandName = message.content.split(" ")[0];
+    displayHelp() {
+        const commandName = this.message.content.split(" ")[0];
         let Embed = new Discord.MessageEmbed()
             .setColor('#0099ff')
             .setTitle('Aide pour la commande '+commandName)
             .setTimestamp()
         this.help(Embed);
-        message.channel.send(Embed);
+        this.message.channel.send(Embed);
     }
 
-    static async check(message,bot) {
-        if (await this.match(message) && await this.checkPermissions(message)) {
-            if (await this.action(message, bot)) {
-                this.saveHistory(message);
+    async check(bot) {
+        if (await this.match() && await this.checkPermissions()) {
+            if (await this.action(bot)) {
+                this.saveHistory();
             }
         }
     }
 
-    static saveHistory(message) {
-        if (message.author.bot) return; // Do nothing if the message is typed by a bot
+    saveHistory() {
+        if (this.message.author.bot) return; // Do nothing if the message is typed by a bot
 
         const date = new Date();
 
@@ -67,12 +78,12 @@ export default class Command {
             minute = addMissingZero(date.getMinutes()),
             seconds = addMissingZero(date.getSeconds());
 
-        const commandName = message.content.slice(1).split(" ")[0],
-            command = message.content.slice(1),
+        const commandName = this.message.content.slice(1).split(" ")[0],
+            command = this.message.content.slice(1),
             dateTime = year+"-"+month+"-"+day+" "+hour+":"+minute+":"+seconds,
-            channelId = message.channel.id,
-            userId = message.member.id,
-            serverId = message.guild.id;
+            channelId = this.message.channel.id,
+            userId = this.message.member != null ? this.message.member.id : "nobody",
+            serverId = this.message.guild != null ? this.message.guild.id : "nothing";
 
         const history: IHistory = {
             commandName,
@@ -86,15 +97,25 @@ export default class Command {
         History.create(history);
     }
 
-    static async checkPermissions(message, displayMsg = true) {
-        const commandName = this.commandName;
+    checkPermissions(displayMsg = true) {
+        return Command.staticCheckPermissions(this.message,displayMsg);
+    }
 
-        if(message.channel.type == "dm" || config.roots.includes(message.author.id) || message.member.hasPermission("ADMINISTRATOR")) return true;
+    static async staticCheckPermissions(message: Message, displayMsg = true) {
+        const commandName = this.staticCommandName;
 
-        const permission: IPermissions = await Permissions.findOne({serverId: message.guild.id, command: commandName});
-        if (permission != null) {
-            for (let roleId of message.member._roles) {
-                if (permission.roles.includes(roleId)) return true;
+        if(message.channel.type == "dm" || config.roots.includes(message.author.id) || (message.member && message.member.hasPermission("ADMINISTRATOR"))) return true;
+
+        if (message.member && message.guild) {
+            const permission: IPermissions = await Permissions.findOne({
+                serverId: message.guild.id,
+                command: commandName
+            });
+            if (permission != null) {
+                // @ts-ignore
+                for (let roleId of this.message.member._roles) {
+                    if (permission.roles.includes(roleId)) return true;
+                }
             }
         }
         if (displayMsg) {
@@ -108,10 +129,20 @@ export default class Command {
         return false;
     }
 
-    static parseCommand(message): any {
+    getValueInCorrectType(value: string) {
+        if (value == "true" || value == "false") {
+            return value == "true";
+        } else if (isNumber(value)) {
+            return parseInt(value);
+        } else {
+            return  value;
+        }
+    }
+
+    parseCommand(): any {
         let argsObject = {};
         let args = "";
-        const commandSplitted = message.content.split(" ");
+        const commandSplitted = this.message.content.split(" ");
         for (let i=1;i<commandSplitted.length;i++) {
             if (i > 1) {
                 args += " ";
@@ -143,14 +174,14 @@ export default class Command {
                             value += args[i];
                             i += 1;
                         }
-                        argsObject[attr] = value != "" ? value : true;
+                        argsObject[attr] = this.getValueInCorrectType(value);
                     } else {
                         let value = "";
                         while (i < args.length && args[i] != " ") {
                             value += args[i];
                             i += 1;
                         }
-                        argsObject[attr] = value != "" ? value : true;
+                        argsObject[attr] = this.getValueInCorrectType(value);
                     }
                 } else {
                     argsObject[attr] = true;
@@ -174,15 +205,15 @@ export default class Command {
                 while (typeof(argsObject[j]) != "undefined") {
                     j += 1;
                 }
-                argsObject[j] = value;
+                argsObject[j] = this.getValueInCorrectType(value);
             }
         }
         return argsObject;
     }
 
-    static help(Embed) {} // To be overloaded
+    help(Embed) {} // To be overloaded
 
-    static async action(message, bot) { // To be overloaded
+    async action(bot) { // To be overloaded
         return true;
     }
 }

@@ -3,21 +3,25 @@ import Command from "../Classes/Command";
 import { checkArgumentsNotifyOnReact, extractEmoteName, forEachNotifyOnReact } from "../Classes/OtherFunctions";
 import { existingCommands } from "../Classes/CommandsDescription";
 import StoredNotifyOnReact, { IStoredNotifyOnReact } from "../Models/StoredNotifyOnReact";
-import Discord from "discord.js";
+import Discord, {Message} from "discord.js";
 
 export class CancelNotifyOnReact extends Command {
-    static commandName = "cancelNotifyOnReact";
+    static staticCommandName = "cancelNotifyOnReact"
 
-    static async action(message,bot) {
-        const args = this.parseCommand(message);
+    constructor(message: Message) {
+        super(message, CancelNotifyOnReact.staticCommandName);
+    }
+
+    async action(bot) {
+        const args = this.parseCommand();
         if (!args) return false;
 
         if (typeof(args[0]) != "undefined" && args[0] == "help") {
-            this.displayHelp(message);
+            this.displayHelp();
             return false;
         }
 
-        const checked = await checkArgumentsNotifyOnReact(message, args)
+        const checked = await checkArgumentsNotifyOnReact(this.message, args)
 
         let errors = checked.errors,
             channelId = checked.channelId,
@@ -29,18 +33,22 @@ export class CancelNotifyOnReact extends Command {
         if (typeof(args.e) != "undefined") {
             emote = extractEmoteName(args.e);
             if (!emote) {
-                errors.push([{name: "Invalid emote", value: "Specified emote is invalid"}]);
+                errors.push({name: "Invalid emote", value: "Specified emote is invalid"});
             }
         }
 
+        if (this.message.guild == null || this.message.member == null) {
+            errors.push({name: "Missing data", value: "We can't find guild or member in the message object"});
+        }
+
         if (errors.length > 0) {
-            this.sendErrors(message, errors);
+            this.sendErrors(errors);
             return false;
         }
 
         if  (channelId == null && messageId == null && emote == null) {
             if (args[0] != "all") {
-                this.displayHelp(message);
+                this.displayHelp();
                 return true;
             }
         }
@@ -50,12 +58,12 @@ export class CancelNotifyOnReact extends Command {
             .setTitle('écoutes de réactions désactivées:')
             .setDescription("Ceci est la liste des écoutes de réactions désactivées :")
             .setTimestamp();
-
-        let listenings = existingCommands.notifyOnReact.commandClass.listenings[message.guild.id];
+        // @ts-ignore
+        let listenings = existingCommands.notifyOnReact.commandClass.listenings[this.message.guild.id];
         if (emote == null) {
             await forEachNotifyOnReact((found, channel, messageId, contentMessage, emote) => {
-                if (found) {
-                    this.deleteNotifyOnReactInBdd(message.guild.id,channel.id,messageId,emote);
+                if (found) { // @ts-ignore
+                    this.deleteNotifyOnReactInBdd(this.message.guild.id,channel.id,messageId,emote);
                     listenings[channel.id][messageId][emote] = false;
                     Embed.addFields({
                         name: "Supprimée : sur '#" + channel.name + "' (" + contentMessage + ") :" + emote + ":",
@@ -67,9 +75,9 @@ export class CancelNotifyOnReact extends Command {
                         value: "Aucune réaction n'a été trouvée et supprimée"
                     });
                 }
-            }, channelId, channel, messageId, contentMessage, message);
+            }, channelId, channel, messageId, contentMessage, this.message);
         } else {
-            if (typeof(listenings[channel.id][messageId][emote]) != "undefined") {
+            if (typeof(listenings[channel.id][messageId][emote]) != "undefined") { // @ts-ignore
                 this.deleteNotifyOnReactInBdd(message.guild.id,channel.id,messageId,emote);
                 listenings[channel.id][messageId][emote] = false;
                 Embed.addFields({
@@ -84,11 +92,11 @@ export class CancelNotifyOnReact extends Command {
             }
         }
 
-        message.channel.send(Embed);
+        this.message.channel.send(Embed);
         return true;
     }
 
-    static async deleteNotifyOnReactInBdd(serverId,channelId,messageId,emoteName) {
+    async deleteNotifyOnReactInBdd(serverId,channelId,messageId,emoteName) {
         await StoredNotifyOnReact.deleteOne({
             serverId: serverId,
             channelToListenId: channelId,
@@ -97,7 +105,7 @@ export class CancelNotifyOnReact extends Command {
         });
     }
 
-    static help(Embed) {
+    help(Embed) {
         Embed.addFields({
             name: "Arguments :",
             value: "--channel ou -ch, Spécifier le channel sur lequel désactifier l'écoute de réaction \n"+
@@ -114,4 +122,5 @@ export class CancelNotifyOnReact extends Command {
                     config.command_prefix+this.commandName+" all"
             });
     }
+
 }

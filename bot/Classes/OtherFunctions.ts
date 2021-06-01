@@ -94,7 +94,7 @@ export async function getHistory(message,args) {
         }
     }
 
-    let sort: string = "asc";
+    let sort: string = "desc";
     if (typeof(args.s) != "undefined" && typeof(args.sort) != "undefined") {
         errors.push({name: "-s or --sort", value: "Please use -s or --sort but not the both"});
     } else if (typeof(args.s) != "undefined" || typeof(args.sort) != "undefined") {
@@ -108,7 +108,7 @@ export async function getHistory(message,args) {
         }
     }
 
-    let limit: number = 0;
+    let limit: number = 5;
     if (typeof(args.l) != "undefined" && typeof(args.limit) != "undefined") {
         errors.push({name: "-l or --limit", value: "Please use -l or --limit but not the both"});
     } else if (typeof(args.l) != "undefined" || typeof(args.limit) != "undefined") {
@@ -183,7 +183,7 @@ export async function getHistory(message,args) {
     } else {
         where.commandName = { $nin: [] };
         for (let aCommand in existingCommands) {
-            if (!await existingCommands[aCommand].commandClass.checkPermissions(message,false)) {
+            if (!await existingCommands[aCommand].commandClass.staticCheckPermissions(message,false)) {
                 where.commandName.$nin.push(aCommand);
             }
         }
@@ -325,4 +325,10 @@ export async function forEachNotifyOnReact(callback, channelId, channel, message
             callback(false);
         }
     }
+}
+
+export function isNumber(num) {
+    return (typeof(num) == 'number' && !isNaN(num)) || (
+      typeof(num) == 'string' && parseInt(num).toString() == num && num != "NaN"
+    );
 }

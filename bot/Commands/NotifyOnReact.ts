@@ -2,7 +2,7 @@ import config from "../config";
 import Command from "../Classes/Command";
 import { extractEmoteName } from "../Classes/OtherFunctions";
 import StoredNotifyOnReact, { IStoredNotifyOnReact } from "../Models/StoredNotifyOnReact";
-import {existingCommands} from "../Classes/CommandsDescription";
+import {Message} from "discord.js";
 
 interface iNotifyOnReact extends Document {
     listen: string;
@@ -12,7 +12,6 @@ interface iNotifyOnReact extends Document {
 }
 
 export class NotifyOnReact extends Command {
-    static commandName = "notifyOnReact";
 
     static listenings = {}; /* example : {
     "773657730388852746": { // id d'un serveur
@@ -25,8 +24,17 @@ export class NotifyOnReact extends Command {
          }
         }*/
 
-    static async action(message, bot) { // notifyOnReact --listen #channel/messageId --message '$user$ a réagit à ce message' -e :yoyo: --writeChannel #channelB
-        const args: iNotifyOnReact = this.parseCommand(message);
+    static staticCommandName = "notifyOnReact";
+
+    constructor(message: Message) {
+        super(message, NotifyOnReact.staticCommandName);
+        this.listenings = NotifyOnReact.listenings;
+    }
+
+    listenings: any;
+
+    async action(bot) { // notifyOnReact --listen #channel/messageId --message '$user$ a réagit à ce message' -e :yoyo: --writeChannel #channelB
+        const args: iNotifyOnReact = this.parseCommand();
         if (!args) return false;
         let errors: Array<Object> = [];
 
@@ -37,7 +45,15 @@ export class NotifyOnReact extends Command {
         let emoteToReact;
 
         if (args[0] == "help") {
-            this.displayHelp(message);
+            this.displayHelp();
+            return false;
+        }
+
+        if (this.message.guild == null) {
+            this.sendErrors({
+                name: "Guild missing",
+                value: "We cannot find the message guild"
+            });
             return false;
         }
 
@@ -53,7 +69,7 @@ export class NotifyOnReact extends Command {
                 errors.push([{name: "Channel to listen not found", value: "Specified channel to listen does not exists"}]);
             } else {
                 channelId = channelId.substring(0,channelId.length-1);
-                channelToListen = message.guild.channels.cache.get(channelId);
+                channelToListen = this.message.guild.channels.cache.get(channelId);
 
                 if (channelToListen == undefined) {
                     errors.push([{name: "Channel to listen not found", value: "Specified channel to listen does not exists"}]);
@@ -92,7 +108,7 @@ export class NotifyOnReact extends Command {
                 errors.push([{name: "Channel to write not found", value: "Specified channel to write does not exists"}]);
             } else {
                 channelId = channelId.substring(0, channelId.length - 1);
-                channelToWrite = message.guild.channels.cache.get(channelId);
+                channelToWrite = this.message.guild.channels.cache.get(channelId);
                 if (channelToWrite == undefined) {
                     errors.push([{name: "Channel not found", value: "Specified channel does not exists"}]);
                 }
@@ -105,7 +121,7 @@ export class NotifyOnReact extends Command {
         }
 
         if (errors.length > 0) {
-            this.sendErrors(message,errors);
+            this.sendErrors(errors);
             return false;
         }
         const serverId = messageToListen.guild.id;
@@ -121,10 +137,10 @@ export class NotifyOnReact extends Command {
         }
         this.listenings[serverId][channelToListen.id][messageToListen.id][emoteName] = true; // Set the key of that reaction listener in the listenings Object
 
-        this.saveNotifyOnReact(messageToListen, channelToWrite, messageToWrite, emoteName, channelToListen);
-        this.reactingAndNotifyOnMessage(messageToListen, channelToWrite, messageToWrite, emoteName, channelToListen);
+        NotifyOnReact.saveNotifyOnReact(messageToListen, channelToWrite, messageToWrite, emoteName, channelToListen);
+        NotifyOnReact.reactingAndNotifyOnMessage(messageToListen, channelToWrite, messageToWrite, emoteName, channelToListen);
 
-        message.channel.send("Command sucessfully executed, all reactions to this message will be notified");
+        this.message.channel.send("Command sucessfully executed, all reactions to this message will be notified");
         return true;
     }
 
@@ -220,7 +236,7 @@ export class NotifyOnReact extends Command {
         }
     }
 
-    static help(Embed) {
+    help(Embed) {
         Embed.
         addFields({
             name: "Arguments :",

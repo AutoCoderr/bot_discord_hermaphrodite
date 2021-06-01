@@ -1,21 +1,26 @@
 import config from "../config";
 import { checkArgumentsNotifyOnReact, forEachNotifyOnReact } from "../Classes/OtherFunctions";
 import Command from "../Classes/Command";
-import Discord from "discord.js";
+import Discord, {Message} from "discord.js";
 
 export class ListNotifyOnReact extends Command {
-    static commandName = "listNotifyOnReact";
 
-    static async action(message,bot) {
-        const args = this.parseCommand(message);
+    static staticCommandName = "listNotifyOnReact";
+
+    constructor(message: Message) {
+        super(message, ListNotifyOnReact.staticCommandName);
+    }
+
+    async action(bot) {
+        const args = this.parseCommand();
         if (!args) return false;
 
         if (typeof(args[0]) != "undefined" && args[0] == "help") {
-            this.displayHelp(message);
+            this.displayHelp();
             return false;
         }
 
-        const checked = await checkArgumentsNotifyOnReact(message, args)
+        const checked = await checkArgumentsNotifyOnReact(this.message, args)
 
         let errors = checked.errors,
             channelId = checked.channelId,
@@ -24,7 +29,7 @@ export class ListNotifyOnReact extends Command {
             contentMessage = checked.contentMessage;
 
         if (errors.length > 0) {
-            this.sendErrors(message, errors);
+            this.sendErrors(errors);
             return false;
         }
 
@@ -48,13 +53,13 @@ export class ListNotifyOnReact extends Command {
                     value: "Aucune réaction n'a été trouvée"
                 });
             }
-        }, channelId, channel, messageId, contentMessage, message);
+        }, channelId, channel, messageId, contentMessage, this.message);
 
-        message.channel.send(Embed);
+        this.message.channel.send(Embed);
         return true;
     }
 
-    static help(Embed) {
+    help(Embed) {
         Embed.addFields({
             name: "Arguments :",
             value: "--channel ou -ch, Spécifier le channel sur lequel lister les écoutes de réactions \n"+

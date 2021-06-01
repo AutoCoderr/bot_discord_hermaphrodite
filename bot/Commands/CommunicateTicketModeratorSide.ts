@@ -1,44 +1,54 @@
 import Command from "../Classes/Command";
 import TicketCommunication, { ITicketCommunication } from "../Models/TicketCommunication";
 import TicketConfig, {ITicketConfig} from "../Models/TicketConfig";
+import {Message} from "discord.js";
+
+const ticketCommunicationChannels = {};
 
 export class CommunicateTicketModeratorSide extends Command {
-    static ticketCommunication = {};
 
-    static async match(message) {
-        return await this.checkIfItIsTicketChannel(message) && !message.author.bot;
+    constructor(message: Message) {
+        super(message, null);
     }
 
-    static async action(message, bot) {
+    async match() {
+        return await this.checkIfItIsTicketChannel() && !this.message.author.bot;
+    }
+
+    async action(bot) {
+        if (this.message.guild == null || this.message.member == null) {
+            this.message.channel.send("*Ni le serveur ni le membre associé à ce message n'ont put être trouvé*");
+            return false;
+        }
         const ticketConfig: ITicketConfig = await TicketConfig.findOne({
-            serverId: message.guild.id,
+            serverId: this.message.guild.id,
             enabled: true
         });
 
         if (ticketConfig == null) {
-            message.channel.send("*Ce message ne peut être envoyé, car les tickets ne sont pas correctement configurés sur ce serveur*");
+            this.message.channel.send("*Ce message ne peut être envoyé, car les tickets ne sont pas correctement configurés sur ce serveur*");
             return false;
         }
 
-        const usedCommunication: ITicketCommunication = await TicketCommunication.findOne({ticketChannelId: message.channel.id});
+        const usedCommunication: ITicketCommunication = await TicketCommunication.findOne({ticketChannelId: this.message.channel.id});
         if (usedCommunication == null) return false;
 
         if (ticketConfig.blacklist.includes(usedCommunication.customerId)) {
-            message.channel.send("*Ce message ne peut être envoyé, car l'utilisateur de ce ticket se trouve dans la blacklist*");
+            this.message.channel.send("*Ce message ne peut être envoyé, car l'utilisateur de ce ticket se trouve dans la blacklist*");
             return false;
         }
 
         let userToWrite;
         try {
-            userToWrite = await message.guild.members.fetch(usedCommunication.customerId);
+            userToWrite = await this.message.guild.members.fetch(usedCommunication.customerId);
         } catch(e) {
-            message.channel.send("*L'utilisateur auteur de ce ticket n'est pas présent sur ce serveur et ne peut donc pas être contacté*");
+            this.message.channel.send("*L'utilisateur auteur de ce ticket n'est pas présent sur ce serveur et ne peut donc pas être contacté*");
             return false;
         }
         try {
             const currentTime = new Date();
             if (currentTime.getTime() - usedCommunication.lastUse > 5 * 60 * 1000 || !usedCommunication.usedByUser) {
-                await userToWrite.send("*Un modérateur de '" + message.guild.name + "' vous répond :*");
+                await userToWrite.send("*Un modérateur de '" + this.message.guild.name + "' vous répond :*");
                 usedCommunication.usedByUser = true;
                 TicketCommunication.updateMany(
                     {
@@ -51,10 +61,10 @@ export class CommunicateTicketModeratorSide extends Command {
                 });
             }
             usedCommunication.lastUse = currentTime.getTime();
-            await userToWrite.send(message.content);
+            await userToWrite.send(this.message.content);
         } catch(e) {
             if (e.message == "Cannot send messages to this user") {
-                message.channel.send("Cet utilisateur n'accepte pas les messages privés")
+                this.message.channel.send("Cet utilisateur n'accepte pas les messages privés")
             }
             return false;
         }// @ts-ignore
@@ -62,11 +72,11 @@ export class CommunicateTicketModeratorSide extends Command {
         return false;
     }
 
-    static async checkIfItIsTicketChannel(message) {
-        if (this.ticketCommunication[message.channel.id] == undefined) {
-            const ticketCommunication: ITicketCommunication = await TicketCommunication.findOne({ticketChannelId: message.channel.id});
-            this.ticketCommunication[message.channel.id] = ticketCommunication != null;
+    async checkIfItIsTicketChannel() {
+        if (ticketCommunicationChannels[this.message.channel.id] == undefined) {
+            const ticketCommunication: ITicketCommunication = await TicketCommunication.findOne({ticketChannelId: this.message.channel.id});
+            ticketCommunicationChannels[this.message.channel.id] = ticketCommunication != null;
         }
-        return this.ticketCommunication[message.channel.id];
+        return ticketCommunicationChannels[this.message.channel.id];
     }
 }

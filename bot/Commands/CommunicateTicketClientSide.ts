@@ -2,19 +2,25 @@ import Command from "../Classes/Command";
 import TicketCommunication, {ITicketCommunication} from "../Models/TicketCommunication";
 import TicketConfig, {ITicketConfig} from "../Models/TicketConfig";
 import config from "../config";
+import {Message} from "discord.js";
+
+const usersInPrompt = {};
 
 export class CommunicateTicketClientSide extends Command {
-    static usersInPrompt = {};
 
-    static async match(message) {
-        return message.channel.type == "dm" && !message.author.bot && !this.usersInPrompt[message.author.id];
+    constructor(message: Message) {
+        super(message, null);
     }
 
-    static async action(message,bot) {
+    async match() {
+        return this.message.channel.type == "dm" && !this.message.author.bot && !usersInPrompt[this.message.author.id];
+    }
+
+    async action(bot) {
         const ticketConfigs: Array<ITicketConfig> = await TicketConfig.find(
             {
                 enabled: true,
-                blacklist: { $ne: message.author.id }
+                blacklist: { $ne: this.message.author.id }
             });
 
         let serverIds: Array<string> = [];
@@ -22,7 +28,7 @@ export class CommunicateTicketClientSide extends Command {
             const ticketConfig = ticketConfigs[i];
             try {
                 const guild = await bot.guilds.fetch(ticketConfig.serverId);
-                await guild.members.fetch(message.author.id);
+                await guild.members.fetch(this.message.author.id);
                 serverIds.push(ticketConfig.serverId);
             } catch(e) {
                 ticketConfigs.splice(i,1);
@@ -31,20 +37,20 @@ export class CommunicateTicketClientSide extends Command {
         }
 
         if (ticketConfigs.length == 0) {
-            message.channel.send("Il n'y aucun serveur avec la fonctionnalité ticket activée de disponible");
+            this.message.channel.send("Il n'y aucun serveur avec la fonctionnalité ticket activée de disponible");
             return false;
         }
 
         const ticketCommunications: Array<ITicketCommunication> = await TicketCommunication.find({
-            customerId: message.author.id,
+            customerId: this.message.author.id,
             serverId: { $in: serverIds }
         });
 
-        if (message.content == config.command_prefix+"server") {
+        if (this.message.content == config.command_prefix+"server") {
             if (ticketConfigs.length == 1) {
-                message.channel.send("Le seul serveur disponible est déjà utilisé par défaut");
+                this.message.channel.send("Le seul serveur disponible est déjà utilisé par défaut");
             } else {
-                this.selectServer(ticketConfigs, ticketCommunications, serverIds, message, bot);
+                this.selectServer(ticketConfigs, ticketCommunications, serverIds, bot);
             }
             return false;
         }
@@ -69,14 +75,14 @@ export class CommunicateTicketClientSide extends Command {
         }
         if (usedCommunication == null) {
             if (ticketConfigs.length == 1) {
-                this.getOrCreateTicketCommunication(bot, message, ticketCommunications, ticketConfigs[0]);
+                this.getOrCreateTicketCommunication(bot, ticketCommunications, ticketConfigs[0]);
             } else {
-                this.selectServer(ticketConfigs, ticketCommunications, serverIds, message, bot);
+                this.selectServer(ticketConfigs, ticketCommunications, serverIds, bot);
             }
         } else {
             for (let ticketConfig of ticketConfigs) {
                 if (ticketConfig.serverId == usedCommunication.serverId) {
-                    this.sendTicket(bot, message, usedCommunication, ticketConfig);
+                    this.sendTicket(bot, usedCommunication, ticketConfig);
                 }
             }
         }
@@ -84,7 +90,7 @@ export class CommunicateTicketClientSide extends Command {
         return false;
     }
 
-    static selectServer(ticketConfigs: Array<ITicketConfig>, ticketCommunications: Array<ITicketCommunication>, serverIds, message, bot) {
+    selectServer(ticketConfigs: Array<ITicketConfig>, ticketCommunications: Array<ITicketCommunication>, serverIds, bot) {
         let serversToChooseString = "";
         for (let i = 0; i < ticketConfigs.length; i++) {
             const ticketConfig = ticketConfigs[i];
@@ -95,26 +101,26 @@ export class CommunicateTicketClientSide extends Command {
             }
             serversToChooseString += "[" + i + "] " + server.name;
         }
-        message.channel.send("Veuillez choisir un des serveurs suivant, pour envoyer le ticket :");
-        message.channel.send(serversToChooseString).then(sentMessage => {
+        this.message.channel.send("Veuillez choisir un des serveurs suivant, pour envoyer le ticket :");
+        this.message.channel.send(serversToChooseString).then(sentMessage => {
             const listener = response => {
                 if (response.author.bot) return;
-                if (response.author.id == message.author.id && response.channel.id == message.channel.id) {
+                if (response.author.id == this.message.author.id && response.channel.id == this.message.channel.id) {
                     if (typeof(serverIds[parseInt(response.content)]) == "undefined") {
-                        message.channel.send("Veuillez rentrer le numéro d'un des serveurs ci dessus pour lui envoyer le ticket");
+                        this.message.channel.send("Veuillez rentrer le numéro d'un des serveurs ci dessus pour lui envoyer le ticket");
                     } else {
-                        this.getOrCreateTicketCommunication(bot, message, ticketCommunications, ticketConfigs[parseInt(response.content)]);
-                        delete this.usersInPrompt[message.author.id];
+                        this.getOrCreateTicketCommunication(bot, ticketCommunications, ticketConfigs[parseInt(response.content)]);
+                        delete usersInPrompt[this.message.author.id];
                         bot.off("message", listener);
                     }
                 }
             };
-            this.usersInPrompt[message.author.id] = true;
+            usersInPrompt[this.message.author.id] = true;
             bot.on("message", listener);
         });
     }
 
-    static async getOrCreateTicketCommunication(bot, message, ticketCommunications, ticketConfig: ITicketConfig) {
+    async getOrCreateTicketCommunication(bot, ticketCommunications, ticketConfig: ITicketConfig) {
         let usedCommunication: ITicketCommunication|null = null;
         for (let ticketCommunication of ticketCommunications) {
             if (ticketCommunication.serverId == ticketConfig.serverId) {
@@ -130,7 +136,7 @@ export class CommunicateTicketClientSide extends Command {
             usedCommunication = {
                 serverId: ticketConfig.serverId,
                 ticketChannelId: null,
-                customerId: message.author.id,
+                customerId: this.message.author.id,
                 usedByUser: true,
                 lastUse: (new Date()).getTime()
             };
@@ -138,25 +144,25 @@ export class CommunicateTicketClientSide extends Command {
         }
         TicketCommunication.updateMany(
             {
-                customerId: message.author.id,
+                customerId: this.message.author.id,
                 serverId: { $ne: ticketConfig.serverId }
             },
             {
                 $set: { usedByUser: false }
             }).then(_ => {});
 
-        if (message.content == config.command_prefix+"server") {
-            message.channel.send("*Serveur configuré*");
+        if (this.message.content == config.command_prefix+"server") {
+            this.message.channel.send("*Serveur configuré*");
         } else {
-            this.sendTicket(bot, message, <ITicketCommunication>usedCommunication, ticketConfig, true);
+            this.sendTicket(bot, <ITicketCommunication>usedCommunication, ticketConfig, true);
         }
     }
 
-    static async sendTicket(bot, message, usedCommunication: ITicketCommunication, ticketConfig: ITicketConfig, displayInfo = false) {
+    async sendTicket(bot, usedCommunication: ITicketCommunication, ticketConfig: ITicketConfig, displayInfo = false) {
         const server = bot.guilds.cache.get(usedCommunication.serverId);
         const categoryChannel = server.channels.cache.get(ticketConfig.categoryId);
         if (categoryChannel == undefined || categoryChannel.type != "category") {
-            message.channel.send("*On dirait que la catégorie configurée sur le serveur n'est pas correcte*");
+            this.message.channel.send("*On dirait que la catégorie configurée sur le serveur n'est pas correcte*");
             return;
         }
         let channelToWrite;
@@ -165,14 +171,14 @@ export class CommunicateTicketClientSide extends Command {
             if (channelToWrite == undefined) usedCommunication.ticketChannelId = null;
         }
         if (usedCommunication.ticketChannelId == null) {
-            channelToWrite = await server.channels.create("Ticket de " + message.author.username + " [" + message.author.id.substring(0, 4) + "]", "text");
+            channelToWrite = await server.channels.create("Ticket de " + this.message.author.username + " [" + this.message.author.id.substring(0, 4) + "]", "text");
             channelToWrite.setParent(categoryChannel.id);
-            channelToWrite.send("Ce ticket a été créé par <@"+message.author.id+">");
+            channelToWrite.send("Ce ticket a été créé par <@"+this.message.author.id+">");
             usedCommunication.ticketChannelId = channelToWrite.id; // @ts-ignore
             usedCommunication.save();
         }
 
-        channelToWrite.send(message.content);
-        if (displayInfo) message.channel.send("*Votre message a été envoyé sur le serveur '"+server.name+"'*")
+        channelToWrite.send(this.message.content);
+        if (displayInfo) this.message.channel.send("*Votre message a été envoyé sur le serveur '"+server.name+"'*")
     }
 }
