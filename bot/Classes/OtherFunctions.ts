@@ -1,6 +1,7 @@
 import { existingCommands } from "./CommandsDescription";
 import History, {IHistory} from "../Models/History";
 import config from "../config";
+import {GuildChannel, Message} from "discord.js";
 
 export function extractEmoteName(emote) {
     let regex = new RegExp("\<(a)?\:[a-zA-Z0-9_-]{2,18}\\:[0-9]{18}\\>");
@@ -252,21 +253,20 @@ export async function checkArgumentsNotifyOnReact(message,args) {  // Vérifie l
     return {errors, channelId, channel, messageId, contentMessage};
 }
 
-export async function forEachNotifyOnReact(callback, channelId, channel, messageId, contentMessage, messageCommand) {
+export async function forEachNotifyOnReact(callback, channel: GuildChannel, message: Message, messageCommand) {
     const serverId = messageCommand.guild.id;
     let listenings = existingCommands.notifyOnReact.commandClass.listenings[serverId];
 
     if (typeof(listenings) == "undefined") {
         callback(false);
-    } else if (channelId != null) {
-        if (typeof(listenings[channelId]) != "undefined") {
-            if (messageId != null) {
+    } else if (channel != undefined) {
+        if (typeof(listenings[channel.id]) != "undefined") {
+            if (message != undefined) {
                 let nbListeneds = 0;
-                if (typeof(listenings[channelId][messageId]) != "undefined") { // Si un channel et un message ont été spécifiés, regarde dans le message
-                    // @ts-ignore
-                    for (let emote in listenings[channelId][messageId]) {
-                        if (listenings[channelId][messageId][emote]) {
-                            callback(true, channel, messageId, contentMessage, emote);
+                if (typeof(listenings[channel.id][message.id]) != "undefined") { // Si un channel et un message ont été spécifiés, regarde dans le message
+                    for (let emote in listenings[channel.id][message.id]) {
+                        if (listenings[channel.id][message.id][emote]) {
+                            callback(true, channel, message.id, message.content, emote);
                             nbListeneds += 1;
                         }
                     }
@@ -275,18 +275,18 @@ export async function forEachNotifyOnReact(callback, channelId, channel, message
                     callback(false);
                 }
             } else { // Si un channel a été spécififié, mais pas de message, regarde tout les messages de ce channel
-                let nbListeneds = 0; // @ts-ignore
-                for (let messageId in listenings[channelId]) {
+                let nbListeneds = 0;
+                for (let messageId in listenings[channel.id]) {
                     let messageListened;
-                    try {
+                    try { // @ts-ignore
                         messageListened = await channel.messages.fetch(messageId);
                     } catch(e) {
                     }
                     const contentMessage = messageListened != undefined ?
                         messageListened.content.substring(0, Math.min(20,messageListened.content.length)) + "..."
-                        : messageId; // @ts-ignore
-                    for (let emote in listenings[channelId][messageId]) {
-                        if (listenings[channelId][messageId][emote]) {
+                        : messageId;
+                    for (let emote in listenings[channel.id][messageId]) {
+                        if (listenings[channel.id][messageId][emote]) {
                             nbListeneds += 1;
                             callback(true, channel, messageId, contentMessage, emote);
                         }

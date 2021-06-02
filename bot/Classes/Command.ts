@@ -49,23 +49,27 @@ export default class Command {
         this.message.channel.send(Embed);
     }
 
-    displayHelp(fails: null|Array<any> = null) {
+    displayHelp(fails: null|Array<any> = null, failsExtract: null|Array<any> = null) {
         const commandName = this.message.content.split(" ")[0];
         let Embed = new Discord.MessageEmbed()
             .setColor('#0099ff')
             .setTitle('Aide pour la commande '+commandName)
             .setTimestamp()
-        let name: string;
-        let value: string;
-        if (fails instanceof Array) {
-            name = "Arguments manquants ou invalides :";
-            value = fails
-                .map(fail =>
-                    (fail.fields instanceof Array ? fail.fields.join(", ") : fail.field)+" : "+fail.description+ " | (type attendu : " + fail.type + ")"
-                ).join("\n");
+
+        if (fails instanceof Array || failsExtract instanceof Array) {
+            if (fails instanceof Array && fails.length > 0) {
+                const name = "Arguments manquants ou invalides :";
+                const value = this.getArgsList(fails);
+                Embed.addFields({name,value});
+            }
+            if (failsExtract instanceof Array && failsExtract.length > 0) {
+                const name = "Données introuvables";
+                const value = this.getArgsList(failsExtract);
+                Embed.addFields({name,value});
+            }
         } else {
-            name = "Champs "
-            value = "";
+            const name = "Champs "
+            let value = "";
             for (const attr in this.argsModel) {
                 const field = this.argsModel[attr];
                 value += field.fields.join(", ")+" : "+field.description+ " | (type attendu : " + field.type + ")\n";
@@ -75,10 +79,17 @@ export default class Command {
                     value += field.field+" : "+field.description+ " | (type attendu : " + field.type + ")\n";
                 }
             }
+            Embed.addFields({name,value});
         }
-        Embed.addFields({name,value});
         this.help(Embed);
         this.message.channel.send(Embed);
+    }
+
+    getArgsList(args: Array<any>) {
+        return args
+            .map(arg =>
+                (arg.fields instanceof Array ? arg.fields.join(", ") : arg.field) + " : " + arg.description + " | (type attendu : " + arg.type + ")"
+            ).join("\n");
     }
 
     async check(bot) {
@@ -184,7 +195,7 @@ export default class Command {
                 while (i < args.length && args[i] == " ") {
                     i += 1;
                 }
-                if (args[i] != "-") {
+                if (i < args.length && args[i] != "-") {
                     if (i < args.length && (args[i] == "'" || args[i] == '"')) {
                         let quote = args[i];
                         let value = "";
@@ -204,7 +215,7 @@ export default class Command {
                         argsObject[attr] = this.getValueInCorrectType(value);
                         attr = "";
                     }
-                } else {
+                } else if (i < args.length) {
                     i -= 1;
                     argsObject[attr] = true;
                     attr = "";
@@ -235,10 +246,9 @@ export default class Command {
         return argsObject;
     }
     async computeArgs(args,model) {
-        console.log("computeArgs");
-        console.log({args,model});
         let out: any = {};
-        let fails: Array<any> = []
+        let fails: Array<any> = [];
+        let failsExtract: Array<any> = [];
         let argsWithoutKeyDefined = false;
         for (const attr in model) {
             if (attr[0] != "$") {
@@ -250,7 +260,13 @@ export default class Command {
                         )
                     ) {
                         if (extractTypes[model[attr].type]) {
-                            out[attr] = await extractTypes[model[attr].type](args[field],this.message);
+                            const moreDatas = typeof(model[attr].moreDatas) == "function" ? model[attr].moreDatas(out) : null
+                            const data = await extractTypes[model[attr].type](args[field],this.message,moreDatas);
+                            if (data) {
+                                out[attr] = data;
+                            } else {
+                                failsExtract.push(model[attr]);
+                            }
                         } else {
                             out[attr] = model[attr].type == "string" ? args[field].toString() : args[field];
                         }
@@ -288,8 +304,8 @@ export default class Command {
                 }
             }
         }
-        if (fails.length > 0) {
-            this.displayHelp(fails);
+        if (fails.length > 0 || failsExtract.length > 0) {
+            this.displayHelp(fails, failsExtract);
             return false;
         }
         return out;
@@ -297,7 +313,7 @@ export default class Command {
 
     help(Embed) {} // To be overloaded
 
-    async action(args,bot) { // To be overloaded
+    async action(args: any,bot) { // To be overloaded
         return true;
     }
 }

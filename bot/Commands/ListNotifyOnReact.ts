@@ -41,7 +41,7 @@ export class ListNotifyOnReact extends Command {
             .setDescription("Ceci est la liste des écoutes de réactions :")
             .setTimestamp();
 
-        await forEachNotifyOnReact((found, channel, messageId, contentMessage, emote) => {
+        /*await forEachNotifyOnReact((found, channel, messageId, contentMessage, emote) => {
             if (found) {
                 Embed.addFields({
                     name: "Sur '#" + channel.name + "' (" + contentMessage + ") :" + emote + ":",
@@ -53,7 +53,7 @@ export class ListNotifyOnReact extends Command {
                     value: "Aucune réaction n'a été trouvée"
                 });
             }
-        }, channelId, channel, messageId, contentMessage, this.message);
+        }, channelId, channel, messageId, contentMessage, this.message);*/
 
         this.message.channel.send(Embed);
         return true;

@@ -1,55 +1,50 @@
 import config from "../config";
 import Command from "../Classes/Command";
-import { checkArgumentsNotifyOnReact, extractEmoteName, forEachNotifyOnReact } from "../Classes/OtherFunctions";
+import { extractEmoteName, forEachNotifyOnReact } from "../Classes/OtherFunctions";
 import { existingCommands } from "../Classes/CommandsDescription";
 import StoredNotifyOnReact, { IStoredNotifyOnReact } from "../Models/StoredNotifyOnReact";
-import Discord, {Message} from "discord.js";
+import Discord, {GuildChannel, Message} from "discord.js";
 
 export class CancelNotifyOnReact extends Command {
+
+    argsModel = {
+        help: { fields: ["--help", "-h"], type: "boolean", description: "Pour afficher l'aide", required: false},
+        all: { fields: ["--all"], type: "boolean", description: "à mettre sans rien d'autre, pour désactiver l'écoute sur tout les messages", required: false },
+        channel: { fields: ["--channel","-ch"], type:"channel", description: "Spécifier le channel sur lequel désactifier l'écoute de réaction", required: args => args.help == undefined && ( args.all == undefined || !args.all ) },
+        emote: { fields: ["--emote", "-e"], type: "emote", description: "Spécifier l'émote pour laquelle il faut désactiver l'écoute (nécessite --channel et --message)", required: false },
+        message: { fields: ["--message", "-m"], type: "message", description: "Spécifier l'id du message sur lequel désactiver l'écoute (nécessite le champs --channel pour savoir où est le message)", required: args => args.emote != undefined, moreDatas: (args) => args.channel}
+    };
+
     static staticCommandName = "cancelNotifyOnReact"
 
     constructor(message: Message) {
         super(message, CancelNotifyOnReact.staticCommandName);
     }
 
-    async action(args,bot) {
+    async action(args: {help: boolean, channel: GuildChannel, message: Message, emote: string},bot) {
+        let {help,channel,message,emote} = args;
 
-        if (typeof(args[0]) != "undefined" && args[0] == "help") {
+        if (help) {
             this.displayHelp();
             return false;
         }
 
-        const checked = await checkArgumentsNotifyOnReact(this.message, args)
-
-        let errors = checked.errors,
-            channelId = checked.channelId,
-            channel = checked.channel,
-            messageId = checked.messageId,
-            contentMessage = checked.contentMessage;
-
-        let emote = null;
-        if (typeof(args.e) != "undefined") {
-            emote = extractEmoteName(args.e);
-            if (!emote) {
-                errors.push({name: "Invalid emote", value: "Specified emote is invalid"});
-            }
-        }
-
         if (this.message.guild == null || this.message.member == null) {
-            errors.push({name: "Missing data", value: "We can't find guild or member in the message object"});
+            this.sendErrors({
+                name: "Missing data",
+                value: "We can't find guild or member in the message object"
+            });
+            return false;
         }
-
-        if (errors.length > 0) {
-            this.sendErrors(errors);
+        if (message && message.guild == null) {
+            this.sendErrors({
+                name: "Missing data",
+                value: "We can't find guild in the given message"
+            });
             return false;
         }
 
-        if  (channelId == null && messageId == null && emote == null) {
-            if (args[0] != "all") {
-                this.displayHelp();
-                return true;
-            }
-        }
+        if (emote) emote = extractEmoteName(emote);
 
         let Embed = new Discord.MessageEmbed()
             .setColor('#0099ff')
@@ -58,7 +53,7 @@ export class CancelNotifyOnReact extends Command {
             .setTimestamp();
         // @ts-ignore
         let listenings = existingCommands.notifyOnReact.commandClass.listenings[this.message.guild.id];
-        if (emote == null) {
+        if (emote == undefined) {
             await forEachNotifyOnReact((found, channel, messageId, contentMessage, emote) => {
                 if (found) { // @ts-ignore
                     this.deleteNotifyOnReactInBdd(this.message.guild.id,channel.id,messageId,emote);
@@ -73,13 +68,13 @@ export class CancelNotifyOnReact extends Command {
                         value: "Aucune réaction n'a été trouvée et supprimée"
                     });
                 }
-            }, channelId, channel, messageId, contentMessage, this.message);
+            }, channel, message, this.message);
         } else {
-            if (typeof(listenings[channel.id][messageId][emote]) != "undefined") { // @ts-ignore
-                this.deleteNotifyOnReactInBdd(message.guild.id,channel.id,messageId,emote);
-                listenings[channel.id][messageId][emote] = false;
+            if (typeof(listenings[channel.id][message.id][emote]) != "undefined") { // @ts-ignore
+                this.deleteNotifyOnReactInBdd(message.guild.id,channel.id,message.id,emote);
+                listenings[channel.id][message.id][emote] = false;
                 Embed.addFields({
-                    name: "sur '#" + channel.name + "' (" + contentMessage + ") :" + emote + ":",
+                    name: "sur '#" + channel.name + "' (" + message.content + ") :" + emote + ":",
                     value: "Cette écoute de réaction a été supprimée"
                 });
             } else {
@@ -104,20 +99,12 @@ export class CancelNotifyOnReact extends Command {
     }
 
     help(Embed) {
-        Embed.addFields({
-            name: "Arguments :",
-            value: "--channel ou -ch, Spécifier le channel sur lequel désactifier l'écoute de réaction \n"+
-                "\t(si pas de message spécifié, désactive l'écoute sur tout les messages de ce channel sur lesquels il y a une écoute)\n"+
-                "--message ou -m, Spécifier l'id du message sur lequel désactiver l'écoute (nécessite le champs --channel pour savoir où est le message)\n"+
-                "-e, Spécifier l'émote pour laquelle il faut désactiver l'écoute (nécessite --channel et \n--message)\n"+
-                "all, à mettre sans rien d'autre, pour désactiver l'écoute sur tout les messages"
-        })
-            .addFields({
+            Embed.addFields({
                 name: "Exemples :",
                 value: config.command_prefix+this.commandName+" --channel #leChannel\n"+
                     config.command_prefix+this.commandName+" --channel #leChannel --message idDuMessage\n"+
                     config.command_prefix+this.commandName+" -ch #leChannel -m idDuMessage -e :emote: \n"+
-                    config.command_prefix+this.commandName+" all"
+                    config.command_prefix+this.commandName+" --all"
             });
     }
 

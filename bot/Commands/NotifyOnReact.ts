@@ -42,7 +42,6 @@ export class NotifyOnReact extends Command {
     listenings: any;
 
     async action(args: { help: boolean, listen: {channel: GuildChannel, message: Message}, emoteToReact: string, messageToWrite: string, channelToWrite: GuildChannel },bot) { // notifyOnReact --listen #ChannelAEcouter/IdDuMessageAEcouter -e :emoteAEcouter: --message '$user$ a réagit à ce message' --writeChannel #channelSurLequelEcrire
-        let errors: Array<Object> = [];
 
         let { help, listen: {channel: channelToListen, message: messageToListen}, emoteToReact, messageToWrite, channelToWrite } = args;
 
