@@ -2,7 +2,7 @@ import config from "../config";
 import Command from "../Classes/Command";
 import { extractEmoteName } from "../Classes/OtherFunctions";
 import StoredNotifyOnReact, { IStoredNotifyOnReact } from "../Models/StoredNotifyOnReact";
-import {Message} from "discord.js";
+import {GuildChannel, Message} from "discord.js";
 
 interface iNotifyOnReact extends Document {
     listen: string;
@@ -12,6 +12,14 @@ interface iNotifyOnReact extends Document {
 }
 
 export class NotifyOnReact extends Command {
+
+    argsModel = {
+        help: { fields: ["--help", "-h"], type: "boolean", description: "Pour afficher l'aide", required: false},
+        listen: { fields: ["--listen","-l"], type:"listenerReactMessage", description: "Indique le channel et le message à écouter, séparés d'un '/'", required: args => args.help == undefined },
+        emoteToReact: { fields: ["--emote", "-e"], type: "emote", description: "Indique l'emote à laquelle réagir", required: args => args.help == undefined },
+        messageToWrite: { fields: ["--message", "-m"], type: "string", description: "Le message à afficher dés qu'une réaction sur le message est detectée", required: args => args.help == undefined },
+        channelToWrite: { fields: ["--writeChannel", "-wc"], type: "channel", description: "le channel sur lequel écrire le message à chaque réaction", required: args => args.help == undefined }
+    };
 
     static listenings = {}; /* example : {
     "773657730388852746": { // id d'un serveur
@@ -33,18 +41,12 @@ export class NotifyOnReact extends Command {
 
     listenings: any;
 
-    async action(bot) { // notifyOnReact --listen #channel/messageId --message '$user$ a réagit à ce message' -e :yoyo: --writeChannel #channelB
-        const args: iNotifyOnReact = this.parseCommand();
-        if (!args) return false;
+    async action(args: { help: boolean, listen: {channel: GuildChannel, message: Message}, emoteToReact: string, messageToWrite: string, channelToWrite: GuildChannel },bot) { // notifyOnReact --listen #ChannelAEcouter/IdDuMessageAEcouter -e :emoteAEcouter: --message '$user$ a réagit à ce message' --writeChannel #channelSurLequelEcrire
         let errors: Array<Object> = [];
 
-        let channelToListen;
-        let messageToListen;
-        let messageToWrite;
-        let channelToWrite;
-        let emoteToReact;
+        let { help, listen: {channel: channelToListen, message: messageToListen}, emoteToReact, messageToWrite, channelToWrite } = args;
 
-        if (args[0] == "help") {
+        if (help) {
             this.displayHelp();
             return false;
         }
@@ -57,73 +59,15 @@ export class NotifyOnReact extends Command {
             return false;
         }
 
-        if (typeof(args.listen) == "undefined") {
-            errors.push({name: "--listen missing", value: "--listen missing in your command"});
-        } else if (args.listen.split("/").length != 2) {
-            errors.push({name: "--listen incorrect", value: "--listen must be in '#channel/idDuMessage' format"})
-        } else {
-            // @ts-ignore
-            let channelId = args.listen.split("/")[0].replaceAll(" ","");
-            channelId = channelId.split("<#")[1];
-            if (channelId == undefined) {
-                errors.push([{name: "Channel to listen not found", value: "Specified channel to listen does not exists"}]);
-            } else {
-                channelId = channelId.substring(0,channelId.length-1);
-                channelToListen = this.message.guild.channels.cache.get(channelId);
-
-                if (channelToListen == undefined) {
-                    errors.push([{name: "Channel to listen not found", value: "Specified channel to listen does not exists"}]);
-                } else {
-                    // @ts-ignore
-                    let messageId = args.listen.split("/")[1].replaceAll(" ","");
-                    try {
-                        messageToListen = await channelToListen.messages.fetch(messageId);
-                    } catch(e) {
-                    }
-                    if (messageToListen == undefined) {
-                        errors.push([{name: "Message to listen not found", value: "Specified message to listen does not exists"}]);
-                    }
-                }
-
-            }
-        }
-
-        if (typeof(args.e) == "undefined") { // check emote
-            errors.push([{name: "-e missing", value: "mention -e of emote missing"}]);
-        } else {
-            emoteToReact = args.e;
-        }
-
-        if (typeof(args.message) == "undefined") {
-            errors.push({name: "--message missing", value: "--message missing in your command"});
-        } else {
-            messageToWrite = args.message;
-        }
-
-        if (typeof(args.writeChannel) == "undefined") {
-            errors.push({name: "--writeChannel missing", value: "--writeChannel missing in your command"});
-        } else {
-            let channelId = args.writeChannel.split("<#")[1];
-            if (channelId == undefined) {
-                errors.push([{name: "Channel to write not found", value: "Specified channel to write does not exists"}]);
-            } else {
-                channelId = channelId.substring(0, channelId.length - 1);
-                channelToWrite = this.message.guild.channels.cache.get(channelId);
-                if (channelToWrite == undefined) {
-                    errors.push([{name: "Channel not found", value: "Specified channel does not exists"}]);
-                }
-            }
+        if (messageToListen.guild == null) {
+            this.sendErrors({
+                name: "Guild missing in the message to listen",
+                value: "We cannot find the guild in the message to listen"
+            });
+            return false;
         }
 
         const emoteName = extractEmoteName(emoteToReact);
-        if (!emoteName) {
-            errors.push([{name: "Invalid emote", value: "Specified emote is invalid"}]);
-        }
-
-        if (errors.length > 0) {
-            this.sendErrors(errors);
-            return false;
-        }
         const serverId = messageToListen.guild.id;
 
         if (typeof(this.listenings[serverId]) == "undefined") {
@@ -237,15 +181,7 @@ export class NotifyOnReact extends Command {
     }
 
     help(Embed) {
-        Embed.
-        addFields({
-            name: "Arguments :",
-            value: "--listen, Indique le channel et le message à écouter, séparés d'un '/'\n"+
-                "-e, Indique l'emote à laquelle réagir\n"+
-                "--message, Le message à afficher dés qu'un réaction sur le message est detectée\n"+
-                "--writeChannel, le channel sur lequel écrire le message à chaque réaction"
-        })
-            .addFields({
+        Embed.addFields({
             name: "Exemple :",
             value: config.command_prefix+"notifyOnReact --listen #ChannelAEcouter/IdDuMessageAEcouter -e :emoteAEcouter: --message '$user$ a réagit à ce message' --writeChannel #channelSurLequelEcrire"
         });

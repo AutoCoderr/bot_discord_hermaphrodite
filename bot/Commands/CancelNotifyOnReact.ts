@@ -12,9 +12,7 @@ export class CancelNotifyOnReact extends Command {
         super(message, CancelNotifyOnReact.staticCommandName);
     }
 
-    async action(bot) {
-        const args = this.parseCommand();
-        if (!args) return false;
+    async action(args,bot) {
 
         if (typeof(args[0]) != "undefined" && args[0] == "help") {
             this.displayHelp();

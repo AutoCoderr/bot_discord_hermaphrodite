@@ -5,6 +5,8 @@ import Permissions, { IPermissions } from "../Models/Permissions";
 import History, {IHistory} from "../Models/History";
 import {isNumber} from "./OtherFunctions";
 import {Message} from "discord.js";
+import {checkTypes} from "./TypeChecker";
+import {extractTypes} from "./TypeExtractor";
 
 export default class Command {
 
@@ -12,6 +14,8 @@ export default class Command {
 
     commandName: null|string;
     message: Message;
+
+    argsModel = {};
 
     constructor(message: Message, commandName: null|string) {
         this.message = message;
@@ -41,26 +45,46 @@ export default class Command {
                 error
             )
         }
-        if (displayHelp) {
-            this.help(Embed);
-        }
 
         this.message.channel.send(Embed);
     }
 
-    displayHelp() {
+    displayHelp(fails: null|Array<any> = null) {
         const commandName = this.message.content.split(" ")[0];
         let Embed = new Discord.MessageEmbed()
             .setColor('#0099ff')
             .setTitle('Aide pour la commande '+commandName)
             .setTimestamp()
+        let name: string;
+        let value: string;
+        if (fails instanceof Array) {
+            name = "Arguments manquants ou invalides :";
+            value = fails
+                .map(fail =>
+                    (fail.fields instanceof Array ? fail.fields.join(", ") : fail.field)+" : "+fail.description+ " | (type attendu : " + fail.type + ")"
+                ).join("\n");
+        } else {
+            name = "Champs "
+            value = "";
+            for (const attr in this.argsModel) {
+                const field = this.argsModel[attr];
+                value += field.fields.join(", ")+" : "+field.description+ " | (type attendu : " + field.type + ")\n";
+            }
+            if (this.argsModel['$argsWithoutKey'] instanceof Array) {
+                for (const field of this.argsModel['$argsWithoutKey']) {
+                    value += field.field+" : "+field.description+ " | (type attendu : " + field.type + ")\n";
+                }
+            }
+        }
+        Embed.addFields({name,value});
         this.help(Embed);
         this.message.channel.send(Embed);
     }
 
     async check(bot) {
         if (await this.match() && await this.checkPermissions()) {
-            if (await this.action(bot)) {
+            const args = await this.computeArgs(this.parseCommand(),this.argsModel);
+            if (args && await this.action(args,bot)) {
                 this.saveHistory();
             }
         }
@@ -149,14 +173,9 @@ export default class Command {
             }
             args += commandSplitted[i];
         }
-
+        let attr: string = "";
         for (let i=0;i<args.length;i++) {
             if (args[i] == "-") {
-                let attr = "";
-                if (args[i]+args[i+1] == "--")
-                    i += 2;
-                else
-                    i += 1;
 
                 while (i < args.length && args[i] != " ") {
                     attr += args[i];
@@ -175,6 +194,7 @@ export default class Command {
                             i += 1;
                         }
                         argsObject[attr] = this.getValueInCorrectType(value);
+                        attr = "";
                     } else {
                         let value = "";
                         while (i < args.length && args[i] != " ") {
@@ -182,9 +202,12 @@ export default class Command {
                             i += 1;
                         }
                         argsObject[attr] = this.getValueInCorrectType(value);
+                        attr = "";
                     }
                 } else {
+                    i -= 1;
                     argsObject[attr] = true;
+                    attr = "";
                 }
             } else if (args[i] != " ") {
                 let value = "";
@@ -208,12 +231,73 @@ export default class Command {
                 argsObject[j] = this.getValueInCorrectType(value);
             }
         }
+        if (attr != "") argsObject[attr] = true;
         return argsObject;
+    }
+    async computeArgs(args,model) {
+        console.log("computeArgs");
+        console.log({args,model});
+        let out: any = {};
+        let fails: Array<any> = []
+        let argsWithoutKeyDefined = false;
+        for (const attr in model) {
+            if (attr[0] != "$") {
+                let found = false;
+                for (let field of model[attr].fields) {
+                    if (args[field] != undefined &&
+                        (
+                            model[attr].type == "string" || checkTypes[model[attr].type](args[field])
+                        )
+                    ) {
+                        if (extractTypes[model[attr].type]) {
+                            out[attr] = await extractTypes[model[attr].type](args[field],this.message);
+                        } else {
+                            out[attr] = model[attr].type == "string" ? args[field].toString() : args[field];
+                        }
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found &&
+                    (
+                        model[attr].required == undefined ||
+                        (typeof(model[attr].required) == "boolean" && model[attr].required) ||
+                        (typeof(model[attr].required) == "function" && model[attr].required(out))
+                    )
+                ) fails.push(model[attr]);
+            } else if (attr == "$argsWithoutKey" && !argsWithoutKeyDefined) {
+                argsWithoutKeyDefined = true;
+                const argsWithoutKey = model[attr];
+                for (let i=0;i<argsWithoutKey.length;i++) {
+                    if (
+                        (
+                            args[i] == undefined &&
+                            (
+                                argsWithoutKey[i].required == undefined ||
+                                argsWithoutKey[i].required
+                            )
+                        ) || (
+                            args[i] != undefined &&
+                            typeof(args[i]) != argsWithoutKey[i].type
+                        )
+                    ) {
+                        fails.push(argsWithoutKey[i]);
+                    } else {
+                        out[argsWithoutKey[i].field] = args[i];
+                    }
+                }
+            }
+        }
+        if (fails.length > 0) {
+            this.displayHelp(fails);
+            return false;
+        }
+        return out;
     }
 
     help(Embed) {} // To be overloaded
 
-    async action(bot) { // To be overloaded
+    async action(args,bot) { // To be overloaded
         return true;
     }
 }
