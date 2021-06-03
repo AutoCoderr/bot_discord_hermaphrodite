@@ -20,7 +20,7 @@ export class ConfigTicket extends Command {
             {
                 field: "two",
                 required: args => ["set","blacklist"].includes(args.action),
-                type: ["category", "string"],
+                types: ["category", "string"],
                 description: "L'id de la catégorie à définir si l'action est 'set', ou l'action à définir sur la blacklist (add, remove, show)",
                 valid: (elem: CategoryChannel|string,args) => (
                     (
