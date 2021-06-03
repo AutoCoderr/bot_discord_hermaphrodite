@@ -195,64 +195,6 @@ export async function getHistory(message,args) {
     return {errors: [], histories: histories, limit: limit};
 }
 
-export async function checkArgumentsNotifyOnReact(message,args) {  // Vérifie la validité des arguments passés pour récupérer les écoutes de réactions
-    let channelId = null;
-    let channel;
-
-    let errors: Array<Object> = [];
-
-    if (typeof(args.channel) != "undefined" && typeof(args.ch) != "undefined") {
-        errors.push({
-            name: "--channel or -ch",
-            value: "--channel or -ch but not the both"
-        });
-    } else if (typeof(args.channel) != "undefined" || typeof(args.ch) != "undefined") {
-        channelId = extractChannelId(typeof(args.channel) != "undefined" ? args.channel : args.ch);
-        if (!channelId) {
-            errors.push({
-                name: "Channel invalide",
-                value: "Mention de channel indiqué invalide"
-            });
-        } else {
-            channel = message.guild.channels.cache.get(channelId);
-            if (channel == undefined) {
-                errors.push( {
-                    name: "Channel inexistant",
-                    value: "Mention de channel indiqué inexistant"
-                });
-            }
-        }
-    }
-
-    let messageId = null;
-    let contentMessage;
-    if (typeof(args.message) != "undefined" && typeof(args.m) != "undefined") {
-        errors.push({
-            name: "--message or -m",
-            value: "--message or -m but not the both"
-        });
-    } else if (typeof(args.message) != "undefined" || typeof(args.m) != "undefined") {
-        if (channelId == null || channel == undefined) {
-            errors.push({
-                name: "Spécifiez un channel",
-                value: "Vous devez spécifier un channel, avant de spécifier un message"
-            });
-        } else {
-            let messageListened
-            messageId = typeof (args.message) != "undefined" ? args.message : args.m;
-            try {
-                messageListened = await channel.messages.fetch(messageId);
-            } catch (e) {
-            }
-            contentMessage = messageListened != undefined ?
-                messageListened.content.substring(0, Math.min(20, messageListened.content.length)) + "..."
-                : messageId;
-        }
-    }
-
-    return {errors, channelId, channel, messageId, contentMessage};
-}
-
 export async function forEachNotifyOnReact(callback, channel: GuildChannel, message: Message, messageCommand) {
     const serverId = messageCommand.guild.id;
     let listenings = existingCommands.notifyOnReact.commandClass.listenings[serverId];

@@ -7,6 +7,7 @@ import {isNumber} from "./OtherFunctions";
 import {Message} from "discord.js";
 import {checkTypes} from "./TypeChecker";
 import {extractTypes} from "./TypeExtractor";
+import client from "../client";
 
 export default class Command {
 

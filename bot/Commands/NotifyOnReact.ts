@@ -2,7 +2,7 @@ import config from "../config";
 import Command from "../Classes/Command";
 import { extractEmoteName } from "../Classes/OtherFunctions";
 import StoredNotifyOnReact, { IStoredNotifyOnReact } from "../Models/StoredNotifyOnReact";
-import {GuildChannel, Message} from "discord.js";
+import {GuildChannel, GuildEmoji, Message} from "discord.js";
 
 interface iNotifyOnReact extends Document {
     listen: string;
@@ -41,9 +41,15 @@ export class NotifyOnReact extends Command {
 
     listenings: any;
 
-    async action(args: { help: boolean, listen: {channel: GuildChannel, message: Message}, emoteToReact: string, messageToWrite: string, channelToWrite: GuildChannel },bot) { // notifyOnReact --listen #ChannelAEcouter/IdDuMessageAEcouter -e :emoteAEcouter: --message '$user$ a réagit à ce message' --writeChannel #channelSurLequelEcrire
+    async action(args: { help: boolean, listen: {channel: GuildChannel, message: Message}, emoteToReact: GuildEmoji, messageToWrite: string, channelToWrite: GuildChannel },bot) { // notifyOnReact --listen #ChannelAEcouter/IdDuMessageAEcouter -e :emoteAEcouter: --message '$user$ a réagit à ce message' --writeChannel #channelSurLequelEcrire
 
-        let { help, listen: {channel: channelToListen, message: messageToListen}, emoteToReact, messageToWrite, channelToWrite } = args;
+        let { help, listen, emoteToReact, messageToWrite, channelToWrite } = args;
+
+        let channelToListen,messageToListen;
+        if (listen) {
+            channelToListen = listen.channel;
+            messageToListen = listen.message
+        }
 
         if (help) {
             this.displayHelp();
@@ -66,7 +72,7 @@ export class NotifyOnReact extends Command {
             return false;
         }
 
-        const emoteName = extractEmoteName(emoteToReact);
+        const emoteName = emoteToReact.name;
         const serverId = messageToListen.guild.id;
 
         if (typeof(this.listenings[serverId]) == "undefined") {

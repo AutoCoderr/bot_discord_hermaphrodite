@@ -3,7 +3,7 @@ import Command from "../Classes/Command";
 import { extractEmoteName, forEachNotifyOnReact } from "../Classes/OtherFunctions";
 import { existingCommands } from "../Classes/CommandsDescription";
 import StoredNotifyOnReact, { IStoredNotifyOnReact } from "../Models/StoredNotifyOnReact";
-import Discord, {GuildChannel, Message} from "discord.js";
+import Discord, {GuildChannel, GuildEmoji, Message} from "discord.js";
 
 export class CancelNotifyOnReact extends Command {
 
@@ -21,7 +21,7 @@ export class CancelNotifyOnReact extends Command {
         super(message, CancelNotifyOnReact.staticCommandName);
     }
 
-    async action(args: {help: boolean, channel: GuildChannel, message: Message, emote: string},bot) {
+    async action(args: {help: boolean, channel: GuildChannel, message: Message, emote: GuildEmoji},bot) {
         let {help,channel,message,emote} = args;
 
         if (help) {
@@ -44,7 +44,7 @@ export class CancelNotifyOnReact extends Command {
             return false;
         }
 
-        if (emote) emote = extractEmoteName(emote);
+        let emoteName = emote ? emote.name : undefined;
 
         let Embed = new Discord.MessageEmbed()
             .setColor('#0099ff')
@@ -53,13 +53,13 @@ export class CancelNotifyOnReact extends Command {
             .setTimestamp();
         // @ts-ignore
         let listenings = existingCommands.notifyOnReact.commandClass.listenings[this.message.guild.id];
-        if (emote == undefined) {
-            await forEachNotifyOnReact((found, channel, messageId, contentMessage, emote) => {
+        if (emoteName == undefined) {
+            await forEachNotifyOnReact((found, channel, messageId, contentMessage, emoteName) => {
                 if (found) { // @ts-ignore
-                    this.deleteNotifyOnReactInBdd(this.message.guild.id,channel.id,messageId,emote);
-                    listenings[channel.id][messageId][emote] = false;
+                    this.deleteNotifyOnReactInBdd(this.message.guild.id,channel.id,messageId,emoteName);
+                    listenings[channel.id][messageId][emoteName] = false;
                     Embed.addFields({
-                        name: "Supprimée : sur '#" + channel.name + "' (" + contentMessage + ") :" + emote + ":",
+                        name: "Supprimée : sur '#" + channel.name + "' (" + contentMessage + ") :" + emoteName + ":",
                         value: "Cette écoute de réaction a été supprimée"
                     });
                 } else {
@@ -69,20 +69,18 @@ export class CancelNotifyOnReact extends Command {
                     });
                 }
             }, channel, message, this.message);
+        } else if (listenings && listenings[channel.id] && listenings[channel.id][message.id] && listenings[channel.id][message.id][emoteName]) { // @ts-ignore
+            this.deleteNotifyOnReactInBdd(message.guild.id,channel.id,message.id,emoteName);
+            listenings[channel.id][message.id][emoteName] = false;
+            Embed.addFields({
+                name: "sur '#" + channel.name + "' (" + message.content + ") :" + emoteName + ":",
+                value: "Cette écoute de réaction a été supprimée"
+            });
         } else {
-            if (typeof(listenings[channel.id][message.id][emote]) != "undefined") { // @ts-ignore
-                this.deleteNotifyOnReactInBdd(message.guild.id,channel.id,message.id,emote);
-                listenings[channel.id][message.id][emote] = false;
-                Embed.addFields({
-                    name: "sur '#" + channel.name + "' (" + message.content + ") :" + emote + ":",
-                    value: "Cette écoute de réaction a été supprimée"
-                });
-            } else {
-                Embed.addFields({
-                    name: "Aucune réaction",
-                    value: "Aucune réaction n'a été trouvée et supprimée"
-                });
-            }
+            Embed.addFields({
+                name: "Aucune réaction",
+                value: "Aucune réaction n'a été trouvée et supprimée"
+            });
         }
 
         this.message.channel.send(Embed);
