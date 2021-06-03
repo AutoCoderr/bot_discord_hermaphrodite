@@ -10,9 +10,35 @@ export class ConfigTicket extends Command {
         help: { fields: ["-h","--help"], type: "boolean", required: false, description: "Pour afficher l'aide" },
 
         $argsWithoutKey: [
-            {field: "action", required: args => args.help == undefined, type: "string", description: "L'action à effectuer : set, show, disable, enable ou blacklist"},
-            {field: "two", required: args => ["set","blacklist"].includes(args.action), type: ["category", "string"], description: "L'id de la catégorie à définir si l'action est 'set', ou l'action à définir sur la blacklist (add, remove, show)"},
-            {field: "user", required: args => args.action == "blacklist" && ['add','remove'].includes(args.two), type: "user", description: "L'utilisateur à ajouter ou retirer de la blacklist"}
+            {
+                field: "action",
+                required: args => args.help == undefined,
+                type: "string",
+                description: "L'action à effectuer : set, show, disable, enable ou blacklist",
+                valid: (elem,_) => ['set','show','disable','enable','blacklist'].includes(elem)
+            },
+            {
+                field: "two",
+                required: args => ["set","blacklist"].includes(args.action),
+                type: ["category", "string"],
+                description: "L'id de la catégorie à définir si l'action est 'set', ou l'action à définir sur la blacklist (add, remove, show)",
+                valid: (elem: CategoryChannel|string,args) => (
+                    (
+                        args.action == 'set' &&
+                        elem instanceof CategoryChannel
+                    )  || (
+                        args.action == 'blacklist' &&
+                        typeof(elem) == "string" &&
+                        ['add','remove','show'].includes(elem)
+                    )
+                )
+            },
+            {
+                field: "user",
+                required: args => args.action == "blacklist" && ['add','remove'].includes(args.two),
+                type: "user",
+                description: "L'utilisateur à ajouter ou retirer de la blacklist"
+            }
         ]
     }
 
@@ -38,27 +64,12 @@ export class ConfigTicket extends Command {
             return false;
         }
 
-        if (!["set","show","disable","enable","blacklist"].includes(action)) {
-            this.sendErrors({
-                name: "Bad argument",
-                value: "Please specify 'set', 'show', 'enable', 'disable'"
-            })
-            return false;
-        }
-
         let ticketConfig: ITicketConfig;
         let category: undefined|CategoryChannel|GuildChannel;
 
         switch(action) {
             case "set":
-                if (!(two instanceof CategoryChannel)) {
-                    this.sendErrors({
-                        name: "Bad argument",
-                        value: "You need to specify the id of the category channel which will be used for the tickets"
-                    });
-                    return false;
-                }
-                category = two;
+                category = <CategoryChannel>two;
                 ticketConfig = await TicketConfig.findOne({serverId: this.message.guild.id});
                 let toEnable = false;
                 if (ticketConfig == null) {
@@ -115,13 +126,6 @@ export class ConfigTicket extends Command {
                 }
                 return true;
             case "blacklist":
-                if (typeof(two) != "string" || !["add","remove","show"].includes(two)) {
-                    this.sendErrors({
-                        name: "Bad argument",
-                        value: "Please specify 'add', 'remove' or 'show'"
-                    });
-                    return false;
-                }
                 switch(two) {
                     case "add":
                         return this.addUserToBlackList(this.message.guild.id,user.id);

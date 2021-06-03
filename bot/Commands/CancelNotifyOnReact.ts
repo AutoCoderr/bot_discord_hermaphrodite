@@ -8,11 +8,37 @@ import Discord, {GuildChannel, GuildEmoji, Message} from "discord.js";
 export class CancelNotifyOnReact extends Command {
 
     argsModel = {
-        help: { fields: ["--help", "-h"], type: "boolean", description: "Pour afficher l'aide", required: false},
-        all: { fields: ["--all"], type: "boolean", description: "à mettre sans rien d'autre, pour désactiver l'écoute sur tout les messages", required: false },
-        channel: { fields: ["--channel","-ch"], type:"channel", description: "Spécifier le channel sur lequel désactifier l'écoute de réaction", required: args => args.help == undefined && ( args.all == undefined || !args.all ) },
-        emote: { fields: ["--emote", "-e"], type: "emote", description: "Spécifier l'émote pour laquelle il faut désactiver l'écoute (nécessite --channel et --message)", required: false },
-        message: { fields: ["--message", "-m"], type: "message", description: "Spécifier l'id du message sur lequel désactiver l'écoute (nécessite le champs --channel pour savoir où est le message)", required: args => args.emote != undefined, moreDatas: (args) => args.channel}
+        help: {
+            fields: ["--help", "-h"],
+            type: "boolean",
+            description: "Pour afficher l'aide",
+            required: false
+        },
+        all: {
+            fields: ["--all"],
+            type: "boolean",
+            description: "à mettre sans rien d'autre, pour désactiver l'écoute sur tout les messages",
+            required: false
+        },
+        channel: {
+            fields: ["--channel","-ch"],
+            type:"channel",
+            description: "Spécifier le channel sur lequel désactifier l'écoute de réaction",
+            required: args => (args.help == undefined || !args.help) && ( args.all == undefined || !args.all )
+        },
+        emote: {
+            fields: ["--emote", "-e"],
+            type: "emote",
+            description: "Spécifier l'émote pour laquelle il faut désactiver l'écoute (nécessite --channel et --message)",
+            required: false
+        },
+        message: {
+            fields: ["--message", "-m"],
+            type: "message",
+            description: "Spécifier l'id du message sur lequel désactiver l'écoute (nécessite le champs --channel pour savoir où est le message)",
+            required: args => args.emote != undefined,
+            moreDatas: (args) => args.channel
+        }
     };
 
     static staticCommandName = "cancelNotifyOnReact"

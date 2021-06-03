@@ -7,7 +7,6 @@ import {isNumber} from "./OtherFunctions";
 import {Message} from "discord.js";
 import {checkTypes} from "./TypeChecker";
 import {extractTypes} from "./TypeExtractor";
-import client from "../client";
 
 export default class Command {
 
@@ -253,6 +252,7 @@ export default class Command {
         let fails: Array<any> = [];
         let failsExtract: Array<any> = [];
         let argsWithoutKeyDefined = false;
+
         for (const attr in model) {
             if (attr[0] != "$") {
                 let found = false;
@@ -280,15 +280,18 @@ export default class Command {
                             const moreDatas = typeof(model[attr].moreDatas) == "function" ? model[attr].moreDatas(out) : null
                             const data = await extractTypes[argType](args[field],this.message,moreDatas);
                             if (data) {
-                                out[attr] = data;
+                                if (typeof(model[attr].valid) != "function" || model[attr].valid(data,out))
+                                    out[attr] = data;
                             } else {
                                 failsExtract.push(model[attr]);
                             }
-                        } else {
+                        } else if (typeof(model[attr].valid) != "function" || model[attr].valid(args[field],out)) {
                             out[attr] = model[attr].type == "string" ? args[field].toString() : args[field];
                         }
-                        found = true;
-                        break;
+                        if (out[attr]) {
+                            found = true;
+                            break;
+                        }
                     }
                 }
                 if (!found &&
@@ -303,6 +306,7 @@ export default class Command {
                 const argsWithoutKey = model[attr];
                 for (let i=0;i<argsWithoutKey.length;i++) {
                     let argType = argsWithoutKey[i].type;
+                    let found = false;
                     if (args[i] != undefined && (
                             (
                                 argsWithoutKey[i].type instanceof Array && argsWithoutKey[i].type.find(type => {
@@ -322,17 +326,22 @@ export default class Command {
                             const moreDatas = typeof(argsWithoutKey[i].moreDatas) == "function" ? argsWithoutKey[i].moreDatas(out) : null
                             const data = await extractTypes[argType](args[i],this.message,moreDatas);
                             if (data) {
-                                out[argsWithoutKey[i].field] = data;
+                                if (typeof(argsWithoutKey[i].valid) != "function" || argsWithoutKey[i].valid(data,out))
+                                    out[argsWithoutKey[i].field] = data;
                             } else {
                                 failsExtract.push(argsWithoutKey[i]);
                             }
-                        } else {
+                        } else if (typeof(argsWithoutKey[i].valid) != "function" || argsWithoutKey[i].valid(args[i],out)) {
                             out[argsWithoutKey[i].field] = argType == "string" ? args[i].toString() : args[i];
                         }
-                    } else if (
-                        argsWithoutKey[i].required == undefined ||
-                        (typeof(argsWithoutKey[i].required) == "boolean" && argsWithoutKey[i].required) ||
-                        (typeof(argsWithoutKey[i].required) == "function" && argsWithoutKey[i].required(out))
+                        if (out[argsWithoutKey[i].field]) found = true;
+                    }
+                    if (
+                        !found && (
+                            argsWithoutKey[i].required == undefined ||
+                            (typeof(argsWithoutKey[i].required) == "boolean" && argsWithoutKey[i].required) ||
+                            (typeof(argsWithoutKey[i].required) == "function" && argsWithoutKey[i].required(out))
+                        )
                     ) {
                         fails.push(argsWithoutKey[i]);
                     }

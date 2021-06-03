@@ -5,15 +5,30 @@ import {Message} from "discord.js";
 
 export class ConfigWelcome extends Command {
 
+    argsModel = {
+        help: { fields: ["-h","--help"], type: "boolean", required: false, description: "Pour afficher l'aide" },
+
+        $argsWithoutKey: [
+            {
+                field: "action",
+                type: "string",
+                required: args => args.help == undefined,
+                description: "L'action à effectuer: set, show, disable ou enable",
+                valid: (elem,_) => {
+                    return ["set","show","disable","enable"].includes(elem)
+                }
+            }
+        ]
+    }
+
     static staticCommandName = "configWelcome";
 
     constructor(message: Message) {
         super(message, ConfigWelcome.staticCommandName);
     }
 
-    async action(bot) {
-        let args = this.parseCommand();
-        if (!args) return false;
+    async action(args: {help: boolean, action: string}, bot) {
+        const {help, action} = args;
 
         if (this.message.guild == null) {
             this.sendErrors( {
@@ -23,22 +38,17 @@ export class ConfigWelcome extends Command {
             return false;
         }
 
-        if (typeof(args[0]) == "undefined") {
-            this.sendErrors( {
-                name: "Argument missing",
-                value: "Please specify 'set', 'show', 'enable', 'disable' or 'help'"
-            });
+        if (help) {
+            this.displayHelp();
             return false;
         }
+
         let welcomeMessage: IWelcomeMessage;
-        switch(args[0]) {
-            case "help":
-                this.displayHelp();
-                return false;
+        switch(action) {
             case "set":
                 this.message.channel.send("Veuillez rentrer le message, qui sera envoyé en MP aux nouveaux arrivants sur ce serveur :")
                     .then(sentMessage => {
-                        const listener = async response => {
+                        const listener = async (response: Message) => {
                             if (response.author.id == this.message.author.id) { // @ts-ignore
                                 let welcomeMessage: IWelcomeMessage = await WelcomeMessage.findOne({serverId: this.message.guild.id});
                                 let create = false;
@@ -91,28 +101,17 @@ export class ConfigWelcome extends Command {
                 }
                 return true;
         }
-
-        this.sendErrors({
-            name: "Bad argument",
-            value: "Please specify 'set', 'show', 'enable', 'disable' or 'help'"
-        })
         return false;
     }
 
     help(Embed) {
         Embed.addFields({
-           name: "Arguments : ",
-           value: "Premier argument: \n"+
-                  " - disable: pour désactiver l'envoie de MP aux nouveaux arrivants,\n"+
-                  " - enable: pour activer l'envoie de MP aux nouveaux arrivants (nécessite d'avoir au préalable définie le dit MP)\n"+
-                  " - set: pour définir le MP à envoyer aux nouveaux arrivants, le bot écoutera votre message suivant pour le définir en tant que MP\n"+
-                  " - show: pour visionner le message envoyé en MP aux nouveaux"
-        }).addFields({
                 name: "Exemples : ",
                 value: config.command_prefix+this.commandName+" disable\n"+
                        config.command_prefix+this.commandName+" enable\n"+
                        config.command_prefix+this.commandName+" set => Le bot vous demande de rentrer le MP => Rentrez le message et validez\n"+
-                       config.command_prefix+this.commandName+" show"
+                       config.command_prefix+this.commandName+" show\n"+
+                       config.command_prefix+this.commandName+" --help"
             });
     }
 }

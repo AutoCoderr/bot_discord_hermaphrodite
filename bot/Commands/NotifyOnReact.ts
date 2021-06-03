@@ -14,11 +14,36 @@ interface iNotifyOnReact extends Document {
 export class NotifyOnReact extends Command {
 
     argsModel = {
-        help: { fields: ["--help", "-h"], type: "boolean", description: "Pour afficher l'aide", required: false},
-        listen: { fields: ["--listen","-l"], type:"listenerReactMessage", description: "Indique le channel et le message à écouter, séparés d'un '/'", required: args => args.help == undefined },
-        emoteToReact: { fields: ["--emote", "-e"], type: "emote", description: "Indique l'emote à laquelle réagir", required: args => args.help == undefined },
-        messageToWrite: { fields: ["--message", "-m"], type: "string", description: "Le message à afficher dés qu'une réaction sur le message est detectée", required: args => args.help == undefined },
-        channelToWrite: { fields: ["--writeChannel", "-wc"], type: "channel", description: "le channel sur lequel écrire le message à chaque réaction", required: args => args.help == undefined }
+        help: {
+            fields: ["--help", "-h"],
+            type: "boolean",
+            description: "Pour afficher l'aide",
+            required: false
+        },
+        listen: {
+            fields: ["--listen","-l"],
+            type: "listenerReactMessage",
+            description: "Indique le channel et le message à écouter, séparés d'un '/'",
+            required: args => args.help == undefined
+        },
+        emoteToReact: {
+            fields: ["--emote", "-e"],
+            type: "emote",
+            description: "Indique l'emote à laquelle réagir",
+            required: args => args.help == undefined
+        },
+        messageToWrite: {
+            fields: ["--message", "-m"],
+            type: "string",
+            description: "Le message à afficher dés qu'une réaction sur le message est detectée",
+            required: args => args.help == undefined
+        },
+        channelToWrite: {
+            fields: ["--writeChannel", "-wc"],
+            type: "channel",
+            description: "le channel sur lequel écrire le message à chaque réaction",
+            required: args => args.help == undefined
+        }
     };
 
     static listenings = {}; /* example : {

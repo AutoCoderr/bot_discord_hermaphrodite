@@ -7,11 +7,37 @@ import {existingCommands} from "../Classes/CommandsDescription";
 export class ListNotifyOnReact extends Command {
 
     argsModel = {
-        help: { fields: ["--help", "-h"], type: "boolean", description: "Pour afficher l'aide", required: false},
-        all: { fields: ["--all"], type: "boolean", description: "à mettre sans rien d'autre, pour afficher l'écoute sur tout les messages", required: false },
-        channel: { fields: ["--channel","-ch"], type:"channel", description: "Spécifier le channel sur lequel afficher les écoutes de réaction", required: args => args.help == undefined && ( args.all == undefined || !args.all ) },
-        emote: { fields: ["--emote", "-e"], type: "emote", description: "Spécifier l'émote pour laquelle il faut afficher l'écoute (nécessite --channel et --message)", required: false },
-        message: { fields: ["--message", "-m"], type: "message", description: "Spécifier l'id du message sur lequel afficher les écoutes (nécessite le champs --channel pour savoir où est le message)", required: args => args.emote != undefined, moreDatas: (args) => args.channel}
+        help: {
+            fields: ["--help", "-h"],
+            type: "boolean",
+            description: "Pour afficher l'aide",
+            required: false
+        },
+        all: {
+            fields: ["--all"],
+            type: "boolean",
+            description: "à mettre sans rien d'autre, pour afficher l'écoute sur tout les messages",
+            required: false
+        },
+        channel: {
+            fields: ["--channel","-ch"],
+            type:"channel",
+            description: "Spécifier le channel sur lequel afficher les écoutes de réaction",
+            required: args => (args.help == undefined || !args.help) && ( args.all == undefined || !args.all )
+        },
+        emote: {
+            fields: ["--emote", "-e"],
+            type: "emote",
+            description: "Spécifier l'émote pour laquelle il faut afficher l'écoute (nécessite --channel et --message)",
+            required: false
+        },
+        message: {
+            fields: ["--message", "-m"],
+            type: "message",
+            description: "Spécifier l'id du message sur lequel afficher les écoutes (nécessite le champs --channel pour savoir où est le message)",
+            required: args => args.emote != undefined,
+            moreDatas: (args) => args.channel
+        }
     };
 
     static staticCommandName = "listNotifyOnReact";
