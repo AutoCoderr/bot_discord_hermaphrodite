@@ -72,8 +72,10 @@ export default class Command {
             const name = "Champs "
             let value = "";
             for (const attr in this.argsModel) {
-                const field = this.argsModel[attr];
-                value += field.fields.join(", ")+" : "+field.description+ " | (type attendu : " + field.type + ")\n";
+                if (attr != "$argsWithoutKey") {
+                    const field = this.argsModel[attr];
+                    value += field.fields.join(", ") + " : " + field.description + " | (type attendu : " + field.type + ")\n";
+                }
             }
             if (this.argsModel['$argsWithoutKey'] instanceof Array) {
                 for (const field of this.argsModel['$argsWithoutKey']) {
@@ -255,14 +257,28 @@ export default class Command {
             if (attr[0] != "$") {
                 let found = false;
                 for (let field of model[attr].fields) {
+                    let argType = model[attr].type;
                     if (args[field] != undefined &&
                         (
-                            model[attr].type == "string" || checkTypes[model[attr].type](args[field])
+                            (
+                                model[attr].type instanceof Array &&
+                                model[attr].type.find(type => {
+                                    if (type == "string" || checkTypes[type](args[field])) {
+                                        argType = type;
+                                        return true;
+                                    }
+                                    return false
+                                }) != undefined
+                            ) || (
+                                typeof(model[attr].type) == "string" && (
+                                    model[attr].type == "string" || checkTypes[model[attr].type](args[field])
+                                )
+                            )
                         )
                     ) {
-                        if (extractTypes[model[attr].type]) {
+                        if (extractTypes[argType]) {
                             const moreDatas = typeof(model[attr].moreDatas) == "function" ? model[attr].moreDatas(out) : null
-                            const data = await extractTypes[model[attr].type](args[field],this.message,moreDatas);
+                            const data = await extractTypes[argType](args[field],this.message,moreDatas);
                             if (data) {
                                 out[attr] = data;
                             } else {
@@ -286,21 +302,39 @@ export default class Command {
                 argsWithoutKeyDefined = true;
                 const argsWithoutKey = model[attr];
                 for (let i=0;i<argsWithoutKey.length;i++) {
-                    if (
-                        (
-                            args[i] == undefined &&
+                    let argType = argsWithoutKey[i].type;
+                    if (args[i] != undefined && (
                             (
-                                argsWithoutKey[i].required == undefined ||
-                                argsWithoutKey[i].required
-                            )
-                        ) || (
-                            args[i] != undefined &&
-                            typeof(args[i]) != argsWithoutKey[i].type
-                        )
+                                argsWithoutKey[i].type instanceof Array && argsWithoutKey[i].type.find(type => {
+                                    if (type == "string" || checkTypes[type](args[i])) {
+                                        argType = type;
+                                        return true;
+                                    }
+                                    return false;
+                                }) != undefined
+                            ) || (
+                                typeof(argsWithoutKey[i].type) == "string" && (
+                                    argsWithoutKey[i].type == "string" || checkTypes[argsWithoutKey[i].type](args[i])
+                                )
+                            ))
+                    ) {
+                        if (extractTypes[argType]) {
+                            const moreDatas = typeof(argsWithoutKey[i].moreDatas) == "function" ? argsWithoutKey[i].moreDatas(out) : null
+                            const data = await extractTypes[argType](args[i],this.message,moreDatas);
+                            if (data) {
+                                out[argsWithoutKey[i].field] = data;
+                            } else {
+                                failsExtract.push(argsWithoutKey[i]);
+                            }
+                        } else {
+                            out[argsWithoutKey[i].field] = argType == "string" ? args[i].toString() : args[i];
+                        }
+                    } else if (
+                        argsWithoutKey[i].required == undefined ||
+                        (typeof(argsWithoutKey[i].required) == "boolean" && argsWithoutKey[i].required) ||
+                        (typeof(argsWithoutKey[i].required) == "function" && argsWithoutKey[i].required(out))
                     ) {
                         fails.push(argsWithoutKey[i]);
-                    } else {
-                        out[argsWithoutKey[i].field] = args[i];
                     }
                 }
             }

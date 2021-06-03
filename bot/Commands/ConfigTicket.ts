@@ -2,9 +2,19 @@ import Command from "../Classes/Command";
 import config from "../config";
 import TicketConfig, {ITicketConfig} from "../Models/TicketConfig";
 import {extractUserId} from "../Classes/OtherFunctions";
-import Discord, {Message} from "discord.js";
+import Discord, {CategoryChannel, GuildChannel, GuildMember, Message} from "discord.js";
 
 export class ConfigTicket extends Command {
+
+    argsModel = {
+        help: { fields: ["-h","--help"], type: "boolean", required: false, description: "Pour afficher l'aide" },
+
+        $argsWithoutKey: [
+            {field: "action", required: args => args.help == undefined, type: "string", description: "L'action à effectuer : set, show, disable, enable ou blacklist"},
+            {field: "two", required: args => ["set","blacklist"].includes(args.action), type: ["category", "string"], description: "L'id de la catégorie à définir si l'action est 'set', ou l'action à définir sur la blacklist (add, remove, show)"},
+            {field: "user", required: args => args.action == "blacklist" && ['add','remove'].includes(args.two), type: "user", description: "L'utilisateur à ajouter ou retirer de la blacklist"}
+        ]
+    }
 
     static staticCommandName = "configTicket";
 
@@ -12,9 +22,13 @@ export class ConfigTicket extends Command {
         super(message, ConfigTicket.staticCommandName);
     }
 
-    async action(bot) {
-        let args = this.parseCommand();
-        if (!args) return false;
+    async action(args: {help: boolean, action: string, two: CategoryChannel|string, user: GuildMember}, bot) {
+        const {help, action, two, user} = args;
+
+        if (help) {
+            this.displayHelp();
+            return false;
+        }
 
         if (this.message.guild == null || this.message.member == null) {
             this.sendErrors({
@@ -24,52 +38,34 @@ export class ConfigTicket extends Command {
             return false;
         }
 
-        if (typeof(args[0]) == "undefined") {
+        if (!["set","show","disable","enable","blacklist"].includes(action)) {
             this.sendErrors({
-                name: "Argument missing",
-                value: "Please specify 'set', 'show', 'enable', 'disable' or 'help'"
-            });
+                name: "Bad argument",
+                value: "Please specify 'set', 'show', 'enable', 'disable'"
+            })
             return false;
         }
 
         let ticketConfig: ITicketConfig;
-        let category;
+        let category: undefined|CategoryChannel|GuildChannel;
 
-        switch(args[0]) {
-            case "help":
-                this.displayHelp();
-                return false;
+        switch(action) {
             case "set":
-                if (typeof(args[1]) == "undefined") {
+                if (!(two instanceof CategoryChannel)) {
                     this.sendErrors({
-                        name: "Argument missing",
-                        value: "You need to specify the id of the category channel which will be user for the tickets"
+                        name: "Bad argument",
+                        value: "You need to specify the id of the category channel which will be used for the tickets"
                     });
                     return false;
                 }
-                const categoryId = args[1];
-                category = this.message.guild.channels.cache.get(categoryId);
-                if (category == undefined) {
-                    this.sendErrors({
-                        name: "Bad id",
-                        value: "The specified id channel does not exist"
-                    });
-                    return false;
-                }
-                if (category.type != "category") {
-                    this.sendErrors({
-                        name: "Bad id",
-                        value: "The specified channel is not a category"
-                    });
-                    return false;
-                }
+                category = two;
                 ticketConfig = await TicketConfig.findOne({serverId: this.message.guild.id});
                 let toEnable = false;
                 if (ticketConfig == null) {
                     toEnable = true;
                     ticketConfig = {
                         enabled: true,
-                        categoryId: categoryId,
+                        categoryId: category.id,
                         serverId: this.message.guild.id,
                         blacklist: []
                     }
@@ -79,7 +75,7 @@ export class ConfigTicket extends Command {
                         toEnable = true;
                         ticketConfig.enabled = true;
                     }
-                    ticketConfig.categoryId = categoryId; // @ts-ignore
+                    ticketConfig.categoryId = category.id; // @ts-ignore
                     ticketConfig.save();
                 }
                 this.message.channel.send("Ce sera dorénavant dans la catégorie '"+category.name+"' que seront gérés les tickets"+
@@ -119,65 +115,24 @@ export class ConfigTicket extends Command {
                 }
                 return true;
             case "blacklist":
-                if (typeof(args[1]) == "undefined") {
+                if (typeof(two) != "string" || !["add","remove","show"].includes(two)) {
                     this.sendErrors({
-                        name: "Argument missing",
-                        value: "Please specify 'add' or 'remove'"
+                        name: "Bad argument",
+                        value: "Please specify 'add', 'remove' or 'show'"
                     });
                     return false;
                 }
-                let userId;
-                switch(args[1]) {
+                switch(two) {
                     case "add":
-                        if (typeof(args[2]) == "undefined") {
-                            this.sendErrors({
-                                name: "Argument missing",
-                                value: "You need to specify the user to add"
-                            });
-                            return false;
-                        }
-                        userId = extractUserId(args[2]);
-                        if (!userId) {
-                            this.sendErrors({
-                                name: "Bad argument",
-                                value: "You haven't correctly mentionned the user to add"
-                            });
-                            return false;
-                        }
-                        return this.addUserToBlackList(this.message.guild.id,userId);
+                        return this.addUserToBlackList(this.message.guild.id,user.id);
 
                     case "remove":
-                        if (typeof(args[2]) == "undefined") {
-                            this.sendErrors({
-                                name: "Argument missing",
-                                value: "You need to specify the user to remove"
-                            });
-                            return false;
-                        }
-                        userId = extractUserId(args[2]);
-                        if (!userId) {
-                            this.sendErrors({
-                                name: "Bad argument",
-                                value: "You haven't correctly mentionned the user to remove"
-                            });
-                            return false;
-                        }
-                        return this.removeUserFromBlackList(this.message.guild.id,userId);
+                        return this.removeUserFromBlackList(this.message.guild.id,user.id);
 
                     case "show":
                         return this.showUsersInBlackList(bot, this.message.guild.id);
                 }
-                this.sendErrors({
-                    name: "Bad argument",
-                    value: "Please specify 'add', 'remove' or 'show'"
-                })
-                return false;
         }
-
-        this.sendErrors({
-            name: "Bad argument",
-            value: "Please specify 'set', 'show', 'enable', 'disable' or 'help'"
-        })
         return false;
     }
 
@@ -245,7 +200,7 @@ export class ConfigTicket extends Command {
             for (const userId of list) {
                 try { // @ts-ignore
                     const user = await this.message.guild.members.fetch(userId);
-                    users.push(user.user);
+                    users.push({username: user.nickname, id: user.id});
                 } catch(e) {
                     users.push({username: "unknown", id: userId});
                 }
@@ -289,15 +244,6 @@ export class ConfigTicket extends Command {
 
     help(Embed) {
         Embed.addFields({
-            name: "Arguments :",
-            value: "set, définir l'id de la catégorie dans laquelle apparaitrons les tickets\n"+
-                   "show, pour voir la catégorie qui a été définie\n"+
-                   "enable, pour activer les tickets sur ce serveur\n"+
-                   "disable, pour désactiver les tickets sur ce serveur\n"+
-                   "blacklist add, pour ajouter un utilisateur à la blacklist\n"+
-                   "blacklist remove, pour retirer un utilisateur de la blacklist\n"+
-                   "blacklist show, pour visionner les utilisateurs de la blacklist"
-        }).addFields({
             name: "Exemples :",
             value: config.command_prefix+this.commandName+" set 475435899654125637\n"+
                    config.command_prefix+this.commandName+" show\n"+
@@ -305,7 +251,8 @@ export class ConfigTicket extends Command {
                    config.command_prefix+this.commandName+" disable\n"+
                    config.command_prefix+this.commandName+" blacklist add @unUtilisateur\n"+
                    config.command_prefix+this.commandName+" blacklist remove @unUtilisateur\n"+
-                   config.command_prefix+this.commandName+" blacklist show"
+                   config.command_prefix+this.commandName+" blacklist show\n"+
+                   config.command_prefix+this.commandName+" --help"
         })
     }
 }

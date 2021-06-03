@@ -16,7 +16,7 @@ export class CommunicateTicketClientSide extends Command {
         return this.message.channel.type == "dm" && !this.message.author.bot && !usersInPrompt[this.message.author.id];
     }
 
-    async action(bot) {
+    async action(_, bot) {
         const ticketConfigs: Array<ITicketConfig> = await TicketConfig.find(
             {
                 enabled: true,

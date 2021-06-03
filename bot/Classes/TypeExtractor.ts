@@ -1,4 +1,4 @@
-import {GuildChannel, GuildEmoji, Message} from "discord.js";
+import {CategoryChannel, GuildChannel, GuildEmoji, GuildMember, Message} from "discord.js";
 import client from "../client";
 
 export const extractTypes = {
@@ -8,6 +8,11 @@ export const extractTypes = {
         channelId = channelId.substring(0,channelId.length-1);
         const channel = message.guild.channels.cache.get(channelId);
         return channel != undefined ? channel : false;
+    },
+    category: (field, message: Message): CategoryChannel|boolean => {
+        if (message.guild == null) return false;
+        const channel = message.guild.channels.cache.get(field);
+        return (channel instanceof CategoryChannel && channel.type == "category") ? channel : false;
     },
     message: async (field, _: Message, channel: GuildChannel|boolean): Promise<Message|boolean> => {
         if (channel) {
@@ -36,6 +41,16 @@ export const extractTypes = {
         const emoteId = field.split(":")[2].split(">")[0];
         const emote = client.emojis.cache.get(emoteId);
         return emote ? emote : false;
+    },
+    user: async (field, message: Message): Promise<GuildMember|boolean> => {
+        if (message.guild == null) return false;
+        let userId = field.split("<@")[1].split(">")[0];
+        if (userId[0] == "!") userId = userId.substring(1);
+        try {
+            return await message.guild.members.fetch(userId);
+        } catch(e) {
+            return false;
+        }
     }
 }
 ;
