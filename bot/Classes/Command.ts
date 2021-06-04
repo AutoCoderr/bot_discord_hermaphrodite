@@ -7,6 +7,7 @@ import {isNumber} from "./OtherFunctions";
 import {Message} from "discord.js";
 import {checkTypes} from "./TypeChecker";
 import {extractTypes} from "./TypeExtractor";
+import instantiate = WebAssembly.instantiate;
 
 export default class Command {
 
@@ -49,7 +50,7 @@ export default class Command {
         this.message.channel.send(Embed);
     }
 
-    displayHelp(fails: null|Array<any> = null, failsExtract: null|Array<any> = null) {
+    displayHelp(fails: null|Array<any> = null, failsExtract: null|Array<any> = null, args = null) {
         const commandName = this.message.content.split(" ")[0];
         let Embed = new Discord.MessageEmbed()
             .setColor('#0099ff')
@@ -65,7 +66,7 @@ export default class Command {
 
                 for (const fail of fails) {
                     if (typeof(fail.errorMessage) == "function") {
-                        fail.errorMessage(fail.value, Embed)
+                        fail.errorMessage(fail.value, args, Embed)
                     }
                 }
             }
@@ -77,7 +78,7 @@ export default class Command {
 
                 for (const failExtract of failsExtract) {
                     if (typeof(failExtract.errorMessage) == "function") {
-                        failExtract.errorMessage(failExtract.value, Embed)
+                        failExtract.errorMessage(failExtract.value, args, Embed)
                     }
                 }
             }
@@ -150,11 +151,13 @@ export default class Command {
     }
 
     checkPermissions(displayMsg = true) {
-        return Command.staticCheckPermissions(this.message,displayMsg);
+        return Command.staticCheckPermissions(this.message,displayMsg,this.commandName);
     }
 
-    static async staticCheckPermissions(message: Message, displayMsg = true) {
-        const commandName = this.staticCommandName;
+    static async staticCheckPermissions(message: Message, displayMsg = true, commandName: string|null = null) {
+        if (commandName == null) {
+            commandName = this.staticCommandName;
+        }
 
         if(message.channel.type == "dm" || config.roots.includes(message.author.id) || (message.member && message.member.hasPermission("ADMINISTRATOR"))) return true;
 
@@ -165,7 +168,7 @@ export default class Command {
             });
             if (permission != null) {
                 // @ts-ignore
-                for (let roleId of this.message.member._roles) {
+                for (let roleId of message.member._roles) {
                     if (permission.roles.includes(roleId)) return true;
                 }
             }
@@ -271,6 +274,7 @@ export default class Command {
         for (const attr in model) {
             if (attr[0] != "$") {
                 let found = false;
+                let incorrectField = false;
                 for (let field of model[attr].fields) {
                     let argType: Array<string>|string = model[attr].type ?? model[attr].types;
                     if (args[field] != undefined &&
@@ -292,28 +296,39 @@ export default class Command {
                         )
                     ) {
                         if (extractTypes[<string>argType]) {
-                            const moreDatas = typeof(model[attr].moreDatas) == "function" ? model[attr].moreDatas(out) : null
+                            const moreDatas = typeof(model[attr].moreDatas) == "function" ? await model[attr].moreDatas(out) : null
                             const data = await extractTypes[<string>argType](args[field],this.message,moreDatas);
                             if (data) {
-                                if (typeof(model[attr].valid) != "function" || model[attr].valid(data,out))
+                                if (typeof(model[attr].valid) != "function" || await model[attr].valid(data,out))
                                     out[attr] = data;
+                                else
+                                    incorrectField = true;
                             } else {
                                 failsExtract.push({...model[attr], value: args[field]});
                             }
-                        } else if (typeof(model[attr].valid) != "function" || model[attr].valid(args[field],out)) {
+                        } else if (typeof(model[attr].valid) != "function" || await model[attr].valid(args[field],out)) {
                             out[attr] = model[attr].type == "string" ? args[field].toString() : args[field];
+                        } else {
+                            incorrectField = true;
                         }
                         if (out[attr]) {
                             found = true;
                             break;
                         }
+                    } else if (args[field] != undefined) {
+                        incorrectField = true;
                     }
+                }
+                if (!found && !incorrectField && model[attr].default) {
+                    out[attr] = model[attr].default;
+                    found = true;
                 }
                 if (!found &&
                     (
+                        incorrectField ||
                         model[attr].required == undefined ||
                         (typeof(model[attr].required) == "boolean" && model[attr].required) ||
-                        (typeof(model[attr].required) == "function" && model[attr].required(out))
+                        (typeof(model[attr].required) == "function" && await model[attr].required(out))
                     )
                 ) fails.push({...model[attr], value: model[attr].fields.map(field => args[field]).find(arg => arg != undefined) });
             } else if (attr == "$argsWithoutKey" && !argsWithoutKeyDefined) {
@@ -322,6 +337,7 @@ export default class Command {
                 for (let i=0;i<argsWithoutKey.length;i++) {
                     let argType: Array<string>|string = argsWithoutKey[i].type ?? argsWithoutKey[i].types;
                     let found = false;
+                    let incorrectField = false;
                     if (args[i] != undefined && (
                             (
                                 argType instanceof Array && argType.find(type => {
@@ -338,24 +354,35 @@ export default class Command {
                             ))
                     ) {
                         if (extractTypes[<string>argType]) {
-                            const moreDatas = typeof(argsWithoutKey[i].moreDatas) == "function" ? argsWithoutKey[i].moreDatas(out) : null
+                            const moreDatas = typeof(argsWithoutKey[i].moreDatas) == "function" ? await argsWithoutKey[i].moreDatas(out) : null
                             const data = await extractTypes[<string>argType](args[i],this.message,moreDatas);
                             if (data) {
-                                if (typeof(argsWithoutKey[i].valid) != "function" || argsWithoutKey[i].valid(data,out))
+                                if (typeof(argsWithoutKey[i].valid) != "function" || await argsWithoutKey[i].valid(data,out))
                                     out[argsWithoutKey[i].field] = data;
+                                else
+                                    incorrectField = true;
                             } else {
                                 failsExtract.push({...argsWithoutKey[i], value: args[i]});
                             }
-                        } else if (typeof(argsWithoutKey[i].valid) != "function" || argsWithoutKey[i].valid(args[i],out)) {
+                        } else if (typeof(argsWithoutKey[i].valid) != "function" || await argsWithoutKey[i].valid(args[i],out)) {
                             out[argsWithoutKey[i].field] = argType == "string" ? args[i].toString() : args[i];
+                        } else {
+                            incorrectField = true;
                         }
                         if (out[argsWithoutKey[i].field]) found = true;
+                    } else if (args[i] != undefined) {
+                        incorrectField = true;
+                    }
+                    if (!found && !incorrectField && argsWithoutKey[i].default) {
+                        out[argsWithoutKey[i].field] = argsWithoutKey[i].default;
+                        found = true;
                     }
                     if (
                         !found && (
+                            incorrectField ||
                             argsWithoutKey[i].required == undefined ||
                             (typeof(argsWithoutKey[i].required) == "boolean" && argsWithoutKey[i].required) ||
-                            (typeof(argsWithoutKey[i].required) == "function" && argsWithoutKey[i].required(out))
+                            (typeof(argsWithoutKey[i].required) == "function" && await argsWithoutKey[i].required(out))
                         )
                     ) {
                         fails.push({...argsWithoutKey[i], value: args[i]});
@@ -364,7 +391,7 @@ export default class Command {
             }
         }
         if (fails.length > 0 || failsExtract.length > 0) {
-            this.displayHelp(fails, failsExtract);
+            this.displayHelp(fails, failsExtract, out);
             return false;
         }
         return out;

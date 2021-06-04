@@ -47,7 +47,7 @@ export class Help extends Command {
         return true;
     }
 
-    static async staticCheckPermissions(message: Message, displayMsg = true) { // overload the staticCheckPermission of Command class to permit all users to execute the help command
+    static async staticCheckPermissions(message: Message, displayMsg, commandName) { // overload the staticCheckPermission of Command class to permit all users to execute the help command
         return true
     }
 }

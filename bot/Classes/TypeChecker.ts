@@ -13,5 +13,5 @@ export const checkTypes = {
 };
 
 const regex = {
-    role: "\<@&[0-9]{18}\>"
+    role: "\<@&[0-9]{18}\>",
 }

@@ -1,8 +1,8 @@
 import config from "../config";
 import Command from "../Classes/Command";
-import { extractEmoteName } from "../Classes/OtherFunctions";
 import StoredNotifyOnReact, { IStoredNotifyOnReact } from "../Models/StoredNotifyOnReact";
-import {GuildChannel, GuildEmoji, Message} from "discord.js";
+import {GuildChannel, GuildEmoji, Message, MessageEmbed} from "discord.js";
+import {checkTypes} from "../Classes/TypeChecker";
 
 interface iNotifyOnReact extends Document {
     listen: string;
@@ -26,12 +26,6 @@ export class NotifyOnReact extends Command {
             description: "Indique le channel et le message à écouter, séparés d'un '/'",
             required: args => args.help == undefined
         },
-        emoteToReact: {
-            fields: ["--emote", "-e"],
-            type: "emote",
-            description: "Indique l'emote à laquelle réagir",
-            required: args => args.help == undefined
-        },
         messageToWrite: {
             fields: ["--message", "-m"],
             type: "string",
@@ -43,7 +37,13 @@ export class NotifyOnReact extends Command {
             type: "channel",
             description: "le channel sur lequel écrire le message à chaque réaction",
             required: args => args.help == undefined
-        }
+        },
+        emoteToReact: {
+            fields: ["--emote", "-e"],
+            type: "emote",
+            description: "Indique l'emote à laquelle réagir",
+            required: args => args.help == undefined
+        },
     };
 
     static listenings = {}; /* example : {
@@ -97,6 +97,17 @@ export class NotifyOnReact extends Command {
             return false;
         }
 
+        if (this.listenings[this.message.guild.id] &&
+            this.listenings[this.message.guild.id][listen.channel.id] &&
+            this.listenings[this.message.guild.id][listen.channel.id][listen.message.id] &&
+            this.listenings[this.message.guild.id][listen.channel.id][listen.message.id][emoteToReact.name]) {
+            this.sendErrors({
+                name: "Déjà écouté",
+                value: "Ce message est déjà écouté sur cette émote"
+            });
+            return false;
+        }
+
         const emoteName = emoteToReact.name;
         const serverId = messageToListen.guild.id;
 
@@ -130,13 +141,14 @@ export class NotifyOnReact extends Command {
             .then(collected => {
                 if (!this.listenings[serverId][channelToListen.id][messageToListen.id][emoteName])  { // Detect if the listening on the message has been disabled
                     delete this.listenings[serverId][channelToListen.id][messageToListen.id][emoteName]; // And delete the useless keys in the listenings object
+
                     if (Object.keys(this.listenings[serverId][channelToListen.id][messageToListen.id]).length == 0) {
                         delete this.listenings[serverId][channelToListen.id][messageToListen.id];
                     }
-                    if (Object.keys(this.listenings[serverId][channelToListen.id]).length === 0) {
+                    if (Object.keys(this.listenings[serverId][channelToListen.id]).length == 0) {
                         delete this.listenings[serverId][channelToListen.id];
                     }
-                    if (Object.keys(this.listenings[serverId]).length === 0) {
+                    if (Object.keys(this.listenings[serverId]).length == 0) {
                         delete this.listenings[serverId];
                     }
                     return;
@@ -153,8 +165,9 @@ export class NotifyOnReact extends Command {
 
                 this.reactingAndNotifyOnMessage(messageToListen, channelToWrite, messageToWrite, emoteName, channelToListen);
             })
-            .catch(collected => {
-                console.log("Catch event in reactingAndNotifyOnMessage() function");
+            .catch(e => {
+                console.log("Catch event in reactingAndNotifyOnMessage() function ");
+                console.error(e);
             });
     }
 

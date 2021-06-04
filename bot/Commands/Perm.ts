@@ -22,15 +22,23 @@ export class Perm extends Command {
                 type: "string",
                 required: args => args.help == undefined,
                 description: "La commande sur laquelle ajouter ou définir la permission",
-                valid: (value, _) => Object.keys(existingCommands)
-                    .filter(commandName => existingCommands[commandName].display)
-                    .includes(value),
+                valid: async (value, _) => { // Vérifie si l'utilisateur à le droit d'accéder à cette commande
+                    const commands = Object.keys(existingCommands);
+                    for (let i=0;i<commands.length;i++) {
+                        const commandName = commands[i];
+                        if (!existingCommands[commandName].display || !(await existingCommands[commandName].commandClass.staticCheckPermissions(this.message,false))) {
+                            commands.splice(i,1);
+                            i -= 1;
+                        }
+                    }
+                    return commands.includes(value);
+                },
 
-                errorMessage: (value, embed: MessageEmbed) => {
+                errorMessage: (value, _, embed: MessageEmbed) => {
                     if (value != undefined) {
                         embed.addFields({
-                            name: "La command n'existe pas",
-                            value: "La commande '" + value + "' n'existe pas"
+                            name: "La commande n'existe pas",
+                            value: "La commande '" + value + "' n'existe pas, ou vous est inaccessible"
                         });
                     } else {
                         embed.addFields({
