@@ -1,4 +1,4 @@
-import {CategoryChannel, GuildChannel, GuildEmoji, GuildMember, Message} from "discord.js";
+import {CategoryChannel, GuildChannel, GuildEmoji, GuildMember, Message, Role} from "discord.js";
 import client from "../client";
 
 export const extractTypes = {
@@ -51,6 +51,22 @@ export const extractTypes = {
         } catch(e) {
             return false;
         }
+    },
+    role: (field, message: Message): Role|boolean => {
+        if (message.guild == null) return false;
+        const roleId = field.split("<@&")[1].split(">")[0];
+        const role = message.guild.roles.cache.get(roleId);
+        return role ?? false;
+    },
+    roles: (field, message: Message): Array<Role>|boolean => {
+        const roles: Array<Role> = [];
+        const rolesMentions = field.split(",");
+        for (const roleMention of rolesMentions) {
+            const role = extractTypes.role(roleMention.trim(), message);
+            if (!(role instanceof Role)) return false;
+            roles.push(role);
+        }
+        return roles;
     }
 }
 ;

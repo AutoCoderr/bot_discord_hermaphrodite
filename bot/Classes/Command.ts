@@ -60,12 +60,26 @@ export default class Command {
             if (fails instanceof Array && fails.length > 0) {
                 const name = "Arguments manquants ou invalides :";
                 const value = this.getArgsList(fails);
-                Embed.addFields({name,value});
+                if (value != "")
+                    Embed.addFields({name,value});
+
+                for (const fail of fails) {
+                    if (typeof(fail.errorMessage) == "function") {
+                        fail.errorMessage(fail.value, Embed)
+                    }
+                }
             }
             if (failsExtract instanceof Array && failsExtract.length > 0) {
                 const name = "Données introuvables";
                 const value = this.getArgsList(failsExtract);
-                Embed.addFields({name,value});
+                if (value != "")
+                    Embed.addFields({name,value});
+
+                for (const failExtract of failsExtract) {
+                    if (typeof(failExtract.errorMessage) == "function") {
+                        failExtract.errorMessage(failExtract.value, Embed)
+                    }
+                }
             }
         } else {
             const name = "Champs "
@@ -89,6 +103,7 @@ export default class Command {
 
     getArgsList(args: Array<any>) {
         return args
+            .filter(arg => typeof(arg.errorMessage) != "function")
             .map(arg =>
                 (arg.fields instanceof Array ? arg.fields.join(", ") : arg.field) + " : " + arg.description + " | (type attendu : " + (arg.type ?? arg.types) + ")"
             ).join("\n\n");
@@ -283,7 +298,7 @@ export default class Command {
                                 if (typeof(model[attr].valid) != "function" || model[attr].valid(data,out))
                                     out[attr] = data;
                             } else {
-                                failsExtract.push(model[attr]);
+                                failsExtract.push({...model[attr], value: args[field]});
                             }
                         } else if (typeof(model[attr].valid) != "function" || model[attr].valid(args[field],out)) {
                             out[attr] = model[attr].type == "string" ? args[field].toString() : args[field];
@@ -300,7 +315,7 @@ export default class Command {
                         (typeof(model[attr].required) == "boolean" && model[attr].required) ||
                         (typeof(model[attr].required) == "function" && model[attr].required(out))
                     )
-                ) fails.push(model[attr]);
+                ) fails.push({...model[attr], value: model[attr].fields.map(field => args[field]).find(arg => arg != undefined) });
             } else if (attr == "$argsWithoutKey" && !argsWithoutKeyDefined) {
                 argsWithoutKeyDefined = true;
                 const argsWithoutKey = model[attr];
@@ -329,7 +344,7 @@ export default class Command {
                                 if (typeof(argsWithoutKey[i].valid) != "function" || argsWithoutKey[i].valid(data,out))
                                     out[argsWithoutKey[i].field] = data;
                             } else {
-                                failsExtract.push(argsWithoutKey[i]);
+                                failsExtract.push({...argsWithoutKey[i], value: args[i]});
                             }
                         } else if (typeof(argsWithoutKey[i].valid) != "function" || argsWithoutKey[i].valid(args[i],out)) {
                             out[argsWithoutKey[i].field] = argType == "string" ? args[i].toString() : args[i];
@@ -343,7 +358,7 @@ export default class Command {
                             (typeof(argsWithoutKey[i].required) == "function" && argsWithoutKey[i].required(out))
                         )
                     ) {
-                        fails.push(argsWithoutKey[i]);
+                        fails.push({...argsWithoutKey[i], value: args[i]});
                     }
                 }
             }

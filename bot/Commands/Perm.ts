@@ -1,36 +1,64 @@
 import config from "../config";
 import Command from "../Classes/Command";
 import { existingCommands } from "../Classes/CommandsDescription";
-import Permissions, { IPermissions } from "../Models/Permissions";
-import Discord, {Message} from "discord.js";
-import {getRolesFromList} from "../Classes/OtherFunctions";
-
-interface IPerm {
-    0: string; // set or add
-    1: string; // command name
-    2: string; // role to add or set
-}
+import {Message, MessageEmbed, Role} from "discord.js";
+import Permissions, {IPermissions} from "../Models/Permissions";
 
 export class Perm extends Command {
+
+    argsModel = {
+        help: { fields: ['-h','--help'], type: "boolean", required: false, description: "Pour afficher l'aide" },
+
+        $argsWithoutKey: [
+            {
+                field: "action",
+                type: "string",
+                required: args => args.help == undefined,
+                description: "'add', 'set' ou 'show', pour ajouter une permission à celle déjà présente, les redéfinir avec set, ou les afficher avec 'show'",
+                valid: (value, _) => ['add','set','show'].includes(value)
+            },
+            {
+                field: "commandName",
+                type: "string",
+                required: args => args.help == undefined,
+                description: "La commande sur laquelle ajouter ou définir la permission",
+                valid: (value, _) => Object.keys(existingCommands)
+                    .filter(commandName => existingCommands[commandName].display)
+                    .includes(value),
+
+                errorMessage: (value, embed: MessageEmbed) => {
+                    if (value != undefined) {
+                        embed.addFields({
+                            name: "La command n'existe pas",
+                            value: "La commande '" + value + "' n'existe pas"
+                        });
+                    } else {
+                        embed.addFields({
+                            name: "Nom de commande manquant",
+                            value: "Nom de la commande non spécifié"
+                        });
+                    }
+                }
+            },
+            {
+                field: "roles",
+                type: "roles",
+                required: args => args.help == undefined && ['add','set'].includes(args.action),
+                description: "Le ou les rôles autorisés à taper cette commande"
+            }
+        ]
+    };
+
     static staticCommandName = "perm";
 
     constructor(message: Message) {
         super(message, Perm.staticCommandName);
     }
 
-    async action(bot) { //%perm set commandName @role
-        const args: IPerm = this.parseCommand();
+    async action(args: {help: boolean, action: string, commandName: string, roles: Array<Role>}, bot) { //%perm set commandName @role
+        const {help, action, commandName, roles} = args;
 
-        // check if arguments are correctly filled
-        if (typeof(args[0]) == "undefined" || (args[0] != "add" && args[0] != "set" && args[0] != "show" && args[0] != "help")) {
-            this.sendErrors({
-                name: "Incorrect parametter",
-                value: "Incorrect parametter, please type 'add', 'set', 'show', or 'help'"
-            });
-            return false;
-        }
-
-        if (args[0] == "help") {
+        if (help) {
             this.displayHelp();
             return false;
         }
@@ -43,29 +71,10 @@ export class Perm extends Command {
             return false;
         }
 
-        const action = args[0];
-
-        if (typeof(args[1]) == "undefined") {
-            this.sendErrors({
-                name: "Command name missing",
-                value: "The command name is not specified"
-            });
-            return false;
-        }
-        if (!Object.keys(existingCommands).includes(args[1]) || !existingCommands[args[1]].display) {
-            this.sendErrors({
-                name: "Command name doesn't exist",
-                value: "The command '"+args[1]+"' doesn't exist"
-            });
-            return false;
-        }
-
-        const commandName = args[1];
-
         if (action == "show") { // Show the roles which are allowed to execute the specified command
             const permissions = await Permissions.find({command: commandName, serverId: this.message.guild.id});
 
-            let Embed = new Discord.MessageEmbed()
+            let Embed = new MessageEmbed()
                 .setColor('#0099ff')
                 .setTitle("Les permissions pour '"+commandName+"' :")
                 .setDescription("Liste des permissions pour '"+commandName+"'")
@@ -98,30 +107,13 @@ export class Perm extends Command {
         }
 
 
-
-        if (typeof(args[2]) == "undefined") { // check if the roles to attibute to that command are correctly filled
-            this.sendErrors({
-                name: "Roles missing",
-                value: "The roles are not specified"
-            });
-            return false;
-        }
-
-
-        // Attribute or add the specified allowed roles to the specified command
-        const specifiedRoles = args[2].split(",");
-        const rolesResponse: any = getRolesFromList(specifiedRoles, this.message);
-        if (!rolesResponse.success) {
-            this.sendErrors(rolesResponse.errors);
-            return false;
-        }
-        const { rolesId } = rolesResponse;
-
         const serverId = this.message.guild.id;
 
-        const permissions = await Permissions.find({serverId: serverId, command: commandName});
+        const permission = await Permissions.findOne({serverId: serverId, command: commandName});
 
-        if (permissions.length == 0) {
+        const rolesId = roles.map(role => role.id);
+
+        if (permission == null) {
             const permission: IPermissions = {
                 command: commandName,
                 roles: rolesId,
@@ -129,7 +121,6 @@ export class Perm extends Command {
             }
             Permissions.create(permission);
         } else {
-            let permission = permissions[0];
             if (action == "add") {
                 for (let roleId of rolesId) {
                     if (permission.roles.includes(roleId)) {
@@ -151,14 +142,7 @@ export class Perm extends Command {
     }
 
     help(Embed) {
-        Embed
-            .addFields({
-                name: "Arguments :",
-                value: "Permier argument : 'add', 'set' ou 'show', pour ajouter une permission à celle déjà présente, les redéfinir avec set, ou les afficher avec 'show'\n"+
-                    "Deuxième argument : La commande sur laquelle ajouter ou définir la permission\n"+
-                    "Troisième argument : Le ou les rôles autorisés à taper cette commande"
-            })
-            .addFields({
+        Embed.addFields({
                name: "Exemples :",
                value: config.command_prefix+"perm add notifyOnReact @Admins\n"+
                     "Ou "+config.command_prefix+"perm set notifyOnReact '@Admins, @Maintainers'\n"+
