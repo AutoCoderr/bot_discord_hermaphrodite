@@ -12,7 +12,7 @@ export class Help extends Command {
         super(message, Help.staticCommandName);
     }
 
-    async action(bot) {
+    async action(_,bot) {
         let Embed = new Discord.MessageEmbed()
             .setColor('#0099ff')
             .setTitle('Toutes les commandes')

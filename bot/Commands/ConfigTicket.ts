@@ -1,7 +1,6 @@
 import Command from "../Classes/Command";
 import config from "../config";
 import TicketConfig, {ITicketConfig} from "../Models/TicketConfig";
-import {extractUserId} from "../Classes/OtherFunctions";
 import Discord, {CategoryChannel, GuildChannel, GuildMember, Message} from "discord.js";
 
 export class ConfigTicket extends Command {

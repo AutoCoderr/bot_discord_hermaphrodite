@@ -7,7 +7,6 @@ import {isNumber} from "./OtherFunctions";
 import {Message} from "discord.js";
 import {checkTypes} from "./TypeChecker";
 import {extractTypes} from "./TypeExtractor";
-import instantiate = WebAssembly.instantiate;
 
 export default class Command {
 
@@ -275,6 +274,7 @@ export default class Command {
             if (attr[0] != "$") {
                 let found = false;
                 let incorrectField = false;
+                let extractFailed = false;
                 for (let field of model[attr].fields) {
                     let argType: Array<string>|string = model[attr].type ?? model[attr].types;
                     if (args[field] != undefined &&
@@ -301,36 +301,37 @@ export default class Command {
                             if (data) {
                                 if (typeof(model[attr].valid) != "function" || await model[attr].valid(data,out))
                                     out[attr] = data;
-                                else
-                                    incorrectField = true;
-                            } else {
-                                failsExtract.push({...model[attr], value: args[field]});
-                            }
-                        } else if (typeof(model[attr].valid) != "function" || await model[attr].valid(args[field],out)) {
+                                 else
+                                     incorrectField = true;
+                            } else
+                                extractFailed = true;
+                        } else if (typeof(model[attr].valid) != "function" || await model[attr].valid(args[field],out))
                             out[attr] = model[attr].type == "string" ? args[field].toString() : args[field];
-                        } else {
+                        else
                             incorrectField = true;
-                        }
+
                         if (out[attr]) {
                             found = true;
                             break;
                         }
-                    } else if (args[field] != undefined) {
+                    } else if (args[field] != undefined)
                         incorrectField = true;
-                    }
                 }
-                if (!found && !incorrectField && model[attr].default) {
+
+                if (model[attr].default && !found && !incorrectField && !extractFailed) {
                     out[attr] = model[attr].default;
                     found = true;
                 }
-                if (!found &&
-                    (
-                        incorrectField ||
+                if (!found) {
+                    if (extractFailed) {
+                        failsExtract.push({...model[attr], value: model[attr].fields.map(field => args[field]).find(arg => arg != undefined)});
+                    } else if (incorrectField ||
                         model[attr].required == undefined ||
                         (typeof(model[attr].required) == "boolean" && model[attr].required) ||
-                        (typeof(model[attr].required) == "function" && await model[attr].required(out))
-                    )
-                ) fails.push({...model[attr], value: model[attr].fields.map(field => args[field]).find(arg => arg != undefined) });
+                        (typeof(model[attr].required) == "function" && await model[attr].required(out))) {
+                        fails.push({...model[attr], value: model[attr].fields.map(field => args[field]).find(arg => arg != undefined) });
+                    }
+                }
             } else if (attr == "$argsWithoutKey" && !argsWithoutKeyDefined) {
                 argsWithoutKeyDefined = true;
                 const argsWithoutKey = model[attr];
@@ -338,6 +339,7 @@ export default class Command {
                     let argType: Array<string>|string = argsWithoutKey[i].type ?? argsWithoutKey[i].types;
                     let found = false;
                     let incorrectField = false;
+                    let extractFailed = false;
                     if (args[i] != undefined && (
                             (
                                 argType instanceof Array && argType.find(type => {
@@ -363,6 +365,7 @@ export default class Command {
                                     incorrectField = true;
                             } else {
                                 failsExtract.push({...argsWithoutKey[i], value: args[i]});
+                                extractFailed = true;
                             }
                         } else if (typeof(argsWithoutKey[i].valid) != "function" || await argsWithoutKey[i].valid(args[i],out)) {
                             out[argsWithoutKey[i].field] = argType == "string" ? args[i].toString() : args[i];
@@ -378,7 +381,7 @@ export default class Command {
                         found = true;
                     }
                     if (
-                        !found && (
+                        !found && !extractFailed && (
                             incorrectField ||
                             argsWithoutKey[i].required == undefined ||
                             (typeof(argsWithoutKey[i].required) == "boolean" && argsWithoutKey[i].required) ||

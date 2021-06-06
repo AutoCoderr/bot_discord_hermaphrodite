@@ -1,6 +1,6 @@
 import config from "../config";
 import Command from "../Classes/Command";
-import { extractEmoteName, forEachNotifyOnReact } from "../Classes/OtherFunctions";
+import { forEachNotifyOnReact } from "../Classes/OtherFunctions";
 import { existingCommands } from "../Classes/CommandsDescription";
 import StoredNotifyOnReact, { IStoredNotifyOnReact } from "../Models/StoredNotifyOnReact";
 import Discord, {GuildChannel, GuildEmoji, Message} from "discord.js";

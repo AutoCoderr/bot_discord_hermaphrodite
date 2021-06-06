@@ -1,14 +1,6 @@
 import { existingCommands } from "./CommandsDescription";
 import History, {IHistory} from "../Models/History";
-import config from "../config";
 import {GuildChannel, GuildMember, Message, MessageEmbed} from "discord.js";
-
-export function extractEmoteName(emote) {
-    let regex = new RegExp("\<(a)?\:[a-zA-Z0-9_-]{2,18}\\:[0-9]{18}\\>");
-    if (!regex.test(emote)) return false;
-    let emoteName = emote.split(":")[1].split(":")[0];
-    return emoteName != undefined ? emoteName : false;
-}
 
 export function addMissingZero(number, n = 2) {
     number = number.toString();
@@ -16,67 +8,6 @@ export function addMissingZero(number, n = 2) {
         number = "0"+number;
     }
     return number;
-}
-
-export function extractChannelId(channelMention) {
-    let channelId = channelMention.split("<#")[1];
-    if (channelId == undefined) return false;
-    if (channelId[channelId.length-1] != ">") return false;
-    channelId = channelId.substring(0,channelId.length-1);
-    if (channelId.length != 18) return false;
-    return channelId;
-}
-
-export function extractRoleId(roleMention) {
-    let roleId = roleMention.split("<@&")[1];
-    if (roleId == undefined) return false;
-    if (roleId[roleId.length-1] != ">") return false;
-    roleId = roleId.substring(0,roleId.length-1);
-    if (roleId.length != 18) return false;
-    return roleId;
-}
-
-export function extractUserId(userMention) {
-    let userId = userMention.split("<@")[1];
-    if (userId == undefined) return false;
-    if (userId[0] == "!") userId = userId.substring(1);
-    if (userId[userId.length-1] != ">") return false;
-    userId = userId.substring(0,userId.length-1);
-    if (userId.length != 18) return false;
-    return userId;
-}
-
-export function getRolesFromList(specifiedRoles, message) {
-    let rolesId: Array<string> = [];
-    let roles: Array<any> = [];
-    for (let specifiedRole of specifiedRoles) {
-        if (specifiedRole == '') continue;
-        let roleId: string = specifiedRole.replaceAll(" ","")
-        roleId = extractRoleId(roleId);
-
-        if (!roleId) {
-            return { success: false, errors: [{
-                name: "Role badly specified",
-                value: "You need to specified an existing role, with the '@'"
-            }]};
-        }
-        let role = message.guild.roles.cache.get(roleId)
-        if (role == undefined) {
-            return { success: false, errors: [{
-                name: "Role doesn't exist",
-                value: "A specified role doesn't exist"
-            }]};
-        }
-        if (rolesId.includes(roleId)) {
-            return { success: false, errors: [{
-                    name: "Same role specified to time",
-                    value: "A same role is specified many times"
-                }]};
-        }
-        roles.push(role);
-        rolesId.push(roleId);
-    }
-    return { success: true, rolesId, roles }
 }
 
 export function getArgsModelHistory(message: Message) {
