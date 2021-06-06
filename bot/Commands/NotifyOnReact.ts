@@ -1,8 +1,7 @@
 import config from "../config";
 import Command from "../Classes/Command";
 import StoredNotifyOnReact, { IStoredNotifyOnReact } from "../Models/StoredNotifyOnReact";
-import {GuildChannel, GuildEmoji, Message, MessageEmbed} from "discord.js";
-import {checkTypes} from "../Classes/TypeChecker";
+import {GuildChannel, GuildEmoji, Message} from "discord.js";
 
 export default class NotifyOnReact extends Command {
 

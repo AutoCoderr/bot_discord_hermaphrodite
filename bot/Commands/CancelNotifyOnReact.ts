@@ -2,7 +2,7 @@ import config from "../config";
 import Command from "../Classes/Command";
 import { forEachNotifyOnReact } from "../Classes/OtherFunctions";
 import { existingCommands } from "../Classes/CommandsDescription";
-import StoredNotifyOnReact, { IStoredNotifyOnReact } from "../Models/StoredNotifyOnReact";
+import StoredNotifyOnReact from "../Models/StoredNotifyOnReact";
 import Discord, {GuildChannel, GuildEmoji, Message} from "discord.js";
 
 export default class CancelNotifyOnReact extends Command {

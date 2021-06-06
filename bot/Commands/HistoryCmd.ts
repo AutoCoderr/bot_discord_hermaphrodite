@@ -1,8 +1,7 @@
 import config from "../config";
 import Command from "../Classes/Command";
 import {getArgsModelHistory, getHistory} from "../Classes/OtherFunctions";
-import Discord, {GuildChannel, GuildMember, Message, MessageEmbed} from "discord.js";
-import {existingCommands} from "../Classes/CommandsDescription";
+import Discord, {GuildChannel, GuildMember, Message} from "discord.js";
 
 export default class HistoryCmd extends Command {
 
