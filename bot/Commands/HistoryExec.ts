@@ -1,9 +1,11 @@
 import Command from "../Classes/Command";
 import config from "../config";
-import {getHistory} from "../Classes/OtherFunctions";
-import {Message} from "discord.js";
+import {GuildChannel, GuildMember, Message} from "discord.js";
+import {getArgsModelHistory, getHistory} from "../Classes/OtherFunctions";
 
 export class HistoryExec extends Command {
+
+    argsModel = getArgsModelHistory(this.message);
 
     static staticCommandName = "historyExec";
 
@@ -12,21 +14,14 @@ export class HistoryExec extends Command {
     }
 
 
-    async action(bot) {
+    async action(args: {help: boolean, command: string, sort: string, limit: number, channel: GuildChannel, user: GuildMember}, bot) {
 
-        const args = this.parseCommand();
-
-        if (args[0] == "help") {
+        if (args.help) {
             this.displayHelp();
             return false;
         }
 
         const response = await getHistory(this.message,args);
-
-        if (response.errors.length > 0) {
-            this.sendErrors(response.errors);
-            return false;
-        }
 
         const histories = response.histories;
 

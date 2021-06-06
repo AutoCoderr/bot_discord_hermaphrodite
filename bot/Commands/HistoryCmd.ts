@@ -1,9 +1,12 @@
 import config from "../config";
 import Command from "../Classes/Command";
-import { getHistory } from "../Classes/OtherFunctions";
-import Discord, {Message} from "discord.js";
+import {getArgsModelHistory, getHistory} from "../Classes/OtherFunctions";
+import Discord, {GuildChannel, GuildMember, Message, MessageEmbed} from "discord.js";
+import {existingCommands} from "../Classes/CommandsDescription";
 
 export class HistoryCmd extends Command {
+
+    argsModel = getArgsModelHistory(this.message);
 
     static staticCommandName = "history";
 
@@ -11,10 +14,9 @@ export class HistoryCmd extends Command {
         super(message, HistoryCmd.staticCommandName);
     }
 
-    async action(bot) {
-        const args = this.parseCommand();
+    async action(args: {help: boolean, command: string, sort: string, limit: number, channel: GuildChannel, user: GuildMember}, bot) {
 
-        if (args[0] == "help") {
+        if (args.help) {
             this.displayHelp();
             return false;
         }
@@ -29,22 +31,19 @@ export class HistoryCmd extends Command {
 
         const response = await getHistory(this.message,args);
 
-        if (response.errors.length > 0) {
-            this.sendErrors(response.errors);
-            return false;
-        }
-
         const histories = response.histories;
 
         let Embeds: Array<any> = [];
         let Embed;
 
+        const historByEmbed = 25;
+
         if (histories.length > 0) {
             for (let i=0;i<histories.length;i++) {
-                if (i % 50 == 0) {
+                if (i % historByEmbed == 0) {
                     Embed = new Discord.MessageEmbed()
                         .setColor('#0099ff')
-                        .setTitle("L'historique des commandes (Partie "+((i/50)+1)+") "+(<number>response.limit > 0 ? "(limité à "+response.limit+")" : "(Sans limite)")+" :")
+                        .setTitle("L'historique des commandes (Partie "+((i/historByEmbed)+1)+") "+(<number>response.limit > 0 ? "(limité à "+response.limit+")" : "(Sans limite)")+" :")
                         .setDescription("Liste des commandes qui ont été tapées :")
                         .setTimestamp();
                     Embeds.push(Embed);
@@ -80,13 +79,6 @@ export class HistoryCmd extends Command {
 
     help(Embed) {
         Embed.addFields({
-            name: "Arguments :",
-            value: "-c ou --command, la commande dont on souhaite voir l'historique\n"+
-                "-s ou --sort, 'asc' ou 'desc/dsc' ('asc' par défaut) pour trier du debut à la fin ou de la fin au début dans l'ordre chronologique\n"+
-                "-l ou --limit, Pour afficher les n premières commandes de la listes\n"+
-                "-ch ou --channel, Pour afficher les commandes executées dans un channel spécifique\n"+
-                "-u ou --user, Pour afficher les commandes executées par un utilisateur spécifique"
-        }).addFields({
                 name: "Exemples :",
                 value: config.command_prefix+"history --command notifyOnReact -l 10 --channel #blabla"
             })

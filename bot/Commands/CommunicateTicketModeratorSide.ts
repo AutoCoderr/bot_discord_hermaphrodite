@@ -15,7 +15,7 @@ export class CommunicateTicketModeratorSide extends Command {
         return await this.checkIfItIsTicketChannel() && !this.message.author.bot;
     }
 
-    async action(bot) {
+    async action(_, bot) {
         if (this.message.guild == null || this.message.member == null) {
             this.message.channel.send("*Ni le serveur ni le membre associé à ce message n'ont put être trouvé*");
             return false;

@@ -12,7 +12,7 @@ export class Help extends Command {
         super(message, Help.staticCommandName);
     }
 
-    async action(bot) {
+    async action(_,bot) {
         let Embed = new Discord.MessageEmbed()
             .setColor('#0099ff')
             .setTitle('Toutes les commandes')
@@ -47,7 +47,7 @@ export class Help extends Command {
         return true;
     }
 
-    static async staticCheckPermissions(message: Message, displayMsg = true) { // overload the staticCheckPermission of Command class to permit all users to execute the help command
+    static async staticCheckPermissions(message: Message, displayMsg, commandName) { // overload the staticCheckPermission of Command class to permit all users to execute the help command
         return true
     }
 }
