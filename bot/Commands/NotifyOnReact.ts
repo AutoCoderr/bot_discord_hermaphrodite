@@ -4,14 +4,7 @@ import StoredNotifyOnReact, { IStoredNotifyOnReact } from "../Models/StoredNotif
 import {GuildChannel, GuildEmoji, Message, MessageEmbed} from "discord.js";
 import {checkTypes} from "../Classes/TypeChecker";
 
-interface iNotifyOnReact extends Document {
-    listen: string;
-    message: string;
-    writeChannel: string;
-    e: string; // emote
-}
-
-export class NotifyOnReact extends Command {
+export default class NotifyOnReact extends Command {
 
     argsModel = {
         help: {
@@ -57,10 +50,12 @@ export class NotifyOnReact extends Command {
          }
         }*/
 
-    static staticCommandName = "notifyOnReact";
+    static display = true;
+    static description = "Pour envoyer un message sur un channel indiqué, quand une réaction à été detectée sur un autre message.";
+    static commandName = "notifyOnReact";
 
     constructor(message: Message) {
-        super(message, NotifyOnReact.staticCommandName);
+        super(message, NotifyOnReact.commandName);
         this.listenings = NotifyOnReact.listenings;
     }
 

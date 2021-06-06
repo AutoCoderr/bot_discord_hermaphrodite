@@ -4,14 +4,16 @@ import {getArgsModelHistory, getHistory} from "../Classes/OtherFunctions";
 import Discord, {GuildChannel, GuildMember, Message, MessageEmbed} from "discord.js";
 import {existingCommands} from "../Classes/CommandsDescription";
 
-export class HistoryCmd extends Command {
+export default class HistoryCmd extends Command {
 
     argsModel = getArgsModelHistory(this.message);
 
-    static staticCommandName = "history";
+    static display = true;
+    static description = "Pour accéder à l'historique des commandes.";
+    static commandName = "history";
 
     constructor(message: Message) {
-        super(message, HistoryCmd.staticCommandName);
+        super(message, HistoryCmd.commandName);
     }
 
     async action(args: {help: boolean, command: string, sort: string, limit: number, channel: GuildChannel, user: GuildMember}, bot) {

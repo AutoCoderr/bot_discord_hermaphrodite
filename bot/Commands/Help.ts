@@ -4,12 +4,12 @@ import * as Discord from "discord.js";
 import config from "../config";
 import {Message} from "discord.js";
 
-export class Help extends Command {
+export default class Help extends Command {
 
-    static staticCommandName = "help";
+    static commandName = "help";
 
     constructor(message: Message) {
-        super(message, Help.staticCommandName);
+        super(message, Help.commandName);
     }
 
     async action(_,bot) {
@@ -20,7 +20,8 @@ export class Help extends Command {
             .setTimestamp()
         let allowedCommands: Array<string> = [];
         for (let commandName in existingCommands) {
-            if (existingCommands[commandName].display && await existingCommands[commandName].commandClass.staticCheckPermissions(this.message, false)) {
+            const command = existingCommands[commandName];
+            if (command.display && await command.staticCheckPermissions(this.message, false)) {
                 allowedCommands.push(commandName);
             }
         }
@@ -31,9 +32,10 @@ export class Help extends Command {
             });
         } else {
             for (let commandName of allowedCommands) {
+                const command = existingCommands[commandName];
                 Embed.addFields({
-                    name: config.command_prefix+commandName+" :",
-                    value: existingCommands[commandName].msg
+                    name: config.command_prefix+command.commandName+" :",
+                    value: command.description+"\n"+config.command_prefix+command.commandName+" -h"
                 });
             }
         }

@@ -105,7 +105,8 @@ export async function getHistory(message,args: {command: string, sort: string, l
 
 export async function forEachNotifyOnReact(callback, channel: GuildChannel, message: Message, messageCommand) {
     const serverId = messageCommand.guild.id;
-    let listenings = existingCommands.notifyOnReact.commandClass.listenings[serverId];
+    // @ts-ignore
+    let listenings = existingCommands.NotifyOnReact.listenings[serverId];
 
     if (typeof(listenings) == "undefined") {
         callback(false);
