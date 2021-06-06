@@ -306,7 +306,7 @@ export default class Command {
                             } else
                                 extractFailed = true;
                         } else if (typeof(model[attr].valid) != "function" || await model[attr].valid(args[field],out))
-                            out[attr] = model[attr].type == "string" ? args[field].toString() : args[field];
+                            out[attr] = argType == "string" ? args[field].toString() : args[field];
                         else
                             incorrectField = true;
 
