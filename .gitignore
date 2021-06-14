@@ -1,6 +1,5 @@
 /.idea
 /bot/node_modules
-/bot/package-lock.json
 /mongodb/data
 /.env
 /bot/*.js

@@ -1,32 +1,68 @@
 import config from "../config";
-import { checkArgumentsNotifyOnReact, forEachNotifyOnReact } from "../Classes/OtherFunctions";
+import {forEachNotifyOnReact} from "../Classes/OtherFunctions";
 import Command from "../Classes/Command";
-import Discord from "discord.js";
+import Discord, {GuildChannel, GuildEmoji, Message} from "discord.js";
+import {existingCommands} from "../Classes/CommandsDescription";
 
 export class ListNotifyOnReact extends Command {
-    static commandName = "listNotifyOnReact";
 
-    static async action(message,bot) {
-        const args = this.parseCommand(message);
-        if (!args) return false;
+    argsModel = {
+        help: {
+            fields: ["--help", "-h"],
+            type: "boolean",
+            description: "Pour afficher l'aide",
+            required: false
+        },
+        all: {
+            fields: ["--all"],
+            type: "boolean",
+            description: "à mettre sans rien d'autre, pour afficher l'écoute sur tout les messages",
+            required: false
+        },
+        channel: {
+            fields: ["--channel","-ch"],
+            type:"channel",
+            description: "Spécifier le channel sur lequel afficher les écoutes de réaction",
+            required: args => (args.help == undefined || !args.help) && ( args.all == undefined || !args.all )
+        },
+        emote: {
+            fields: ["--emote", "-e"],
+            type: "emote",
+            description: "Spécifier l'émote pour laquelle il faut afficher l'écoute (nécessite --channel et --message)",
+            required: false
+        },
+        message: {
+            fields: ["--message", "-m"],
+            type: "message",
+            description: "Spécifier l'id du message sur lequel afficher les écoutes (nécessite le champs --channel pour savoir où est le message)",
+            required: args => args.emote != undefined,
+            moreDatas: (args) => args.channel
+        }
+    };
 
-        if (typeof(args[0]) != "undefined" && args[0] == "help") {
-            this.displayHelp(message);
+    static staticCommandName = "listNotifyOnReact";
+
+    constructor(message: Message) {
+        super(message, ListNotifyOnReact.staticCommandName);
+    }
+
+    async action(args: {help: boolean, channel: GuildChannel, message: Message, emote: GuildEmoji}, bot) {
+        let {help,channel,message,emote} = args;
+
+        if (help) {
+            this.displayHelp();
             return false;
         }
 
-        const checked = await checkArgumentsNotifyOnReact(message, args)
-
-        let errors = checked.errors,
-            channelId = checked.channelId,
-            channel = checked.channel,
-            messageId = checked.messageId,
-            contentMessage = checked.contentMessage;
-
-        if (errors.length > 0) {
-            this.sendErrors(message, errors);
+        if (this.message.guild == null) {
+            this.sendErrors({
+                name: "Missing data",
+                value: "We can't find guild in the message object"
+            });
             return false;
         }
+
+        let emoteName = emote ? emote.name : undefined;
 
         // Affiche dans un Embed, l'ensemble des écoutes de réactions qu'il y a
 
@@ -36,34 +72,44 @@ export class ListNotifyOnReact extends Command {
             .setDescription("Ceci est la liste des écoutes de réactions :")
             .setTimestamp();
 
-        await forEachNotifyOnReact((found, channel, messageId, contentMessage, emote) => {
-            if (found) {
-                Embed.addFields({
-                    name: "Sur '#" + channel.name + "' (" + contentMessage + ") :" + emote + ":",
-                    value: "Il y a une écoute de réaction sur ce message"
-                });
-            } else {
-                Embed.addFields({
-                    name: "Aucune réaction",
-                    value: "Aucune réaction n'a été trouvée"
-                });
-            }
-        }, channelId, channel, messageId, contentMessage, message);
+        let listenings = existingCommands.notifyOnReact.commandClass.listenings[this.message.guild.id];
 
-        message.channel.send(Embed);
+        if (emoteName == undefined) {
+            await forEachNotifyOnReact((found, channel, messageId, contentMessage, emoteName) => {
+                if (found) {
+                    Embed.addFields({
+                        name: "Sur '#" + channel.name + "' (" + contentMessage + ") :" + emoteName + ":",
+                        value: "Il y a une écoute de réaction sur ce message"
+                    });
+                } else {
+                    Embed.addFields({
+                        name: "Aucune réaction",
+                        value: "Aucune réaction n'a été trouvée"
+                    });
+                }
+            }, channel, message, this.message);
+        } else if (listenings && listenings[channel.id] && listenings[channel.id][message.id] && listenings[channel.id][message.id][emoteName]) { // @ts-ignore
+            Embed.addFields({
+                name: "sur '#" + channel.name + "' (" + message.content + ") :" + emoteName + ":",
+                value: "Cette écoute de réaction a été supprimée"
+            });
+        } else {
+            Embed.addFields({
+                name: "Aucune réaction",
+                value: "Aucune réaction n'a été trouvée et supprimée"
+            });
+        }
+
+        this.message.channel.send(Embed);
         return true;
     }
 
-    static help(Embed) {
+    help(Embed) {
         Embed.addFields({
-            name: "Arguments :",
-            value: "--channel ou -ch, Spécifier le channel sur lequel lister les écoutes de réactions \n"+
-                "--message ou -m, Spécifier l'id du message sur lequel afficher les réactions (nécessite le champs --channel pour savoir où est le message)"
-        })
-            .addFields({
                 name: "Exemples :",
-                value: config.command_prefix+this.commandName+" -channel #leChannel\n"+
-                    config.command_prefix+this.commandName+" -channel #leChannel -m idDuMessage\n"
+                value: config.command_prefix+this.commandName+" --channel #leChannel\n"+
+                    config.command_prefix+this.commandName+" --channel #leChannel -m idDuMessage\n"+
+                    config.command_prefix+this.commandName+" --all\n"
             });
     }
 }

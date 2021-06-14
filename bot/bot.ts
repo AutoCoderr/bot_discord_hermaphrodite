@@ -2,21 +2,17 @@ import config from "./config";
 
 import { existingCommands } from "./Classes/CommandsDescription";
 import WelcomeMessage, {IWelcomeMessage} from "./Models/WelcomeMessage";
+import client from "./client";
 
-import * as Discord from "discord.js";
 import init from "./init";
 
 
-
-
-const bot = new Discord.Client();
-
 // check all commands
-bot.on('message', async message => {
-    //console.log(message.content)
+client.on('message', async message => {
     for (let commandName in existingCommands) {
-        const command = existingCommands[commandName].commandClass;
-        command.check(message, bot);
+        const commandClass = existingCommands[commandName].commandClass;
+        const command = new commandClass(message);
+        command.check(client);
     }
 
     if (!message.author.bot) {
@@ -36,9 +32,9 @@ bot.on('message', async message => {
     }
 });
 
-bot.login(config.token);
+client.login(config.token);
 
-init(bot);
+init(client);
 
 
 // @ts-ignore

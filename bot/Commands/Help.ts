@@ -2,11 +2,17 @@ import Command from "../Classes/Command";
 import { existingCommands } from "../Classes/CommandsDescription";
 import * as Discord from "discord.js";
 import config from "../config";
+import {Message} from "discord.js";
 
 export class Help extends Command {
-    static commandName = "help";
 
-    static async action(message,bot) {
+    static staticCommandName = "help";
+
+    constructor(message: Message) {
+        super(message, Help.staticCommandName);
+    }
+
+    async action(_,bot) {
         let Embed = new Discord.MessageEmbed()
             .setColor('#0099ff')
             .setTitle('Toutes les commandes')
@@ -14,7 +20,7 @@ export class Help extends Command {
             .setTimestamp()
         let allowedCommands: Array<string> = [];
         for (let commandName in existingCommands) {
-            if (existingCommands[commandName].display && await existingCommands[commandName].commandClass.checkPermissions(message,false)) {
+            if (existingCommands[commandName].display && await existingCommands[commandName].commandClass.staticCheckPermissions(this.message, false)) {
                 allowedCommands.push(commandName);
             }
         }
@@ -31,13 +37,17 @@ export class Help extends Command {
                 });
             }
         }
-        message.channel.send(Embed);
+        this.message.channel.send(Embed);
         return true;
     }
 
-    static async saveHistory(message) {} // overload saveHistory of Command class to save nothing in the history
+    async saveHistory() {} // overload saveHistory of Command class to save nothing in the history
 
-    static async checkPermissions(message, displayMsg) { // overload checkPermission of Command class to permit all users to execute the help command
+    async checkPermissions(displayMsg) { // overload checkPermission of Command class to permit all users to execute the help command
         return true;
+    }
+
+    static async staticCheckPermissions(message: Message, displayMsg, commandName) { // overload the staticCheckPermission of Command class to permit all users to execute the help command
+        return true
     }
 }

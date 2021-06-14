@@ -1,44 +1,46 @@
 import Command from "../Classes/Command";
 import config from "../config";
-import {getHistory} from "../Classes/OtherFunctions";
+import {GuildChannel, GuildMember, Message} from "discord.js";
+import {getArgsModelHistory, getHistory} from "../Classes/OtherFunctions";
 
 export class HistoryExec extends Command {
-    static commandName = "historyExec";
 
-    static async action(message, bot) {
+    argsModel = getArgsModelHistory(this.message);
 
-        const args = this.parseCommand(message);
+    static staticCommandName = "historyExec";
 
-        if (args[0] == "help") {
-            this.displayHelp(message);
+    constructor(message: Message) {
+        super(message, HistoryExec.staticCommandName);
+    }
+
+
+    async action(args: {help: boolean, command: string, sort: string, limit: number, channel: GuildChannel, user: GuildMember}, bot) {
+
+        if (args.help) {
+            this.displayHelp();
             return false;
         }
 
-        const response = await getHistory(message,args);
-
-        if (response.errors.length > 0) {
-            this.sendErrors(message, response.errors);
-            return false;
-        }
+        const response = await getHistory(this.message,args);
 
         const histories = response.histories;
 
-        message.channel.send("Execute : ");
+        this.message.channel.send("Execute : ");
 
         if (histories.length > 0) {
             for (let history of histories) {
-                message.channel.send(config.command_prefix+history.command);
+                this.message.channel.send(config.command_prefix+history.command);
             }
         } else {
-            message.channel.send("Aucune commande trouvée")
+            this.message.channel.send("Aucune commande trouvée")
         }
 
         return true;
     }
 
-    static async saveHistory(message) {} // overload saveHistory of Command class to save nothing in the history
+    saveHistory() {} // overload saveHistory of Command class to save nothing in the history
 
-    static help(Embed) {
+    help(Embed) {
         Embed.addFields({
             name: "Arguments :",
             value: "-c ou --command, la commande dont on souhaite executer l'historique\n"+
