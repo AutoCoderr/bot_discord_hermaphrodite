@@ -34,18 +34,17 @@ export default class Perm extends Command {
                     return commands.includes(value);
                 },
 
-                errorMessage: (value, _, embed: MessageEmbed) => {
+                errorMessage: (value, _) => {
                     if (value != undefined) {
-                        embed.addFields({
+                        return {
                             name: "La commande n'existe pas",
                             value: "La commande '" + value + "' n'existe pas, ou vous est inaccessible"
-                        });
-                    } else {
-                        embed.addFields({
-                            name: "Nom de commande manquant",
-                            value: "Nom de la commande non spécifié"
-                        });
+                        };
                     }
+                    return {
+                        name: "Nom de commande manquant",
+                        value: "Nom de la commande non spécifié"
+                    };
                 }
             },
             {

@@ -1,10 +1,10 @@
 import config from "../config";
 import * as Discord from "discord.js";
-import { addMissingZero } from "./OtherFunctions";
+import {addMissingZero, splitFieldsEmbed} from "./OtherFunctions";
 import Permissions, { IPermissions } from "../Models/Permissions";
 import History, {IHistory} from "../Models/History";
 import {isNumber} from "./OtherFunctions";
-import {Message} from "discord.js";
+import {Message, MessageEmbed} from "discord.js";
 import {checkTypes} from "./TypeChecker";
 import {extractTypes} from "./TypeExtractor";
 
@@ -53,62 +53,92 @@ export default class Command {
 
     displayHelp(fails: null|Array<any> = null, failsExtract: null|Array<any> = null, args = null) {
         const commandName = this.message.content.split(" ")[0];
-        let Embed = new Discord.MessageEmbed()
-            .setColor('#0099ff')
-            .setTitle('Aide pour la commande '+commandName)
-            .setTimestamp()
+        let Embeds: Array<MessageEmbed> = [
+            new MessageEmbed()
+                .setTitle("Aide pour la commande "+commandName)
+                .setColor('#0099ff')
+        ];
 
         if (fails instanceof Array || failsExtract instanceof Array) {
             if (fails instanceof Array && fails.length > 0) {
-                const name = "Arguments manquants ou invalides :";
-                const value = this.getArgsList(fails);
-                if (value != "")
-                    Embed.addFields({name,value});
-
+                const subFields = this.getArgsList(fails);
                 for (const fail of fails) {
                     if (typeof(fail.errorMessage) == "function") {
-                        fail.errorMessage(fail.value, args, Embed)
+                        const errors = fail.errorMessage(fail.value, args)
+                        if (errors instanceof Array){
+                            for (const error of errors) {
+                                subFields.push(error);
+                            }
+                        } else {
+                            subFields.push(errors);
+                        }
                     }
                 }
+                Embeds = [...Embeds, ...splitFieldsEmbed(25, subFields, (Embed: MessageEmbed, partNb) => {
+                    if (partNb == 1) {
+                        Embed.setTitle("Arguments manquants ou invalides :");
+                    }
+                })];
             }
             if (failsExtract instanceof Array && failsExtract.length > 0) {
-                const name = "Données introuvables";
-                const value = this.getArgsList(failsExtract);
-                if (value != "")
-                    Embed.addFields({name,value});
+
+                const subFields = this.getArgsList(failsExtract);
 
                 for (const failExtract of failsExtract) {
                     if (typeof(failExtract.errorMessage) == "function") {
-                        failExtract.errorMessage(failExtract.value, args, Embed)
+                        const errors = failExtract.errorMessage(failExtract.value, args)
+                        if (errors instanceof Array){
+                            for (const error of errors) {
+                                subFields.push(error);
+                            }
+                        } else {
+                            subFields.push(errors);
+                        }
                     }
                 }
+
+                Embeds = [...Embeds, ...splitFieldsEmbed(25, subFields, (Embed: MessageEmbed, partNb) => {
+                    if (partNb == 1) {
+                        Embed.setTitle("Données introuvables");
+                    }
+                })];
             }
         } else {
-            const name = "Champs "
-            let value = "";
+            const subFields: Array<{name: string, value: string}> = [];
             for (const attr in this.argsModel) {
                 if (attr != "$argsWithoutKey") {
                     const field = this.argsModel[attr];
-                    value += field.fields.join(", ") + " : " + field.description + " | (type attendu : " + (field.type ?? field.types) + ")\n\n";
+                    subFields.push({
+                        name: field.fields.join(", "),
+                        value: field.description + " | ( "+(field.default != undefined ? "Par défaut : "+field.default+" ; " : "")+"type attendu : " + (field.type ?? field.types) + " )"
+                    })
                 }
             }
-            if (this.argsModel['$argsWithoutKey'] instanceof Array) {
-                for (const field of this.argsModel['$argsWithoutKey']) {
-                    value += field.field+" : "+field.description+ " | (type attendu : " + (field.type ?? field.types) + ")\n\n";
+            Embeds = [...Embeds, ...splitFieldsEmbed(25, subFields, (Embed: MessageEmbed, partNb) => {
+                if (partNb == 1) {
+                    Embed.setTitle("Champs");
                 }
-            }
-            Embed.addFields({name,value});
+            })];
+
         }
-        this.help(Embed);
-        this.message.channel.send(Embed);
+
+        if (Embeds.length > 0) {
+            this.help(Embeds[Embeds.length-1]);
+            for (const Embed of Embeds) {
+                this.message.channel.send(Embed);
+            }
+        }
     }
 
     getArgsList(args: Array<any>) {
         return args
             .filter(arg => typeof(arg.errorMessage) != "function")
             .map(arg =>
-                (arg.fields instanceof Array ? arg.fields.join(", ") : arg.field) + " : " + arg.description + " | (type attendu : " + (arg.type ?? arg.types) + ")"
-            ).join("\n\n");
+                ({
+                    name: (arg.fields instanceof Array ? arg.fields.join(", ") : arg.field),
+                    value: arg.description + " | ( "+(arg.default != undefined ? "Par défaut : "+arg.default+" ; " : "")+"type attendu : " + (arg.type ?? arg.types) + " )"
+                })
+            );
     }
 
     async check(bot) {
@@ -320,7 +350,7 @@ export default class Command {
                         incorrectField = true;
                 }
 
-                if (model[attr].default && !found && !incorrectField && !extractFailed) {
+                if (model[attr].default != undefined && !found && !incorrectField && !extractFailed) {
                     out[attr] = model[attr].default;
                     found = true;
                 }
@@ -378,7 +408,7 @@ export default class Command {
                     } else if (args[i] != undefined) {
                         incorrectField = true;
                     }
-                    if (!found && !incorrectField && argsWithoutKey[i].default) {
+                    if (!found && !incorrectField && argsWithoutKey[i].default != undefined) {
                         out[argsWithoutKey[i].field] = argsWithoutKey[i].default;
                         found = true;
                     }
