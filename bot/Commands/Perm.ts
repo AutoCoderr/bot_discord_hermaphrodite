@@ -4,7 +4,7 @@ import { existingCommands } from "../Classes/CommandsDescription";
 import {Message, MessageEmbed, Role} from "discord.js";
 import Permissions, {IPermissions} from "../Models/Permissions";
 
-export class Perm extends Command {
+export default class Perm extends Command {
 
     argsModel = {
         help: { fields: ['-h','--help'], type: "boolean", required: false, description: "Pour afficher l'aide" },
@@ -57,10 +57,12 @@ export class Perm extends Command {
         ]
     };
 
-    static staticCommandName = "perm";
+    static display = true;
+    static description = "Pour configurer les permissions.";
+    static commandName = "perm";
 
     constructor(message: Message) {
-        super(message, Perm.staticCommandName);
+        super(message, Perm.commandName);
     }
 
     async action(args: {help: boolean, action: string, commandName: string, roles: Array<Role>}, bot) { //%perm set commandName @role

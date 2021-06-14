@@ -10,7 +10,7 @@ import init from "./init";
 // check all commands
 client.on('message', async message => {
     for (let commandName in existingCommands) {
-        const commandClass = existingCommands[commandName].commandClass;
+        const commandClass = existingCommands[commandName];
         const command = new commandClass(message);
         command.check(client);
     }

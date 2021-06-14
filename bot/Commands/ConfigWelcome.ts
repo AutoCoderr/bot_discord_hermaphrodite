@@ -3,7 +3,7 @@ import Command from "../Classes/Command";
 import WelcomeMessage, {IWelcomeMessage} from "../Models/WelcomeMessage";
 import {Message} from "discord.js";
 
-export class ConfigWelcome extends Command {
+export default class ConfigWelcome extends Command {
 
     argsModel = {
         help: { fields: ["-h","--help"], type: "boolean", required: false, description: "Pour afficher l'aide" },
@@ -21,10 +21,12 @@ export class ConfigWelcome extends Command {
         ]
     }
 
-    static staticCommandName = "configWelcome";
+    static display = true;
+    static description = "Pour activer, désactiver, ou définir le message privé à envoyer automatiquement aux nouveaux arrivants."
+    static commandName = "configWelcome";
 
     constructor(message: Message) {
-        super(message, ConfigWelcome.staticCommandName);
+        super(message, ConfigWelcome.commandName);
     }
 
     async action(args: {help: boolean, action: string}, bot) {

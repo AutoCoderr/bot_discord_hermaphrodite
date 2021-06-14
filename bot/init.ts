@@ -1,10 +1,12 @@
 import {existingCommands} from "./Classes/CommandsDescription";
-import TicketCommunication, {ITicketCommunication} from "./Models/TicketCommunication";
-import TicketConfig , {ITicketConfig} from "./Models/TicketConfig";
+import {getExistingCommands} from "./Classes/CommandsDescription";
 
 export default function init(bot) {
     setTimeout(async () => {
-        console.log("Detect stored notifyOnReacts in the database and apply them")
-        existingCommands.notifyOnReact.commandClass.applyNotifyOnReactAtStarting(bot);
+        getExistingCommands().then(() => {
+            console.log("Detect stored notifyOnReacts in the database and apply them")
+            //@ts-ignore
+            existingCommands.NotifyOnReact.applyNotifyOnReactAtStarting(bot);
+        })
     }, 5000);
 }

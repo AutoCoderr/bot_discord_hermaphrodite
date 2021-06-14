@@ -10,7 +10,9 @@ import {extractTypes} from "./TypeExtractor";
 
 export default class Command {
 
-    static staticCommandName: null|string = null;
+    static commandName: null|string = null;
+    static display: boolean = false;
+    static description: null|string = null;
 
     commandName: null|string;
     message: Message;
@@ -155,7 +157,7 @@ export default class Command {
 
     static async staticCheckPermissions(message: Message, displayMsg = true, commandName: string|null = null) {
         if (commandName == null) {
-            commandName = this.staticCommandName;
+            commandName = this.commandName;
         }
 
         if(message.channel.type == "dm" || config.roots.includes(message.author.id) || (message.member && message.member.hasPermission("ADMINISTRATOR"))) return true;

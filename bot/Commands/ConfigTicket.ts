@@ -3,7 +3,7 @@ import config from "../config";
 import TicketConfig, {ITicketConfig} from "../Models/TicketConfig";
 import Discord, {CategoryChannel, GuildChannel, GuildMember, Message} from "discord.js";
 
-export class ConfigTicket extends Command {
+export default class ConfigTicket extends Command {
 
     argsModel = {
         help: { fields: ["-h","--help"], type: "boolean", required: false, description: "Pour afficher l'aide" },
@@ -41,10 +41,12 @@ export class ConfigTicket extends Command {
         ]
     }
 
-    static staticCommandName = "configTicket";
+    static display = true;
+    static description = "Pour définir la catégorie pour les channels des tickets, activer, ou désactiver les ticket.";
+    static commandName = "configTicket";
 
     constructor(message: Message) {
-        super(message, ConfigTicket.staticCommandName);
+        super(message, ConfigTicket.commandName);
     }
 
     async action(args: {help: boolean, action: string, two: CategoryChannel|string, user: GuildMember}, bot) {

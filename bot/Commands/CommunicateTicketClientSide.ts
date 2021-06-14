@@ -6,7 +6,7 @@ import {Message} from "discord.js";
 
 const usersInPrompt = {};
 
-export class CommunicateTicketClientSide extends Command {
+export default class CommunicateTicketClientSide extends Command {
 
     constructor(message: Message) {
         super(message, null);

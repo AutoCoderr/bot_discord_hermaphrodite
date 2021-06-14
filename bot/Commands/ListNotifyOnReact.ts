@@ -4,7 +4,7 @@ import Command from "../Classes/Command";
 import Discord, {GuildChannel, GuildEmoji, Message} from "discord.js";
 import {existingCommands} from "../Classes/CommandsDescription";
 
-export class ListNotifyOnReact extends Command {
+export default class ListNotifyOnReact extends Command {
 
     argsModel = {
         help: {
@@ -40,10 +40,12 @@ export class ListNotifyOnReact extends Command {
         }
     };
 
-    static staticCommandName = "listNotifyOnReact";
+    static display = true;
+    static description = "Pour lister les messages, sur lesquels il y a une écoute de réaction.";
+    static commandName = "listNotifyOnReact";
 
     constructor(message: Message) {
-        super(message, ListNotifyOnReact.staticCommandName);
+        super(message, ListNotifyOnReact.commandName);
     }
 
     async action(args: {help: boolean, channel: GuildChannel, message: Message, emote: GuildEmoji}, bot) {
@@ -72,7 +74,8 @@ export class ListNotifyOnReact extends Command {
             .setDescription("Ceci est la liste des écoutes de réactions :")
             .setTimestamp();
 
-        let listenings = existingCommands.notifyOnReact.commandClass.listenings[this.message.guild.id];
+        // @ts-ignore
+        let listenings = existingCommands.NotifyOnReact.listenings[this.message.guild.id];
 
         if (emoteName == undefined) {
             await forEachNotifyOnReact((found, channel, messageId, contentMessage, emoteName) => {
