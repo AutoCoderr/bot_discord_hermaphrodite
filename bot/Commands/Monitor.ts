@@ -1,6 +1,9 @@
 import Command from "../Classes/Command";
 import {Guild, GuildChannel, Message, MessageEmbed, TextChannel} from "discord.js";
 import config from "../config";
+import MonitoringMessage, {IMonitoringMessage} from "../Models/MonitoringMessage";
+import {splitFieldsEmbed} from "../Classes/OtherFunctions";
+import client from "../client";
 
 export default class Monitor extends Command {
 
@@ -19,7 +22,7 @@ export default class Monitor extends Command {
         },
         onlineMemberCount: async (guild: Guild, Embed: MessageEmbed) => {
             Embed.addFields({
-                name: "Nombre maximum de membres",
+                name: "Nombre de membres en ligne",
                 value: (await guild.members.fetch()).filter(member => member.presence.status == "online").size
             });
         },
@@ -38,13 +41,13 @@ export default class Monitor extends Command {
         description: (guild: Guild, Embed: MessageEmbed) => {
             Embed.addFields({
                 name: "Description",
-                value: guild.description
+                value: guild.description ?? "Aucune description"
             });
         },
         icon: (guild: Guild, Embed: MessageEmbed) => {
             Embed.addFields({
-                name: "Icone :",
-                value: guild.iconURL()
+                name: "Icone",
+                value: guild.iconURL() ?? "Aucune icone"
             });
         }
     }
@@ -117,23 +120,31 @@ export default class Monitor extends Command {
         $argsWithoutKey: [
             {
                 field: "action",
-                description: "L'action à effectuer : Ajout de monitoring (add), Suppression de monitoring (remove), les afficher (show)",
+                description: "L'action à effectuer : Ajout de monitoring (add), Suppression de monitoring (remove), les afficher (show), rafraichir (refresh)",
                 required: (args) => args.help == undefined,
                 type: "string",
-                valid: (elem: string, _) => ["add","remove","show"].includes(elem)
+                valid: (elem: string, _) => ["add","remove","show","refresh"].includes(elem)
             },
             {
                 field: "channel",
                 description: "Le channel sur lequel monitorer le serveur",
-                required: (args) => ["add","remove"].includes(args.action),
+                required: (args) => args.help == undefined && ["add","remove","refresh"].includes(args.action),
                 type: "channel",
-                valid: (elem: GuildChannel, _) => elem.type = "text"
+                valid: (elem: GuildChannel, _) => elem.type = "text",
+                default: this.message.channel
+            },
+            {
+                field: "message",
+                description: "L'id du message à supprimer ou rafraichir",
+                type: "message",
+                required: (args) => args.help == undefined && ["remove","refresh"].includes(args.action),
+                moreDatas: (args) => args.channel
             }
         ]
     }
 
-    async action(args: {help: boolean, action: string, channel: TextChannel}, bot) {
-        const {help, action, channel} = args;
+    async action(args: {help: boolean, action: string, channel: TextChannel, message: Message}, bot) {
+        const {help, action, channel, message} = args;
 
         if (help) {
             this.displayHelp();
@@ -150,28 +161,127 @@ export default class Monitor extends Command {
 
         switch (action) {
             case "add":
-                const message = await channel.send(Monitor.getMonitorMessage(this.message.guild));
-                this.message.channel.send("Un message a été créé sur le channel <#"+channel.id+">");
+                const datasToDisplay: Array<string> = [];
+                for (const attr in Monitor.datasCanBeDisplayed) {
+                    if (args["show"+attr[0].toUpperCase()+attr.substring(1)]) {
+                        datasToDisplay.push(attr);
+                    }
+                }
+                const createdMessage: Message = await channel.send(await Monitor.getMonitorMessage(this.message.guild, datasToDisplay));
+                await MonitoringMessage.create({
+                    serverId: this.message.guild.id,
+                    datas: datasToDisplay,
+                    channelId: channel.id,
+                    messageId: createdMessage.id
+                });
+                this.message.channel.send("Un message de monitoring a été créé sur le channel <#"+channel.id+">");
+                return true;
+            case "refresh":
+                const monitoringMessage: IMonitoringMessage = await MonitoringMessage.findOne({
+                    serverId: this.message.guild.id,
+                    channelId: channel.id,
+                    messageId: message.id
+                });
+                if (monitoringMessage == null) {
+                    this.message.channel.send("Il n'y a pas de monitoring sur ce message");
+                    return false;
+                }
+                await message.edit(await Monitor.getMonitorMessage(this.message.guild,monitoringMessage.datas));
+                this.message.channel.send("Monitoring mis à jour");
                 return true;
             case "show":
-                this.message.channel.send("Ceci est l'action show");
+                const channelsById = {};
+                const monitoringMessages: Array<IMonitoringMessage> = await MonitoringMessage.find({
+                    serverId: this.message.guild.id
+                });
+                if (monitoringMessages.length > 0) {
+                    const Embeds = splitFieldsEmbed(25, await Promise.all(monitoringMessages.map(async monitoringMessage => {
+                        if (channelsById[monitoringMessage.channelId] == undefined) { // @ts-ignore
+                            channelsById[monitoringMessage.channelId] = this.message.guild.channels.cache.get(monitoringMessage.channelId);
+                        }
+                        const exist = await Monitor.checkMonitoringMessageExist(monitoringMessage, this.message.guild, channelsById[monitoringMessage.channelId]);
+                        return {
+                            name: exist ? "Sur la channel #" + exist.channel.name : "Ce message et/ou ce salon n'existe plus",
+                            value: exist ? "Message " + exist.message.id + " ; Données : " + monitoringMessage.datas.join(", ") : "Supprimé"
+                        }
+                    })), (Embed: MessageEmbed, partNb: number) => {
+                        if (partNb == 1) {
+                            Embed.setTitle("Les messages de monitoring")
+                        }
+                    });
+                    for (const Embed of Embeds) {
+                        this.message.channel.send(Embed);
+                    }
+                } else {
+                    this.message.channel.send("Il n'y a aucun monitoring sur ce serveur");
+                }
+
                 return true;
             case "remove":
-                this.message.channel.send("Ceci est l'action remove");
-                return true;
+                const res = await MonitoringMessage.deleteOne({
+                    serverId: this.message.guild.id,
+                    channelId: channel.id,
+                    messageId: message.id
+                });
+                if (res.deletedCount > 0) {
+                    await message.delete();
+                    this.message.channel.send("Monitoring supprimé aves succès");
+                    return true;
+                } else {
+                    this.message.channel.send("Il n'y a pas de monitoring sur ce message");
+                    return false;
+                }
         }
         return false;
     }
 
-    static getMonitorMessage(guild: Guild) {
-        return new MessageEmbed()
+    static async checkMonitoringMessageExist(monitoringMessage: IMonitoringMessage, guild: null|undefined|Guild = null, channel: null|undefined|TextChannel = null) {
+        if (guild == null) {
+            guild = client.guilds.cache.get(monitoringMessage.serverId);
+        }
+
+        if (!channel && guild) {
+            channel = <TextChannel>guild.channels.cache.get(monitoringMessage.channelId);
+        }
+        if (channel && channel.type != "text") channel = null
+
+        let message: null | Message = null;
+        if (channel) {
+            try {
+                message = await channel.messages.fetch(monitoringMessage.messageId);
+            } catch (e) {
+            }
+        }
+        if (message == null || channel == null || guild == null) {
+            await MonitoringMessage.deleteOne({ // @ts-ignore
+                serverId: monitoringMessage.serverId,
+                channelId: monitoringMessage.channelId,
+                messageId: monitoringMessage.messageId
+            });
+            return false;
+        }
+        return {message,channel,guild};
+    }
+
+    static async refreshMonitor(monitoringMessage: IMonitoringMessage) {
+        const exist = await this.checkMonitoringMessageExist(monitoringMessage);
+        if (exist) {
+            const {message, guild} = exist;
+            await message.edit(await this.getMonitorMessage(guild,monitoringMessage.datas));
+            return true;
+        }
+        return false;
+    }
+
+    static async getMonitorMessage(guild: Guild, datasToDisplay: Array<string>) {
+        const Embed = new MessageEmbed()
             .setColor('#0099ff')
             .setTitle('Serveur : '+guild.name)
-            .setTimestamp()
-            .addFields({
-               name: "Nombre de membres",
-               value: guild.memberCount
-            });
+            .setTimestamp();
+        for (const data of datasToDisplay) {
+            await this.datasCanBeDisplayed[data](guild, Embed);
+        }
+        return Embed;
     }
 
     help(Embed: MessageEmbed) {
