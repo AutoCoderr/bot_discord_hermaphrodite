@@ -5,14 +5,48 @@ import config from "../config";
 export default class Monitor extends Command {
 
     static datasCanBeDisplayed = {
-        memberCount: (guild: Guild) => guild.memberCount,
-        memberMax: (guild: Guild) => guild.maximumMembers,
-        presenceCount: (guild: Guild) => guild.presences.cache.size,
-        presenceMax: (guild: Guild) => guild.maximumPresences,
-        emojiCount: (guild: Guild) => guild.emojis.cache.size,
-        channelCount: (guild: Guild) => guild.channels.cache.size,
-        description: (guild: Guild) => guild.description,
-        icon: (guild: Guild) => guild.iconURL()
+        memberCount: (guild: Guild, Embed: MessageEmbed) => {
+            Embed.addFields({
+                name: "Nombre de membres",
+                value: guild.memberCount
+            });
+        },
+        memberMax: (guild: Guild, Embed: MessageEmbed) => {
+            Embed.addFields({
+                name: "Nombre maximum de membres",
+                value: guild.maximumMembers
+            });
+        },
+        onlineMemberCount: async (guild: Guild, Embed: MessageEmbed) => {
+            Embed.addFields({
+                name: "Nombre maximum de membres",
+                value: (await guild.members.fetch()).filter(member => member.presence.status == "online").size
+            });
+        },
+        emojiCount: (guild: Guild, Embed: MessageEmbed) => {
+            Embed.addFields({
+                name: "Nombre d'emotes",
+                value: guild.emojis.cache.size
+            });
+        },
+        channelCount: (guild: Guild, Embed: MessageEmbed) => {
+            Embed.addFields({
+                name: "Nombre de channels",
+                value: guild.channels.cache.size
+            });
+        },
+        description: (guild: Guild, Embed: MessageEmbed) => {
+            Embed.addFields({
+                name: "Description",
+                value: guild.description
+            });
+        },
+        icon: (guild: Guild, Embed: MessageEmbed) => {
+            Embed.addFields({
+                name: "Icone :",
+                value: guild.iconURL()
+            });
+        }
     }
 
     static display = true;
@@ -58,17 +92,10 @@ export default class Monitor extends Command {
             required: false,
             default: false
         },
-        showPresenceCount: {
-            fields: ["-pc", "--presence-count", "--show-presence-count"],
+        showOnlineMemberCount: {
+            fields: ["-omc", "--online-member-count", "--show-online-member-count"],
             type: "boolean",
             description: "Pour afficher ou non le nombre de personnes connectées",
-            required: false,
-            default: false
-        },
-        showPresenceMax: {
-            fields: ["-pm", "--presence-max", "--show-presence-max"],
-            type: "boolean",
-            description: "Pour afficher ou non le nombre maximum de personnes connectées",
             required: false,
             default: false
         },
