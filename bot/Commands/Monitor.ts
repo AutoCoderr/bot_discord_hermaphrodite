@@ -71,76 +71,66 @@ export default class Monitor extends Command {
             fields: ["-mc", "--member-count", "--show-member-count"],
             type: "boolean",
             description: "Pour afficher ou non le nombre de membres",
-            required: false,
             default: true
         },
         showDescription: {
             fields: ["-d", "--description", "--show-description"],
             type: "boolean",
             description: "Pour afficher ou non la description",
-            required: false,
             default: true
         },
         showIcon: {
             fields: ["-i", "--icon", "--show-icon"],
             type: "boolean",
             description: "Pour afficher ou non l'icone",
-            required: false,
+            default: true
+        },
+        showOnlineMemberCount: {
+            fields: ["-omc", "--online-member-count", "--show-online-member-count"],
+            type: "boolean",
+            description: "Pour afficher ou non le nombre de personnes connectées",
             default: true
         },
         showMemberMax: {
             fields: ["-mm", "--member-max", "--show-member-max"],
             type: "boolean",
             description: "Pour afficher ou non le nombre maximum de membres",
-            required: false,
-            default: false
-        },
-        showOnlineMemberCount: {
-            fields: ["-omc", "--online-member-count", "--show-online-member-count"],
-            type: "boolean",
-            description: "Pour afficher ou non le nombre de personnes connectées",
-            required: false,
             default: false
         },
         showEmojiCount: {
             fields: ["-ec", "--emoji-count", "--show-emoji-count"],
             type: "boolean",
             description: "Pour afficher ou non le nombre d'emotes",
-            required: false,
             default: false
         },
         showChannelCount: {
             fields: ["-cc", "--channel-count", "--show-channel-count"],
             type: "boolean",
             description: "Pour afficher ou non le nombre de channels",
-            required: false,
             default: false
         },
 
-        $argsWithoutKey: [
-            {
-                field: "action",
+        $argsByType: {
+            action: {
+                type: "string",
                 description: "L'action à effectuer : Ajout de monitoring (add), Suppression de monitoring (remove), les afficher (show), rafraichir (refresh)",
                 required: (args) => args.help == undefined,
-                type: "string",
                 valid: (elem: string, _) => ["add","remove","show","refresh"].includes(elem)
             },
-            {
-                field: "channel",
-                description: "Le channel sur lequel monitorer le serveur",
-                required: (args) => args.help == undefined && ["add","remove","refresh"].includes(args.action),
+            channel: {
                 type: "channel",
-                valid: (elem: GuildChannel, _) => elem.type = "text",
-                default: this.message.channel
+                description: "Le channel sur lequel monitorer le serveur",
+                default: this.message.channel,
+                required: (args) => args.help == undefined && args.action != "show",
+                valid: (elem: GuildChannel, _) => elem.type == "text"
             },
-            {
-                field: "message",
-                description: "L'id du message à supprimer ou rafraichir",
+            message: {
                 type: "message",
-                required: (args) => args.help == undefined && ["remove","refresh"].includes(args.action),
+                description: "L'id du message à supprimer ou rafraichir",
+                required: (args) => args.help == undefined && ["refresh","remove"].includes(args.action),
                 moreDatas: (args) => args.channel
             }
-        ]
+        }
     }
 
     async action(args: {help: boolean, action: string, channel: TextChannel, message: Message}, bot) {
@@ -161,12 +151,9 @@ export default class Monitor extends Command {
 
         switch (action) {
             case "add":
-                const datasToDisplay: Array<string> = [];
-                for (const attr in Monitor.datasCanBeDisplayed) {
-                    if (args["show"+attr[0].toUpperCase()+attr.substring(1)]) {
-                        datasToDisplay.push(attr);
-                    }
-                }
+                const datasToDisplay = Object.keys(Monitor.datasCanBeDisplayed).filter(attr =>
+                    args["show"+attr[0].toUpperCase()+attr.substring(1)]
+                )
                 const createdMessage: Message = await channel.send(await Monitor.getMonitorMessage(this.message.guild, datasToDisplay));
                 await MonitoringMessage.create({
                     serverId: this.message.guild.id,
@@ -186,7 +173,8 @@ export default class Monitor extends Command {
                     this.message.channel.send("Il n'y a pas de monitoring sur ce message");
                     return false;
                 }
-                await message.edit(await Monitor.getMonitorMessage(this.message.guild,monitoringMessage.datas));
+                await message.edit(await Monitor.getMonitorMessage(this.message.guild, monitoringMessage.datas));
+
                 this.message.channel.send("Monitoring mis à jour");
                 return true;
             case "show":
@@ -288,7 +276,10 @@ export default class Monitor extends Command {
         Embed.addFields({
             name: "Exemples :",
             value: config.command_prefix+this.commandName+" add #leChannelSurLequelMonitorer\n"+
-                   config.command_prefix+this.commandName+" remove #leChannelSurLequelNePlusMonitorer idDuMessageDeMonitoring\n"+
+                   config.command_prefix+this.commandName+" remove #leChannelSurLequelNePlusMonitorer idDuMessage\n"+
+                   config.command_prefix+this.commandName+" remove idDuMessageDeMonitoring (sans channel spécifié, prend le channel courant)\n"+
+                   config.command_prefix+this.commandName+" refresh #leChannelSurLequelRefraichir idDuMessage\n"+
+                   config.command_prefix+this.commandName+" refresh idDuMessageDeMonitoring (sans channel spécifié, prend le channel courant)\n"+
                    config.command_prefix+this.commandName+" show\n"+
                    config.command_prefix+this.commandName+" -h\n"
         });

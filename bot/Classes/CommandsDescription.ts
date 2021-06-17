@@ -9,8 +9,8 @@ export function getExistingCommands(): Promise<void> {
             .then(files => files.filter(file => file.endsWith(".js")))
             .then(files => files.map(file => require(path+file).default))
             .then(commands => {
-                for (const command of commands) {
-                    existingCommands[command.name] = command;
+                for (const commandClass of commands) {
+                    existingCommands[commandClass.name] = commandClass;
                 }
                 resolve();
             });

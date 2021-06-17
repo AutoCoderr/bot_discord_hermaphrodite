@@ -2,6 +2,7 @@ import config from "../config";
 import Command from "../Classes/Command";
 import {getArgsModelHistory, getHistory, splitFieldsEmbed} from "../Classes/OtherFunctions";
 import {GuildChannel, GuildMember, Message, MessageEmbed} from "discord.js";
+import {IHistory} from "../Models/History";
 
 export default class HistoryCmd extends Command {
 
@@ -30,10 +31,9 @@ export default class HistoryCmd extends Command {
             return false;
         }
 
-        const histories = await getHistory(this.message,args);
+        const histories: Array<IHistory> = await getHistory(this.message,args);
 
         let Embeds: Array<any> = [];
-        let Embed;
 
         const historByEmbed = 25;
 
@@ -42,8 +42,8 @@ export default class HistoryCmd extends Command {
                 const user = this.message.guild.members.cache.get(history.userId); //@ts-ignore
                 const channel = this.message.guild.channels.cache.get(history.channelId);
 
-                const userName = user != undefined ? user.nickname : "unknown";
-                const channelName = channel != undefined ? channel.name : "unknown"
+                const userName = user != undefined ? (user.nickname ?? user.user.username) : "<@"+history.userId+">";
+                const channelName = channel != undefined ? channel.name : history.channelId
 
                 return {
                     name: "[" + history.dateTime + "] "+userName+" sur #"+channelName+" :",

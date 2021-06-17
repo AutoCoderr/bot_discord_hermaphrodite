@@ -8,7 +8,7 @@ export const checkTypes = {
     channel: field => checkTypes.string(field) && new RegExp("^\<#[0-9]{18}\>$").test(field),
     user: field => checkTypes.string(field) && new RegExp("^\<@(!)?[0-9]{18}\>$").test(field),
     role: field => checkTypes.string(field) && new RegExp("^"+regex.role+"$").test(field),
-    roles: field => checkTypes.string(field) && new RegExp("^( )*"+regex.role+"( )*(\,( )*"+regex.role+"( )*)*$").test(field),
+    roles: field => checkTypes.string(field) && (new RegExp("^( )*"+regex.role+"( )*(\,( )*"+regex.role+"( )*)*$").test(field) || field.trim() == ""),
     listenerReactMessage: field => checkTypes.string(field) && new RegExp("^\<#[0-9]{18}\>/[0-9]{18}$").test(field)
 };
 

@@ -9,7 +9,7 @@ export default class Perm extends Command {
     argsModel = {
         help: { fields: ['-h','--help'], type: "boolean", required: false, description: "Pour afficher l'aide" },
 
-        $argsWithoutKey: [
+        $argsByOrder: [
             {
                 field: "action",
                 type: "string",
@@ -26,12 +26,11 @@ export default class Perm extends Command {
                     const commands = Object.keys(existingCommands);
                     for (let i=0;i<commands.length;i++) {
                         const commandName = commands[i];
-                        if (!existingCommands[commandName].display || !(await existingCommands[commandName].commandClass.staticCheckPermissions(this.message,false))) {
-                            commands.splice(i,1);
-                            i -= 1;
+                        if (existingCommands[commandName].commandName == value && existingCommands[commandName].display && await existingCommands[commandName].staticCheckPermissions(this.message,false)) {
+                            return true;
                         }
                     }
-                    return commands.includes(value);
+                    return false
                 },
 
                 errorMessage: (value, _) => {
@@ -50,7 +49,7 @@ export default class Perm extends Command {
             {
                 field: "roles",
                 type: "roles",
-                required: args => args.help == undefined && ['add','set'].includes(args.action),
+                required: args => args.help == undefined && args.action == "add",
                 description: "Le ou les rôles autorisés à taper cette commande"
             }
         ]
@@ -120,7 +119,7 @@ export default class Perm extends Command {
 
         const permission = await Permissions.findOne({serverId: serverId, command: commandName});
 
-        const rolesId = roles.map(role => role.id);
+        const rolesId = roles ? roles.map(role => role.id) : [];
 
         if (permission == null) {
             const permission: IPermissions = {

@@ -59,6 +59,8 @@ export const extractTypes = {
         return role ?? false;
     },
     roles: (field, message: Message): Array<Role>|boolean => {
+        if (field.length-field.replace(",","") == 0) return [];
+
         const roles: Array<Role> = [];
         const rolesMentions = field.split(",");
         for (const roleMention of rolesMentions) {

@@ -8,7 +8,7 @@ export default class ConfigWelcome extends Command {
     argsModel = {
         help: { fields: ["-h","--help"], type: "boolean", required: false, description: "Pour afficher l'aide" },
 
-        $argsWithoutKey: [
+        $argsByOrder: [
             {
                 field: "action",
                 type: "string",
