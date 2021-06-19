@@ -8,7 +8,7 @@ import {Message, MessageEmbed} from "discord.js";
 import {checkTypes} from "./TypeChecker";
 import {extractTypes} from "./TypeExtractor";
 
-const invalidModelCommands = {};
+const validModelCommands = {};
 
 export default class Command {
 
@@ -315,16 +315,18 @@ export default class Command {
     }
 
     checkIfModelValid() {
+        if (this.commandName != null && validModelCommands[this.commandName]) return true;
+
         let valid = true;
-        if (this.commandName != null && invalidModelCommands[this.commandName]) valid = false;
+        if (this.commandName != null && validModelCommands[this.commandName] == false) valid = false;
 
         if (valid && this.argsModel.$argsByType && this.argsModel.$argsByOrder) valid = false;
 
-        if (!valid) {
-            if (this.commandName != null && !invalidModelCommands[this.commandName]) {
-                invalidModelCommands[this.commandName] = true;
-            }
 
+        if (this.commandName != null && !validModelCommands[this.commandName]) {
+            validModelCommands[this.commandName] = valid;
+        }
+        if (!valid) {
             this.message.channel.send(new MessageEmbed()
                 .setTitle("Modèle de la commande invalide")
                 .setDescription("Le modèle de la commande est invalide")
