@@ -24,6 +24,16 @@ export const extractTypes = {
         }
         return false;
     },
+    messages: async (field, message: Message, channel: GuildChannel|boolean):  Promise<Array<Message>|false> => {
+        const messagesIds = field.split(",");
+        const messages: Array<Message> = [];
+        for (const messageId of messagesIds) {
+            const AMessage = await extractTypes.message(messageId.trim(), message, channel);
+            if (!AMessage) return false;
+            messages.push(AMessage);
+        }
+        return messages;
+    },
     listenerReactMessage: async (field, message: Message): Promise<{channel: GuildChannel, message: Message}|false> => {
         const channelMention = field.split("/")[0];
         const channel: GuildChannel|boolean|undefined = extractTypes.channel(channelMention, message);

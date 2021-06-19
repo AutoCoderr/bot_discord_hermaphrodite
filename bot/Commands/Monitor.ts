@@ -196,8 +196,8 @@ export default class Monitor extends Command {
                 required: (args) => args.help == undefined && args.action != "show",
                 valid: (elem: GuildChannel, _) => elem.type == "text"
             },
-            message: {
-                type: "message",
+            messages: {
+                type: "messages",
                 description: "L'id du message à supprimer ou rafraichir",
                 required: (args) => args.help == undefined && ["refresh","remove"].includes(args.action),
                 moreDatas: (args) => args.channel
@@ -205,8 +205,8 @@ export default class Monitor extends Command {
         }
     }
 
-    async action(args: {help: boolean, action: string, channel: TextChannel, message: Message}, bot) {
-        const {help, action, channel, message} = args;
+    async action(args: {help: boolean, action: string, channel: TextChannel, messages: Array<Message>}, bot) {
+        const {help, action, channel, messages} = args;
 
         if (help) {
             this.displayHelp();
@@ -266,16 +266,17 @@ export default class Monitor extends Command {
                 this.message.channel.send("Un message de monitoring a été créé sur le channel <#"+channel.id+">");
                 return true;
             case "refresh":
-                monitoringMessage = await MonitoringMessage.findOne({
-                    serverId: this.message.guild.id,
-                    channelId: channel.id,
-                    messageId: message.id
-                });
-                if (monitoringMessage == null) {
-                    this.message.channel.send("Il n'y a pas de monitoring sur ce message");
-                    return false;
+                for (const message of messages) {
+                    monitoringMessage = await MonitoringMessage.findOne({
+                        serverId: this.message.guild.id,
+                        channelId: channel.id,
+                        messageId: message.id
+                    });
+                    if (monitoringMessage == null) {
+                        this.message.channel.send("Il n'y a pas de monitoring sur le message "+message.id);
+                    }
+                    await message.edit(await Monitor.getMonitorMessage(this.message.guild, monitoringMessage.datas));
                 }
-                await message.edit(await Monitor.getMonitorMessage(this.message.guild, monitoringMessage.datas));
 
                 this.message.channel.send("Monitoring mis à jour");
                 return true;
@@ -317,19 +318,20 @@ export default class Monitor extends Command {
 
                 return true;
             case "remove":
-                const res = await MonitoringMessage.deleteOne({
-                    serverId: this.message.guild.id,
-                    channelId: channel.id,
-                    messageId: message.id
-                });
-                if (res.deletedCount > 0) {
-                    await message.delete();
-                    this.message.channel.send("Monitoring supprimé avec succès");
-                    return true;
-                } else {
-                    this.message.channel.send("Il n'y a pas de monitoring sur ce message");
-                    return false;
+                for (const message of messages) {
+                    const res = await MonitoringMessage.deleteOne({
+                        serverId: this.message.guild.id,
+                        channelId: channel.id,
+                        messageId: message.id
+                    });
+                    if (res.deletedCount > 0) {
+                        await message.delete();
+                        this.message.channel.send("Monitoring supprimé avec succès sur le message "+message.id);
+                    } else {
+                        this.message.channel.send("Il n'y a pas de monitoring sur le message "+message.id);
+                    }
                 }
+                return true;
         }
         return false;
     }
