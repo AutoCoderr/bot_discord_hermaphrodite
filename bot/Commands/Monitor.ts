@@ -28,7 +28,7 @@ export default class Monitor extends Command {
         userCount: {
             display: (guild: Guild, Embed: MessageEmbed) => {
                 Embed.addFields({
-                    name: "Nombre de d'utilisateurs",
+                    name: "Nombre d'utilisateurs",
                     value: guild.memberCount
                 });
             },
@@ -41,7 +41,7 @@ export default class Monitor extends Command {
         memberMax: {
             display: (guild: Guild, Embed: MessageEmbed) => {
                 Embed.addFields({
-                    name: "Nombre maximum de membres",
+                    name: "Nombre maximum d'utilisateurs",
                     value: guild.maximumMembers
                 });
             }
@@ -49,7 +49,7 @@ export default class Monitor extends Command {
         onlineUserCount: {
             display: async (guild: Guild, Embed: MessageEmbed) => {
                 Embed.addFields({
-                    name: "Nombre d'utilisateur en ligne",
+                    name: "Nombre d'utilisateurs en ligne",
                     value: (await guild.members.fetch()).filter(member => member.presence.status == "online").size
                 });
             },
