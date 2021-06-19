@@ -5,7 +5,7 @@ const db = connect();
 
 export interface IMonitoringMessage {
     serverId: string;
-    datas: Array<string>;
+    datas: Array<string|{data: string,params: any}>;
     channelId: string,
     messageId: string
 }

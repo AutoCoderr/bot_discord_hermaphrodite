@@ -1,5 +1,14 @@
 import Command from "../Classes/Command";
-import {Guild, GuildChannel, GuildMember, Message, MessageEmbed, PartialGuildMember, TextChannel} from "discord.js";
+import {
+    Guild,
+    GuildChannel,
+    GuildMember,
+    Message,
+    MessageEmbed,
+    PartialGuildMember,
+    Role,
+    TextChannel
+} from "discord.js";
 import config from "../config";
 import MonitoringMessage, {IMonitoringMessage} from "../Models/MonitoringMessage";
 import {splitFieldsEmbed} from "../Classes/OtherFunctions";
@@ -16,10 +25,10 @@ export default class Monitor extends Command {
     static listeneds = {};
 
     static datasCanBeDisplayed = {
-        memberCount: {
+        userCount: {
             display: (guild: Guild, Embed: MessageEmbed) => {
                 Embed.addFields({
-                    name: "Nombre de membres",
+                    name: "Nombre de d'utilisateurs",
                     value: guild.memberCount
                 });
             },
@@ -37,10 +46,10 @@ export default class Monitor extends Command {
                 });
             }
         },
-        onlineMemberCount: {
+        onlineUserCount: {
             display: async (guild: Guild, Embed: MessageEmbed) => {
                 Embed.addFields({
-                    name: "Nombre de membres en ligne",
+                    name: "Nombre d'utilisateur en ligne",
                     value: (await guild.members.fetch()).filter(member => member.presence.status == "online").size
                 });
             },
@@ -50,6 +59,24 @@ export default class Monitor extends Command {
                         (oldPresence.status == "online" || newPresence.status == "online") &&
                         oldPresence.status != newPresence.status)  && callback(newPresence.guild))
             }
+        },
+        roleMembersCount: {
+            display: (guild: Guild, Embed: MessageEmbed, params: {roleId: string}) => {
+                const {roleId} = params;
+                const role = guild.roles.cache.get(roleId);
+                if (role) {
+                    Embed.addFields({
+                        name: "Nombre de membres du role @" + role.name,
+                        value: role.members.size
+                    });
+                } else {
+                    Embed.addFields({
+                        name: "Membres du role "+roleId,
+                        value: "Role introuvable"
+                    })
+                }
+            },
+            params: {roleId: (role: Role) => role.id}
         },
         emojiCount: {
             display: (guild: Guild, Embed: MessageEmbed) => {
@@ -106,10 +133,10 @@ export default class Monitor extends Command {
             description: "Pour afficher l'aide",
             required: false
         },
-        showMemberCount: {
-            fields: ["-mc", "--member-count", "--show-member-count"],
+        showUserCount: {
+            fields: ["-uc", "--user-count", "--show-user-count"],
             type: "boolean",
-            description: "Pour afficher ou non le nombre de membres",
+            description: "Pour afficher ou non le nombre d'utilisateurs",
             default: true
         },
         showDescription: {
@@ -124,10 +151,10 @@ export default class Monitor extends Command {
             description: "Pour afficher ou non l'icone",
             default: true
         },
-        showOnlineMemberCount: {
-            fields: ["-omc", "--online-member-count", "--show-online-member-count"],
+        showOnlineUserCount: {
+            fields: ["-ouc", "--online-user-count", "--show-online-user-count"],
             type: "boolean",
-            description: "Pour afficher ou non le nombre de personnes connectées",
+            description: "Pour afficher ou non le nombre d'utilisateurs connectées",
             default: true
         },
         showMemberMax: {
@@ -135,6 +162,12 @@ export default class Monitor extends Command {
             type: "boolean",
             description: "Pour afficher ou non le nombre maximum de membres",
             default: false
+        },
+        showRoleMembersCount: {
+            fields: ["-rmc", "--role-members-count", "--show-role-members-count"],
+            type: "roles",
+            description: "Pour afficher le nombre de membres d'un ou de plusieurs rôles spécifiés (exemple: "+config.command_prefix+"monitor -rmc @moderateurs)",
+            required: false
         },
         showEmojiCount: {
             fields: ["-ec", "--emoji-count", "--show-emoji-count"],
@@ -190,9 +223,38 @@ export default class Monitor extends Command {
         let monitoringMessage: IMonitoringMessage;
         switch (action) {
             case "add":
-                const datasToDisplay = Object.keys(Monitor.datasCanBeDisplayed).filter(attr =>
+                let datasToDisplay: Array<string|{data: string, params: any}> = <Array<string|{data: string, params: any}>>Object.keys(Monitor.datasCanBeDisplayed).filter(attr =>
                     args["show"+attr[0].toUpperCase()+attr.substring(1)]
-                )
+                ).map(attr => {
+                    const argsData = args["show"+attr[0].toUpperCase()+attr.substring(1)]
+                    if (Monitor.datasCanBeDisplayed[attr].params) {
+                        if (argsData instanceof Array) {
+                            return argsData.map(param => ({
+                                data: attr,
+                                params: Object.keys(Monitor.datasCanBeDisplayed[attr].params).reduce((acc, paramKey) => {
+                                    acc[paramKey] = Monitor.datasCanBeDisplayed[attr].params[paramKey](param);
+                                    return acc;
+                                }, {})
+                            }));
+                        } else {
+                            return {
+                                data: attr,
+                                params: Object.keys(Monitor.datasCanBeDisplayed[attr].params).reduce((acc, paramKey) => {
+                                    acc[paramKey] = Monitor.datasCanBeDisplayed[attr].params[paramKey](argsData);
+                                    return acc;
+                                }, {})
+                            }
+                        }
+                    } else {
+                        return attr;
+                    }
+                });
+                for (let i=0;i<datasToDisplay.length;i++) {
+                    if (datasToDisplay[i] instanceof Array) {// @ts-ignore
+                        datasToDisplay = [...datasToDisplay.slice(0,i), ...datasToDisplay[i], ...datasToDisplay.slice(i+1)];
+                    }
+                }
+
                 const createdMessage: Message = await channel.send(await Monitor.getMonitorMessage(this.message.guild, datasToDisplay));
                 monitoringMessage = await MonitoringMessage.create({
                     serverId: this.message.guild.id,
@@ -230,7 +292,16 @@ export default class Monitor extends Command {
                         const exist = await Monitor.checkMonitoringMessageExist(monitoringMessage, this.message.guild, channelsById[monitoringMessage.channelId]);
                         return {
                             name: exist ? "Sur la channel #" + exist.channel.name : "Ce message et/ou ce salon n'existe plus",
-                            value: exist ? "Message " + exist.message.id + " ; Données : " + monitoringMessage.datas.join(", ") : "Supprimé"
+                            value: exist ?
+                                "Message " + exist.message.id + " ; Données : " + monitoringMessage.datas.map(data =>
+                                    typeof(data) == "string" ?
+                                        data :
+                                        data.data+"("+Object.keys(data.params).reduce((acc, paramName, index) => {
+                                            if (index > 0) acc += ", ";
+                                            acc += paramName+": "+data.params[paramName];
+                                            return acc;
+                                        }, "")+")").join(", ")
+                                : "Supprimé"
                         }
                     })), (Embed: MessageEmbed, partNb: number) => {
                         if (partNb == 1) {
@@ -303,26 +374,34 @@ export default class Monitor extends Command {
         return false;
     }
 
-    static async getMonitorMessage(guild: Guild, datasToDisplay: Array<string>) {
+    static async getMonitorMessage(guild: Guild, datasToDisplay: Array<string|{data: string, params: any}>) {
         const Embed = new MessageEmbed()
             .setColor('#0099ff')
             .setTitle('Serveur : '+guild.name)
             .setTimestamp();
         for (const data of datasToDisplay) {
-            await this.datasCanBeDisplayed[data].display(guild, Embed);
+            if (typeof(data) == "string") {
+                await this.datasCanBeDisplayed[data].display(guild, Embed);
+            } else {
+                await this.datasCanBeDisplayed[data.data].display(guild, Embed, data.params);
+            }
         }
         return Embed;
     }
 
     static startMonitoringMessageEvent(monitoringMessage: IMonitoringMessage) {
         if (Object.keys(this.listeneds).length == this.nbListeners) return;
-        for (const dataName of monitoringMessage.datas) {
+        for (const data of monitoringMessage.datas) {
+            const dataName = typeof(data) == "string" ? data : data.data;
             if (!this.listeneds[dataName] && typeof(this.datasCanBeDisplayed[dataName].listen) == "function") {
                 this.listeneds[dataName] = true;
                 this.datasCanBeDisplayed[dataName].listen(async (guild: Guild) => {
                     const monitoringMessages: Array<IMonitoringMessage> = await MonitoringMessage.find({
                         serverId: guild.id,
-                        datas: dataName
+                        $or: [
+                            {datas: dataName},
+                            {"datas.data": dataName}
+                        ]
                     });
                     for (const monitoringMessage of monitoringMessages) {
                         await this.refreshMonitor(monitoringMessage);

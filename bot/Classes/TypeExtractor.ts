@@ -2,7 +2,7 @@ import {CategoryChannel, GuildChannel, GuildEmoji, GuildMember, Message, Role} f
 import client from "../client";
 
 export const extractTypes = {
-    channel: (field, message: Message): GuildChannel|boolean => {
+    channel: (field, message: Message): GuildChannel|false => {
         if (message.guild == null) return false;
         let channelId = field.split("<#")[1];
         channelId = channelId.substring(0,channelId.length-1);
@@ -14,7 +14,7 @@ export const extractTypes = {
         const channel = message.guild.channels.cache.get(field);
         return (channel instanceof CategoryChannel && channel.type == "category") ? channel : false;
     },
-    message: async (field, _: Message, channel: GuildChannel|boolean): Promise<Message|boolean> => {
+    message: async (field, _: Message, channel: GuildChannel|boolean): Promise<Message|false> => {
         if (channel) {
             try { // @ts-ignore
                 return await channel.messages.fetch(field)
@@ -24,7 +24,7 @@ export const extractTypes = {
         }
         return false;
     },
-    listenerReactMessage: async (field, message: Message): Promise<{channel: GuildChannel, message: Message}|boolean> => {
+    listenerReactMessage: async (field, message: Message): Promise<{channel: GuildChannel, message: Message}|false> => {
         const channelMention = field.split("/")[0];
         const channel: GuildChannel|boolean|undefined = extractTypes.channel(channelMention, message);
         let messageToGet: Message|null = null
@@ -37,12 +37,12 @@ export const extractTypes = {
         }
         return messageToGet ? {message: messageToGet,channel} : false;
     },
-    emote: (field, _: Message): GuildEmoji|boolean => {
+    emote: (field, _: Message): GuildEmoji|false => {
         const emoteId = field.split(":")[2].split(">")[0];
         const emote = client.emojis.cache.get(emoteId);
         return emote ? emote : false;
     },
-    user: async (field, message: Message): Promise<GuildMember|boolean> => {
+    user: async (field, message: Message): Promise<GuildMember|false> => {
         if (message.guild == null) return false;
         let userId = field.split("<@")[1].split(">")[0];
         if (userId[0] == "!") userId = userId.substring(1);
@@ -52,13 +52,13 @@ export const extractTypes = {
             return false;
         }
     },
-    role: (field, message: Message): Role|boolean => {
+    role: (field, message: Message): Role|false => {
         if (message.guild == null) return false;
         const roleId = field.split("<@&")[1].split(">")[0];
         const role = message.guild.roles.cache.get(roleId);
         return role ?? false;
     },
-    roles: (field, message: Message): Array<Role>|boolean => {
+    roles: (field, message: Message): Array<Role>|false => {
         if (field.length-field.replace(",","") == 0) return [];
 
         const roles: Array<Role> = [];
@@ -70,5 +70,4 @@ export const extractTypes = {
         }
         return roles;
     }
-}
-;
+};

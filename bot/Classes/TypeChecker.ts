@@ -12,6 +12,6 @@ export const checkTypes = {
     listenerReactMessage: field => checkTypes.string(field) && new RegExp("^\<#[0-9]{18}\>/[0-9]{18}$").test(field)
 };
 
-const regex = {
-    role: "\<@&[0-9]{18}\>",
-}
+const regex: any = {};
+
+regex.role = "\<@&[0-9]{18}\>";
