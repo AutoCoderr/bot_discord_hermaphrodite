@@ -5,6 +5,12 @@ import MonitoringMessage, {IMonitoringMessage} from "../Models/MonitoringMessage
 import {splitFieldsEmbed} from "../Classes/OtherFunctions";
 import client from "../client";
 
+interface messageChannelAndGuild {
+    message: Message;
+    channel: TextChannel;
+    guild: Guild
+}
+
 export default class Monitor extends Command {
 
     static listeneds = {};
@@ -71,13 +77,19 @@ export default class Monitor extends Command {
         },
         icon: {
             display: (guild: Guild, Embed: MessageEmbed) => {
-                Embed.addFields({
-                    name: "Icone",
-                    value: guild.iconURL() ?? "Aucune icone"
-                });
+                if (typeof(guild.iconURL()) == "string") {
+                    Embed.setImage(<string>guild.iconURL());
+                } else {
+                    Embed.addFields({
+                        name: "Icône du serveur",
+                        value: "Aucune icône"
+                    });
+                }
             }
         }
     };
+
+    static nbListeners = Object.keys(Monitor.datasCanBeDisplayed).filter(data => typeof(Monitor.datasCanBeDisplayed[data].listen) == "function").length;
 
     static display = true;
     static description = "Pour afficher en temps réel des infos relatives au serveur";
@@ -188,7 +200,7 @@ export default class Monitor extends Command {
                     channelId: channel.id,
                     messageId: createdMessage.id
                 });
-                Monitor.checkAndStartMonitoringMessageEvent(monitoringMessage);
+                Monitor.startMonitoringMessageEvent(monitoringMessage);
                 this.message.channel.send("Un message de monitoring a été créé sur le channel <#"+channel.id+">");
                 return true;
             case "refresh":
@@ -279,8 +291,10 @@ export default class Monitor extends Command {
         return {message,channel,guild};
     }
 
-    static async refreshMonitor(monitoringMessage: IMonitoringMessage, guild: null|undefined|Guild = null, channel: null|undefined|TextChannel = null) {
-        const exist = await this.checkMonitoringMessageExist(monitoringMessage, guild, channel);
+    static async refreshMonitor(monitoringMessage: IMonitoringMessage, exist: false|messageChannelAndGuild = false) {
+        if (!exist) {
+            exist = await this.checkMonitoringMessageExist(monitoringMessage);
+        }
         if (exist) {
             const {message, guild} = exist;
             await message.edit(await this.getMonitorMessage(guild,monitoringMessage.datas));
@@ -300,24 +314,22 @@ export default class Monitor extends Command {
         return Embed;
     }
 
-    static checkAndStartMonitoringMessageEvent(monitoringMessage: IMonitoringMessage) {
-        if (Object.keys(this.listeneds).length == Object.keys(this.datasCanBeDisplayed).length) return;
+    static startMonitoringMessageEvent(monitoringMessage: IMonitoringMessage) {
+        if (Object.keys(this.listeneds).length == this.nbListeners) return;
         for (const dataName of monitoringMessage.datas) {
-            if (!this.listeneds[dataName]) {
+            if (!this.listeneds[dataName] && typeof(this.datasCanBeDisplayed[dataName].listen) == "function") {
                 this.listeneds[dataName] = true;
-                if (this.datasCanBeDisplayed[dataName].listen) {
-                    this.datasCanBeDisplayed[dataName].listen(async (guild: Guild) => {
-                        const monitoringMessages: Array<IMonitoringMessage> = await MonitoringMessage.find({
-                            serverId: guild.id,
-                            datas: dataName
-                        });
-                        for (const monitoringMessage of monitoringMessages) {
-                            await this.refreshMonitor(monitoringMessage);
-                        }
+                this.datasCanBeDisplayed[dataName].listen(async (guild: Guild) => {
+                    const monitoringMessages: Array<IMonitoringMessage> = await MonitoringMessage.find({
+                        serverId: guild.id,
+                        datas: dataName
                     });
-                }
+                    for (const monitoringMessage of monitoringMessages) {
+                        await this.refreshMonitor(monitoringMessage);
+                    }
+                });
             }
-            if (Object.keys(this.listeneds).length == Object.keys(this.datasCanBeDisplayed).length) return;
+            if (Object.keys(this.listeneds).length == this.nbListeners) return;
         }
     }
 
@@ -325,9 +337,11 @@ export default class Monitor extends Command {
         console.log("Init all monitoring event listeners");
         const monitoringMessages: Array<IMonitoringMessage> = await MonitoringMessage.find();
         for (const monitoringMessage of monitoringMessages) {
-            if (await this.checkMonitoringMessageExist(monitoringMessage)) {
-                this.checkAndStartMonitoringMessageEvent(monitoringMessage);
-                if (Object.keys(this.listeneds).length == Object.keys(this.datasCanBeDisplayed).length) break;
+            const exist = await this.checkMonitoringMessageExist(monitoringMessage);
+            if (exist) {
+                this.startMonitoringMessageEvent(monitoringMessage);
+                this.refreshMonitor(monitoringMessage,exist);
+                if (Object.keys(this.listeneds).length == this.nbListeners) break;
             }
         }
         console.log("All listenings started");
@@ -336,7 +350,9 @@ export default class Monitor extends Command {
     help(Embed: MessageEmbed) {
         Embed.addFields({
             name: "Exemples :",
-            value: config.command_prefix+this.commandName+" add #leChannelSurLequelMonitorer\n"+
+            value: config.command_prefix+this.commandName+" add (prend par défaut le channel de l'utilisateur)\n"+
+                   config.command_prefix+this.commandName+" add #unAutreChannelSurLequelMonitorer\n"+
+                   config.command_prefix+this.commandName+" add -ec -d false (avec le nombre d'emojis, sans la description)\n"+
                    config.command_prefix+this.commandName+" remove #leChannelSurLequelNePlusMonitorer idDuMessage\n"+
                    config.command_prefix+this.commandName+" remove idDuMessageDeMonitoring (sans channel spécifié, prend le channel courant)\n"+
                    config.command_prefix+this.commandName+" refresh #leChannelSurLequelRefraichir idDuMessage\n"+

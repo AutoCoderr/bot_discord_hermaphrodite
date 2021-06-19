@@ -392,7 +392,7 @@ export default class Command {
                             triedValue = args[field];
                         }
 
-                        if (out[attr]) {
+                        if (out[attr] != undefined) {
                             found = true;
                             break;
                         }
@@ -459,7 +459,7 @@ export default class Command {
                         } else {
                             incorrectField = true;
                         }
-                        if (out[argsByOrder[i].field]) found = true;
+                        if (out[argsByOrder[i].field] != undefined) found = true;
                     } else if (args[i] != undefined) {
                         incorrectField = true;
                     }
@@ -533,7 +533,7 @@ export default class Command {
                                 incorrectField = true;
                                 triedValue = args[i];
                             }
-                            if (out[attr]) {
+                            if (out[attr] != undefined) {
                                 found = true;
                                 break;
                             }
