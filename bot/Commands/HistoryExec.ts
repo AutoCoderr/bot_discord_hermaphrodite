@@ -23,9 +23,7 @@ export default class HistoryExec extends Command {
             return false;
         }
 
-        const response = await getHistory(this.message,args);
-
-        const histories = response.histories;
+        const histories = await getHistory(this.message,args);
 
         this.message.channel.send("Execute : ");
 

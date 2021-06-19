@@ -7,6 +7,8 @@ export default function init(bot) {
             console.log("Detect stored notifyOnReacts in the database and apply them")
             //@ts-ignore
             existingCommands.NotifyOnReact.applyNotifyOnReactAtStarting(bot);
+            //@ts-ignore
+            existingCommands.Monitor.initAllEventListeners();
         })
     }, 5000);
 }

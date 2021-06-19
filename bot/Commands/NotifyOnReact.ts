@@ -132,7 +132,7 @@ export default class NotifyOnReact extends Command {
             return reaction.emoji.name == emoteName;
         };
         messageToListen.awaitReactions(filter, { max: 1 })
-            .then(collected => {
+            .then(_ => {
                 if (!this.listenings[serverId][channelToListen.id][messageToListen.id][emoteName])  { // Detect if the listening on the message has been disabled
                     delete this.listenings[serverId][channelToListen.id][messageToListen.id][emoteName]; // And delete the useless keys in the listenings object
 
