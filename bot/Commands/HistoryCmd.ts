@@ -1,17 +1,19 @@
 import config from "../config";
 import Command from "../Classes/Command";
-import {getArgsModelHistory, getHistory} from "../Classes/OtherFunctions";
-import Discord, {GuildChannel, GuildMember, Message, MessageEmbed} from "discord.js";
-import {existingCommands} from "../Classes/CommandsDescription";
+import {getArgsModelHistory, getHistory, splitFieldsEmbed} from "../Classes/OtherFunctions";
+import {GuildChannel, GuildMember, Message, MessageEmbed} from "discord.js";
+import {IHistory} from "../Models/History";
 
-export class HistoryCmd extends Command {
+export default class HistoryCmd extends Command {
 
     argsModel = getArgsModelHistory(this.message);
 
-    static staticCommandName = "history";
+    static display = true;
+    static description = "Pour accéder à l'historique des commandes.";
+    static commandName = "history";
 
     constructor(message: Message) {
-        super(message, HistoryCmd.staticCommandName);
+        super(message, HistoryCmd.commandName);
     }
 
     async action(args: {help: boolean, command: string, sort: string, limit: number, channel: GuildChannel, user: GuildMember}, bot) {
@@ -29,39 +31,31 @@ export class HistoryCmd extends Command {
             return false;
         }
 
-        const response = await getHistory(this.message,args);
-
-        const histories = response.histories;
+        const histories: Array<IHistory> = await getHistory(this.message,args);
 
         let Embeds: Array<any> = [];
-        let Embed;
 
         const historByEmbed = 25;
 
         if (histories.length > 0) {
-            for (let i=0;i<histories.length;i++) {
-                if (i % historByEmbed == 0) {
-                    Embed = new Discord.MessageEmbed()
-                        .setColor('#0099ff')
-                        .setTitle("L'historique des commandes (Partie "+((i/historByEmbed)+1)+") "+(<number>response.limit > 0 ? "(limité à "+response.limit+")" : "(Sans limite)")+" :")
-                        .setDescription("Liste des commandes qui ont été tapées :")
-                        .setTimestamp();
-                    Embeds.push(Embed);
-                }
-                const history = histories[i];
-                const user = this.message.guild.members.cache.get(history.userId);
+            Embeds = splitFieldsEmbed(historByEmbed,histories.map(history => { //@ts-ignore
+                const user = this.message.guild.members.cache.get(history.userId); //@ts-ignore
                 const channel = this.message.guild.channels.cache.get(history.channelId);
 
-                const userName = user != undefined ? user.nickname : "unknown";
-                const channelName = channel != undefined ? channel.name : "unknown"
+                const userName = user != undefined ? (user.nickname ?? user.user.username) : "<@"+history.userId+">";
+                const channelName = channel != undefined ? channel.name : history.channelId
 
-                Embed.addFields({
+                return {
                     name: "[" + history.dateTime + "] "+userName+" sur #"+channelName+" :",
                     value: config.command_prefix+history.command
-                });
-            }
+                };
+            }), (Embed: MessageEmbed, partNb: number) => {
+                Embed
+                    .setTitle("L'historique des commandes (Partie "+partNb+") "+(<number>args.limit > 0 ? "(limité à "+args.limit+")" : "(Sans limite)")+" :")
+                    .setDescription("Liste des commandes qui ont été tapées :");
+            });
         } else {
-            Embeds.push(new Discord.MessageEmbed()
+            Embeds.push(new MessageEmbed()
                 .setColor('#0099ff')
                 .setTitle("L'historique des commandes :")
                 .setDescription("Liste des commandes qui ont été tapées :")

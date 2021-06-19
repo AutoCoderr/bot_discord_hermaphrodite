@@ -5,7 +5,7 @@ import {Message} from "discord.js";
 
 const ticketCommunicationChannels = {};
 
-export class CommunicateTicketModeratorSide extends Command {
+export default class CommunicateTicketModeratorSide extends Command {
 
     constructor(message: Message) {
         super(message, null);

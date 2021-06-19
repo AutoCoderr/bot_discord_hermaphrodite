@@ -2,10 +2,10 @@ import config from "../config";
 import Command from "../Classes/Command";
 import { forEachNotifyOnReact } from "../Classes/OtherFunctions";
 import { existingCommands } from "../Classes/CommandsDescription";
-import StoredNotifyOnReact, { IStoredNotifyOnReact } from "../Models/StoredNotifyOnReact";
+import StoredNotifyOnReact from "../Models/StoredNotifyOnReact";
 import Discord, {GuildChannel, GuildEmoji, Message} from "discord.js";
 
-export class CancelNotifyOnReact extends Command {
+export default class CancelNotifyOnReact extends Command {
 
     argsModel = {
         help: {
@@ -41,10 +41,11 @@ export class CancelNotifyOnReact extends Command {
         }
     };
 
-    static staticCommandName = "cancelNotifyOnReact"
+    static description = "Pour désactiver l'écoute d'une réaction sur un ou plusieurs messages.";
+    static commandName = "cancelNotifyOnReact"
 
     constructor(message: Message) {
-        super(message, CancelNotifyOnReact.staticCommandName);
+        super(message, CancelNotifyOnReact.commandName);
     }
 
     async action(args: {help: boolean, channel: GuildChannel, message: Message, emote: GuildEmoji},bot) {
@@ -78,7 +79,7 @@ export class CancelNotifyOnReact extends Command {
             .setDescription("Ceci est la liste des écoutes de réactions désactivées :")
             .setTimestamp();
         // @ts-ignore
-        let listenings = existingCommands.notifyOnReact.commandClass.listenings[this.message.guild.id];
+        let listenings = existingCommands.NotifyOnReact.listenings[this.message.guild.id];
         if (emoteName == undefined) {
             await forEachNotifyOnReact((found, channel, messageId, contentMessage, emoteName) => {
                 if (found) { // @ts-ignore

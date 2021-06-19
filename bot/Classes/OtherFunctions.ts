@@ -30,18 +30,17 @@ export function getArgsModelHistory(message: Message) {
                 }
                 return commands.includes(value);
             },
-            errorMessage: (value, _, embed: MessageEmbed) => {
+            errorMessage: (value, _) => {
                 if (value != undefined) {
-                    embed.addFields({
+                    return {
                         name: "La commande n'existe pas",
                         value: "La commande '" + value + "' n'existe pas, ou vous est inaccessible"
-                    });
-                } else {
-                    embed.addFields({
-                        name: "Nom de commande manquant",
-                        value: "Nom de la commande non spécifié"
-                    });
+                    };
                 }
+                return {
+                    name: "Nom de commande manquant",
+                    value: "Nom de la commande non spécifié"
+                };
             }
         },
         sort: {
@@ -90,7 +89,7 @@ export async function getHistory(message,args: {command: string, sort: string, l
     } else {
         where.commandName = { $nin: [] };
         for (let aCommand in existingCommands) {
-            if (!await existingCommands[aCommand].commandClass.staticCheckPermissions(message,false)) {
+            if (!await existingCommands[aCommand].staticCheckPermissions(message,false)) {
                 where.commandName.$nin.push(aCommand);
             }
         }
@@ -98,14 +97,13 @@ export async function getHistory(message,args: {command: string, sort: string, l
 
     if (sort == "dsc") sort = "desc";
 
-    const histories:Array<IHistory> = await History.find(where).limit(limit).sort({dateTime: sort});
-
-    return {histories: histories, limit: limit};
+    return await History.find(where).limit(limit).sort({dateTime: sort});
 }
 
 export async function forEachNotifyOnReact(callback, channel: GuildChannel, message: Message, messageCommand) {
     const serverId = messageCommand.guild.id;
-    let listenings = existingCommands.notifyOnReact.commandClass.listenings[serverId];
+    // @ts-ignore
+    let listenings = existingCommands.NotifyOnReact.listenings[serverId];
 
     if (typeof(listenings) == "undefined") {
         callback(false);
@@ -175,6 +173,26 @@ export async function forEachNotifyOnReact(callback, channel: GuildChannel, mess
             callback(false);
         }
     }
+}
+
+export function splitFieldsEmbed(nbByPart: number,
+                                     fields: Array<{name: string, value: string}>,
+                                     atEachPart: Function): Array<MessageEmbed> {
+    let Embed: MessageEmbed;
+    let Embeds: Array<MessageEmbed> = [];
+    for (let i=0;i<fields.length;i++) {
+        if (i % nbByPart == 0) {
+            Embed = new MessageEmbed()
+                .setColor('#0099ff')
+                .setTimestamp();
+            atEachPart(Embed, (i/nbByPart)+1);
+            Embeds.push(Embed);
+        }
+        const field = fields[i];
+        // @ts-ignore
+        Embed.addFields(field);
+    }
+    return Embeds;
 }
 
 export function isNumber(num) {

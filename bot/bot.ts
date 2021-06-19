@@ -6,11 +6,23 @@ import client from "./client";
 
 import init from "./init";
 
+/*client.on('guildMemberRemove', async member => {
+    console.log(member.guild.memberCount);
+    console.log(member.nickname+" has leave");
+});
+
+client.on('guildMemberAdd', async member => {
+    const res = await member.guild.members.fetch();
+    console.log(res.find(member => member.nickname == "Lian la polymorphe"));
+    console.log(member.guild.memberCount);
+    console.log(member.nickname+" has join");
+});*/
+
 
 // check all commands
 client.on('message', async message => {
     for (let commandName in existingCommands) {
-        const commandClass = existingCommands[commandName].commandClass;
+        const commandClass = existingCommands[commandName];
         const command = new commandClass(message);
         command.check(client);
     }

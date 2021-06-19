@@ -19,6 +19,7 @@
   },
   "homepage": "https://github.com/AutoCoderr/bot_discord_hermaphrodite#readme",
   "devDependencies": {
+    "@types/node": "^15.12.1",
     "typescript": "^4.0.5"
   },
   "dependencies": {
