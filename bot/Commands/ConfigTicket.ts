@@ -8,37 +8,30 @@ export default class ConfigTicket extends Command {
     argsModel = {
         help: { fields: ["-h","--help"], type: "boolean", required: false, description: "Pour afficher l'aide" },
 
-        $argsByOrder: [
-            {
-                field: "action",
+        $argsByType: {
+            action: {
                 required: args => args.help == undefined,
                 type: "string",
                 description: "L'action à effectuer : set, show, disable, enable ou blacklist",
                 valid: (elem,_) => ['set','show','disable','enable','blacklist'].includes(elem)
             },
-            {
-                field: "two",
-                required: args => ["set","blacklist"].includes(args.action),
-                types: ["category", "string"],
-                description: "L'id de la catégorie à définir si l'action est 'set', ou l'action à définir sur la blacklist (add, remove, show)",
-                valid: (elem: CategoryChannel|string,args) => (
-                    (
-                        args.action == 'set' &&
-                        elem instanceof CategoryChannel
-                    )  || (
-                        args.action == 'blacklist' &&
-                        typeof(elem) == "string" &&
-                        ['add','remove','show'].includes(elem)
-                    )
-                )
+            category: {
+                required: args => args.help == undefined && args.action == "set",
+                type: "category",
+                description: "L'id de la catégorie à définir avec 'set'"
             },
-            {
-                field: "user",
-                required: args => args.action == "blacklist" && ['add','remove'].includes(args.two),
+            actionBlacklist: {
+                required: args => args.help == undefined && args.action == "blacklist",
+                type: "string",
+                description: "L'action à effectuer sur la blacklist",
+                valid: (elem,_) => ['add','remove','show'].includes(elem)
+            },
+            user: {
+                required: args => args.help == undefined && args.action == "blacklist" && ['add','remove'].includes(args.actionBlacklist),
                 type: "user",
                 description: "L'utilisateur à ajouter ou retirer de la blacklist"
             }
-        ]
+        }
     }
 
     static display = true;
@@ -49,8 +42,8 @@ export default class ConfigTicket extends Command {
         super(message, ConfigTicket.commandName);
     }
 
-    async action(args: {help: boolean, action: string, two: CategoryChannel|string, user: GuildMember}, bot) {
-        const {help, action, two, user} = args;
+    async action(args: {help: boolean, action: string, category: CategoryChannel, actionBlacklist: string, user: GuildMember}, bot) {
+        const {help, action, category, actionBlacklist, user} = args;
 
         if (help) {
             this.displayHelp();
@@ -66,11 +59,9 @@ export default class ConfigTicket extends Command {
         }
 
         let ticketConfig: ITicketConfig;
-        let category: undefined|CategoryChannel|GuildChannel;
 
         switch(action) {
             case "set":
-                category = <CategoryChannel>two;
                 ticketConfig = await TicketConfig.findOne({serverId: this.message.guild.id});
                 let toEnable = false;
                 if (ticketConfig == null) {
@@ -98,11 +89,11 @@ export default class ConfigTicket extends Command {
                 if (ticketConfig == null) {
                     this.message.channel.send("On dirait que vous n'avez pas encore configuré les tickets sur ce serveur, vous pouvez le faire en définissant la catégorie via : "+config.command_prefix+this.commandName+" set idDeLaCategorie")
                 } else {
-                    category = this.message.guild.channels.cache.get(<string>ticketConfig.categoryId);
+                    const category = this.message.guild.channels.cache.get(<string>ticketConfig.categoryId);
                     if (category == undefined) {
                         this.message.channel.send("On dirait que la catégorie que vous aviez définie n'existe plus, vous pouvez la redéfinir avec : " + config.command_prefix + this.commandName + " set idDeLaCategorie");
                     } else {
-                        this.message.channel.send("Catégorie utilisée pour les tickers : " + category.name);
+                        this.message.channel.send("Catégorie utilisée pour les tickets : " + category.name);
                     }
                 }
                 return true;
@@ -127,7 +118,7 @@ export default class ConfigTicket extends Command {
                 }
                 return true;
             case "blacklist":
-                switch(two) {
+                switch(actionBlacklist) {
                     case "add":
                         return this.addUserToBlackList(this.message.guild.id,user.id);
 
@@ -205,7 +196,7 @@ export default class ConfigTicket extends Command {
             for (const userId of list) {
                 try { // @ts-ignore
                     const user = await this.message.guild.members.fetch(userId);
-                    users.push({username: user.nickname, id: user.id});
+                    users.push({username: user.nickname ?? user.user.username, id: user.id});
                 } catch(e) {
                     users.push({username: "unknown", id: userId});
                 }
