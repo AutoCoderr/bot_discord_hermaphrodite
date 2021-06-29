@@ -48,7 +48,7 @@ export default class CancelNotifyOnReact extends Command {
         super(message, CancelNotifyOnReact.commandName);
     }
 
-    async action(args: {help: boolean, channel: GuildChannel, message: Message, emote: GuildEmoji},bot) {
+    async action(args: {help: boolean, channel: GuildChannel, message: Message, emote: GuildEmoji|string},bot) {
         let {help,channel,message,emote} = args;
 
         if (help) {
@@ -71,7 +71,7 @@ export default class CancelNotifyOnReact extends Command {
             return false;
         }
 
-        let emoteName = emote ? emote.name : undefined;
+        let emoteName = emote ? (emote instanceof GuildEmoji ? emote.name : emote) : undefined;
 
         let Embed = new Discord.MessageEmbed()
             .setColor('#0099ff')
@@ -83,7 +83,7 @@ export default class CancelNotifyOnReact extends Command {
         if (emoteName == undefined) {
             await forEachNotifyOnReact((found, channel, messageId, contentMessage, emoteName) => {
                 if (found) { // @ts-ignore
-                    this.deleteNotifyOnReactInBdd(this.message.guild.id,channel.id,messageId,emoteName);
+                    CancelNotifyOnReact.deleteNotifyOnReactInBdd(this.message.guild.id,channel.id,messageId,emoteName);
                     listenings[channel.id][messageId][emoteName] = false;
                     Embed.addFields({
                         name: "Supprimée : sur '#" + channel.name + "' (" + contentMessage + ") :" + emoteName + ":",
@@ -97,7 +97,7 @@ export default class CancelNotifyOnReact extends Command {
                 }
             }, channel, message, this.message);
         } else if (listenings && listenings[channel.id] && listenings[channel.id][message.id] && listenings[channel.id][message.id][emoteName]) { // @ts-ignore
-            this.deleteNotifyOnReactInBdd(message.guild.id,channel.id,message.id,emoteName);
+            CancelNotifyOnReact.deleteNotifyOnReactInBdd(message.guild.id,channel.id,message.id,emoteName);
             listenings[channel.id][message.id][emoteName] = false;
             Embed.addFields({
                 name: "sur '#" + channel.name + "' (" + message.content + ") :" + emoteName + ":",
@@ -114,7 +114,7 @@ export default class CancelNotifyOnReact extends Command {
         return true;
     }
 
-    async deleteNotifyOnReactInBdd(serverId,channelId,messageId,emoteName) {
+    static async deleteNotifyOnReactInBdd(serverId,channelId,messageId,emoteName) {
         await StoredNotifyOnReact.deleteOne({
             serverId: serverId,
             channelToListenId: channelId,

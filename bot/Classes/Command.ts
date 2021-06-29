@@ -523,7 +523,7 @@ export default class Command {
                                     } else {
                                         triedValue = data;
                                     }
-                                } else {
+                                } else if (required) {
                                     extractFailed = true;
                                     triedValue = args[i];
                                 }

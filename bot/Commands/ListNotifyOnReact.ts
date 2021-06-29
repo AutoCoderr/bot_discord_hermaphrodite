@@ -48,7 +48,7 @@ export default class ListNotifyOnReact extends Command {
         super(message, ListNotifyOnReact.commandName);
     }
 
-    async action(args: {help: boolean, channel: GuildChannel, message: Message, emote: GuildEmoji}, bot) {
+    async action(args: {help: boolean, channel: GuildChannel, message: Message, emote: GuildEmoji|string}, bot) {
         let {help,channel,message,emote} = args;
 
         if (help) {
@@ -64,7 +64,7 @@ export default class ListNotifyOnReact extends Command {
             return false;
         }
 
-        let emoteName = emote ? emote.name : undefined;
+        let emoteName = emote ? (emote instanceof GuildEmoji ? emote.name : emote) : undefined;
 
         // Affiche dans un Embed, l'ensemble des écoutes de réactions qu'il y a
 
