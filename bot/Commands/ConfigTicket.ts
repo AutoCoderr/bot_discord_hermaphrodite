@@ -1,7 +1,17 @@
 import Command from "../Classes/Command";
 import config from "../config";
 import TicketConfig, {ITicketConfig} from "../Models/TicketConfig";
-import Discord, {CategoryChannel, GuildChannel, GuildEmoji, GuildMember, Message, TextChannel} from "discord.js";
+import Discord, {
+    CategoryChannel,
+    Guild,
+    GuildChannel,
+    GuildEmoji,
+    GuildMember,
+    Message,
+    MessageEmbed,
+    TextChannel
+} from "discord.js";
+import {splitFieldsEmbed} from "../Classes/OtherFunctions";
 
 export default class ConfigTicket extends Command {
 
@@ -28,23 +38,23 @@ export default class ConfigTicket extends Command {
                 valid: (elem,_) => ['add','remove','show'].includes(elem)
             },
             user: {
-                required: args => args.help == undefined && args.action == "blacklist" && ['add','remove'].includes(args.actionBlacklist),
+                required: args => args.help == undefined && args.action == "blacklist" && ['add','remove'].includes(args.subAction),
                 type: "user",
                 description: "L'utilisateur à ajouter ou retirer de la blacklist"
             },
             channelListen: {
-                required: args => args.help == undefined && args.subAction == "add" || (args.subAction == "remove" && !args.allListen),
+                required: args => args.help == undefined && args.action == "listen" && (args.subAction == "add" || (args.subAction == "remove" && !args.allListen)),
                 type: "channel",
                 description: "Le channel sur lequel ajouter, retirer, ou afficher les écoutes de réaction",
                 valid: (elem: GuildChannel,_) => elem.type == "text"
             },
             emoteListen: {
-                required: args => args.help == undefined && args.subAction == "add",
+                required: args => args.help == undefined && args.action == "listen" && args.subAction == "add",
                 type: "emote",
                 description: "L'emote sur l'aquelle ajouter ou retirer une écoute de réaction"
             },
             messageListen: {
-                required: args => args.help == undefined && args.subAction == "add" || (args.subAction == "remove" && args.emoteListen != undefined),
+                required: args => args.help == undefined && args.action == "listen" && (args.subAction == "add" || (args.subAction == "remove" && args.emoteListen != undefined)),
                 type: "message",
                 description: "L'id du message sur lequel ajouter, retirer, ou afficher les écoutes de réaction",
                 moreDatas: args => args.channelListen
@@ -78,6 +88,8 @@ export default class ConfigTicket extends Command {
         }
 
         let ticketConfig: ITicketConfig;
+        let emoteName: string;
+        let listensToKeep: Array<{channelId: string, messageId: string, emoteName: string}>;
 
         switch(action) {
             case "set":
@@ -113,7 +125,7 @@ export default class ConfigTicket extends Command {
                     if (category == undefined) {
                         this.message.channel.send("On dirait que la catégorie que vous aviez définie n'existe plus, vous pouvez la redéfinir avec : " + config.command_prefix + this.commandName + " set idDeLaCategorie");
                     } else {
-                        this.message.channel.send("Catégorie utilisée pour les tickets : " + category.name);
+                        this.message.channel.send("Catégorie utilisée pour les tickets : " + category.name+" ("+(ticketConfig.enabled ? 'activé': 'désactivé')+")");
                     }
                 }
                 return true;
@@ -143,10 +155,10 @@ export default class ConfigTicket extends Command {
                     this.message.channel.send("On dirait que vous n'avez pas encore configuré les tickets sur ce serveur, vous pouvez le faire en définissant la catégorie via : "+config.command_prefix+this.commandName+" set idDeLaCategorie");
                     return false;
                 }
+                if (!(ticketConfig.messagesToListen instanceof Array)) ticketConfig.messagesToListen = [];
                 switch (subAction) {
                     case "add":
                         const emote = emoteListen instanceof GuildEmoji ? emoteListen.name : emoteListen;
-                        if (!(ticketConfig.messagesToListen instanceof Array)) ticketConfig.messagesToListen = [];
                         if (ticketConfig.messagesToListen.find(message =>
                             message.channelId == channelListen.id &&
                             message.messageId == messageListen.id &&
@@ -158,6 +170,61 @@ export default class ConfigTicket extends Command {
                         ticketConfig.messagesToListen.push({channelId: channelListen.id, messageId: messageListen.id, emoteName: emote}); // @ts-ignore
                         ticketConfig.save();
                         this.message.channel.send("Une écoute a été activée sur ce message pour la création de ticket");
+                        return true;
+                    case "remove":
+                        emoteName = emoteListen instanceof GuildEmoji ? emoteListen.name : emoteListen;
+                        listensToKeep = ticketConfig.messagesToListen.filter(message =>
+                            (emoteName != undefined && message.emoteName != emoteName) ||
+                            (messageListen != undefined && message.messageId != messageListen.id) ||
+                            (channelListen != undefined && message.channelId != channelListen.id)
+                        );
+                        if (ticketConfig.messagesToListen.length-listensToKeep.length == 0) {
+                            this.message.channel.send("Aucune écoute de réaction n'a été trouvée");
+                            return false;
+                        }
+                        ticketConfig.messagesToListen = listensToKeep; // @ts-ignore
+                        ticketConfig.save();
+                        this.message.channel.send("Les écoutes ont été supprimée avec succès!");
+                        return true;
+                    case "show":
+                        emoteName = emoteListen instanceof GuildEmoji ? emoteListen.name : emoteListen;
+
+                        const fields: Array<{name: string, value: string}> = [];
+                        for (let i=0;i<ticketConfig.messagesToListen.length;i++) {
+                            const message = ticketConfig.messagesToListen[i];
+                            if ((emoteName == undefined || message.emoteName == emoteName) &&
+                                (messageListen == undefined || message.messageId == messageListen.id) &&
+                                (channelListen == undefined || message.channelId == channelListen.id)) {
+                                const exist = await ConfigTicket.listeningMessageExist(ticketConfig.messagesToListen[i],this.message.guild);
+                                fields.push(exist ? {
+                                    name: "#"+exist.channel.name+" > ("+exist.message.content.substring(0,Math.min(20,exist.message.content.length))+"...) :"+ticketConfig.messagesToListen[i].emoteName+":",
+                                    value: "Channel : #"+exist.channel.name+" ; Id du message : "+exist.message.id
+                                } : {
+                                    name: "Message/channel introuvable",
+                                    value: "Le message de cette écoute n'existe plus"
+                                });
+                                if (!exist) {
+                                    ticketConfig.messagesToListen.splice(i,1);
+                                    i -= 1;
+                                }
+                            }
+                        }
+                        if (fields.length == 0) {
+                            this.message.channel.send("Aucune écoute de réaction trouvée");
+                            return false;
+                        } // @ts-ignore
+                        ticketConfig.save();
+                        const embeds: Array<MessageEmbed> = splitFieldsEmbed(25,fields,(Embed: MessageEmbed, partNb: number) => {
+                            if (partNb == 1) {
+                                Embed.setTitle("Les écoutes de réactions pour le ticketing");
+                            }
+                        });
+
+                        for (const embed of embeds) {
+                            this.message.channel.send(embed);
+                        }
+                        return true;
+
                 }
                 return false;
             case "blacklist":
@@ -280,6 +347,21 @@ export default class ConfigTicket extends Command {
             this.message.channel.send(Embed);
         }
         return true;
+    }
+
+    static async listeningMessageExist(listening: {channelId: string, messageId: string}, guild: Guild) {
+        const channel: undefined|TextChannel = <TextChannel>guild.channels.cache.get(listening.channelId);
+        if (!channel)
+            return false;
+
+        let message: null|Message = null;
+        try {
+            message = await channel.messages.fetch(listening.messageId);
+        } catch (e) {}
+        if (!message) return false;
+
+
+        return {channel,message};
     }
 
     help(Embed) {
