@@ -151,9 +151,9 @@ export default class ConfigTicket extends Command {
                     TicketConfig.create(ticketConfig);
                 } else {
                     ticketConfig.moderatorId = moderatorRole.id;
+                    // @ts-ignore
+                    ticketConfig.save()
                 }
-                // @ts-ignore
-                await ticketConfig.save()
                 this.message.channel.send("Les modérateurs ont été définit sur le role <@&"+moderatorRole.id+">");
                 return true;
             case "unset-moderator":
