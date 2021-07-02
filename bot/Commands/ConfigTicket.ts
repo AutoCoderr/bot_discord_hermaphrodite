@@ -460,6 +460,7 @@ export default class ConfigTicket extends Command {
                 });
                 if (ticketConfig == null) return;
                 let category: CategoryChannel;
+
                 if (userWhoReact.id != (<ClientUser>client.user).id &&
                     ticketConfig.enabled &&
                     ticketConfig.categoryId != null &&
@@ -469,41 +470,51 @@ export default class ConfigTicket extends Command {
 
                     const ticketChannel = ticketConfig.ticketChannels.find(ticketChannel => ticketChannel.userId == userWhoReact.id);
                     let channel: TextChannel|undefined = ticketChannel ? <TextChannel>guild.channels.cache.get(ticketChannel.channelId) : undefined;
+
                     if (!channel || channel.parentID != category.id) {
+                        if (!ticketConfig.blacklist.includes(userWhoReact.id)) {
 
-                        const moderatorRole: Role|undefined = ticketConfig.moderatorId ? guild.roles.cache.get(ticketConfig.moderatorId) : undefined;
+                            const moderatorRole: Role | undefined = ticketConfig.moderatorId ? guild.roles.cache.get(ticketConfig.moderatorId) : undefined;
 
-                        channel = await guild.channels.create('Ticket de '+userWhoReact.username+" "+userWhoReact.id, {
-                            type: "text"
-                        });
-                        await channel.setParent(category);
-                        await channel.overwritePermissions([
-                            ...[
-                                {
-                                    id: guild.roles.everyone,
-                                    deny: toDenyToEveryone
-                                },
-                                {
-                                    id: userWhoReact.id,
-                                    allow: toAllowToAuthorAndModerators
-                                }
-                            ],
-                            ...(moderatorRole ? [
-                                {
-                                    id: moderatorRole.id,
-                                    allow: toAllowToAuthorAndModerators
-                                }
-                            ] : [])
-                        ]);
-                        channel.send((moderatorRole ? '<@&'+moderatorRole.id+'> ! ' : '')+"Nouveau ticket de <@"+userWhoReact.id+">");
-                        if (ticketChannel)
-                            ticketChannel.channelId = channel.id;
-                        else
-                            ticketConfig.ticketChannels.push({channelId: channel.id, userId: userWhoReact.id});
+                            let member: null|GuildMember = null
+                            try {
+                                member = await guild.members.fetch(userWhoReact.id);
+                            } catch (e) {
+                            }
+                            const username = member && member.nickname ? member.nickname : userWhoReact.username;
+                            channel = await guild.channels.create('Ticket de ' + username + " " + userWhoReact.id, {
+                                type: "text"
+                            });
+                            await channel.setParent(category);
+                            await channel.overwritePermissions([
+                                ...[
+                                    {
+                                        id: guild.roles.everyone,
+                                        deny: toDenyToEveryone
+                                    },
+                                    {
+                                        id: userWhoReact.id,
+                                        allow: toAllowToAuthorAndModerators
+                                    }
+                                ],
+                                ...(moderatorRole ? [
+                                    {
+                                        id: moderatorRole.id,
+                                        allow: toAllowToAuthorAndModerators
+                                    }
+                                ] : [])
+                            ]);
+                            channel.send((moderatorRole ? '<@&' + moderatorRole.id + '> ! ' : '') + "Nouveau ticket de <@" + userWhoReact.id + ">");
+                            if (ticketChannel)
+                                ticketChannel.channelId = channel.id;
+                            else
+                                ticketConfig.ticketChannels.push({channelId: channel.id, userId: userWhoReact.id});
 
-                        //@ts-ignore
-                        ticketConfig.save();
+                            //@ts-ignore
+                            ticketConfig.save();
 
+                        } else
+                            userWhoReact.send("Vous ne pouvez créer de ticket sur le serveur "+guild.name+" car vous êtes dans la blacklist");
                     }
                 }
                 ConfigTicket.listenMessageTicket(message, emoteName, _idConfigTicket, _idMessageToListen);
