@@ -8,7 +8,7 @@ import Discord, {
     GuildEmoji,
     GuildMember,
     Message,
-    MessageEmbed, PermissionString,
+    MessageEmbed, PermissionString, Role,
     TextChannel, User
 } from "discord.js";
 import {splitFieldsEmbed} from "../Classes/OtherFunctions";
@@ -38,7 +38,12 @@ export default class ConfigTicket extends Command {
                 required: args => args.help == undefined,
                 type: "string",
                 description: "L'action à effectuer : set, show, disable, enable, listen ou blacklist",
-                valid: (elem,_) => ['set','show','disable','enable','listen','blacklist'].includes(elem)
+                valid: (elem,_) => ['set','set-moderator','unset-moderator','show','show-moderator','disable','enable','listen','blacklist'].includes(elem)
+            },
+            moderatorRole: {
+                required: args => args.help == undefined && args.action == "set-moderator",
+                type: "role",
+                description: "Le role désignant les modérateurs sur ce serveur"
             },
             category: {
                 required: args => args.help == undefined && args.action == "set",
@@ -84,8 +89,8 @@ export default class ConfigTicket extends Command {
         super(message, ConfigTicket.commandName);
     }
 
-    async action(args: {help: boolean, action: string, category: CategoryChannel, subAction: string, user: GuildMember, channelListen: TextChannel, messageListen: Message, emoteListen: GuildEmoji|string}, bot) {
-        const {help, action, category, subAction, user, channelListen, messageListen, emoteListen} = args;
+    async action(args: {help: boolean, action: string, category: CategoryChannel, subAction: string, user: GuildMember, channelListen: TextChannel, messageListen: Message, emoteListen: GuildEmoji|string, moderatorRole: Role}, bot) {
+        const {help, action, category, subAction, user, channelListen, messageListen, emoteListen, moderatorRole} = args;
 
         if (help) {
             this.displayHelp();
@@ -103,7 +108,6 @@ export default class ConfigTicket extends Command {
 
         let ticketConfig: ITicketConfig;
         let emoteName: string;
-        let listensToKeep: Array<{channelId: string, messageId: string, emoteName: string}>;
 
         switch(action) {
             case "set":
@@ -117,6 +121,7 @@ export default class ConfigTicket extends Command {
                         serverId: this.message.guild.id,
                         blacklist: [],
                         messagesToListen: [],
+                        moderatorId: null,
                         ticketChannels: []
                     }
                     TicketConfig.create(ticketConfig);
@@ -131,6 +136,36 @@ export default class ConfigTicket extends Command {
                 this.message.channel.send("Ce sera dorénavant dans la catégorie '"+category.name+"' que seront gérés les tickets"+
                     (toEnable ?  "\n(La fonctionnalité des tickets a été activée)" : ""));
                 return true;
+            case "set-moderator":
+                ticketConfig = await TicketConfig.findOne({serverId: this.message.guild.id});
+                if (ticketConfig == null) {
+                    ticketConfig = {
+                        enabled: false,
+                        categoryId: null,
+                        serverId: this.message.guild.id,
+                        blacklist: [],
+                        messagesToListen: [],
+                        moderatorId: moderatorRole.id,
+                        ticketChannels: []
+                    };
+                    TicketConfig.create(ticketConfig);
+                } else {
+                    ticketConfig.moderatorId = moderatorRole.id;
+                }
+                // @ts-ignore
+                await ticketConfig.save()
+                this.message.channel.send("Les modérateurs ont été définit sur le role <@&"+moderatorRole.id+">");
+                return true;
+            case "unset-moderator":
+                ticketConfig = await TicketConfig.findOne({serverId: this.message.guild.id});
+                if (ticketConfig == null || !ticketConfig.moderatorId) {
+                    this.message.channel.send("Aucun rôle modérateur configuré");
+                } else {
+                    ticketConfig.moderatorId = null; //@ts-ignore
+                    ticketConfig.save()
+                    this.message.channel.send("Le rôle modérateur a été retiré de la configuration");
+                }
+                return true;
             case "show":
                 ticketConfig = await TicketConfig.findOne({serverId: this.message.guild.id, categoryId: { $ne: null }});
                 if (ticketConfig == null) {
@@ -142,6 +177,14 @@ export default class ConfigTicket extends Command {
                     } else {
                         this.message.channel.send("Catégorie utilisée pour les tickets : " + category.name+" ("+(ticketConfig.enabled ? 'activé': 'désactivé')+")");
                     }
+                }
+                return true;
+            case "show-moderator":
+                ticketConfig = await TicketConfig.findOne({serverId: this.message.guild.id, moderatorId: { $ne: null }});
+                if (ticketConfig) {
+                    this.message.channel.send("Role modérateur configuré : <@&"+ticketConfig.moderatorId+">");
+                } else {
+                    this.message.channel.send("Aucun rôle modérateur configuré");
                 }
                 return true;
             case "disable":
@@ -198,12 +241,15 @@ export default class ConfigTicket extends Command {
 
                         let nbRemoved = 0;
                         for (let i=0;i<ticketConfig.messagesToListen.length;i++) {
-                            const message = ticketConfig.messagesToListen[i];
-                            if ((emoteName == undefined || message.emoteName == emoteName) &&
-                                (messageListen == undefined || message.messageId == messageListen.id) &&
-                                (channelListen == undefined || message.channelId == channelListen.id)) {
-                                const reaction = messageListen.reactions.cache.find(reaction => reaction.emoji.name == message.emoteName);
-                                if (reaction) reaction.remove();
+                            const listening = ticketConfig.messagesToListen[i];
+                            if ((emoteName == undefined || listening.emoteName == emoteName) &&
+                                (messageListen == undefined || listening.messageId == messageListen.id) &&
+                                (channelListen == undefined || listening.channelId == channelListen.id)) {
+                                const exist = await ConfigTicket.listeningMessageExist(listening,this.message.guild);
+                                if (exist) {
+                                    const reaction = exist.message.reactions.cache.find(reaction => reaction.emoji.name == listening.emoteName);
+                                    if (reaction) reaction.remove();
+                                }
                                 ticketConfig.messagesToListen.splice(i,1);
                                 i -= 1;
                                 nbRemoved += 1;
@@ -279,6 +325,7 @@ export default class ConfigTicket extends Command {
             ticketConfig = {
                 enabled: false,
                 categoryId: null,
+                moderatorId: null,
                 blacklist: [userId],
                 serverId: serverId,
                 messagesToListen: [],
@@ -423,21 +470,32 @@ export default class ConfigTicket extends Command {
                     const ticketChannel = ticketConfig.ticketChannels.find(ticketChannel => ticketChannel.userId == userWhoReact.id);
                     let channel: TextChannel|undefined = ticketChannel ? <TextChannel>guild.channels.cache.get(ticketChannel.channelId) : undefined;
                     if (!channel || channel.parentID != category.id) {
+
+                        const moderatorRole: Role|undefined = ticketConfig.moderatorId ? guild.roles.cache.get(ticketConfig.moderatorId) : undefined;
+
                         channel = await guild.channels.create('Ticket de '+userWhoReact.username+" "+userWhoReact.id, {
                             type: "text"
                         });
                         await channel.setParent(category);
                         await channel.overwritePermissions([
-                            {
-                                id: guild.roles.everyone,
-                                deny: toDenyToEveryone
-                            },
-                            {
-                                id: userWhoReact.id,
-                                allow: toAllowToAuthorAndModerators
-                            }
+                            ...[
+                                {
+                                    id: guild.roles.everyone,
+                                    deny: toDenyToEveryone
+                                },
+                                {
+                                    id: userWhoReact.id,
+                                    allow: toAllowToAuthorAndModerators
+                                }
+                            ],
+                            ...(moderatorRole ? [
+                                {
+                                    id: moderatorRole.id,
+                                    allow: toAllowToAuthorAndModerators
+                                }
+                            ] : [])
                         ]);
-                        channel.send("Nouveau ticket de <@"+userWhoReact.id+">");
+                        channel.send((moderatorRole ? '<@&'+moderatorRole.id+'> ! ' : '')+"Nouveau ticket de <@"+userWhoReact.id+">");
                         if (ticketChannel)
                             ticketChannel.channelId = channel.id;
                         else
@@ -507,6 +565,9 @@ export default class ConfigTicket extends Command {
                    config.command_prefix+this.commandName+" listen show\n"+
                    config.command_prefix+this.commandName+" listen show #channel\n"+
                    config.command_prefix+this.commandName+" listen show #channel idDunMessage\n"+
+                   config.command_prefix+this.commandName+" set-moderator @moderateurs\n"+
+                   config.command_prefix+this.commandName+" unset-moderator\n"+
+                   config.command_prefix+this.commandName+" show-moderator\n"+
                    config.command_prefix+this.commandName+" --help"
         })
     }

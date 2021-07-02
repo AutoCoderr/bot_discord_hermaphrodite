@@ -7,6 +7,7 @@ export interface ITicketConfig {
     _id?: string;
     enabled: boolean;
     categoryId: string|null;
+    moderatorId?: string|null;
     blacklist: Array<string>;
     messagesToListen?: Array<{_id?: string, channelId: string, messageId: string, emoteName: string}>;
     ticketChannels?: Array<{ _id?: string, channelId: string, userId: string}>;
@@ -27,6 +28,7 @@ const messageToListen: Schema = new Schema({
 const TicketConfigSchema: Schema = new Schema({
     enabled: { type: Boolean, required: true },
     categoryId: { type: String, required: true },
+    moderatorId: { type: String },
     blacklist: { type: Array, required: true },
     messagesToListen: [messageToListen],
     ticketChannels: [ticketChannel],
