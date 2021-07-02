@@ -4,10 +4,11 @@ import { connect } from "../Mongo";
 const db = connect();
 
 export interface ITicketConfig {
+    _id?: string;
     enabled: boolean;
     categoryId: string|null;
     blacklist: Array<string>;
-    messagesToListen: Array<{channelId: string, messageId: string, emoteName: string}>
+    messagesToListen: Array<{_id?: string, channelId: string, messageId: string, emoteName: string}>
     serverId: string;
 }
 

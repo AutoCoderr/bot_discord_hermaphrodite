@@ -9,6 +9,8 @@ export default function init(bot) {
             existingCommands.NotifyOnReact.applyNotifyOnReactAtStarting(bot);
             //@ts-ignore
             existingCommands.Monitor.initAllEventListeners();
+            //@ts-ignore
+            existingCommands.ConfigTicket.initListeningAllMessages();
         })
     }, 5000);
 }

@@ -2,7 +2,7 @@ import Command from "../Classes/Command";
 import config from "../config";
 import TicketConfig, {ITicketConfig} from "../Models/TicketConfig";
 import Discord, {
-    CategoryChannel,
+    CategoryChannel, ClientUser,
     Guild,
     GuildChannel,
     GuildEmoji,
@@ -12,6 +12,7 @@ import Discord, {
     TextChannel
 } from "discord.js";
 import {splitFieldsEmbed} from "../Classes/OtherFunctions";
+import client from "../client";
 
 export default class ConfigTicket extends Command {
 
@@ -155,6 +156,11 @@ export default class ConfigTicket extends Command {
                     this.message.channel.send("On dirait que vous n'avez pas encore configuré les tickets sur ce serveur, vous pouvez le faire en définissant la catégorie via : "+config.command_prefix+this.commandName+" set idDeLaCategorie");
                     return false;
                 }
+                let currentCategory: undefined|CategoryChannel = undefined;
+                if (ticketConfig.categoryId == null || (currentCategory = <CategoryChannel>this.message.guild.channels.cache.get(ticketConfig.categoryId)) == undefined) {
+                    this.message.channel.send("On dirait que vous n'avez pas encore configuré les tickets sur ce serveur, vous pouvez le faire en définissant la catégorie via : "+config.command_prefix+this.commandName+" set idDeLaCategorie")
+                    return false;
+                }
                 if (!(ticketConfig.messagesToListen instanceof Array)) ticketConfig.messagesToListen = [];
                 switch (subAction) {
                     case "add":
@@ -169,22 +175,33 @@ export default class ConfigTicket extends Command {
                         }
                         ticketConfig.messagesToListen.push({channelId: channelListen.id, messageId: messageListen.id, emoteName: emote}); // @ts-ignore
                         ticketConfig.save();
+                        messageListen.react(emoteListen);
+                        ConfigTicket.listenMessageTicket(currentCategory, messageListen, emote, ticketConfig._id, ticketConfig.messagesToListen[0]._id);
                         this.message.channel.send("Une écoute a été activée sur ce message pour la création de ticket");
                         return true;
                     case "remove":
                         emoteName = emoteListen instanceof GuildEmoji ? emoteListen.name : emoteListen;
-                        listensToKeep = ticketConfig.messagesToListen.filter(message =>
-                            (emoteName != undefined && message.emoteName != emoteName) ||
-                            (messageListen != undefined && message.messageId != messageListen.id) ||
-                            (channelListen != undefined && message.channelId != channelListen.id)
-                        );
-                        if (ticketConfig.messagesToListen.length-listensToKeep.length == 0) {
+
+                        let nbRemoved = 0;
+                        for (let i=0;i<ticketConfig.messagesToListen.length;i++) {
+                            const message = ticketConfig.messagesToListen[i];
+                            if ((emoteName == undefined || message.emoteName == emoteName) &&
+                                (messageListen == undefined || message.messageId == messageListen.id) &&
+                                (channelListen == undefined || message.channelId == channelListen.id)) {
+                                const reaction = messageListen.reactions.cache.find(reaction => reaction.emoji.name == message.emoteName);
+                                if (reaction) reaction.remove();
+                                ticketConfig.messagesToListen.splice(i,1);
+                                i -= 1;
+                                nbRemoved += 1;
+                            }
+                        }
+                        if (nbRemoved == 0) {
                             this.message.channel.send("Aucune écoute de réaction n'a été trouvée");
                             return false;
                         }
-                        ticketConfig.messagesToListen = listensToKeep; // @ts-ignore
+                         // @ts-ignore
                         ticketConfig.save();
-                        this.message.channel.send("Les écoutes ont été supprimée avec succès!");
+                        this.message.channel.send(nbRemoved+" écoutes ont été supprimées avec succès!");
                         return true;
                     case "show":
                         emoteName = emoteListen instanceof GuildEmoji ? emoteListen.name : emoteListen;
@@ -350,18 +367,76 @@ export default class ConfigTicket extends Command {
     }
 
     static async listeningMessageExist(listening: {channelId: string, messageId: string}, guild: Guild) {
-        const channel: undefined|TextChannel = <TextChannel>guild.channels.cache.get(listening.channelId);
+        const channel: undefined | TextChannel = <TextChannel>guild.channels.cache.get(listening.channelId);
         if (!channel)
             return false;
 
-        let message: null|Message = null;
+        let message: null | Message = null;
         try {
             message = await channel.messages.fetch(listening.messageId);
-        } catch (e) {}
+        } catch (e) {
+        }
         if (!message) return false;
 
 
-        return {channel,message};
+        return {channel, message};
+    }
+
+    static listenMessageTicket(category: CategoryChannel, message: Message, emoteName, _idConfigTicket, _idMessageToListen) {
+        let userWhoReact;
+        const filter = (reaction, user) => {
+            userWhoReact = user;
+            return reaction.emoji.name == emoteName;
+        };
+        message.awaitReactions(filter, { max: 1 })
+            .then(async _ => {
+                if (!userWhoReact) return;
+                const ticketConfig = await TicketConfig.findOne({
+                    _id: _idConfigTicket,
+                    'messagesToListen._id': _idMessageToListen
+                });
+                if (ticketConfig == null) return;
+                if (userWhoReact.id != (<ClientUser>client.user).id) {
+                    console.log("React");
+                }
+                ConfigTicket.listenMessageTicket(category, message, emoteName, _idConfigTicket, _idMessageToListen);
+            })
+            .catch(e => {
+                console.log("Catch event in listenMessageTicket() function ");
+                console.error(e);
+            });
+    }
+
+    static async initListeningAllMessages() {
+        console.log("Start listening all messages for ticketing");
+        const ticketConfigs: Array<ITicketConfig> = await TicketConfig.find({enabled: true});
+
+        for (const ticketConfig of ticketConfigs) {
+            const guild = client.guilds.cache.get(ticketConfig.serverId);
+            if (!guild) {
+                TicketConfig.deleteOne({_id: ticketConfig._id});
+                console.log("server "+ticketConfig.serverId+" does not exist");
+                continue;
+            }
+            let category: CategoryChannel|undefined = undefined;
+            if (ticketConfig.categoryId == undefined || (category = <CategoryChannel>guild.channels.cache.get(ticketConfig.categoryId)) == undefined) {
+                console.log("Category of "+guild.name+" is not defined or not found");
+            }
+
+            if (!(ticketConfig.messagesToListen instanceof Array)) continue;
+            for (let i=0;i<ticketConfig.messagesToListen.length;i++) {
+                const listening = ticketConfig.messagesToListen[i];
+                const exist = await ConfigTicket.listeningMessageExist(listening,guild);
+                if (exist) {
+                    ConfigTicket.listenMessageTicket(<CategoryChannel>category,exist.message,listening.emoteName,ticketConfig._id,listening._id);
+                } else {
+                    ticketConfig.messagesToListen.splice(i,1);
+                    i -= 1;
+                }
+            }// @ts-ignore
+            ticketConfig.save();
+        }
+        console.log("All ticketing message listened");
     }
 
     help(Embed) {
