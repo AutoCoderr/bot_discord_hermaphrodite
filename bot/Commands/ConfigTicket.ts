@@ -8,11 +8,24 @@ import Discord, {
     GuildEmoji,
     GuildMember,
     Message,
-    MessageEmbed,
-    TextChannel
+    MessageEmbed, PermissionString,
+    TextChannel, User
 } from "discord.js";
 import {splitFieldsEmbed} from "../Classes/OtherFunctions";
 import client from "../client";
+
+
+const toDenyToEveryone: Array<PermissionString> = ['SEND_MESSAGES','VIEW_CHANNEL','SEND_TTS_MESSAGES', 'MANAGE_CHANNELS', 'MANAGE_MESSAGES'];
+const toAllowToAuthorAndModerators: Array<PermissionString> = [
+    'SEND_MESSAGES',
+    'SEND_TTS_MESSAGES',
+    'ADD_REACTIONS',
+    'VIEW_CHANNEL',
+    'MANAGE_MESSAGES',
+    'MANAGE_CHANNELS',
+    'EMBED_LINKS',
+    'ATTACH_FILES',
+    'READ_MESSAGE_HISTORY'];
 
 export default class ConfigTicket extends Command {
 
@@ -103,7 +116,8 @@ export default class ConfigTicket extends Command {
                         categoryId: category.id,
                         serverId: this.message.guild.id,
                         blacklist: [],
-                        messagesToListen: []
+                        messagesToListen: [],
+                        ticketChannels: []
                     }
                     TicketConfig.create(ticketConfig);
                 } else {
@@ -156,8 +170,8 @@ export default class ConfigTicket extends Command {
                     this.message.channel.send("On dirait que vous n'avez pas encore configuré les tickets sur ce serveur, vous pouvez le faire en définissant la catégorie via : "+config.command_prefix+this.commandName+" set idDeLaCategorie");
                     return false;
                 }
-                let currentCategory: undefined|CategoryChannel = undefined;
-                if (ticketConfig.categoryId == null || (currentCategory = <CategoryChannel>this.message.guild.channels.cache.get(ticketConfig.categoryId)) == undefined) {
+
+                if (ticketConfig.categoryId == null || <CategoryChannel>this.message.guild.channels.cache.get(ticketConfig.categoryId) == undefined) {
                     this.message.channel.send("On dirait que vous n'avez pas encore configuré les tickets sur ce serveur, vous pouvez le faire en définissant la catégorie via : "+config.command_prefix+this.commandName+" set idDeLaCategorie")
                     return false;
                 }
@@ -176,7 +190,7 @@ export default class ConfigTicket extends Command {
                         ticketConfig.messagesToListen.push({channelId: channelListen.id, messageId: messageListen.id, emoteName: emote}); // @ts-ignore
                         ticketConfig.save();
                         messageListen.react(emoteListen);
-                        ConfigTicket.listenMessageTicket(currentCategory, messageListen, emote, ticketConfig._id, ticketConfig.messagesToListen[0]._id);
+                        ConfigTicket.listenMessageTicket(messageListen, emote, ticketConfig._id, ticketConfig.messagesToListen[ticketConfig.messagesToListen.length-1]._id);
                         this.message.channel.send("Une écoute a été activée sur ce message pour la création de ticket");
                         return true;
                     case "remove":
@@ -267,7 +281,8 @@ export default class ConfigTicket extends Command {
                 categoryId: null,
                 blacklist: [userId],
                 serverId: serverId,
-                messagesToListen: []
+                messagesToListen: [],
+                ticketChannels: []
             }
             TicketConfig.create(ticketConfig);
         } else {
@@ -382,8 +397,9 @@ export default class ConfigTicket extends Command {
         return {channel, message};
     }
 
-    static listenMessageTicket(category: CategoryChannel, message: Message, emoteName, _idConfigTicket, _idMessageToListen) {
-        let userWhoReact;
+    static listenMessageTicket(message: Message, emoteName, _idConfigTicket, _idMessageToListen) {
+        const guild: Guild = <Guild>message.guild;
+        let userWhoReact: User;
         const filter = (reaction, user) => {
             userWhoReact = user;
             return reaction.emoji.name == emoteName;
@@ -391,15 +407,48 @@ export default class ConfigTicket extends Command {
         message.awaitReactions(filter, { max: 1 })
             .then(async _ => {
                 if (!userWhoReact) return;
-                const ticketConfig = await TicketConfig.findOne({
+                const ticketConfig: ITicketConfig = await TicketConfig.findOne({
                     _id: _idConfigTicket,
                     'messagesToListen._id': _idMessageToListen
                 });
                 if (ticketConfig == null) return;
-                if (userWhoReact.id != (<ClientUser>client.user).id) {
-                    console.log("React");
+                let category: CategoryChannel;
+                if (userWhoReact.id != (<ClientUser>client.user).id &&
+                    ticketConfig.enabled &&
+                    ticketConfig.categoryId != null &&
+                    (category = <CategoryChannel>guild.channels.cache.get(ticketConfig.categoryId)) != undefined) {
+
+                    if (!(ticketConfig.ticketChannels instanceof Array)) ticketConfig.ticketChannels = [];
+
+                    const ticketChannel = ticketConfig.ticketChannels.find(ticketChannel => ticketChannel.userId == userWhoReact.id);
+                    let channel: TextChannel|undefined = ticketChannel ? <TextChannel>guild.channels.cache.get(ticketChannel.channelId) : undefined;
+                    if (!channel || channel.parentID != category.id) {
+                        channel = await guild.channels.create('Ticket de '+userWhoReact.username+" "+userWhoReact.id, {
+                            type: "text"
+                        });
+                        await channel.setParent(category);
+                        await channel.overwritePermissions([
+                            {
+                                id: guild.roles.everyone,
+                                deny: toDenyToEveryone
+                            },
+                            {
+                                id: userWhoReact.id,
+                                allow: toAllowToAuthorAndModerators
+                            }
+                        ]);
+                        channel.send("Nouveau ticket de <@"+userWhoReact.id+">");
+                        if (ticketChannel)
+                            ticketChannel.channelId = channel.id;
+                        else
+                            ticketConfig.ticketChannels.push({channelId: channel.id, userId: userWhoReact.id});
+
+                        //@ts-ignore
+                        ticketConfig.save();
+
+                    }
                 }
-                ConfigTicket.listenMessageTicket(category, message, emoteName, _idConfigTicket, _idMessageToListen);
+                ConfigTicket.listenMessageTicket(message, emoteName, _idConfigTicket, _idMessageToListen);
             })
             .catch(e => {
                 console.log("Catch event in listenMessageTicket() function ");
@@ -409,7 +458,7 @@ export default class ConfigTicket extends Command {
 
     static async initListeningAllMessages() {
         console.log("Start listening all messages for ticketing");
-        const ticketConfigs: Array<ITicketConfig> = await TicketConfig.find({enabled: true});
+        const ticketConfigs: Array<ITicketConfig> = await TicketConfig.find();
 
         for (const ticketConfig of ticketConfigs) {
             const guild = client.guilds.cache.get(ticketConfig.serverId);
@@ -421,6 +470,7 @@ export default class ConfigTicket extends Command {
             let category: CategoryChannel|undefined = undefined;
             if (ticketConfig.categoryId == undefined || (category = <CategoryChannel>guild.channels.cache.get(ticketConfig.categoryId)) == undefined) {
                 console.log("Category of "+guild.name+" is not defined or not found");
+                continue;
             }
 
             if (!(ticketConfig.messagesToListen instanceof Array)) continue;
@@ -428,7 +478,7 @@ export default class ConfigTicket extends Command {
                 const listening = ticketConfig.messagesToListen[i];
                 const exist = await ConfigTicket.listeningMessageExist(listening,guild);
                 if (exist) {
-                    ConfigTicket.listenMessageTicket(<CategoryChannel>category,exist.message,listening.emoteName,ticketConfig._id,listening._id);
+                    ConfigTicket.listenMessageTicket(exist.message,listening.emoteName,ticketConfig._id,listening._id);
                 } else {
                     ticketConfig.messagesToListen.splice(i,1);
                     i -= 1;

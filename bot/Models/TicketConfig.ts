@@ -8,9 +8,15 @@ export interface ITicketConfig {
     enabled: boolean;
     categoryId: string|null;
     blacklist: Array<string>;
-    messagesToListen: Array<{_id?: string, channelId: string, messageId: string, emoteName: string}>
+    messagesToListen?: Array<{_id?: string, channelId: string, messageId: string, emoteName: string}>;
+    ticketChannels?: Array<{ _id?: string, channelId: string, userId: string}>;
     serverId: string;
 }
+
+const ticketChannel: Schema = new Schema({
+    channelId: {type: String, required: true},
+    userId: {type: String, required: true},
+});
 
 const messageToListen: Schema = new Schema({
     channelId: {type: String, required: true},
@@ -23,6 +29,7 @@ const TicketConfigSchema: Schema = new Schema({
     categoryId: { type: String, required: true },
     blacklist: { type: Array, required: true },
     messagesToListen: [messageToListen],
+    ticketChannels: [ticketChannel],
     serverId: { type: String, required: true }
 });
 
