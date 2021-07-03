@@ -37,7 +37,7 @@ export default class ConfigTicket extends Command {
             action: {
                 required: args => args.help == undefined,
                 type: "string",
-                description: "L'action à effectuer : set, show, disable, enable, listen ou blacklist",
+                description: "L'action à effectuer : set, set-moderator, unset-moderator, show, show-moderator, disable, enable, listen ou blacklist",
                 valid: (elem,_) => ['set','set-moderator','unset-moderator','show','show-moderator','disable','enable','listen','blacklist'].includes(elem)
             },
             moderatorRole: {
@@ -53,7 +53,7 @@ export default class ConfigTicket extends Command {
             subAction: {
                 required: args => args.help == undefined && ["blacklist","listen"].includes(args.action),
                 type: "string",
-                description: "L'action à effectuer",
+                description: "L'action à effectuer : add, remove ou show",
                 valid: (elem,_) => ['add','remove','show'].includes(elem)
             },
             user: {
