@@ -2,6 +2,8 @@ import config from "../config";
 import Command from "../Classes/Command";
 import StoredNotifyOnReact, { IStoredNotifyOnReact } from "../Models/StoredNotifyOnReact";
 import {GuildChannel, GuildEmoji, Message} from "discord.js";
+import TicketConfig, {ITicketConfig} from "../Models/TicketConfig";
+import {existingCommands} from "../Classes/CommandsDescription";
 
 export default class NotifyOnReact extends Command {
 
@@ -60,7 +62,7 @@ export default class NotifyOnReact extends Command {
 
     listenings: any;
 
-    async action(args: { help: boolean, listen: {channel: GuildChannel, message: Message}, emoteToReact: GuildEmoji, messageToWrite: string, channelToWrite: GuildChannel },bot) { // notifyOnReact --listen #ChannelAEcouter/IdDuMessageAEcouter -e :emoteAEcouter: --message '$user$ a réagit à ce message' --writeChannel #channelSurLequelEcrire
+    async action(args: { help: boolean, listen: {channel: GuildChannel, message: Message}, emoteToReact: GuildEmoji|string, messageToWrite: string, channelToWrite: GuildChannel },bot) { // notifyOnReact --listen #ChannelAEcouter/IdDuMessageAEcouter -e :emoteAEcouter: --message '$user$ a réagit à ce message' --writeChannel #channelSurLequelEcrire
 
         let { help, listen, emoteToReact, messageToWrite, channelToWrite } = args;
 
@@ -91,10 +93,12 @@ export default class NotifyOnReact extends Command {
             return false;
         }
 
+        const emoteName = emoteToReact instanceof GuildEmoji ? emoteToReact.name : emoteToReact;
+
         if (this.listenings[this.message.guild.id] &&
             this.listenings[this.message.guild.id][listen.channel.id] &&
             this.listenings[this.message.guild.id][listen.channel.id][listen.message.id] &&
-            this.listenings[this.message.guild.id][listen.channel.id][listen.message.id][emoteToReact.name]) {
+            this.listenings[this.message.guild.id][listen.channel.id][listen.message.id][emoteName]) {
             this.sendErrors({
                 name: "Déjà écouté",
                 value: "Ce message est déjà écouté sur cette émote"
@@ -102,7 +106,6 @@ export default class NotifyOnReact extends Command {
             return false;
         }
 
-        const emoteName = emoteToReact.name;
         const serverId = messageToListen.guild.id;
 
         if (typeof(this.listenings[serverId]) == "undefined") {
@@ -133,6 +136,7 @@ export default class NotifyOnReact extends Command {
         };
         messageToListen.awaitReactions(filter, { max: 1 })
             .then(_ => {
+                if (!userWhoReact) return;
                 if (!this.listenings[serverId][channelToListen.id][messageToListen.id][emoteName])  { // Detect if the listening on the message has been disabled
                     delete this.listenings[serverId][channelToListen.id][messageToListen.id][emoteName]; // And delete the useless keys in the listenings object
 
@@ -183,19 +187,32 @@ export default class NotifyOnReact extends Command {
         const storedNotifyOnReacts: Array<IStoredNotifyOnReact> = await StoredNotifyOnReact.find({});
         for (let i=0;i<storedNotifyOnReacts.length;i++) {
             const storedNotifyOnReact = storedNotifyOnReacts[i];
-            const serverId = storedNotifyOnReact.serverId;
+            const serverId = storedNotifyOnReact.serverId; // @ts-ignore
+            const deleteNotif = () => existingCommands.CancelNotifyOnReact.deleteNotifyOnReactInBdd(serverId,storedNotifyOnReact.channelToListenId,storedNotifyOnReact.messageToListenId,storedNotifyOnReact.emoteName);
 
             const server = bot.guilds.cache.get(serverId);
             if (server == undefined) continue;
 
             const channelToListen = server.channels.cache.get(storedNotifyOnReact.channelToListenId);
-            if (channelToListen == undefined) continue;
-            // @ts-ignore
-            const messageToListen = await channelToListen.messages.fetch(storedNotifyOnReact.messageToListenId);
-            if (messageToListen == undefined) continue;
+            if (channelToListen == undefined) {
+                deleteNotif();
+                continue;
+            }
+            let messageToListen: null|Message = null;
+            try {
+                // @ts-ignore
+                messageToListen = await channelToListen.messages.fetch(storedNotifyOnReact.messageToListenId);
+            } catch (e) {}
+            if (messageToListen == null) {
+                deleteNotif();
+                continue;
+            }
 
             const channelToWrite = server.channels.cache.get(storedNotifyOnReact.channelToWriteId);
-            if (channelToWrite == undefined) continue;
+            if (channelToWrite == undefined) {
+                deleteNotif();
+                continue;
+            }
 
             if (typeof (this.listenings[serverId]) == "undefined") {
                 this.listenings[serverId] = {};
