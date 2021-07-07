@@ -488,9 +488,11 @@ export default class Command {
                 for (let attr in argsByType) {
                     let found = false;
                     let extractFailed = false;
-                    let incorrectField = false;
                     let triedValue = null;
                     let argType: Array<string>|string = argsByType[attr].type ?? argsByType[attr].types;
+                    const required = argsByType[attr].required == undefined ||
+                        (typeof(argsByType[attr].required) == "boolean" && argsByType[attr].required) ||
+                        (typeof(argsByType[attr].required) == "function" && await argsByType[attr].required(out));
 
 
                     for (let i=0;args[i];i++) {
@@ -519,18 +521,16 @@ export default class Command {
                                         out[attr] = data;
                                         alreadyDefineds[i] = true;
                                     } else {
-                                        incorrectField = true;
                                         triedValue = data;
                                     }
-                                } else {
+                                } else if (required) {
                                     extractFailed = true;
                                     triedValue = args[i];
                                 }
                             } else if (typeof(argsByType[attr].valid) != "function" || await argsByType[attr].valid(args[i],out)) {
                                 out[attr] = argType == "string" ? args[i].toString() : args[i];
                                 alreadyDefineds[i] = true;
-                            } else {
-                                incorrectField = true;
+                            } else if (required){
                                 triedValue = args[i];
                             }
                             if (out[attr] != undefined) {
@@ -539,13 +539,10 @@ export default class Command {
                             }
                         }
                     }
-                    const required = argsByType[attr].required == undefined ||
-                        (typeof(argsByType[attr].required) == "boolean" && argsByType[attr].required) ||
-                        (typeof(argsByType[attr].required) == "function" && await argsByType[attr].required(out));
 
                     if (required) {
                         const defaultValue = typeof (argsByType[attr].default) == "function" ? argsByType[attr].default(out) : argsByType[attr].default;
-                        if (!found && !incorrectField && defaultValue != undefined) {
+                        if (!found && defaultValue != undefined) {
                             out[attr] = defaultValue;
                             found = true;
                         }
@@ -553,7 +550,7 @@ export default class Command {
                     if (!found) {
                         if (extractFailed) {
                             failsExtract.push({...argsByType[attr], value: triedValue, field: attr});
-                        } else if (incorrectField || required) {
+                        } else if (required) {
                             fails.push({...argsByType[attr], value: triedValue, field: attr});
                         }
                     }

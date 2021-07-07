@@ -48,6 +48,7 @@ export const extractTypes = {
         return messageToGet ? {message: messageToGet,channel} : false;
     },
     emote: (field, _: Message): GuildEmoji|false => {
+        if (new RegExp("^[^\u0000-\u007F]+$").test(field)) return field;
         const emoteId = field.split(":")[2].split(">")[0];
         const emote = client.emojis.cache.get(emoteId);
         return emote ? emote : false;
