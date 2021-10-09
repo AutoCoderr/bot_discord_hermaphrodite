@@ -6,18 +6,6 @@ import client from "./client";
 
 import init from "./init";
 
-/*client.on('guildMemberRemove', async member => {
-    console.log(member.guild.memberCount);
-    console.log(member.nickname+" has leave");
-});
-
-client.on('guildMemberAdd', async member => {
-    const res = await member.guild.members.fetch();
-    console.log(res.find(member => member.nickname == "Lian la polymorphe"));
-    console.log(member.guild.memberCount);
-    console.log(member.nickname+" has join");
-});*/
-
 
 // check all commands
 client.on('message', async message => {
@@ -34,7 +22,7 @@ client.on('message', async message => {
             if (welcomeMessage != null) {
                 try {
                     await message.author.send(welcomeMessage.message);
-                } catch (e) {
+                } catch (e) {// @ts-ignore
                     if (e.message == "Cannot send messages to this user") {
                         message.channel.send("<@"+message.author.id+"> \n\n"+welcomeMessage.message);
                     }

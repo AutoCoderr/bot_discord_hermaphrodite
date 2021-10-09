@@ -42,6 +42,7 @@ export default class CancelNotifyOnReact extends Command {
     };
 
     static description = "Pour désactiver l'écoute d'une réaction sur un ou plusieurs messages.";
+    static display = true;
     static commandName = "cancelNotifyOnReact"
 
     constructor(message: Message) {
@@ -110,7 +111,7 @@ export default class CancelNotifyOnReact extends Command {
             });
         }
 
-        this.message.channel.send(Embed);
+        this.message.channel.send({embeds: [Embed]});
         return true;
     }
 

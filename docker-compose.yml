@@ -1,13 +1,12 @@
 version: '3'
 services:
   bot:
-    image: node:14
+    build: ./docker/bot
     ports :
       - "80:80"
     volumes:
       - ./bot:/bot
     working_dir: /bot
-    command: npm start
     depends_on:
       - mongodb
     networks:
@@ -15,7 +14,7 @@ services:
       - exterior
 
   mongodb:
-    image: mongo:latest
+    image: mongo:bionic
     volumes:
       - ./mongodb/mongod.conf:/etc/mongod.conf
       - ./mongodb/data/db/:/data/db/
@@ -30,6 +29,7 @@ services:
     ports:
       - "27017:27017"
     networks:
+      - exterior
       - bdd
 networks:
   bdd:

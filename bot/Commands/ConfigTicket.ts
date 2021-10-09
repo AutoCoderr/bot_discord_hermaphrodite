@@ -65,7 +65,7 @@ export default class ConfigTicket extends Command {
                 required: args => args.help == undefined && args.action == "listen" && (args.subAction == "add" || (args.subAction == "remove" && !args.allListen)),
                 type: "channel",
                 description: "Le channel sur lequel ajouter, retirer, ou afficher les écoutes de réaction",
-                valid: (elem: GuildChannel,_) => elem.type == "text"
+                valid: (elem: GuildChannel,_) => elem.type == "GUILD_TEXT"
             },
             emoteListen: {
                 required: args => args.help == undefined && args.action == "listen" && args.subAction == "add",
@@ -107,7 +107,7 @@ export default class ConfigTicket extends Command {
         }
 
         let ticketConfig: ITicketConfig;
-        let emoteName: string;
+        let emoteName: string|null;
 
         switch(action) {
             case "set":
@@ -222,6 +222,10 @@ export default class ConfigTicket extends Command {
                 switch (subAction) {
                     case "add":
                         const emote = emoteListen instanceof GuildEmoji ? emoteListen.name : emoteListen;
+                        if (emote == null) {
+                            this.message.channel.send("L'émoji spécifié semble invalide");
+                            return false;
+                        }
                         if (ticketConfig.messagesToListen.find(message =>
                             message.channelId == channelListen.id &&
                             message.messageId == messageListen.id &&
@@ -242,7 +246,7 @@ export default class ConfigTicket extends Command {
                         let nbRemoved = 0;
                         for (let i=0;i<ticketConfig.messagesToListen.length;i++) {
                             const listening = ticketConfig.messagesToListen[i];
-                            if ((emoteName == undefined || listening.emoteName == emoteName) &&
+                            if ((emoteName == null || listening.emoteName == emoteName) &&
                                 (messageListen == undefined || listening.messageId == messageListen.id) &&
                                 (channelListen == undefined || listening.channelId == channelListen.id)) {
                                 const exist = await ConfigTicket.listeningMessageExist(listening,this.message.guild);
@@ -261,7 +265,7 @@ export default class ConfigTicket extends Command {
                         }
                          // @ts-ignore
                         ticketConfig.save();
-                        this.message.channel.send(nbRemoved+" écoutes ont été supprimées avec succès!");
+                        this.message.channel.send(nbRemoved+" écoute"+(nbRemoved > 1 ? 's' : '')+" "+(nbRemoved > 1 ? "ont " : "a ")+"été supprimée"+(nbRemoved > 1 ? 's' : '')+" avec succès!");
                         return true;
                     case "show":
                         emoteName = emoteListen instanceof GuildEmoji ? emoteListen.name : emoteListen;
@@ -296,10 +300,7 @@ export default class ConfigTicket extends Command {
                                 Embed.setTitle("Les écoutes de réactions pour le ticketing");
                             }
                         });
-
-                        for (const embed of embeds) {
-                            this.message.channel.send(embed);
-                        }
+                        this.message.channel.send({embeds});
                         return true;
 
                 }
@@ -368,14 +369,14 @@ export default class ConfigTicket extends Command {
     async showUsersInBlackList(bot, serverId) {
         let ticketConfig: ITicketConfig = await TicketConfig.findOne({serverId: serverId});
 
-        let Embeds = [new Discord.MessageEmbed()
+        let embeds = [new Discord.MessageEmbed()
             .setColor('#0099ff')
             .setTitle("Les utilisateurs de la blacklist :")
             .setDescription("Liste des utilisateurs de la blacklist")
             .setTimestamp()];
 
         if (ticketConfig == null || ticketConfig.blacklist.length == 0) {
-            Embeds[0].addFields({
+            embeds[0].addFields({
                 name: "Aucun utilisateur",
                 value: "Il n'y a aucun utilisateur dans la blacklist"
             });
@@ -402,29 +403,27 @@ export default class ConfigTicket extends Command {
 
             for  (let msg=0; msg*linePerMessage*userDisplayedPerLine < users.length; msg ++) {
                 if (msg > 0) {
-                    Embeds.push(new Discord.MessageEmbed()
+                    embeds.push(new Discord.MessageEmbed()
                         .setColor('#0099ff')
                         .setTitle("Les utilisateurs de la blacklist (Partie "+(msg+1)+") :")
                         .setDescription("Liste des utilisateurs de la blacklist")
                         .setTimestamp());
                 }
-                let Embed = Embeds[Embeds.length-1];
+                let embed = embeds[embeds.length-1];
                 for (let line = 0; line < linePerMessage && msg*linePerMessage*userDisplayedPerLine + line*userDisplayedPerLine < users.length; line++) {
                     let usersNames: Array<string> = [];
                     for (let userIndex=0;userIndex < userDisplayedPerLine && msg*linePerMessage*userDisplayedPerLine + line*userDisplayedPerLine + userIndex < users.length;userIndex++) {
                         const user = users[msg*linePerMessage*userDisplayedPerLine + line*userDisplayedPerLine + userIndex];
                         usersNames.push("@"+(user != null ? user.username : "unknown")+"("+user.id+")");
                     }
-                    Embed.addFields({
+                    embed.addFields({
                         name: "Les utilisateurs :",
                         value: usersNames.join(", ")
                     });
                 }
             }
         }
-        for (let Embed of Embeds) {
-            this.message.channel.send(Embed);
-        }
+        this.message.channel.send({embeds});
         return true;
     }
 
@@ -451,7 +450,7 @@ export default class ConfigTicket extends Command {
             userWhoReact = user;
             return reaction.emoji.name == emoteName;
         };
-        message.awaitReactions(filter, { max: 1 })
+        message.awaitReactions({ max: 1 , filter})
             .then(async _ => {
                 if (!userWhoReact) return;
                 const ticketConfig: ITicketConfig = await TicketConfig.findOne({
@@ -471,7 +470,7 @@ export default class ConfigTicket extends Command {
                     const ticketChannel = ticketConfig.ticketChannels.find(ticketChannel => ticketChannel.userId == userWhoReact.id);
                     let channel: TextChannel|undefined = ticketChannel ? <TextChannel>guild.channels.cache.get(ticketChannel.channelId) : undefined;
 
-                    if (!channel || channel.parentID != category.id) {
+                    if (!channel || channel.parentId != category.id) {
                         if (!ticketConfig.blacklist.includes(userWhoReact.id)) {
 
                             const moderatorRole: Role | undefined = ticketConfig.moderatorId ? guild.roles.cache.get(ticketConfig.moderatorId) : undefined;
@@ -483,10 +482,10 @@ export default class ConfigTicket extends Command {
                             }
                             const username = member && member.nickname ? member.nickname : userWhoReact.username;
                             channel = await guild.channels.create('Ticket de ' + username + " " + userWhoReact.id, {
-                                type: "text"
+                                type: "GUILD_TEXT"
                             });
                             await channel.setParent(category);
-                            await channel.overwritePermissions([
+                            await channel.permissionOverwrites.set([
                                 ...[
                                     {
                                         id: guild.roles.everyone,
@@ -514,7 +513,7 @@ export default class ConfigTicket extends Command {
                             ticketConfig.save();
 
                         } else
-                            userWhoReact.send("Vous ne pouvez créer de ticket sur le serveur "+guild.name+" car vous êtes dans la blacklist");
+                            userWhoReact.send("Vous ne pouvez créer de ticket sur le serveur "+guild.name+" car vous êtes dans la blacklist").catch(() => {});
                     }
                 }
                 ConfigTicket.listenMessageTicket(message, emoteName, _idConfigTicket, _idMessageToListen);

@@ -48,7 +48,7 @@ export default class Command {
             )
         }
 
-        this.message.channel.send(Embed);
+        this.message.channel.send({embeds: [Embed]});
     }
 
     displayHelp(fails: null|Array<any> = null, failsExtract: null|Array<any> = null, args = null) {
@@ -142,7 +142,7 @@ export default class Command {
         if (Embeds.length > 0) {
             this.help(Embeds[Embeds.length-1]);
             for (const Embed of Embeds) {
-                this.message.channel.send(Embed);
+                this.message.channel.send({embeds: [Embed]});
             }
         }
     }
@@ -207,7 +207,7 @@ export default class Command {
             commandName = this.commandName;
         }
 
-        if (message.channel.type == "dm" || config.roots.includes(message.author.id) || (message.member && message.member.hasPermission("ADMINISTRATOR"))) return true;
+        if (message.channel.type == "DM" || config.roots.includes(message.author.id) || (message.member && message.member.permissions.has("ADMINISTRATOR"))) return true;
 
         if (message.member && message.guild) {
             const permission: IPermissions = await Permissions.findOne({
@@ -227,7 +227,7 @@ export default class Command {
                 .setTitle('Permission denied')
                 .setDescription("Vous n'avez pas le droit d'executer la commande '" + commandName + "'")
                 .setTimestamp();
-            message.channel.send(Embed);
+            message.channel.send({embeds: [Embed]});
         }
         return false;
     }
@@ -327,12 +327,13 @@ export default class Command {
             validModelCommands[this.commandName] = valid;
         }
         if (!valid) {
-            this.message.channel.send(new MessageEmbed()
-                .setTitle("Modèle de la commande invalide")
-                .setDescription("Le modèle de la commande est invalide")
-                .setColor('#0099ff')
-                .setTimestamp()
-            );
+            this.message.channel.send({embeds: [
+                        new MessageEmbed()
+                            .setTitle("Modèle de la commande invalide")
+                            .setDescription("Le modèle de la commande est invalide")
+                            .setColor('#0099ff')
+                            .setTimestamp()
+                    ]})
             return false;
         }
         return true;
@@ -357,16 +358,16 @@ export default class Command {
                         (
                             (
                                 argType instanceof Array &&
-                                argType.find((type: string) => {
-                                    if (type == "string" || checkTypes[type](args[field])) {
-                                        argType = type;
-                                        return true;
-                                    }
-                                    return false
-                                }) != undefined
+                                    await Promise.all(argType.map(async type => {
+                                        if (type == "string" || await checkTypes[type](args[field])) {
+                                            argType = type;
+                                            return true;
+                                        }
+                                        return false
+                                    })).then(goodTypes => goodTypes.some(type => type))
                             ) || (
                                 typeof(argType) == "string" && (
-                                    argType == "string" || checkTypes[argType](args[field])
+                                    argType == "string" || await checkTypes[argType](args[field])
                                 )
                             )
                         )
@@ -429,16 +430,17 @@ export default class Command {
                     let extractFailed = false;
                     if (args[i] != undefined && (
                             (
-                                argType instanceof Array && argType.find(type => {
-                                    if (type == "string" || checkTypes[type](args[i])) {
+                                argType instanceof Array &&
+                                await Promise.all(argType.map(async type => {
+                                    if (type == "string" || await checkTypes[type](args[i])) {
                                         argType = type;
                                         return true;
                                     }
-                                    return false;
-                                }) != undefined
+                                    return false
+                                })).then(goodTypes => goodTypes.some(type => type))
                             ) || (
                                 typeof(argType) == "string" && (
-                                    argType == "string" || checkTypes[argType](args[i])
+                                    argType == "string" || await checkTypes[argType](args[i])
                                 )
                             ))
                     ) {
@@ -500,13 +502,13 @@ export default class Command {
 
                         if (args[i] != undefined && (
                             (
-                                argType instanceof Array && argType.find(type => {
-                                    if (type == "string" || checkTypes[type](args[i])) {
+                                argType instanceof Array && await Promise.all(argType.map(async type => {
+                                    if (type == "string" || await checkTypes[type](args[i])) {
                                         argType = type;
                                         return true;
                                     }
-                                    return false;
-                                }) != undefined
+                                    return false
+                                })).then(goodTypes => goodTypes.some(type => type))
                             ) || (
                                 typeof(argType) == "string" && (
                                     argType == "string" || checkTypes[argType](args[i])

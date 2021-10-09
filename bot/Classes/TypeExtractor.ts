@@ -1,18 +1,28 @@
-import {CategoryChannel, GuildChannel, GuildEmoji, GuildMember, Message, Role} from "discord.js";
+import {CategoryChannel, GuildChannel, GuildEmoji, GuildMember, Message, Role, ThreadChannel} from "discord.js";
 import client from "../client";
 
 export const extractTypes = {
-    channel: (field, message: Message): GuildChannel|false => {
+    channel: (field, message: Message): GuildChannel|ThreadChannel|false => {
         if (message.guild == null) return false;
         let channelId = field.split("<#")[1];
         channelId = channelId.substring(0,channelId.length-1);
         const channel = message.guild.channels.cache.get(channelId);
         return channel != undefined ? channel : false;
     },
+    channels: (field, message: Message): Array<GuildChannel|ThreadChannel>|false => {
+        const channelsMentions = field.split(",");
+        const channels: Array<GuildChannel|ThreadChannel> = [];
+        for (const channelMention of channelsMentions) {
+            const AChannel = extractTypes.channel(channelMention.trim(), message);
+            if (!AChannel) return false;
+            channels.push(AChannel);
+        }
+        return channels;
+    },
     category: (field, message: Message): CategoryChannel|boolean => {
         if (message.guild == null) return false;
         const channel = message.guild.channels.cache.get(field);
-        return (channel instanceof CategoryChannel && channel.type == "category") ? channel : false;
+        return (channel instanceof CategoryChannel && channel.type == "GUILD_CATEGORY") ? channel : false;
     },
     message: async (field, _: Message, channel: GuildChannel|boolean): Promise<Message|false> => {
         if (channel) {
@@ -36,7 +46,7 @@ export const extractTypes = {
     },
     listenerReactMessage: async (field, message: Message): Promise<{channel: GuildChannel, message: Message}|false> => {
         const channelMention = field.split("/")[0];
-        const channel: GuildChannel|boolean|undefined = extractTypes.channel(channelMention, message);
+        const channel: GuildChannel|ThreadChannel|boolean = extractTypes.channel(channelMention, message);
         let messageToGet: Message|null = null
         if (channel instanceof GuildChannel) {
             const messageId = field.split("/")[1].replaceAll(" ","");
@@ -62,6 +72,16 @@ export const extractTypes = {
         } catch(e) {
             return false;
         }
+    },
+    users: async (field, message: Message): Promise<Array<GuildMember>|false> => {
+        const userMentions = field.split(",");
+        const users: Array<GuildMember> = [];
+        for (const userMention of userMentions) {
+            const AUser = await extractTypes.user(userMention.trim(), message);
+            if (!AUser) return false;
+            users.push(AUser);
+        }
+        return users;
     },
     role: (field, message: Message): Role|false => {
         if (message.guild == null) return false;

@@ -39,7 +39,7 @@ export default class Help extends Command {
                 });
             }
         }
-        this.message.channel.send(Embed);
+        this.message.channel.send({embeds: [Embed]});
         return true;
     }
 

@@ -95,6 +95,11 @@ export default class NotifyOnReact extends Command {
 
         const emoteName = emoteToReact instanceof GuildEmoji ? emoteToReact.name : emoteToReact;
 
+        if (emoteName == null) {
+            this.message.channel.send("L'émoji spécifié semble invalide");
+            return false;
+        }
+
         if (this.listenings[this.message.guild.id] &&
             this.listenings[this.message.guild.id][listen.channel.id] &&
             this.listenings[this.message.guild.id][listen.channel.id][listen.message.id] &&
@@ -134,7 +139,7 @@ export default class NotifyOnReact extends Command {
             userWhoReact = user;
             return reaction.emoji.name == emoteName;
         };
-        messageToListen.awaitReactions(filter, { max: 1 })
+        messageToListen.awaitReactions({ max: 1 , filter})
             .then(_ => {
                 if (!userWhoReact) return;
                 if (!this.listenings[serverId][channelToListen.id][messageToListen.id][emoteName])  { // Detect if the listening on the message has been disabled
@@ -183,6 +188,7 @@ export default class NotifyOnReact extends Command {
     }
 
     static async applyNotifyOnReactAtStarting(bot) { // Detect notifyOnReacts storeds in the database and apply them
+        console.log("Detect stored notifyOnReacts in the database and apply them")
         const channels = {};
         const storedNotifyOnReacts: Array<IStoredNotifyOnReact> = await StoredNotifyOnReact.find({});
         for (let i=0;i<storedNotifyOnReacts.length;i++) {
