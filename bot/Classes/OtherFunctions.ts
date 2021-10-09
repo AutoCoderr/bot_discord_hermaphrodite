@@ -1,6 +1,7 @@
 import { existingCommands } from "./CommandsDescription";
 import History, {IHistory} from "../Models/History";
 import {GuildChannel, GuildMember, Message, MessageEmbed} from "discord.js";
+import Command from "./Command";
 
 export function addMissingZero(number, n = 2) {
     number = number.toString();
@@ -14,21 +15,30 @@ export function getArgsModelHistory(message: Message) {
     return {
         help: { fields: ['-h', '--help'], type: "boolean", required: false, description: "Pour afficher l'aide" },
 
-        command: {
+        commands: {
             fields: ['-c', '--command'],
             type: "string",
             required: false,
-            description: "La commande dont on souhaite voir l'historique",
-            valid: async (value, _) => { // Vérifie si l'utilisateur à le droit d'accéder à cette commande
-                const commands = Object.keys(existingCommands);
-                for (let i=0;i<commands.length;i++) {
-                    const commandName = commands[i];
-                    if (!existingCommands[commandName].display || !(await existingCommands[commandName].commandClass.staticCheckPermissions(message,false))) {
-                        commands.splice(i,1);
-                        i -= 1;
+            description: "La ou les commandes dont on souhaite voir l'historique",
+            valid: async (commandList, _) => { // Vérifie si l'utilisateur à le droit d'accéder à cette commande
+                const alreadySpecifiedCommands = {};
+                const commands: typeof Command[] = Object.values(existingCommands);
+                for (let specifiedCommandName of commandList.split(",")) {
+                    specifiedCommandName = specifiedCommandName.trim();
+                    if (alreadySpecifiedCommands[specifiedCommandName] === undefined) {
+                        let commandExists = false
+                        for (const command of commands) {
+                            if (command.commandName == specifiedCommandName && command.display && await command.staticCheckPermissions(message, false)) {
+                                commandExists = true;
+                                break;
+                            }
+                        }
+                        if (!commandExists) return false;
+                    } else {
+                        return false;
                     }
                 }
-                return commands.includes(value);
+                return true;
             },
             errorMessage: (value, _) => {
                 if (value != undefined) {
@@ -57,35 +67,39 @@ export function getArgsModelHistory(message: Message) {
             required: false,
             description: "Pour afficher les n dernières commandes de la listes"
         },
-        channel: {
+        channels: {
             fields: ['-ch', '--channel'],
-            type: "channel",
+            type: "channels",
             required: false,
-            description: "Pour afficher les commandes executées dans un channel spécifique"
+            description: "Pour afficher les commandes executées dans un ou des channels spécifiques"
         },
-        user: {
+        users: {
             fields: ['-u', '--user'],
-            type: "user",
+            type: "users",
             required: false,
-            description: "Pour afficher les commandes executées par un utilisateur spécifique"
+            description: "Pour afficher les commandes executées par un ou des utilisateurs spécifiques"
         }
 
     };
 }
 
 
-export async function getHistory(message,args: {command: string, sort: string, limit: number, channel: GuildChannel, user: GuildMember}) {
-    let { command, sort, limit, channel, user } = args;
+export async function getHistory(message,args: {commands: string, sort: string, limit: number, channels: GuildChannel[], users: GuildMember[]}) {
+    let { commands, sort, limit, channels, users } = args;
 
     let where:any = {serverId: message.guild.id};
-    if (user != undefined) {
-        where.userId = user.id
+    if (users != undefined) {
+        where.userId = {$in: users.map(user => user.id)};
     }
-    if (channel != undefined) {
-        where.channelId = channel.id;
+    if (channels != undefined) {
+        where.channelId = {$in: channels.map(channel => channel.id)};
     }
-    if (command != null) {
-        where.commandName = command;
+    if (commands != undefined) {
+        where.commandName = {$in: []};
+        for (let commandName of commands.split(",")) {
+            commandName = commandName.trim();
+            where.commandName.$in.push(commandName);
+        }
     } else {
         where.commandName = { $nin: [] };
         for (let aCommand in existingCommands) {

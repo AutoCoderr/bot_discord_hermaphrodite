@@ -18,19 +18,29 @@ export default class Perm extends Command {
                 valid: (value, _) => ['add','set','show'].includes(value)
             },
             {
-                field: "commandName",
+                field: "commands",
                 type: "string",
                 required: args => args.help == undefined,
-                description: "La commande sur laquelle ajouter ou définir la permission",
-                valid: async (value, _) => { // Vérifie si l'utilisateur à le droit d'accéder à cette commande
-                    const commands = Object.keys(existingCommands);
-                    for (let i=0;i<commands.length;i++) {
-                        const commandName = commands[i];
-                        if (existingCommands[commandName].commandName == value && existingCommands[commandName].display && await existingCommands[commandName].staticCheckPermissions(this.message,false)) {
-                            return true;
+                description: "La ou les commandes sur laquelle ajouter ou définir la permission",
+                valid: async (commandList, _) => { // Vérifie si l'utilisateur à le droit d'accéder à cette commande
+                    const alreadySpecifiedCommands = {};
+                    const commands: typeof Command[] = Object.values(existingCommands);
+                    for (let specifiedCommandName of commandList.split(",")) {
+                        specifiedCommandName = specifiedCommandName.trim();
+                        if (alreadySpecifiedCommands[specifiedCommandName] === undefined) {
+                            let commandExists = false
+                            for (const command of commands) {
+                                if (command.commandName == specifiedCommandName && command.display && await command.staticCheckPermissions(this.message, false)) {
+                                    commandExists = true;
+                                    break;
+                                }
+                            }
+                            if (!commandExists) return false;
+                        } else {
+                            return false;
                         }
                     }
-                    return false
+                    return true;
                 },
 
                 errorMessage: (value, _) => {
@@ -63,8 +73,10 @@ export default class Perm extends Command {
         super(message, Perm.commandName);
     }
 
-    async action(args: {help: boolean, action: string, commandName: string, roles: Array<Role>}, bot) { //%perm set commandName @role
-        const {help, action, commandName, roles} = args;
+    async action(args: {help: boolean, action: string, commands: string, roles: Array<Role>}, bot) { //%perm set commandName @role
+        const {help, action, commands, roles} = args;
+
+        const commandsList = commands.split(",").map(commandName => commandName.trim());
 
         if (help) {
             this.displayHelp();
@@ -80,72 +92,79 @@ export default class Perm extends Command {
         }
 
         if (action == "show") { // Show the roles which are allowed to execute the specified command
-            const permissions = await Permissions.find({command: commandName, serverId: this.message.guild.id});
 
-            let Embed = new MessageEmbed()
-                .setColor('#0099ff')
-                .setTitle("Les permissions pour '"+commandName+"' :")
-                .setDescription("Liste des permissions pour '"+commandName+"'")
-                .setTimestamp();
+            const embeds: MessageEmbed[] = [];
 
-            if (permissions.length == 0 || permissions[0].roles.length == 0) {
-                Embed.addFields({
-                    name: "Aucune permission",
-                    value: "Il n'y a aucune permission trouvée pour la commande "+commandName
-                })
-            } else {
-                let roles: Array<string> = [];
-                for (let roleId of permissions[0].roles) {
-                    let role = this.message.guild.roles.cache.get(roleId);
-                    let roleName: string;
-                    if (role == undefined) {
-                        roleName = "unknown";
-                    } else {
-                        roleName = role.name;
+            for (const commandName of commandsList) {
+                const permission: IPermissions|null = await Permissions.findOne({command: commandName, serverId: this.message.guild.id});
+                let embed = new MessageEmbed()
+                    .setColor('#0099ff')
+                    .setTitle("Les permissions pour '"+commandName+"' :")
+                    .setDescription("Liste des permissions pour '"+commandName+"'")
+                    .setTimestamp();
+                if (permission == null || permission.roles.length == 0) {
+                    embed.addFields({
+                        name: "Aucune permission",
+                        value: "Il n'y a aucune permission trouvée pour la commande " + commandName
+                    });
+                } else {
+                    let roles: Array<string> = [];
+                    for (let roleId of permission.roles) { //@ts-ignore
+                        let role = this.message.guild.roles.cache.get(roleId);
+                        let roleName: string;
+                        if (role == undefined) {
+                            roleName = "unknown";
+                        } else {
+                            roleName = role.name;
+                        }
+                        roles.push('@'+roleName);
                     }
-                    roles.push('@'+roleName);
+                    embed.addFields({
+                        name: "Les roles :",
+                        value: roles.join(", ")
+                    });
                 }
-                Embed.addFields({
-                    name: "Les roles :",
-                    value: roles.join(", ")
-                });
+                embeds.push(embed);
             }
-            this.message.channel.send(Embed);
+
+            this.message.channel.send({embeds});
             return true;
         }
 
 
         const serverId = this.message.guild.id;
 
-        const permission = await Permissions.findOne({serverId: serverId, command: commandName});
-
         const rolesId = roles ? roles.map(role => role.id) : [];
 
-        if (permission == null) {
-            const permission: IPermissions = {
-                command: commandName,
-                roles: rolesId,
-                serverId: serverId
-            }
-            Permissions.create(permission);
-        } else {
-            if (action == "add") {
-                for (let roleId of rolesId) {
-                    if (permission.roles.includes(roleId)) {
-                        this.sendErrors({
-                            name: "Role already added",
-                            value: "That role is already attributed for that command"
-                        });
-                        return false;
-                    }
+        for (const commandName of commandsList) {
+            const permission = await Permissions.findOne({serverId: serverId, command: commandName});
+
+            if (permission == null) {
+                const permission: IPermissions = {
+                    command: commandName,
+                    roles: rolesId,
+                    serverId: serverId
                 }
-                permission.roles = [...permission.roles, ...rolesId]
-            } else if (action == "set") {
-                permission.roles = rolesId;
+                Permissions.create(permission);
+            } else {
+                if (action == "add") {
+                    for (let roleId of rolesId) {
+                        if (permission.roles.includes(roleId)) {
+                            this.sendErrors({
+                                name: "Role already added",
+                                value: "That role is already attributed for that command"
+                            });
+                            return false;
+                        }
+                    }
+                    permission.roles = [...permission.roles, ...rolesId]
+                } else if (action == "set") {
+                    permission.roles = rolesId;
+                }
+                await permission.save();
             }
-            await permission.save();
+            this.message.channel.send("Permission added or setted successfully for the '"+commandName+"' command!");
         }
-        this.message.channel.send("Permission added or setted successfully!");
         return true;
     }
 

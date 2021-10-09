@@ -16,7 +16,7 @@ export default class HistoryExec extends Command {
     }
 
 
-    async action(args: {help: boolean, command: string, sort: string, limit: number, channel: GuildChannel, user: GuildMember}, bot) {
+    async action(args: {help: boolean, commands: string, sort: string, limit: number, channels: GuildChannel[], users: GuildMember[]}, bot) {
 
         if (args.help) {
             this.displayHelp();

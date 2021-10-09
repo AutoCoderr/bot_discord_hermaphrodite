@@ -4,9 +4,9 @@
   "description": "Ceci est un bot cool",
   "main": "bot.js",
   "scripts": {
-    "start": "npx tsc && node bot.js",
-    "watch": "npx tsc -w",
-    "build": "npx tsc"
+    "start": "tsc && node bot.js",
+    "watch": "tsc -w",
+    "build": "tsc"
   },
   "repository": {
     "type": "git",
@@ -20,10 +20,10 @@
   "homepage": "https://github.com/AutoCoderr/bot_discord_hermaphrodite#readme",
   "devDependencies": {
     "@types/node": "^15.12.1",
-    "typescript": "^4.0.5"
+    "typescript": "^4.4.3"
   },
   "dependencies": {
-    "discord.js": "^12.4.1",
-    "mongoose": "^5.10.13"
+    "discord.js": "^13.2.0",
+    "mongoose": "^6.0.10"
   }
 }

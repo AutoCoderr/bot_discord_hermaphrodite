@@ -19,7 +19,7 @@ export const connect = () => {
 
     const url = 'mongodb://' + config.username_mongo + ':' + config.password_mongo + '@' + config.host_mongo + ':27017/' + config.database_mongo;
 
-    mongoose.connect(url, {useNewUrlParser: true});
+    mongoose.connect(url);
 
     database = mongoose;
 

@@ -16,7 +16,7 @@ export default class HistoryCmd extends Command {
         super(message, HistoryCmd.commandName);
     }
 
-    async action(args: {help: boolean, command: string, sort: string, limit: number, channel: GuildChannel, user: GuildMember}, bot) {
+    async action(args: {help: boolean, commands: string, sort: string, limit: number, channels: GuildChannel[], users: GuildMember[]}, bot) {
 
         if (args.help) {
             this.displayHelp();
@@ -33,12 +33,12 @@ export default class HistoryCmd extends Command {
 
         const histories: Array<IHistory> = await getHistory(this.message,args);
 
-        let Embeds: Array<any> = [];
+        let embeds: Array<MessageEmbed> = [];
 
         const historByEmbed = 25;
 
         if (histories.length > 0) {
-            Embeds = splitFieldsEmbed(historByEmbed,histories.map(history => { //@ts-ignore
+            embeds = splitFieldsEmbed(historByEmbed,histories.map(history => { //@ts-ignore
                 const user = this.message.guild.members.cache.get(history.userId); //@ts-ignore
                 const channel = this.message.guild.channels.cache.get(history.channelId);
 
@@ -55,7 +55,7 @@ export default class HistoryCmd extends Command {
                     .setDescription("Liste des commandes qui ont été tapées :");
             });
         } else {
-            Embeds.push(new MessageEmbed()
+            embeds.push(new MessageEmbed()
                 .setColor('#0099ff')
                 .setTitle("L'historique des commandes :")
                 .setDescription("Liste des commandes qui ont été tapées :")
@@ -65,9 +65,7 @@ export default class HistoryCmd extends Command {
                     value: "Aucun élément n'a été trouvé dans l'historique"
                 }));
         }
-        for (let Embed of Embeds) {
-            this.message.channel.send(Embed);
-        }
+        this.message.channel.send({embeds});
         return true;
     }
 
