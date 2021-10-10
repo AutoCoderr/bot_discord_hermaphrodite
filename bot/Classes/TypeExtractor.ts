@@ -1,5 +1,7 @@
 import {CategoryChannel, GuildChannel, GuildEmoji, GuildMember, Message, Role, ThreadChannel} from "discord.js";
 import client from "../client";
+import {existingCommands} from "./CommandsDescription";
+import Command from "./Command";
 
 export const extractTypes = {
     channel: (field, message: Message): GuildChannel|ThreadChannel|false => {
@@ -100,5 +102,26 @@ export const extractTypes = {
             roles.push(role);
         }
         return roles;
+    },
+    command: async (field, message: Message): Promise<typeof Command|false>=> {
+        const commandList: typeof Command[] = Object.values(existingCommands);
+        let commandFound: typeof Command|false = false;
+        for (const command of commandList) {
+            if (command.commandName === field && command.display && await command.staticCheckPermissions(message,false)) {
+                commandFound = command;
+                break;
+            }
+        }
+        return commandFound;
+    },
+    commands: async (field, message: Message): Promise<typeof Command[]|false> => {
+        let commands: typeof Command[] = [];
+        for (let commandName of field.split(",")) {
+            commandName = commandName.trim();
+            const command = await extractTypes.command(commandName,message);
+            if (!command) return false;
+            commands.push(command);
+        }
+        return commands;
     }
 };

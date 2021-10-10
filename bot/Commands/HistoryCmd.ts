@@ -16,7 +16,7 @@ export default class HistoryCmd extends Command {
         super(message, HistoryCmd.commandName);
     }
 
-    async action(args: {help: boolean, commands: string, sort: string, limit: number, channels: GuildChannel[], users: GuildMember[]}, bot) {
+    async action(args: {help: boolean, commands: typeof Command[], sort: string, limit: number, channels: GuildChannel[], users: GuildMember[]}, bot) {
 
         if (args.help) {
             this.displayHelp();

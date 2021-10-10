@@ -53,7 +53,7 @@ export default class Command {
 
     displayHelp(fails: null|Array<any> = null, failsExtract: null|Array<any> = null, args = null) {
         const commandName = this.message.content.split(" ")[0];
-        let Embeds: Array<MessageEmbed> = [
+        let embeds: Array<MessageEmbed> = [
             new MessageEmbed()
                 .setTitle("Aide pour la commande "+commandName)
                 .setColor('#0099ff')
@@ -74,7 +74,7 @@ export default class Command {
                         }
                     }
                 }
-                Embeds = [...Embeds, ...splitFieldsEmbed(25, subFields, (Embed: MessageEmbed, partNb) => {
+                embeds = [...embeds, ...splitFieldsEmbed(25, subFields, (Embed: MessageEmbed, partNb) => {
                     if (partNb == 1) {
                         Embed.setTitle("Arguments manquants ou invalides :");
                     }
@@ -97,7 +97,7 @@ export default class Command {
                     }
                 }
 
-                Embeds = [...Embeds, ...splitFieldsEmbed(25, subFields, (Embed: MessageEmbed, partNb) => {
+                embeds = [...embeds, ...splitFieldsEmbed(25, subFields, (Embed: MessageEmbed, partNb) => {
                     if (partNb == 1) {
                         Embed.setTitle("Données introuvables");
                     }
@@ -131,7 +131,7 @@ export default class Command {
                 }
             }
 
-            Embeds = [...Embeds, ...splitFieldsEmbed(25, subFields, (Embed: MessageEmbed, partNb) => {
+            embeds = [...embeds, ...splitFieldsEmbed(25, subFields, (Embed: MessageEmbed, partNb) => {
                 if (partNb == 1) {
                     Embed.setTitle("Champs");
                 }
@@ -139,11 +139,9 @@ export default class Command {
 
         }
 
-        if (Embeds.length > 0) {
-            this.help(Embeds[Embeds.length-1]);
-            for (const Embed of Embeds) {
-                this.message.channel.send({embeds: [Embed]});
-            }
+        if (embeds.length > 0) {
+            this.help(embeds[embeds.length-1]);
+            this.message.channel.send({embeds});
         }
     }
 
@@ -238,7 +236,7 @@ export default class Command {
         } else if (isNumber(value)) {
             return parseInt(value);
         } else {
-            return  value;
+            return value.trim();
         }
     }
 
@@ -380,7 +378,7 @@ export default class Command {
                                     out[attr] = data;
                                 else {
                                     incorrectField = true;
-                                    triedValue = data;
+                                    triedValue = args[field];
                                 }
                             } else {
                                 extractFailed = true;
@@ -523,7 +521,7 @@ export default class Command {
                                         out[attr] = data;
                                         alreadyDefineds[i] = true;
                                     } else {
-                                        triedValue = data;
+                                        triedValue = args[i];
                                     }
                                 } else if (required) {
                                     extractFailed = true;

@@ -17,23 +17,14 @@ export function getArgsModelHistory(message: Message) {
 
         commands: {
             fields: ['-c', '--command'],
-            type: "string",
+            type: "commands",
             required: false,
             description: "La ou les commandes dont on souhaite voir l'historique",
-            valid: async (commandList, _) => { // Vérifie si l'utilisateur à le droit d'accéder à cette commande
+            valid: async (commandList: typeof Command[], _) => { // Vérifie si une commande n'a pas été tapée plusieurs fois
                 const alreadySpecifiedCommands = {};
-                const commands: typeof Command[] = Object.values(existingCommands);
-                for (let specifiedCommandName of commandList.split(",")) {
-                    specifiedCommandName = specifiedCommandName.trim();
-                    if (alreadySpecifiedCommands[specifiedCommandName] === undefined) {
-                        let commandExists = false
-                        for (const command of commands) {
-                            if (command.commandName == specifiedCommandName && command.display && await command.staticCheckPermissions(message, false)) {
-                                commandExists = true;
-                                break;
-                            }
-                        }
-                        if (!commandExists) return false;
+                for (const command of commandList) {
+                    if (alreadySpecifiedCommands[<string>command.commandName] === undefined) {
+                        alreadySpecifiedCommands[<string>command.commandName] = true;
                     } else {
                         return false;
                     }
@@ -43,8 +34,8 @@ export function getArgsModelHistory(message: Message) {
             errorMessage: (value, _) => {
                 if (value != undefined) {
                     return {
-                        name: "La commande n'existe pas",
-                        value: "La commande '" + value + "' n'existe pas, ou vous est inaccessible"
+                        name: "Liste de commandes invalide",
+                        value: value+" : Une de ces commandes n'existe pas, vous est inaccesible, ou a été spécifiée plusieurs fois"
                     };
                 }
                 return {
@@ -84,7 +75,7 @@ export function getArgsModelHistory(message: Message) {
 }
 
 
-export async function getHistory(message,args: {commands: string, sort: string, limit: number, channels: GuildChannel[], users: GuildMember[]}) {
+export async function getHistory(message,args: {commands: typeof Command[], sort: string, limit: number, channels: GuildChannel[], users: GuildMember[]}) {
     let { commands, sort, limit, channels, users } = args;
 
     let where:any = {serverId: message.guild.id};
@@ -96,9 +87,8 @@ export async function getHistory(message,args: {commands: string, sort: string, 
     }
     if (commands != undefined) {
         where.commandName = {$in: []};
-        for (let commandName of commands.split(",")) {
-            commandName = commandName.trim();
-            where.commandName.$in.push(commandName);
+        for (const command of commands) {
+            where.commandName.$in.push(command.commandName);
         }
     } else {
         where.commandName = { $nin: [] };
