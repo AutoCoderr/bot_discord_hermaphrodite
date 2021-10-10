@@ -1,6 +1,6 @@
 import { existingCommands } from "./CommandsDescription";
-import History, {IHistory} from "../Models/History";
-import {GuildChannel, GuildMember, Message, MessageEmbed} from "discord.js";
+import History from "../Models/History";
+import {EmbedFieldData, GuildChannel, GuildMember, Message, MessageEmbed} from "discord.js";
 import Command from "./Command";
 
 export function addMissingZero(number, n = 2) {
@@ -180,7 +180,7 @@ export async function forEachNotifyOnReact(callback, channel: GuildChannel, mess
 }
 
 export function splitFieldsEmbed(nbByPart: number,
-                                     fields: Array<{name: string, value: string}>,
+                                     fields: EmbedFieldData[],
                                      atEachPart: Function): Array<MessageEmbed> {
     let Embed: MessageEmbed;
     let Embeds: Array<MessageEmbed> = [];

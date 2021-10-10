@@ -17,5 +17,5 @@ const VocalSubscribeSchema: Schema = new Schema({
     serverId: { type: String, required: true }
 });
 
-
+// @ts-ignore
 export default db.model<IVocalSubscribe>('VocalSubscribe', VocalSubscribeSchema);

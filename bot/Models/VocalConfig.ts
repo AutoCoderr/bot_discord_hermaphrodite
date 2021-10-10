@@ -6,7 +6,7 @@ const db = connect();
 export interface IVocalConfig {
     enabled: boolean;
     listenerBlacklist: string[];
-    listenedBlacklist: string[];
+    listenableBlacklist: string[];
     channelBlacklist: string[];
     serverId: string;
 }
@@ -14,10 +14,10 @@ export interface IVocalConfig {
 const VocalConfigSchema: Schema = new Schema({
     enabled: { type: Boolean, required: true },
     listenerBlacklist: { type: Array, required: true },
-    listenedBlacklist: { type: Array, required: true },
+    listenableBlacklist: { type: Array, required: true },
     channelBlacklist: { type: Array, required: true },
     serverId: { type: String, required: true }
 });
 
-
+// @ts-ignore
 export default db.model<IVocalConfig>('VocalConfig', VocalConfigSchema);

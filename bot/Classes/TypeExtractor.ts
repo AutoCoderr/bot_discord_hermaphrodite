@@ -1,17 +1,26 @@
-import {CategoryChannel, GuildChannel, GuildEmoji, GuildMember, Message, Role, ThreadChannel} from "discord.js";
+import {
+    CategoryChannel,
+    GuildChannel,
+    GuildEmoji,
+    GuildMember,
+    Message,
+    Role,
+    ThreadChannel,
+    VoiceChannel
+} from "discord.js";
 import client from "../client";
 import {existingCommands} from "./CommandsDescription";
 import Command from "./Command";
 
 export const extractTypes = {
-    channel: (field, message: Message): GuildChannel|ThreadChannel|false => {
+    channel: (field, message: Message): GuildChannel|ThreadChannel|VoiceChannel|false => {
         if (message.guild == null) return false;
         let channelId = field.split("<#")[1];
         channelId = channelId.substring(0,channelId.length-1);
         const channel = message.guild.channels.cache.get(channelId);
         return channel != undefined ? channel : false;
     },
-    channels: (field, message: Message): Array<GuildChannel|ThreadChannel>|false => {
+    channels: (field, message: Message): Array<GuildChannel|ThreadChannel|VoiceChannel>|false => {
         const channelsMentions = field.split(",");
         const channels: Array<GuildChannel|ThreadChannel> = [];
         for (const channelMention of channelsMentions) {

@@ -15,6 +15,5 @@ const WelcomeMessageSchema: Schema = new Schema({
     serverId: { type: String, required: true}
 });
 
-// Export the model and return your IUser interface
 // @ts-ignore
 export default db.model<IWelcomeMessage>('WelcomeMessage', WelcomeMessageSchema);

@@ -15,4 +15,5 @@ const PermissionSchema: Schema = new Schema({
     serverId: { type: String, required: true}
 });
 
+// @ts-ignore
 export default db.model<IPermissions>('Permissions', PermissionSchema);

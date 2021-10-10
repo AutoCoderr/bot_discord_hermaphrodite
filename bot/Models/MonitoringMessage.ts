@@ -17,4 +17,5 @@ const MonitoringMessageSchema: Schema = new Schema({
     messageId: { type: String, required: true}
 });
 
+// @ts-ignore
 export default db.model<IEmote>('MonitoringMessage', MonitoringMessageSchema);
