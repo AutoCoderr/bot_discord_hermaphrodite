@@ -348,7 +348,7 @@ export default class Command {
                 let found = false;
                 let incorrectField = false;
                 let extractFailed = false;
-                let triedValue = null;
+                let triedValue;
 
                 for (let field of model[attr].fields) {
                     let argType: Array<string>|string = model[attr].type ?? model[attr].types;
@@ -488,11 +488,19 @@ export default class Command {
                 for (let attr in argsByType) {
                     let found = false;
                     let extractFailed = false;
-                    let triedValue = null;
+                    let validFailed = false;
+                    let triedValue;
                     let argType: Array<string>|string = argsByType[attr].type ?? argsByType[attr].types;
+
                     const required = argsByType[attr].required == undefined ||
                         (typeof(argsByType[attr].required) == "boolean" && argsByType[attr].required) ||
                         (typeof(argsByType[attr].required) == "function" && await argsByType[attr].required(out));
+
+                    const displayExtractError = (typeof(argsByType[attr].displayExtractError) == "boolean" && argsByType[attr].displayExtractError) ||
+                        (typeof(argsByType[attr].displayExtractError) == "function" && await argsByType[attr].displayExtractError(out));
+
+                    const displayValidError = (typeof(argsByType[attr].displayValidError) == "boolean" && argsByType[attr].displayValidError) ||
+                        (typeof(argsByType[attr].displayValidError) == "function" && await argsByType[attr].displayValidError(out));
 
 
                     for (let i=0;args[i];i++) {
@@ -521,9 +529,10 @@ export default class Command {
                                         out[attr] = data;
                                         alreadyDefineds[i] = true;
                                     } else {
+                                        validFailed = true;
                                         triedValue = args[i];
                                     }
-                                } else if (required) {
+                                } else if (required || displayExtractError) {
                                     extractFailed = true;
                                     triedValue = args[i];
                                 }
@@ -550,7 +559,7 @@ export default class Command {
                     if (!found) {
                         if (extractFailed) {
                             failsExtract.push({...argsByType[attr], value: triedValue, field: attr});
-                        } else if (required) {
+                        } else if (required || (validFailed && displayValidError)) {
                             fails.push({...argsByType[attr], value: triedValue, field: attr});
                         }
                     }

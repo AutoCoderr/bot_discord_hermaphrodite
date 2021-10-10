@@ -14,7 +14,8 @@ export const checkTypes = {
     roles: field => checkTypes.string(field) && (new RegExp("^"+regex.role+"( )*(\,( )*"+regex.role+"( )*)*$").test(field) || field.trim() == ""),
     listenerReactMessage: field => checkTypes.string(field) && new RegExp("^\<#[0-9]{18}\>/[0-9]{18}$").test(field),
     command: (field) => checkTypes.string(field) && new RegExp("^"+regex.command+"$").test(field),
-    commands: (field) => checkTypes.string(field) && new RegExp("^"+regex.command+"( )*(\,( )*"+regex.command+"( )*)*$")
+    commands: (field) => checkTypes.string(field) && new RegExp("^"+regex.command+"( )*(\,( )*"+regex.command+"( )*)*$"),
+    duration: (field) => checkTypes.string(field) && new RegExp("^[0-9]+[smhj]$")
 };
 
 const regex: any = {};

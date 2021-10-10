@@ -132,5 +132,20 @@ export const extractTypes = {
             commands.push(command);
         }
         return commands;
+    },
+    duration: (field,_) => {
+        const unit = field[field.length-1];
+        const value = parseInt(field.substring(0,field.length-1));
+
+        switch (unit) {
+            case 's':
+                return value*1000;
+            case 'm':
+                return value*1000*60;
+            case 'h':
+                return value*1000*60*60;
+            case 'j':
+                return value*1000*60*60*24;
+        }
     }
 };
