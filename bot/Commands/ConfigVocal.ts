@@ -84,7 +84,7 @@ export default class ConfigVocal extends Command {
                     listenerBlacklist: [],
                     listenableBlacklist: [],
                     channelBlacklist: [],
-                    limitByUser: {},
+                    userMutes: {},
                     serverId: this.message.guild.id
                 })
             } else {

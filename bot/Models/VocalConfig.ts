@@ -8,8 +8,7 @@ export interface IVocalConfig {
     listenerBlacklist: string[];
     listenableBlacklist: string[];
     channelBlacklist: string[];
-    limitByUser: { [id: string]: number };
-    muteByUser: { [id: string]: number }; // Last mute command datetime by User, to know who user we have to mute
+    userMutes: { [id: string]: { limit: number, lastMute: Date, mutedFor: number } };
     serverId: string;
 }
 
@@ -18,7 +17,7 @@ const VocalConfigSchema: Schema = new Schema({
     listenerBlacklist: { type: Array, required: true },
     listenableBlacklist: { type: Array, required: true },
     channelBlacklist: { type: Array, required: true },
-    limitByUser: { type: Object, required: true },
+    userMutes: { type: Object, required: false },
     serverId: { type: String, required: true }
 });
 

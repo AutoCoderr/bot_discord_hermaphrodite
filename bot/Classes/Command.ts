@@ -532,14 +532,15 @@ export default class Command {
                                         validFailed = true;
                                         triedValue = args[i];
                                     }
-                                } else if (required || displayExtractError) {
+                                } else {
                                     extractFailed = true;
                                     triedValue = args[i];
                                 }
                             } else if (typeof(argsByType[attr].valid) != "function" || await argsByType[attr].valid(args[i],out)) {
                                 out[attr] = argType == "string" ? args[i].toString() : args[i];
                                 alreadyDefineds[i] = true;
-                            } else if (required){
+                            } else {
+                                validFailed = true;
                                 triedValue = args[i];
                             }
                             if (out[attr] != undefined) {
@@ -557,7 +558,7 @@ export default class Command {
                         }
                     }
                     if (!found) {
-                        if (extractFailed) {
+                        if (extractFailed && (required || displayExtractError)) {
                             failsExtract.push({...argsByType[attr], value: triedValue, field: attr});
                         } else if (required || (validFailed && displayValidError)) {
                             fails.push({...argsByType[attr], value: triedValue, field: attr});

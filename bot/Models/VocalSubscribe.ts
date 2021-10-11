@@ -8,15 +8,13 @@ export interface IVocalSubscribe {
     listenerId: string;
     listenedId: string;
     serverId: string;
-    lastEventDate: number;
 }
 
 const VocalSubscribeSchema: Schema = new Schema({
     channelId: { type: String, required: true },
     listenerId: { type: String, required: true },
     listenedId: { type: String, required: true },
-    serverId: { type: String, required: true },
-    lastEventDate: { type: Number, required: true }
+    serverId: { type: String, required: true }
 });
 
 // @ts-ignore
