@@ -4,7 +4,7 @@ import {
     GuildChannel,
     GuildMember,
     Message,
-    MessageEmbed,
+    MessageEmbed, Role,
     ThreadChannel,
     VoiceChannel
 } from "discord.js";
@@ -39,27 +39,49 @@ export default class ConfigVocal extends Command {
             blacklistType: {
                 required: (args) => args.help == undefined && args.action === "blacklist",
                 type: "string",
-                description: "Le type de blacklist: listener, listened, channel",
-                valid: field => ['listener','listenable','channel'].includes(field)
+                description: "Le type de blacklist: listener, channel",
+                valid: field => ['listener','channel'].includes(field)
             },
             users: {
-                required: (args) => args.help == undefined && args.action === "blacklist" &&
-                    ['add','remove'].includes(args.subAction) && ['listener','listened'].includes(args.blacklistType),
+                required: false,
+                displayExtractError: true,
                 type: "users",
-                description: "Le ou les utilisateurs à ajouter ou supprimer"
+                description: "Le ou les utilisateurs à ajouter ou supprimer",
+                errorMessage: (_) => ({
+                    name: "Utilisateurs pas ou mal renseignés",
+                    value: "Les utilisateurs n'ont pas réussi à être récupéré"
+                })
+            },
+            roles: {
+                displayExtractError: true,
+                required: (args) => args.help == undefined && args.action === "blacklist" &&
+                    ['add','remove'].includes(args.subAction) && args.blacklistType == 'listener' && args.users === undefined,
+                type: 'roles',
+                description: "Les roles à ajouter ou retirer de la blacklist",
+                errorMessage: (value, args) => (value === undefined && args.users === undefined) ? {
+                    name: "Au moins l'un des deux",
+                    value: "Vous devez mentioner au moins un utilisateur ou un role à retirer ou à ajouter à la blacklist listener"
+                } : {
+                    name: "Rôle pas ou mal renseigné",
+                    value: "Les rôles n'ont pas réussi à être récupéré"
+                }
             },
             channels: {
                 required: (args) => args.help == undefined && args.action === "blacklist" &&
                     ['add','remove'].includes(args.subAction) && args.blacklistType == "channel",
                 type: 'channels',
                 description: "Le ou les channels vocaux à supprimer ou ajouter",
-                value: (channels: GuildChannel[]) => !channels.some(channel => channel.type != "GUILD_VOICE")
+                valid: (channels: GuildChannel[]) => !channels.some(channel => channel.type != "GUILD_VOICE"),
+                errorMessage: (_) => ({
+                    name: "Channels non ou mal renseigné",
+                    value: "Ils ne peuvent être que des channels vocaux"
+                })
             }
         }
     }
 
-    async action(args: {help: boolean, action: string, subAction: string, blacklistType: string, users: GuildMember[], channels: VoiceChannel[]}) {
-        const {help, action, subAction, blacklistType, users, channels} = args;
+    async action(args: {help: boolean, action: string, subAction: string, blacklistType: string, users: GuildMember[], roles: Role[], channels: VoiceChannel[]}) {
+        const {help, action, subAction, blacklistType, users, roles, channels} = args;
 
         if (help) {
             this.displayHelp();
@@ -81,9 +103,9 @@ export default class ConfigVocal extends Command {
             if (vocalConfig == null) {
                 VocalConfig.create({
                     enabled: action == "enable",
-                    listenerBlacklist: [],
-                    listenableBlacklist: [],
+                    listenerBlacklist: { users: [], roles: [] },
                     channelBlacklist: [],
+                    listenableDenies: {},
                     userMutes: {},
                     serverId: this.message.guild.id
                 })
@@ -103,50 +125,43 @@ export default class ConfigVocal extends Command {
             }
             switch (subAction) {
                 case 'add':
-                    let blacklistedIds = {};
-                    for (const id of vocalConfig[blacklistType+"Blacklist"])
-                        blacklistedIds[id] = true;
-
-                    for (const id of blacklistType == "channel" ? channels.map(channel => channel.id) : users.map(user => user.id)) {
-                        if (!blacklistedIds[id]) {
-                            blacklistedIds[id] = true;
-                            vocalConfig[blacklistType + "Blacklist"].push(id)
-                        }
+                    if (blacklistType == "channel") {
+                        vocalConfig.channelBlacklist = this.addIdsToList(vocalConfig.channelBlacklist, channels.map(channel => channel.id));
+                    } else {
+                        if (users)
+                            vocalConfig.listenerBlacklist.users = this.addIdsToList(vocalConfig.listenerBlacklist.users, users.map(user => user.id));
+                        if (roles)
+                            vocalConfig.listenerBlacklist.roles = this.addIdsToList(vocalConfig.listenerBlacklist.roles, roles.map(role => role.id));
                     }
                     this.message.channel.send("Les "+(blacklistType == "channel" ? "channels" : "utilisateurs")+" ont été ajouté à la blacklist '"+blacklistType+"'");
                     break;
                 case 'remove':
-                    vocalConfig[blacklistType+"Blacklist"] = vocalConfig[blacklistType+"Blacklist"]
-                        .filter(id =>
-                            (blacklistType == "channel" && !channels.some(channel => channel.id == id)) ||
-                            (blacklistType != "channel" && !users.some(user => user.id == id))
-                        );
+                    if (blacklistType == "channel") {
+                        vocalConfig.channelBlacklist = this.removeIdsToList(vocalConfig.channelBlacklist, channels.map(channel => channel.id))
+                    } else {
+                        if (users)
+                            vocalConfig.listenerBlacklist.users = this.removeIdsToList(vocalConfig.listenerBlacklist.users, users.map(user => user.id));
+                        if (roles)
+                            vocalConfig.listenerBlacklist.roles = this.removeIdsToList(vocalConfig.listenerBlacklist.roles, roles.map(role => role.id));
+                    }
                     this.message.channel.send("Les "+(blacklistType == "channel" ? "channels" : "utilisateurs")+" ont été retirés de la blacklist '"+blacklistType+"'");
                     break;
                 case 'clear':
-                    vocalConfig[blacklistType+"Blacklist"] = [];
+                    if (blacklistType == "channel") {
+                        vocalConfig.channelBlacklist = [];
+                    } else {
+                        vocalConfig.listenerBlacklist.users = [];
+                        vocalConfig.listenerBlacklist.roles = [];
+                    }
                     this.message.channel.send("La blacklist '"+blacklistType+"' a été vidée");
                     break;
                 case 'show':
-                    const fields: EmbedFieldData[] = vocalConfig[blacklistType+"Blacklist"].length > 0 ?
-                        await Promise.all(vocalConfig[blacklistType+"Blacklist"].map(async (id: string) => {
-                            let member: GuildMember|undefined;
-                            let channel: GuildChannel|VoiceChannel|ThreadChannel|undefined;
-                            if (blacklistType != "channel") {
-                                member = await this.message.guild?.members.fetch(id)
-                            } else {
-                                channel = this.message.guild?.channels.cache.get(id);
-                            }
-                            return {
-                                name: blacklistType == "channel" ?
-                                    ( channel ? '#!'+channel.name : "introuvale" ) :
-                                    ( member ? '@'+(member.nickname??member.user.username) : "introuvable" ),
-                                value: "id : "+id
-                            };
-                        })) : [{
-                            name: "Aucun "+(blacklistType == "channel" ? "channel" : "utilisateur")+" dans cette liste",
-                            value: "Aucun "+(blacklistType == "channel" ? "channel" : "utilisateur")+" dans cette liste",
-                        }];
+                    let fields: EmbedFieldData[];
+                    if (blacklistType == "channel") {
+                        fields = await this.createEmbedFieldList([vocalConfig.channelBlacklist],['channel']);
+                    } else {
+                        fields = await this.createEmbedFieldList([vocalConfig.listenerBlacklist.users,vocalConfig.listenerBlacklist.roles],['user','role']);
+                    }
 
                     const embeds = splitFieldsEmbed(25,fields,(embed: MessageEmbed,nbPart) => {
                         if (nbPart == 1) {
@@ -163,6 +178,60 @@ export default class ConfigVocal extends Command {
         return true;
     }
 
+    async createEmbedFieldList(lists, types): Promise<EmbedFieldData[]> {
+        let outList: EmbedFieldData[] = [];
+        if (lists.length != types.length) return outList;
+        for (let i=0;i<lists.length;i++) {
+            const embeds: EmbedFieldData[] = await Promise.all(lists[i].map(async (id: string) => {
+                let member: GuildMember|undefined;
+                let role: Role|undefined;
+                let channel: GuildChannel|VoiceChannel|ThreadChannel|undefined;
+
+                let name: string = "introuvable";
+                switch (types[i]) {
+                    case 'channel':
+                        channel = this.message.guild?.channels.cache.get(id);
+                        if (channel)
+                            name = '#!'+channel.name;
+                        break;
+                    case 'user':
+                        member = await this.message.guild?.members.fetch(id);
+                        if (member)
+                            name = '@'+(member.nickname??member.user.username);
+                        break;
+                    case 'role':
+                        role = this.message.guild?.roles.cache.get(id);
+                        if (role)
+                            name = '@&'+role.name;
+                }
+                return {
+                    name: name+(types.length > 1 ? " ("+types[i]+")" : ""),
+                    value: "id : "+id
+                };
+            }));
+            outList = [ ...outList, ...embeds ];
+        }
+        return outList.length > 0 ? outList : [{name: "Aucun élement", value: "Il n'y a aucun élement dans cette liste"}];
+    }
+
+    removeIdsToList(sourceList, listToRemove) {
+        return sourceList.filter(id => !listToRemove.some(idToRemove => idToRemove == id));
+    }
+
+    addIdsToList(sourceList, listToAdd) {
+        let listedIds = {};
+        for (const id of sourceList)
+            listedIds[id] = true;
+
+        for (const id of listToAdd) {
+            if (!listedIds[id]) {
+                listedIds[id] = true;
+                sourceList.push(id)
+            }
+        }
+        return sourceList;
+    }
+
 
     help(Embed: MessageEmbed) {
         Embed.addFields({
@@ -171,9 +240,11 @@ export default class ConfigVocal extends Command {
                 config.command_prefix+this.commandName+" enable\n"+
                 config.command_prefix+this.commandName+" disable\n"+
                 config.command_prefix+this.commandName+" blacklist add listener @user1,@user2 \n"+
+                config.command_prefix+this.commandName+" blacklist add listener @role1,@role2 \n"+
+                config.command_prefix+this.commandName+" blacklist remove listener @user1,@user2 @role1,@role2 \n"+
                 config.command_prefix+this.commandName+" blacklist remove channel '#channel1, #channel2' \n"+
-                config.command_prefix+this.commandName+" blacklist clear listenable \n"+
-                config.command_prefix+this.commandName+" blacklist show listenable \n"+
+                config.command_prefix+this.commandName+" blacklist clear channel \n"+
+                config.command_prefix+this.commandName+" blacklist show listener \n"+
                 config.command_prefix+this.commandName+" -h"
         });
     }

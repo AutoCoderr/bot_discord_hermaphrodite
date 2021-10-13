@@ -89,7 +89,11 @@ export default class Vocal extends Command {
             return false;
         }
 
-        const vocalConfig: IVocalConfig = await VocalConfig.findOne({serverId: this.message.guild.id, enabled: true});
+        console.log(args);
+
+        return false;
+
+        /*const vocalConfig: IVocalConfig = await VocalConfig.findOne({serverId: this.message.guild.id, enabled: true});
         if (vocalConfig == null) {
             this.sendErrors( {
                 name: "Vocal désactivé",
@@ -109,7 +113,8 @@ export default class Vocal extends Command {
             case 'subscribe':
                 const addeds: typeof VocalSubscribe[] = [];
                 const deleteds: typeof VocalSubscribe[] = [];
-                const forbiddens: { [id: string]: VoiceChannel|GuildMember|boolean } = {};
+                const forbiddens: { [id: string]: boolean } = {};
+                const forbiddensToDisplay: { [id: string]: VoiceChannel|GuildMember } = {};
 
                 if (channels && users) {
                     const alreadyAll: { [id: string]: VoiceChannel|GuildMember } = {};
@@ -165,10 +170,10 @@ export default class Vocal extends Command {
                                 addeds.push({channel,user});
                             } else {
                                 if (forbiddens[user.id])
-                                    forbiddens[user.id] = user
+                                    forbiddensToDisplay[user.id] = user
 
                                 if (forbiddens[channel.id])
-                                    forbiddens[channel.id] = channel
+                                    forbiddensToDisplay[channel.id] = channel
                             }
                         }
                     }
@@ -199,12 +204,12 @@ export default class Vocal extends Command {
                             })
                             addeds.push({channel: channels ? elem : 'all', user: users ? elem : 'all'});
                         } else
-                            forbiddens[elem.id] = elem;
+                            forbiddensToDisplay[elem.id] = elem;
                     }
                 }
         }
 
-        return false;
+        return false;*/
     }
 
     help(Embed: MessageEmbed) {
