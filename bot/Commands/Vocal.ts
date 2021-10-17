@@ -1,6 +1,6 @@
 import Command from "../Classes/Command";
 import {
-    GuildMember,
+    GuildMember, Interaction,
     Message,
     MessageActionRow,
     MessageButton,
@@ -11,7 +11,8 @@ import config from "../config";
 import VocalSubscribe from "../Models/VocalSubscribe";
 import VocalConfig, {IVocalConfig} from "../Models/VocalConfig";
 import VocalUserConfig, {IVocalUserConfig} from "../Models/VocalUserConfig";
-import VocalInvite from "../Models/VocalInvite";
+import VocalInvite, {IVocalInvite} from "../Models/VocalInvite";
+import client from "../client";
 
 export default class Vocal extends Command {
     static display = true;
@@ -204,22 +205,22 @@ export default class Vocal extends Command {
             }
             if (forbiddens.length > 0)
                 embed.addFields({
-                    name: "Ces utilisateur(s)/role(s) vous ont bloqués :",
+                    name: "Vous êtes bloqués par :",
                     value: forbiddens.map(user => "<@"+user.id+">").join("\n")
                 });
             if (alreadySubscribeds.length > 0)
                 embed.addFields({
-                    name: "Vous avez déjà une écoute sur ces utilisateur(s) :",
+                    name: "Déjà écoutés  :",
                     value: alreadySubscribeds.map(user => "<@"+user.id+">").join("\n")
                 });
             if (alreadyInviteds.length > 0)
                 embed.addFields({
-                    name: "Vous avez déjà envoyé une invitation à ces utilisateurs :",
+                    name: "Déjà invités :",
                     value: alreadyInviteds.map(user => "<@"+user.id+">").join("\n")
                 });
             if (inviteds.length > 0)
                 embed.addFields({
-                    name: "Des invitations ont été envoyés vers ces utilisateurs : ",
+                    name: "Invités avec succès :",
                     value: inviteds.map(user => "<@"+user.id+">").join("\n")
                 });
 
@@ -229,6 +230,43 @@ export default class Vocal extends Command {
         }
 
         return false;
+    }
+
+    static async listenInviteButtons(interaction: Interaction) {
+        if (interaction.isButton()) {
+            const invite: IVocalInvite = await VocalInvite.findOne({
+                buttonId: interaction.customId
+            })
+
+            let server;
+
+            if (invite !== null) {
+                await interaction.deferReply();
+                if ((server = client.guilds.cache.get(invite.serverId)) === undefined) {
+                    await interaction.editReply({content: "Le serveur associé à cette invitation semble inaccessible au bot"});
+                } else if (invite.accept) {
+                    await VocalSubscribe.create({
+                        serverId: invite.serverId,
+                        listenerId: invite.requesterId,
+                        listenedId: invite.requestedId,
+                        enabled: true
+                    });
+                    const requester = await server.members.fetch(invite.requesterId);
+                    await requester.send("<@" + invite.requestedId + "> a accepté votre invitation");
+                    await interaction.editReply({content: "Invitation acceptée"});
+                } else {
+                    const requester = await server.members.fetch(invite.requesterId);
+                    await requester.send("<@" + invite.requestedId + "> a refusé votre invitation");
+                    await interaction.editReply({content: "Invitation refusée"});
+                }
+
+                await VocalInvite.deleteMany({
+                    serverId: invite.serverId,
+                    requesterId: invite.requesterId,
+                    requestedId: invite.requestedId
+                });
+            }
+        }
     }
 
     help(Embed: MessageEmbed) {
