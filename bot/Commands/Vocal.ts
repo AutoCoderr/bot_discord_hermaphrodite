@@ -1,5 +1,5 @@
 import Command from "../Classes/Command";
-import {GuildChannel, GuildMember, Message, MessageEmbed, VoiceChannel} from "discord.js";
+import {GuildChannel, GuildMember, Message, MessageEmbed, Role, VoiceChannel} from "discord.js";
 import config from "../config";
 import VocalSubscribe from "../Models/VocalSubscribe";
 import VocalConfig, {IVocalConfig} from "../Models/VocalConfig";
@@ -20,33 +20,36 @@ export default class Vocal extends Command {
             action: {
                 required: (args) => args.help == undefined,
                 type: "string",
-                default: "subscribe",
-                description: "L'action à effectuer : subscribe, info, clear, all, limit, mute, deny, accept",
-                valid: (field) => ['subscribe','info','clear','all','limit','mute', 'deny', 'accept'].includes(field)
+                description: "L'action à effectuer : sub|add, unsub|remove, block|ghost, unsub|unghost, stop, start, limit, mute, status",
+                valid: (field) => ['sub','add','unsub','remove','block','ghost','unblock','unghost','stop','start','limit','mute','status'].includes(field)
             },
-            channels: {
+            roles: {
                 required: false,
                 displayValidError: true,
-                type: "channels",
-                description: "Le ou les channels vocaux sur lesquels écouter",
-                valid: (channels: GuildChannel[]) => {
+                displayExtractError: true,
+                type: "roles",
+                description: "Le ou les roles à ignorer",
+                valid: (roles: Role[]) => {
                     const alreadySpecified = {};
-                    for (const channel of channels) {
-                        if (channel.type != "GUILD_VOICE" || alreadySpecified[channel.id])
+                    for (const role of roles) {
+                        if (alreadySpecified[role.id])
                             return false;
-                        alreadySpecified[channel.id] = true
+                        alreadySpecified[role.id] = true
                     }
                     return true;
                 },
                 errorMessage: () => ({
-                    name: "Channels mal rentré",
-                    value: "Vous avez mal renseigné vos channels. Ils ne peuvent être que des channels vocaux, et vous ne pouvez pas renseigner plus d'une fois le même channel"
+                    name: "Roles mal rentrés",
+                    value: "Vous avez mal renseigné vos roles. Vous ne pouvez pas renseigner plus d'une fois le même role"
                 })
             },
             users: {
-                required: (args) => args.help == undefined && args.action == "subscribe" && args.channels == undefined,
+                required: (args) => args.help == undefined &&
+                    (['sub','add','unsub','remove'].includes(args.action) || ( ['ghost','block','unghost','unblock'].includes(args.action) && args.roles == undefined)),
+                displayValidError: true,
+                displayExtractError: true,
                 type: "users",
-                description: "Le ou les utilisateurs à écouter quand ils se connectent sur un vocal",
+                description: "Le ou les utilisateurs à ignorer ou écouter quand ils se connectent sur un vocal",
                 valid: (users: GuildMember[]) => {
                     const alreadySpecified = {};
                     for (const user of users) {
@@ -56,19 +59,19 @@ export default class Vocal extends Command {
                     }
                     return true;
                 },
-                errorMessage: (value, args) => (value == undefined && args.channels == undefined) ?
+                errorMessage: (value, args) => (value == undefined && args.channels == undefined && ['ghost','block','unghost','unblock'].includes(args.action)) ?
                         {
                             name: "Rentrez au moins l'un des deux",
-                            value: "Vous devez avoir mentionné au moins un utilisateur ou un channel. Vous pouvez également utiliser l'action 'all'"
+                            value: "Vous devez avoir mentionné au moins un utilisateur ou un role."
                         } : {
                             name: "Utilisateurs non ou mal renseigné",
-                            value: "Vous n'avez pas ou mal renseigné "
+                            value: "Vous n'avez pas ou mal renseigné les utilisateurs"
                         }
             },
             time: {
                 required: (args) => args.help == undefined && ["limit","mute"].includes(args.action),
                 type: "duration",
-                description: "Le temps durant lequel on souhaite ne pas recevoir de notif"
+                description: "Le temps durant lequel on souhaite ne pas recevoir de notif (ex: 30s, 5m, 3h, 2j)"
             }
         }
     }
@@ -76,7 +79,12 @@ export default class Vocal extends Command {
     async action(args: {help: boolean, action: string, channels: VoiceChannel[], users: GuildMember[], time: number}) {
         const {help, action, channels, users, time} = args;
 
-        if (help) {
+        console.log(args);
+
+        this.message.channel.send("TEST");
+        return false;
+
+        /*if (help) {
             this.displayHelp();
             return false;
         }
@@ -89,11 +97,7 @@ export default class Vocal extends Command {
             return false;
         }
 
-        console.log(args);
-
-        return false;
-
-        /*const vocalConfig: IVocalConfig = await VocalConfig.findOne({serverId: this.message.guild.id, enabled: true});
+        const vocalConfig: IVocalConfig = await VocalConfig.findOne({serverId: this.message.guild.id, enabled: true});
         if (vocalConfig == null) {
             this.sendErrors( {
                 name: "Vocal désactivé",
@@ -101,15 +105,17 @@ export default class Vocal extends Command {
             });
             return false;
         }
-        if (vocalConfig.listenerBlacklist.includes(this.message.author.id)) {
+        if (vocalConfig.listenerBlacklist.users.includes(this.message.author.id) ||
+            vocalConfig.listenerBlacklist.roles.some(roleId => this.message.member && this.message.member.roles.cache.some(role => role.id === roleId))) {
             this.sendErrors( {
                 name: "Accès interdit",
                 value: "Vous n'avez visiblement pas le droit d'utiliser l'option d'abonnement vocal sur ce serveur"
             });
             return false;
         }
+        return false;*/
 
-        switch (action) {
+        /*switch (action) {
             case 'subscribe':
                 const addeds: typeof VocalSubscribe[] = [];
                 const deleteds: typeof VocalSubscribe[] = [];
@@ -216,16 +222,17 @@ export default class Vocal extends Command {
         Embed.addFields({
             name: "Exemples :",
             value:
-                config.command_prefix+this.commandName+" @user1,@user2, #!channel1,#!channel2 \nS'abonner à channel1 et channel2, pour user1 et user2\n\n"+
-                config.command_prefix+this.commandName+" #!channel1,#!channel2 \nS'abonner à channel1 et channel2 pour tout les users\n\n"+
-                config.command_prefix+this.commandName+" @user1 \nS'abonner à user1 pour tout les channels\n\n"+
-                config.command_prefix+this.commandName+" all \nS'abonner à tout les channels pour tous les users sur ce serveur\n\n"+
-                config.command_prefix+this.commandName+" info \nVoir les abonnements vocaux\n\n"+
-                config.command_prefix+this.commandName+" clear \nSe désinscrire de tous \n\n"+
+                config.command_prefix+this.commandName+" sub|add @user \nDemander à @user si on peut écouter ses connexions vocales\n\n"+
+                config.command_prefix+this.commandName+" sub|add '@user1, @user2' \nDemander à @user1 et @user2 si ou peut écouter leurs connexions vocales\n\n"+
+                config.command_prefix+this.commandName+" unsub|remove @user1 \nSe désabonner de @user1\n\n"+
+                config.command_prefix+this.commandName+" block|ghost @user\nIgnorer les invitations de @user et l'empêcher de nous écouter\n\n"+
+                config.command_prefix+this.commandName+" block|ghost @&role\nIgnorer les invitations des membres du role @&role et les empêcher de nous écouter\n\n"+
+                config.command_prefix+this.commandName+" unblock|unghost '@user1, @user2' @&role\nPermettre à nouveau à @user1, @user2 et aux membdre du role @&role de nous écouter\n\n"+
+                config.command_prefix+this.commandName+" stop \nCesser d'écouter les connexions au vocal\n\n"+
+                config.command_prefix+this.commandName+" start \nDe nouveau écouter les connexions au vocal\n\n"+
                 config.command_prefix+this.commandName+" limit 'time' \nAttendre un temps minimum entre chaque notif \nexemples pour time: 30s, 1h, 5m, 1j\n\n"+
                 config.command_prefix+this.commandName+" mute 'time' \nNe plus recevoir de notif pendant x temps\n\n"+
-                config.command_prefix+this.commandName+" deny \nEmpêcher les autres de nous écouter\n\n"+
-                config.command_prefix+this.commandName+" accept \nAccepter que les autres nous écoutent\n\n"+
+                config.command_prefix+this.commandName+" status \nAffichet toutes les infos vous concernant\n\n"+
                 config.command_prefix+this.commandName+" -h \nPour afficher l'aide"
         });
     }
