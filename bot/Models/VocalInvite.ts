@@ -14,7 +14,7 @@ export interface IVocalInvite {
 const VocalInviteSchema: Schema = new Schema({
     buttonId: { type: String, required: true },
     requesterId: { type: String, required: true },
-    requestedId: { type: Boolean, required: true },
+    requestedId: { type: String, required: true },
     accept: { type: Boolean, required: true },
     serverId: { type: String, required: true }
 });

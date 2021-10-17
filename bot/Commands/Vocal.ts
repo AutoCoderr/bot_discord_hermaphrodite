@@ -1,8 +1,17 @@
 import Command from "../Classes/Command";
-import {GuildChannel, GuildMember, Message, MessageEmbed, Role, VoiceChannel} from "discord.js";
+import {
+    GuildMember,
+    Message,
+    MessageActionRow,
+    MessageButton,
+    MessageEmbed,
+    Role
+} from "discord.js";
 import config from "../config";
 import VocalSubscribe from "../Models/VocalSubscribe";
 import VocalConfig, {IVocalConfig} from "../Models/VocalConfig";
+import VocalUserConfig, {IVocalUserConfig} from "../Models/VocalUserConfig";
+import VocalInvite from "../Models/VocalInvite";
 
 export default class Vocal extends Command {
     static display = true;
@@ -76,20 +85,15 @@ export default class Vocal extends Command {
         }
     }
 
-    async action(args: {help: boolean, action: string, channels: VoiceChannel[], users: GuildMember[], time: number}) {
-        const {help, action, channels, users, time} = args;
+    async action(args: {help: boolean, action: string, users: GuildMember[], roles: Role[], time: number}) {
+        const {help, action, roles, users, time} = args;
 
-        console.log(args);
-
-        this.message.channel.send("TEST");
-        return false;
-
-        /*if (help) {
+        if (help) {
             this.displayHelp();
             return false;
         }
 
-        if (this.message.guild == null) {
+        if (this.message.guild === null) {
             this.sendErrors( {
                 name: "Missing guild",
                 value: "We couldn't find the message guild"
@@ -105,117 +109,126 @@ export default class Vocal extends Command {
             });
             return false;
         }
-        if (vocalConfig.listenerBlacklist.users.includes(this.message.author.id) ||
-            vocalConfig.listenerBlacklist.roles.some(roleId => this.message.member && this.message.member.roles.cache.some(role => role.id === roleId))) {
+        if (['add','sub','remove','unsub'].includes(action) &&
+            (vocalConfig.listenerBlacklist.users.includes(this.message.author.id) ||
+            vocalConfig.listenerBlacklist.roles.some(roleId => this.message.member && this.message.member.roles.cache.some(role => role.id === roleId)))) {
             this.sendErrors( {
                 name: "Accès interdit",
                 value: "Vous n'avez visiblement pas le droit d'utiliser l'option d'abonnement vocal sur ce serveur"
             });
             return false;
         }
-        return false;*/
 
-        /*switch (action) {
-            case 'subscribe':
-                const addeds: typeof VocalSubscribe[] = [];
-                const deleteds: typeof VocalSubscribe[] = [];
-                const forbiddens: { [id: string]: boolean } = {};
-                const forbiddensToDisplay: { [id: string]: VoiceChannel|GuildMember } = {};
+        const embed = new MessageEmbed()
+            .setTitle("Resultat de la commande : ")
+            .setDescription("Resultat de la commande : "+this.message.content)
+            .setAuthor("Herma bot");
 
-                if (channels && users) {
-                    const alreadyAll: { [id: string]: VoiceChannel|GuildMember } = {};
+        if (['add','sub'].includes(action)) {
+            const forbiddens: GuildMember[] = [];
+            const inviteds: GuildMember[] = [];
+            const alreadyInviteds: GuildMember[] = [];
+            const alreadySubscribeds: GuildMember[] = [];
 
-                    for (const channel of channels) {
-                        const allSubscribe = await VocalSubscribe.findOne({
-                            serverId: this.message.guild.id,
-                            channelId: channel.id,
-                            listenedId: 'all',
-                            listenerId: this.message.author.id
-                        });
-                        if (allSubscribe !== null) {
-                            alreadyAll[channel.id] = channel;
-                            continue;
-                        }
+            for (const user of users) {
+                const subscribe = await VocalSubscribe.findOne({
+                    listenerId: this.message.author.id,
+                    listenedId: user.id,
+                    serverId: this.message.guild.id
+                });
 
-                        if (forbiddens[channel.id] === undefined) {
-                            forbiddens[channel.id] = vocalConfig.channelBlacklist.includes(channel.id);
-                        }
-                        for (const user of users) {
-                            if (alreadyAll[user.id]) continue;
-                            const allSubscribe = await VocalSubscribe.findOne({
-                                serverId: this.message.guild.id,
-                                channelId: 'all',
-                                listenedId: user.id,
-                                listenerId: this.message.author.id
-                            });
-                            if (allSubscribe !== null) {
-                                alreadyAll[user.id] = user;
-                                continue;
-                            }
-
-                            if (forbiddens[user.id] === undefined) {
-                                forbiddens[user.id] = vocalConfig.listenableBlacklist.includes(user.id);
-                            }
-                            let subscribe: typeof VocalSubscribe = await VocalSubscribe.findOne({
-                                serverId: this.message.guild.id,
-                                channelId: channel.id,
-                                listenedId: user.id,
-                                listenerId: this.message.author.id
-                            });
-
-                            if (subscribe !== null) {
-                                subscribe.delete();
-                                deleteds.push({channel,user});
-                            } else  if (!forbiddens[user.id] && !forbiddens[channel.id]) {
-                                VocalSubscribe.create({
-                                    serverId: this.message.guild.id,
-                                    channelId: channel.id,
-                                    listenedId: user.id,
-                                    listenerId: this.message.author.id
-                                });
-                                addeds.push({channel,user});
-                            } else {
-                                if (forbiddens[user.id])
-                                    forbiddensToDisplay[user.id] = user
-
-                                if (forbiddens[channel.id])
-                                    forbiddensToDisplay[channel.id] = channel
-                            }
-                        }
-                    }
-                } else {
-                    for (const elem of (channels??users)) {
-                        forbiddens[elem.id] = channels ? vocalConfig.channelBlacklist.includes(elem.id) : vocalConfig.listenableBlacklist.includes(elem.id);
-
-                        const subscribe = await VocalSubscribe.findOne({
-                            serverId: this.message.guild.id,
-                            channelId: channels ? elem.id : 'all',
-                            listenedId: users ? elem.id : 'all',
-                            listenerId: this.message.author.id
-                        });
-                        if (subscribe !== null) {
-                            subscribe.delete();
-                            deleteds.push({channel: channels ? elem : 'all', user: users ? elem : 'all'});
-                        } else if (!forbiddens[elem.id]) {
-                            VocalSubscribe.deleteMany({
-                                serverId: this.message.guild.id,
-                                ...(channels ? {channelId: elem.id} : {listenedId: elem.id}),
-                                listenerId: this.message.author.id
-                            });
-                            VocalSubscribe.create({
-                                serverId: this.message.guild.id,
-                                channelId: channels ? elem.id : 'all',
-                                listenedId: users ? elem.id : 'all',
-                                listenerId: this.message.author.id
-                            })
-                            addeds.push({channel: channels ? elem : 'all', user: users ? elem : 'all'});
-                        } else
-                            forbiddensToDisplay[elem.id] = elem;
-                    }
+                if (subscribe !== null) {
+                    alreadySubscribeds.push(user);
+                    continue;
                 }
+
+                const invite = await VocalInvite.findOne({
+                    serverId: this.message.guild.id,
+                    requesterId: this.message.author.id,
+                    requestedId: user.id
+                });
+
+                if (invite !== null) {
+                    alreadyInviteds.push(user);
+                    continue;
+                }
+
+                const userConfig: null|IVocalUserConfig = await VocalUserConfig.findOne({
+                    serverId: this.message.guild.id,
+                    userId: user.id
+                });
+                if (userConfig !== null &&
+                    (
+                        userConfig.blocked.users.includes(this.message.author.id) ||
+                        userConfig.blocked.roles.some(roleId => this.message.member && this.message.member.roles.cache.some(role => role.id === roleId))
+                    )) {
+                    forbiddens.push(user);
+                    continue;
+                }
+                const acceptButtonId = (Date.now()*10**4+Math.floor(Math.random()*10**4)).toString()+"a";
+                const denyButtonId = (Date.now()*10**4+Math.floor(Math.random()*10**4)).toString()+"d";
+
+                inviteds.push(user);
+
+                await Promise.all([
+                    VocalInvite.create({
+                        buttonId: acceptButtonId,
+                        requesterId: this.message.author.id,
+                        requestedId: user.id,
+                        accept: true,
+                        serverId: this.message.guild.id
+                    }),
+                    VocalInvite.create({
+                        buttonId: denyButtonId,
+                        requesterId: this.message.author.id,
+                        requestedId: user.id,
+                        accept: false,
+                        serverId: this.message.guild.id
+                    }),
+                    user.send({
+                        content: "<@"+this.message.author.id+"> souhaite pouvoir écouter vos connexions vocales sur le serveur '"+this.message.guild.name+"'",
+                        components: [
+                            new MessageActionRow().addComponents(
+                                new MessageButton()
+                                    .setCustomId(acceptButtonId)
+                                    .setLabel("Accepter")
+                                    .setStyle("SUCCESS"),
+                                new MessageButton()
+                                    .setCustomId(denyButtonId)
+                                    .setLabel("Refuser")
+                                    .setStyle("DANGER"),
+                            )
+                        ]
+                    })
+                ]);
+            }
+            if (forbiddens.length > 0)
+                embed.addFields({
+                    name: "Ces utilisateur(s)/role(s) vous ont bloqués :",
+                    value: forbiddens.map(user => "<@"+user.id+">").join("\n")
+                });
+            if (alreadySubscribeds.length > 0)
+                embed.addFields({
+                    name: "Vous avez déjà une écoute sur ces utilisateur(s) :",
+                    value: alreadySubscribeds.map(user => "<@"+user.id+">").join("\n")
+                });
+            if (alreadyInviteds.length > 0)
+                embed.addFields({
+                    name: "Vous avez déjà envoyé une invitation à ces utilisateurs :",
+                    value: alreadyInviteds.map(user => "<@"+user.id+">").join("\n")
+                });
+            if (inviteds.length > 0)
+                embed.addFields({
+                    name: "Des invitations ont été envoyés vers ces utilisateurs : ",
+                    value: inviteds.map(user => "<@"+user.id+">").join("\n")
+                });
+
+            this.message.channel.send({embeds: [embed]});
+            return true;
+
         }
 
-        return false;*/
+        return false;
     }
 
     help(Embed: MessageEmbed) {
