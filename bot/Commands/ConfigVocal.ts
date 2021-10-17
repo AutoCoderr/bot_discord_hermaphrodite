@@ -133,7 +133,7 @@ export default class ConfigVocal extends Command {
                         if (roles)
                             vocalConfig.listenerBlacklist.roles = this.addIdsToList(vocalConfig.listenerBlacklist.roles, roles.map(role => role.id));
                     }
-                    this.message.channel.send("Les "+(blacklistType == "channel" ? "channels" : "utilisateurs")+" ont été ajouté à la blacklist '"+blacklistType+"'");
+                    this.message.channel.send("Les "+(blacklistType == "channel" ? "channels" : "utilisateurs/roles")+" ont été ajouté à la blacklist '"+blacklistType+"'");
                     break;
                 case 'remove':
                     if (blacklistType == "channel") {

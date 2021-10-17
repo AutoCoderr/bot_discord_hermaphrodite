@@ -4,16 +4,16 @@ import { connect } from "../Mongo";
 const db = connect();
 
 export interface IVocalSubscribe {
-    channelId: string;
     listenerId: string;
     listenedId: string;
+    enabled: boolean;
     serverId: string;
 }
 
 const VocalSubscribeSchema: Schema = new Schema({
-    channelId: { type: String, required: true },
     listenerId: { type: String, required: true },
     listenedId: { type: String, required: true },
+    enabled: { type: Boolean, required: true },
     serverId: { type: String, required: true }
 });
 
