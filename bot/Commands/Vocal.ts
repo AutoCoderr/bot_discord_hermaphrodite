@@ -229,6 +229,41 @@ export default class Vocal extends Command {
 
         }
 
+        if (['unsub','remove'].includes(action)) {
+            const doesntExist: GuildMember[] = [];
+            const deleted: GuildMember[] = [];
+
+            for (const user of users) {
+                const vocalSubscribe: typeof VocalSubscribe = await VocalSubscribe.findOne({
+                    serverId: this.message.guild.id,
+                    listenerId: this.message.author.id,
+                    listenedId: user.id
+                });
+
+                if (vocalSubscribe === null) {
+                    doesntExist.push(user);
+                    continue;
+                }
+
+                vocalSubscribe.remove();
+                deleted.push(user);
+            }
+
+            if (doesntExist.length > 0)
+                embed.addFields({
+                    name: "Vous n'avez pas d'écoute sur :",
+                    value: doesntExist.map(user => "<@"+user.id+">").join("\n")
+                });
+            if (deleted.length > 0)
+                embed.addFields({
+                    name: "Supprimés avec succès :",
+                    value: deleted.map(user => "<@"+user.id+">").join("\n")
+                });
+
+            this.message.channel.send({embeds: [embed]});
+            return true;
+        }
+
         return false;
     }
 
@@ -252,11 +287,11 @@ export default class Vocal extends Command {
                         enabled: true
                     });
                     const requester = await server.members.fetch(invite.requesterId);
-                    await requester.send("<@" + invite.requestedId + "> a accepté votre invitation");
+                    await requester.send("<@" + invite.requestedId + "> a accepté votre invitation sur '"+server.name+"'");
                     await interaction.editReply({content: "Invitation acceptée"});
                 } else {
                     const requester = await server.members.fetch(invite.requesterId);
-                    await requester.send("<@" + invite.requestedId + "> a refusé votre invitation");
+                    await requester.send("<@" + invite.requestedId + "> a refusé votre invitation sur '"+server.name+"'");
                     await interaction.editReply({content: "Invitation refusée"});
                 }
 
