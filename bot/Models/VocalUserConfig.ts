@@ -29,4 +29,4 @@ const VocalUserConfigSchema: Schema = new Schema({
 });
 
 // @ts-ignore
-export default db.model<IVocalUserConfig>('VocalUserSubscribe', VocalUserConfigSchema);
+export default db.model<IVocalUserConfig>('VocalUserConfig', VocalUserConfigSchema);

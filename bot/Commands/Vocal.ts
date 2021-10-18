@@ -264,6 +264,103 @@ export default class Vocal extends Command {
             return true;
         }
 
+        if (['block','ghost'].includes(action)) {
+            let ownUserConfig: IVocalUserConfig|typeof VocalUserConfig= await VocalUserConfig.findOne({
+                serverId: this.message.guild.id,
+                userId: this.message.author.id
+            });
+
+            if (ownUserConfig === null) {
+                ownUserConfig = await VocalUserConfig.create({
+                    serverId: this.message.guild.id,
+                    userId: this.message.author.id,
+                    blocked: {users: [], roles: []},
+                    listening: true,
+                    limit: 0
+                });
+            }
+
+            const alreadyBlocked: Array<GuildMember | Role> = [];
+            const blocked: Array<GuildMember | Role> = [];
+            const notFoundUsersId: string[] = [];
+
+            if (users) {
+                for (const user of users) {
+                    if (ownUserConfig.blocked.users.includes(user.id)) {
+                        alreadyBlocked.push(user);
+                        continue;
+                    }
+
+                    blocked.push(user);
+
+                    ownUserConfig.blocked.users.push(user.id);
+
+                    await VocalSubscribe.updateMany({
+                        serverId: this.message.guild.id,
+                        listenerId: user.id,
+                        listenedId: this.message.author.id
+                    }, {
+                        enabled: false
+                    });
+                }
+            }
+
+
+            if (roles) {
+                const vocalSubscribes: Array<typeof VocalSubscribe> = await VocalSubscribe.find({
+                    serverId: this.message.guild.id,
+                    listened: this.message.author.id
+                })
+                for (const role of roles) {
+                    if (ownUserConfig.blocked.roles.includes(role.id)) {
+                        alreadyBlocked.push(role);
+                        continue;
+                    }
+
+                    blocked.push(role);
+
+                    ownUserConfig.blocked.roles.push(role.id);
+
+                    for (const vocalSubscribe of vocalSubscribes) {
+                        if (!vocalSubscribe.enabled) continue;
+                        let user: GuildMember;
+                        try {
+                            user = await this.message.guild.members.fetch(vocalSubscribe.listenerId);
+                        } catch (e) {
+                            notFoundUsersId.push(vocalSubscribe.listenerId);
+                            continue;
+                        }
+
+                        if (user.roles.cache.some(userRole => userRole.id === role.id)) {
+                            vocalSubscribe.enabled = false;
+                        }
+
+                    }
+                }
+                Promise.all(vocalSubscribes.map(vocalSubscribe => vocalSubscribe.save()));
+            }
+            ownUserConfig.save();
+
+            if (notFoundUsersId.length > 0)
+                embed.addFields({
+                    name: "Utilisateurs introuvables : ",
+                    value: notFoundUsersId.map(userId => "<@" + userId + ">").join("\n")
+                });
+            if (alreadyBlocked.length > 0)
+                embed.addFields({
+                    name: "Déjà bloqués :",
+                    value: alreadyBlocked.map(elem => "<@" + (elem instanceof Role ? "&" : "") + elem.id + "> (" + (elem instanceof Role ? 'role' : 'user') + ")").join("\n")
+                });
+            if (blocked.length > 0)
+                embed.addFields({
+                    name: "Bloqué succèes : ",
+                    value: blocked.map(elem => "<@" + (elem instanceof Role ? "&" : "") + elem.id + "> (" + (elem instanceof Role ? 'role' : 'user') + ")").join("\n")
+                });
+
+            this.message.channel.send({embeds: [embed]});
+            return true;
+        }
+
         return false;
     }
 

@@ -96,7 +96,7 @@ export default class ConfigVocal extends Command {
             return false;
         }
 
-        let vocalConfig: typeof VocalConfig = await VocalConfig.findOne({server: this.message.guild.id})
+        let vocalConfig: typeof VocalConfig = await VocalConfig.findOne({serverId: this.message.guild.id})
 
         if (action == "enable" || action == "disable") {
 
