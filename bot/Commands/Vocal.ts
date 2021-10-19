@@ -8,7 +8,7 @@ import {
     Role
 } from "discord.js";
 import config from "../config";
-import VocalSubscribe from "../Models/VocalSubscribe";
+import VocalSubscribe, {IVocalSubscribe} from "../Models/VocalSubscribe";
 import VocalConfig, {IVocalConfig} from "../Models/VocalConfig";
 import VocalUserConfig, {IVocalUserConfig} from "../Models/VocalUserConfig";
 import VocalInvite, {IVocalInvite} from "../Models/VocalInvite";
@@ -294,23 +294,11 @@ export default class Vocal extends Command {
                     blocked.push(user);
 
                     ownUserConfig.blocked.users.push(user.id);
-
-                    await VocalSubscribe.updateMany({
-                        serverId: this.message.guild.id,
-                        listenerId: user.id,
-                        listenedId: this.message.author.id
-                    }, {
-                        enabled: false
-                    });
                 }
             }
 
 
             if (roles) {
-                const vocalSubscribes: Array<typeof VocalSubscribe> = await VocalSubscribe.find({
-                    serverId: this.message.guild.id,
-                    listened: this.message.author.id
-                })
                 for (const role of roles) {
                     if (ownUserConfig.blocked.roles.includes(role.id)) {
                         alreadyBlocked.push(role);
@@ -320,25 +308,36 @@ export default class Vocal extends Command {
                     blocked.push(role);
 
                     ownUserConfig.blocked.roles.push(role.id);
-
-                    for (const vocalSubscribe of vocalSubscribes) {
-                        if (!vocalSubscribe.enabled) continue;
-                        let user: GuildMember;
-                        try {
-                            user = await this.message.guild.members.fetch(vocalSubscribe.listenerId);
-                        } catch (e) {
-                            notFoundUsersId.push(vocalSubscribe.listenerId);
-                            continue;
-                        }
-
-                        if (user.roles.cache.some(userRole => userRole.id === role.id)) {
-                            vocalSubscribe.enabled = false;
-                        }
-
-                    }
                 }
-                Promise.all(vocalSubscribes.map(vocalSubscribe => vocalSubscribe.save()));
             }
+
+            const vocalSubscribes: Array<typeof VocalSubscribe|IVocalSubscribe> = await VocalSubscribe.find({
+                serverId: this.message.guild.id,
+                listened: this.message.author.id,
+                enabled: true
+            });
+
+            for (const vocalSubscribe of vocalSubscribes) {
+                if (ownUserConfig.blocked.users.includes(vocalSubscribe.listenerId)) {
+                    vocalSubscribe.enabled = false;
+                    vocalSubscribe.save();
+                    continue;
+                }
+
+                let user: GuildMember;
+                try {
+                    user = await this.message.guild.members.fetch(vocalSubscribe.listenerId);
+                } catch (e) {
+                    notFoundUsersId.push(vocalSubscribe.listenerId);
+                    continue;
+                }
+
+                if (user.roles.cache.some(role => ownUserConfig.blocked.roles.some(roleId => role.id === roleId))) {
+                    vocalSubscribe.enabled = false;
+                    vocalSubscribe.save();
+                }
+            }
+
             ownUserConfig.save();
 
             if (notFoundUsersId.length > 0)
