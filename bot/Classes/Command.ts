@@ -51,7 +51,7 @@ export default class Command {
         this.message.channel.send({embeds: [Embed]});
     }
 
-    displayHelp(fails: null|Array<any> = null, failsExtract: null|Array<any> = null, args = null) {
+    displayHelp(displayHelp = true, fails: null|Array<any> = null, failsExtract: null|Array<any> = null, args = null) {
         const commandName = this.message.content.split(" ")[0];
         let embeds: Array<MessageEmbed> = [
             new MessageEmbed()
@@ -140,7 +140,13 @@ export default class Command {
         }
 
         if (embeds.length > 0) {
-            this.help(embeds[embeds.length-1]);
+            if (displayHelp)
+                this.help(embeds[embeds.length-1])
+            else
+                embeds[embeds.length-1].addFields({
+                   name: "Voir l'aide : ",
+                   value: "Tapez : "+config.command_prefix+this.commandName+" -h"
+                });
             this.message.channel.send({embeds});
         }
     }
@@ -568,7 +574,7 @@ export default class Command {
             }
         }
         if (fails.length > 0 || failsExtract.length > 0) {
-            this.displayHelp(fails, failsExtract, out);
+            this.displayHelp(false, fails, failsExtract, out);
             return false;
         }
         return out;

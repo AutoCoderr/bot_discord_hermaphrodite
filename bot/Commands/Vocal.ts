@@ -63,7 +63,7 @@ export default class Vocal extends Command {
                 valid: (users: GuildMember[]) => {
                     const alreadySpecified = {};
                     for (const user of users) {
-                        if (alreadySpecified[user.id])
+                        if (user.id === this.message.author.id || alreadySpecified[user.id])
                             return false;
                         alreadySpecified[user.id] = true
                     }
@@ -75,7 +75,8 @@ export default class Vocal extends Command {
                             value: "Vous devez avoir mentionné au moins un utilisateur ou un role."
                         } : {
                             name: "Utilisateurs non ou mal renseigné",
-                            value: "Vous n'avez pas ou mal renseigné les utilisateurs"
+                            value: "Vous n'avez pas ou mal renseigné les utilisateurs.\n"+
+                                "Vous ne pouvez pas vous renseignez vous même, ni renseigner plusieurs les mêmes personnes"
                         }
             },
             time: {
@@ -264,7 +265,7 @@ export default class Vocal extends Command {
             return true;
         }
 
-        if (['block','ghost'].includes(action)) {
+        if (['block','ghost','unblock','unghost'].includes(action)) {
             let ownUserConfig: IVocalUserConfig|typeof VocalUserConfig= await VocalUserConfig.findOne({
                 serverId: this.message.guild.id,
                 userId: this.message.author.id
@@ -280,83 +281,143 @@ export default class Vocal extends Command {
                 });
             }
 
-            const alreadyBlocked: Array<GuildMember | Role> = [];
-            const blocked: Array<GuildMember | Role> = [];
-            const notFoundUsersId: string[] = [];
+            if (['block','ghost'].includes(action)) {
+                const alreadyBlocked: Array<GuildMember | Role> = [];
+                const blocked: Array<GuildMember | Role> = [];
+                const notFoundUsersId: string[] = [];
 
-            if (users) {
-                for (const user of users) {
-                    if (ownUserConfig.blocked.users.includes(user.id)) {
-                        alreadyBlocked.push(user);
+                for (const [name,list] of Object.entries({users,roles})) {
+                    if (list !== undefined) {
+                        for (const elem of list) {
+                            if (ownUserConfig.blocked[name].includes(elem.id)) {
+                                alreadyBlocked.push(elem);
+                                continue;
+                            }
+
+                            blocked.push(elem);
+
+                            ownUserConfig.blocked[name].push(elem.id);
+                        }
+                    }
+                }
+
+                const vocalSubscribes: Array<typeof VocalSubscribe|IVocalSubscribe> = await VocalSubscribe.find({
+                    serverId: this.message.guild.id,
+                    listenedId: this.message.author.id,
+                    enabled: true
+                });
+
+                for (const vocalSubscribe of vocalSubscribes) {
+                    if (ownUserConfig.blocked.users.includes(vocalSubscribe.listenerId)) {
+                        vocalSubscribe.enabled = false;
+                        vocalSubscribe.save();
                         continue;
                     }
 
-                    blocked.push(user);
-
-                    ownUserConfig.blocked.users.push(user.id);
-                }
-            }
-
-
-            if (roles) {
-                for (const role of roles) {
-                    if (ownUserConfig.blocked.roles.includes(role.id)) {
-                        alreadyBlocked.push(role);
+                    let user: GuildMember;
+                    try {
+                        user = await this.message.guild.members.fetch(vocalSubscribe.listenerId);
+                    } catch (e) {
+                        notFoundUsersId.push(vocalSubscribe.listenerId);
                         continue;
                     }
 
-                    blocked.push(role);
-
-                    ownUserConfig.blocked.roles.push(role.id);
+                    if (user.roles.cache.some(role => ownUserConfig.blocked.roles.some(roleId => role.id === roleId))) {
+                        vocalSubscribe.enabled = false;
+                        vocalSubscribe.save();
+                    }
                 }
+
+                ownUserConfig.save();
+
+                if (notFoundUsersId.length > 0)
+                    embed.addFields({
+                        name: "Utilisateurs introuvables : ",
+                        value: notFoundUsersId.map(userId => "<@" + userId + ">").join("\n")
+                    });
+                if (alreadyBlocked.length > 0)
+                    embed.addFields({
+                        name: "Déjà bloqués :",
+                        value: alreadyBlocked.map(elem => "<@" + (elem instanceof Role ? "&" : "") + elem.id + "> (" + (elem instanceof Role ? 'role' : 'user') + ")").join("\n")
+                    });
+                if (blocked.length > 0)
+                    embed.addFields({
+                        name: "Bloqués avec succès : ",
+                        value: blocked.map(elem => "<@" + (elem instanceof Role ? "&" : "") + elem.id + "> (" + (elem instanceof Role ? 'role' : 'user') + ")").join("\n")
+                    });
+
+                this.message.channel.send({embeds: [embed]});
+
+            } else if (['unblock','unghost'].includes(action)) {
+                const unBlocked: Array<GuildMember|Role> = [];
+                const alreadyUnblocked: Array<GuildMember|Role> = [];
+                const notFoundUsersId: string[] = [];
+
+                for (const [name,list] of Object.entries({users,roles})) {
+                    if (list !== undefined) {
+                        for (const elem of list) {
+                            let blockedIndex;
+                            if ((blockedIndex = ownUserConfig.blocked[name].indexOf(elem.id)) == -1) {
+                                alreadyUnblocked.push(elem);
+                                continue;
+                            }
+
+                            ownUserConfig.blocked[name].splice(blockedIndex,1);
+                            unBlocked.push(elem);
+                        }
+                    }
+                }
+
+                const vocalSubscribes: Array<typeof VocalSubscribe|IVocalSubscribe> = await VocalSubscribe.find({
+                    serverId: this.message.guild.id,
+                    listenedId: this.message.author.id,
+                    enabled: false
+                });
+
+                for (const vocalSubscribe of vocalSubscribes) {
+                    if (ownUserConfig.blocked.users.includes(vocalSubscribe.listenerId))
+                        continue;
+
+                    const userConfig: null|IVocalUserConfig = await VocalUserConfig.findOne({serverId: this.message.guild.id, listenerId: vocalSubscribe.listenerId});
+                    if (userConfig != null && !userConfig.listening)
+                        continue;
+
+                    let user: GuildMember;
+                    try {
+                        user = await this.message.guild.members.fetch(vocalSubscribe.listenerId);
+                    } catch (e) {
+                        notFoundUsersId.push(vocalSubscribe.listenerId);
+                        continue;
+                    }
+
+                    if (user.roles.cache.some(role => ownUserConfig.blocked.roles.some(roleId => roleId === role.id)))
+                        continue;
+
+                    vocalSubscribe.enabled = true;
+                    vocalSubscribe.save();
+                }
+
+                ownUserConfig.save();
+
+                if (notFoundUsersId.length > 0)
+                    embed.addFields({
+                        name: "Utilisateurs introuvables : ",
+                        value: notFoundUsersId.map(userId => "<@" + userId + ">").join("\n")
+                    });
+                if (alreadyUnblocked.length > 0)
+                    embed.addFields({
+                        name: "Non bloqués :",
+                        value: alreadyUnblocked.map(elem => "<@" + (elem instanceof Role ? "&" : "") + elem.id + "> (" + (elem instanceof Role ? 'role' : 'user') + ")").join("\n")
+                    });
+                if (unBlocked.length > 0)
+                    embed.addFields({
+                        name: "débloqués avec succès : ",
+                        value: unBlocked.map(elem => "<@" + (elem instanceof Role ? "&" : "") + elem.id + "> (" + (elem instanceof Role ? 'role' : 'user') + ")").join("\n")
+                    });
+
+                this.message.channel.send({embeds: [embed]});
             }
 
-            const vocalSubscribes: Array<typeof VocalSubscribe|IVocalSubscribe> = await VocalSubscribe.find({
-                serverId: this.message.guild.id,
-                listened: this.message.author.id,
-                enabled: true
-            });
-
-            for (const vocalSubscribe of vocalSubscribes) {
-                if (ownUserConfig.blocked.users.includes(vocalSubscribe.listenerId)) {
-                    vocalSubscribe.enabled = false;
-                    vocalSubscribe.save();
-                    continue;
-                }
-
-                let user: GuildMember;
-                try {
-                    user = await this.message.guild.members.fetch(vocalSubscribe.listenerId);
-                } catch (e) {
-                    notFoundUsersId.push(vocalSubscribe.listenerId);
-                    continue;
-                }
-
-                if (user.roles.cache.some(role => ownUserConfig.blocked.roles.some(roleId => role.id === roleId))) {
-                    vocalSubscribe.enabled = false;
-                    vocalSubscribe.save();
-                }
-            }
-
-            ownUserConfig.save();
-
-            if (notFoundUsersId.length > 0)
-                embed.addFields({
-                    name: "Utilisateurs introuvables : ",
-                    value: notFoundUsersId.map(userId => "<@" + userId + ">").join("\n")
-                });
-            if (alreadyBlocked.length > 0)
-                embed.addFields({
-                    name: "Déjà bloqués :",
-                    value: alreadyBlocked.map(elem => "<@" + (elem instanceof Role ? "&" : "") + elem.id + "> (" + (elem instanceof Role ? 'role' : 'user') + ")").join("\n")
-                });
-            if (blocked.length > 0)
-                embed.addFields({
-                    name: "Bloqué succèes : ",
-                    value: blocked.map(elem => "<@" + (elem instanceof Role ? "&" : "") + elem.id + "> (" + (elem instanceof Role ? 'role' : 'user') + ")").join("\n")
-                });
-
-            this.message.channel.send({embeds: [embed]});
             return true;
         }
 
