@@ -11,6 +11,7 @@ import {
 import client from "../client";
 import {existingCommands} from "./CommandsDescription";
 import Command from "./Command";
+import {isNumber,durationUnits,durationUnitsMult} from "./OtherFunctions";
 
 export const extractTypes = {
     channel: (field, message: Message): GuildChannel|ThreadChannel|VoiceChannel|false => {
@@ -134,18 +135,37 @@ export const extractTypes = {
         return commands;
     },
     duration: (field,_) => {
-        const unit = field[field.length-1];
-        const value = parseInt(field.substring(0,field.length-1));
+        if (field === 0) return 0;
+        const unitByName = Object.entries(durationUnits).reduce((acc,[key,values]) => ({
+                ...acc,
+                ...values.reduce((acc, value) => ({
+                    ...acc,
+                    [value]: key
+                }), {})
+            }), {});
 
-        switch (unit) {
-            case 's':
-                return value*1000;
-            case 'm':
-                return value*1000*60;
-            case 'h':
-                return value*1000*60*60;
-            case 'j':
-                return value*1000*60*60*24;
+        let ms = 0;
+        let i=0;
+        while (i<field.length) {
+            while (field[i] === " ") {
+                i++
+            }
+            let numStr = ''
+            while (isNumber(field[i])) {
+                numStr += field[i];
+                i++;
+            }
+            while (field[i] === " ") {
+                i++
+            }
+            let unitName = ''
+            while (i<field.length && field[i] !== " " && !isNumber(field[i])) {
+                unitName += field[i];
+                i++;
+            }
+            ms += parseInt(numStr)*durationUnitsMult[unitByName[unitName]]
         }
+
+        return ms;
     }
 };

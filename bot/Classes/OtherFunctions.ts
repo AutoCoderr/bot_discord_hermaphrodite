@@ -204,3 +204,23 @@ export function isNumber(num) {
       typeof(num) == 'string' && parseInt(num).toString() == num && num != "NaN"
     );
 }
+
+export const durationUnits = {
+    second: ['s','seconde','secondes','second','seconds','sec'],
+    minute: ['m','minute','minutes','min'],
+    hour: ['h','hour','hours','heure','heures']
+}
+
+export const durationUnitsMult = {
+    second: 1000,
+    minute: 60*1000,
+    hour: 60*60*1000
+}
+
+export function decomposeMsTime(ms: number) {
+    return {
+        h: Math.floor(ms/1000/60/60),
+        m: Math.floor(ms/1000/60)%60,
+        s: Math.floor(ms/1000)%60
+    }
+}

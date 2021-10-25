@@ -13,6 +13,7 @@ import VocalConfig, {IVocalConfig} from "../Models/VocalConfig";
 import VocalUserConfig, {IVocalUserConfig} from "../Models/VocalUserConfig";
 import VocalInvite, {IVocalInvite} from "../Models/VocalInvite";
 import client from "../client";
+import {decomposeMsTime} from "../Classes/OtherFunctions";
 
 export default class Vocal extends Command {
     static display = true;
@@ -30,8 +31,8 @@ export default class Vocal extends Command {
             action: {
                 required: (args) => args.help == undefined,
                 type: "string",
-                description: "L'action à effectuer : sub|add, unsub|remove, block|ghost, unsub|unghost, stop, start, limit, mute, status",
-                valid: (field) => ['sub', 'add', 'unsub', 'remove', 'block', 'ghost', 'unblock', 'unghost', 'stop', 'start', 'limit', 'mute', 'status'].includes(field)
+                description: "L'action à effectuer : sub|add, unsub|remove, block|ghost, unsub|unghost, stop, start, limit, mute, unmute, status",
+                valid: (field) => ['sub', 'add', 'unsub', 'remove', 'block', 'ghost', 'unblock', 'unghost', 'stop', 'start', 'limit', 'mute', 'unmute', 'status'].includes(field)
             },
             roles: {
                 required: false,
@@ -82,7 +83,8 @@ export default class Vocal extends Command {
             time: {
                 required: (args) => args.help == undefined && ["limit", "mute"].includes(args.action),
                 type: "duration",
-                description: "Le temps durant lequel on souhaite ne pas recevoir de notif (ex: 30s, 5m, 3h, 2j)"
+                description: "Le temps durant lequel on souhaite ne pas recevoir de notif (ex: 30s, 5m, 3h, 2j)",
+                valid: (time, args) => args.action !== 'mute' || time > 0
             }
         }
     }
@@ -493,6 +495,59 @@ export default class Vocal extends Command {
             return true;
         }
 
+        if (action === "mute") {
+            ownUserConfig.lastMute = new Date();
+            ownUserConfig.mutedFor = time
+
+            const {h,m,s} = decomposeMsTime(time);
+
+            this.message.channel.send(
+                "Vous ne recevrez plus de notification pendant"+
+                (h > 0 ? ' '+h+' heure'+(h > 1 ? 's' : '') : '')+
+                (m > 0 ? ' '+m+' minute'+(m > 1 ? 's' : '') : '')+
+                (s > 0 ? ' '+s+' seconde'+(s > 1 ? 's' : '') : '')+"."
+            );
+
+            ownUserConfig.save();
+            return true;
+        }
+
+        if (action == 'unmute') {
+            if (
+                typeof(ownUserConfig.mutedFor) === "number" &&
+                ownUserConfig.lastMute !== null &&
+                ownUserConfig.lastMute instanceof Date &&
+                Date.now()-ownUserConfig.lastMute.getTime() <= ownUserConfig.mutedFor
+            ) {
+                ownUserConfig.lastMute = null;
+                ownUserConfig.mutedFor = null;
+
+                this.message.channel.send("Vous pouvez de nouveau recevoir des notifications");
+
+                ownUserConfig.save();
+                return true;
+            }
+
+            this.message.channel.send("Vous n'êtes pas mute");
+        }
+
+        if (action == 'limit') {
+            ownUserConfig.limit = time;
+
+            const {h,m,s} = decomposeMsTime(time);
+
+            this.message.channel.send((h+m+s === 0) ? "Il n'y aura maintenant aucun répit entre chaque notification":
+                "Il y aura maintenant un répit de"+
+                    (h > 0 ? ' '+h+" heure"+(h > 1 ? 's' : '') : '')+
+                    (m > 0 ? ' '+m+" minute"+(m > 1 ? 's' : '') : '')+
+                    (s > 0 ? ' '+s+" seconde"+(s > 1 ? 's' : '') : '')
+                +" entre chaque notification"
+            );
+            ownUserConfig.save();
+
+            return true;
+        }
+
         return false;
     }
 
@@ -549,7 +604,8 @@ export default class Vocal extends Command {
                 config.command_prefix + this.commandName + " start \nDe nouveau écouter les connexions au vocal\n\n" +
                 config.command_prefix + this.commandName + " limit 'time' \nAttendre un temps minimum entre chaque notif \nexemples pour time: 30s, 1h, 5m, 1j\n\n" +
                 config.command_prefix + this.commandName + " mute 'time' \nNe plus recevoir de notif pendant x temps\n\n" +
-                config.command_prefix + this.commandName + " status \nAffichet toutes les infos vous concernant\n\n" +
+                config.command_prefix + this.commandName + " unmute \nDe nouveaux recevoir les notifs\n\n" +
+                config.command_prefix + this.commandName + " status \nAfficher toutes les infos vous concernant\n\n" +
                 config.command_prefix + this.commandName + " -h \nPour afficher l'aide"
         });
     }

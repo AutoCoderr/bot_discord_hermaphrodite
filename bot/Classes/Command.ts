@@ -237,13 +237,39 @@ export default class Command {
     }
 
     getValueInCorrectType(value: string) {
+        value = value.trim();
         if (value == "true" || value == "false") {
             return value == "true";
         } else if (isNumber(value)) {
             return parseInt(value);
         } else {
-            return value.trim();
+            return value;
         }
+    }
+
+    checkIfModelValid() {
+        if (this.commandName != null && validModelCommands[this.commandName]) return true;
+
+        let valid = true;
+        if (this.commandName != null && validModelCommands[this.commandName] == false) valid = false;
+
+        if (valid && this.argsModel.$argsByType && this.argsModel.$argsByOrder) valid = false;
+
+
+        if (this.commandName != null && !validModelCommands[this.commandName]) {
+            validModelCommands[this.commandName] = valid;
+        }
+        if (!valid) {
+            this.message.channel.send({embeds: [
+                    new MessageEmbed()
+                        .setTitle("Modèle de la commande invalide")
+                        .setDescription("Le modèle de la commande est invalide")
+                        .setColor('#0099ff')
+                        .setTimestamp()
+                ]})
+            return false;
+        }
+        return true;
     }
 
     parseCommand(): any {
@@ -318,31 +344,6 @@ export default class Command {
         return argsObject;
     }
 
-    checkIfModelValid() {
-        if (this.commandName != null && validModelCommands[this.commandName]) return true;
-
-        let valid = true;
-        if (this.commandName != null && validModelCommands[this.commandName] == false) valid = false;
-
-        if (valid && this.argsModel.$argsByType && this.argsModel.$argsByOrder) valid = false;
-
-
-        if (this.commandName != null && !validModelCommands[this.commandName]) {
-            validModelCommands[this.commandName] = valid;
-        }
-        if (!valid) {
-            this.message.channel.send({embeds: [
-                        new MessageEmbed()
-                            .setTitle("Modèle de la commande invalide")
-                            .setDescription("Le modèle de la commande est invalide")
-                            .setColor('#0099ff')
-                            .setTimestamp()
-                    ]})
-            return false;
-        }
-        return true;
-    }
-
     async computeArgs(args,model) {
         let out: any = {};
         let fails: Array<any> = [];
@@ -379,7 +380,7 @@ export default class Command {
                         if (extractTypes[<string>argType]) {
                             const moreDatas = typeof(model[attr].moreDatas) == "function" ? await model[attr].moreDatas(out,argType) : null
                             const data = await extractTypes[<string>argType](args[field],this.message,moreDatas);
-                            if (data) {
+                            if (data !== false) {
                                 if (typeof(model[attr].valid) != "function" || await model[attr].valid(data,out))
                                     out[attr] = data;
                                 else {
@@ -451,7 +452,7 @@ export default class Command {
                         if (extractTypes[<string>argType]) {
                             const moreDatas = typeof(argsByOrder[i].moreDatas) == "function" ? await argsByOrder[i].moreDatas(out,argType) : null
                             const data = await extractTypes[<string>argType](args[i],this.message,moreDatas);
-                            if (data) {
+                            if (data !== false) {
                                 if (typeof(argsByOrder[i].valid) != "function" || await argsByOrder[i].valid(data,out))
                                     out[argsByOrder[i].field] = data;
                                 else
@@ -509,7 +510,7 @@ export default class Command {
                         (typeof(argsByType[attr].displayValidError) == "function" && await argsByType[attr].displayValidError(out));
 
 
-                    for (let i=0;args[i];i++) {
+                    for (let i=0;args[i] !== undefined;i++) {
                         if (alreadyDefineds[i]) continue;
 
                         if (args[i] != undefined && (
@@ -530,7 +531,7 @@ export default class Command {
                             if (extractTypes[<string>argType]) {
                                 const moreDatas = typeof(argsByType[attr].moreDatas) == "function" ? await argsByType[attr].moreDatas(out,argType) : null
                                 const data = await extractTypes[<string>argType](args[i],this.message,moreDatas);
-                                if (data) {
+                                if (data !== false) {
                                     if (typeof(argsByType[attr].valid) != "function" || await argsByType[attr].valid(data,out)) {
                                         out[attr] = data;
                                         alreadyDefineds[i] = true;

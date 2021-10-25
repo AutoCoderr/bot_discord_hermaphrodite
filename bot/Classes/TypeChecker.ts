@@ -1,3 +1,5 @@
+import {durationUnits} from "./OtherFunctions";
+
 export const checkTypes = {
     number: field => typeof(field) == "number",
     string: field => typeof(field) == "string",
@@ -15,7 +17,17 @@ export const checkTypes = {
     listenerReactMessage: field => checkTypes.string(field) && new RegExp("^\<#[0-9]{18}\>/[0-9]{18}$").test(field),
     command: (field) => checkTypes.string(field) && new RegExp("^"+regex.command+"$").test(field),
     commands: (field) => checkTypes.string(field) && new RegExp("^"+regex.command+"( )*(\,( )*"+regex.command+"( )*)*$"),
-    duration: (field) => checkTypes.string(field) && new RegExp("^[0-9]+[smhj]$")
+    duration: (field) => {
+        if (!checkTypes.string(field) && !checkTypes.number(field)) return false;
+        field = field.toString();
+        const regex = "[0-9]+( )*("+
+            Object.values(durationUnits).reduce(
+                (acc,values,i) =>
+                    acc+(i > 0 ? '|' : '')+values.join('|')
+                , '')
+            +")";
+        return new RegExp("^( )*("+regex+"( )*)+|0+$").test(field);
+    }
 };
 
 const regex: any = {};
