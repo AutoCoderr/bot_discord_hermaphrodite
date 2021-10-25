@@ -11,6 +11,7 @@ import {
 import VocalConfig from "../Models/VocalConfig";
 import {splitFieldsEmbed} from "../Classes/OtherFunctions";
 import config from "../config";
+import VocalSubscribe, {IVocalSubscribe} from "../Models/VocalSubscribe";
 
 export default class ConfigVocal extends Command {
     static display = true;
@@ -125,6 +126,7 @@ export default class ConfigVocal extends Command {
             }
             switch (subAction) {
                 case 'add':
+                    const notFoundUserId: string[] = [];
                     if (blacklistType == "channel") {
                         vocalConfig.channelBlacklist = this.addIdsToList(vocalConfig.channelBlacklist, channels.map(channel => channel.id));
                     } else {
@@ -132,8 +134,31 @@ export default class ConfigVocal extends Command {
                             vocalConfig.listenerBlacklist.users = this.addIdsToList(vocalConfig.listenerBlacklist.users, users.map(user => user.id));
                         if (roles)
                             vocalConfig.listenerBlacklist.roles = this.addIdsToList(vocalConfig.listenerBlacklist.roles, roles.map(role => role.id));
+                        const vocalSubscribes: Array<IVocalSubscribe|typeof VocalSubscribe> = await VocalSubscribe.find({
+                            serverId: this.message.guild.id
+                        });
+                        for (const vocalSubscribe of vocalSubscribes) {
+                            if (users !== undefined && users.some(user => user.id === vocalSubscribe.listenerId)) {
+                                vocalSubscribe.remove();
+                                continue;
+                            }
+
+                            let member: null|GuildMember = null;
+                            try {
+                                member = await this.message.guild.members.fetch(vocalSubscribe.listenerId);
+                            } catch (e) {
+                                notFoundUserId.push(vocalSubscribe.listenerId);
+                            }
+                            if (member === null || (roles !== undefined && member.roles.cache.some(roleA => roles.some(roleB => roleA.id === roleB.id)))) {
+                                vocalSubscribe.remove();
+                            }
+                        }
                     }
-                    this.message.channel.send("Les "+(blacklistType == "channel" ? "channels" : "utilisateurs/roles")+" ont été ajouté à la blacklist '"+blacklistType+"'");
+                    let msg = "Les "+(blacklistType == "channel" ? "channels" : "utilisateurs/roles")+" ont été ajouté à la blacklist '"+blacklistType+"'"
+                    if (notFoundUserId.length > 0) {
+                        msg += "\n" + notFoundUserId.map(id => "L'utilisateur avec l'id " + id + " est introuvable, son écoute a été supprimée").join("\n")
+                    }
+                    this.message.channel.send(msg);
                     break;
                 case 'remove':
                     if (blacklistType == "channel") {
@@ -144,7 +169,7 @@ export default class ConfigVocal extends Command {
                         if (roles)
                             vocalConfig.listenerBlacklist.roles = this.removeIdsToList(vocalConfig.listenerBlacklist.roles, roles.map(role => role.id));
                     }
-                    this.message.channel.send("Les "+(blacklistType == "channel" ? "channels" : "utilisateurs")+" ont été retirés de la blacklist '"+blacklistType+"'");
+                    this.message.channel.send("Les "+(blacklistType == "channel" ? "channels" : "utilisateurs/roles")+" ont été retirés de la blacklist '"+blacklistType+"'");
                     break;
                 case 'clear':
                     if (blacklistType == "channel") {
