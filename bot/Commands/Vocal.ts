@@ -536,7 +536,7 @@ export default class Vocal extends Command {
 
             const {h,m,s} = decomposeMsTime(time);
 
-            this.message.channel.send((h+m+s === 0) ? "Il n'y aura maintenant aucun répit entre chaque notification":
+            this.message.channel.send((h+m+s === 0) ? "Il n'y aura maintenant aucun répit entre les notifications" :
                 "Il y aura maintenant un répit de"+
                     (h > 0 ? ' '+h+" heure"+(h > 1 ? 's' : '') : '')+
                     (m > 0 ? ' '+m+" minute"+(m > 1 ? 's' : '') : '')+

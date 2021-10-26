@@ -26,7 +26,7 @@ export const checkTypes = {
                     acc+(i > 0 ? '|' : '')+values.join('|')
                 , '')
             +")";
-        return new RegExp("^( )*("+regex+"( )*)+|0+$").test(field);
+        return new RegExp("^(( )*("+regex+"( )*)+|0+)$").test(field);
     }
 };
 

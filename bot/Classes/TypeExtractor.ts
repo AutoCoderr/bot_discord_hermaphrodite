@@ -135,7 +135,7 @@ export const extractTypes = {
         return commands;
     },
     duration: (field,_) => {
-        if (field === 0) return 0;
+        if (field === 0 || (typeof(field) == "string" && parseInt(field) === 0)) return 0;
         const unitByName = Object.entries(durationUnits).reduce((acc,[key,values]) => ({
                 ...acc,
                 ...values.reduce((acc, value) => ({
