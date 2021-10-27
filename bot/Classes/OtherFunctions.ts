@@ -217,10 +217,16 @@ export const durationUnitsMult = {
     hour: 60*60*1000
 }
 
-export function decomposeMsTime(ms: number) {
+export function decomposeMsTime(ms: number): {h: number, m: number, s: number} {
     return {
         h: Math.floor(ms/1000/60/60),
         m: Math.floor(ms/1000/60)%60,
         s: Math.floor(ms/1000)%60
     }
+}
+
+export function showTime(time: {h: number, m: number, s: number}): string {
+    return (time.h > 0 ? ' '+time.h+' heure'+(time.h > 1 ? 's' : '') : '')+
+        (time.m > 0 ? ' '+time.m+' minute'+(time.m > 1 ? 's' : '') : '')+
+        (time.s > 0 ? ' '+time.s+' seconde'+(time.s > 1 ? 's' : '') : '')
 }

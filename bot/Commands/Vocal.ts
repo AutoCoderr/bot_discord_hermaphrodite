@@ -13,7 +13,7 @@ import VocalConfig, {IVocalConfig} from "../Models/VocalConfig";
 import VocalUserConfig, {IVocalUserConfig} from "../Models/VocalUserConfig";
 import VocalInvite, {IVocalInvite} from "../Models/VocalInvite";
 import client from "../client";
-import {decomposeMsTime} from "../Classes/OtherFunctions";
+import {decomposeMsTime, showTime} from "../Classes/OtherFunctions";
 
 export default class Vocal extends Command {
     static display = true;
@@ -496,17 +496,10 @@ export default class Vocal extends Command {
         }
 
         if (action === "mute") {
-            ownUserConfig.lastMute = new Date();
+            ownUserConfig.lastMute = new Date(Math.floor(Date.now()/1000)*1000);
             ownUserConfig.mutedFor = time
 
-            const {h,m,s} = decomposeMsTime(time);
-
-            this.message.channel.send(
-                "Vous ne recevrez plus de notification pendant"+
-                (h > 0 ? ' '+h+' heure'+(h > 1 ? 's' : '') : '')+
-                (m > 0 ? ' '+m+' minute'+(m > 1 ? 's' : '') : '')+
-                (s > 0 ? ' '+s+' seconde'+(s > 1 ? 's' : '') : '')+"."
-            );
+            this.message.channel.send("Vous ne recevrez plus de notification pendant"+showTime(decomposeMsTime(time)));
 
             ownUserConfig.save();
             return true;
@@ -515,9 +508,8 @@ export default class Vocal extends Command {
         if (action == 'unmute') {
             if (
                 typeof(ownUserConfig.mutedFor) === "number" &&
-                ownUserConfig.lastMute !== null &&
                 ownUserConfig.lastMute instanceof Date &&
-                Date.now()-ownUserConfig.lastMute.getTime() <= ownUserConfig.mutedFor
+                Date.now()-ownUserConfig.lastMute.getTime() < ownUserConfig.mutedFor
             ) {
                 ownUserConfig.lastMute = null;
                 ownUserConfig.mutedFor = null;
@@ -534,17 +526,66 @@ export default class Vocal extends Command {
         if (action == 'limit') {
             ownUserConfig.limit = time;
 
-            const {h,m,s} = decomposeMsTime(time);
+            const decomposedTime = decomposeMsTime(time);
 
-            this.message.channel.send((h+m+s === 0) ? "Il n'y aura maintenant aucun répit entre les notifications" :
-                "Il y aura maintenant un répit de"+
-                    (h > 0 ? ' '+h+" heure"+(h > 1 ? 's' : '') : '')+
-                    (m > 0 ? ' '+m+" minute"+(m > 1 ? 's' : '') : '')+
-                    (s > 0 ? ' '+s+" seconde"+(s > 1 ? 's' : '') : '')
-                +" entre chaque notification"
+            this.message.channel.send((decomposedTime.h+decomposedTime.m+decomposedTime.s === 0) ?
+                "Il n'y aura maintenant aucun répit entre les notifications" :
+                "Il y aura maintenant un répit de"+showTime(decomposedTime)+" entre chaque notification"
             );
             ownUserConfig.save();
 
+            return true;
+        }
+
+        if (action == "status") {
+            const now = Math.floor(Date.now()/1000)*1000;
+
+            const muted = typeof(ownUserConfig.mutedFor) == "number" &&
+                ownUserConfig.lastMute instanceof Date &&
+                now-ownUserConfig.lastMute.getTime() < ownUserConfig.mutedFor;
+
+            let sinceTimeMuted;
+            let remaningTimeMuted;
+            if (muted) {
+                sinceTimeMuted = decomposeMsTime(now-ownUserConfig.lastMute.getTime());
+                remaningTimeMuted = decomposeMsTime(ownUserConfig.mutedFor-now+ownUserConfig.lastMute.getTime());
+            }
+            embed.addFields({
+                name: muted ? "Vous êtes mute" : "Vous n'est pas mute",
+                value: muted ? "Vous êtes mute depuis"+showTime(sinceTimeMuted)+
+                    ".\nIl reste"+showTime(remaningTimeMuted)+"." : "Vous n'êtes pas mute"
+            });
+
+            embed.addFields({
+                name: "Répit entre chaque notifications : ",
+                value: (ownUserConfig.limit >  0 ? "Vous avez"+showTime(decomposeMsTime(ownUserConfig.limit)) : "Vous n'avez pas")+
+                    " de répit entre chaque notification"
+            });
+
+            embed.addFields({
+                name: "Ecoute "+(ownUserConfig.listening ? "activée" : "désactivée"),
+                value: "L'écoute est "+(ownUserConfig.listening ? "activée" : "désactivée")
+            });
+
+            if (ownUserConfig.blocked.users.length > 0) {
+                embed.addFields({
+                    name: "Les utilisateurs que vous avez bloqué",
+                    value: ownUserConfig.blocked.users.map(userId => "<@"+userId+">").join("\n")
+                });
+            }
+            if (ownUserConfig.blocked.roles.length > 0) {
+                embed.addFields({
+                    name: "Les roles que vous avez bloqué",
+                    value: ownUserConfig.blocked.roles.map(userId => "<@&"+userId+">").join("\n")
+                });
+            }
+            if (ownUserConfig.blocked.users.length+ownUserConfig.blocked.roles.length == 0) {
+                embed.addFields({
+                    name: "Blacklist vide",
+                    value: "Vous n'avez bloqué aucun utilisateur ni aucun role"
+                });
+            }
+            this.message.channel.send({embeds: [embed]});
             return true;
         }
 
