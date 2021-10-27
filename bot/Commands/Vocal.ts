@@ -5,7 +5,7 @@ import {
     MessageActionRow,
     MessageButton,
     MessageEmbed,
-    Role
+    Role, VoiceState
 } from "discord.js";
 import config from "../config";
 import VocalSubscribe, {IVocalSubscribe} from "../Models/VocalSubscribe";
@@ -590,6 +590,12 @@ export default class Vocal extends Command {
         }
 
         return false;
+    }
+
+    static listenVoiceChannelsConnects(oldState: VoiceState, newState: VoiceState) {
+        if (oldState.channelId === null && newState.channelId !== null) {
+            console.log("user "+newState.member?.id+" connected on voice channel "+newState.channelId+" on server "+newState.guild.id);
+        }
     }
 
     static async listenInviteButtons(interaction: Interaction) {

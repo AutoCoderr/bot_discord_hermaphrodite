@@ -1,7 +1,7 @@
 import {existingCommands} from "./Classes/CommandsDescription";
 import {getExistingCommands} from "./Classes/CommandsDescription";
 import client from "./client";
-import {Interaction} from "discord.js";
+import {Interaction, VoiceState} from "discord.js";
 
 export default function init(bot) {
     setTimeout(async () => {
@@ -17,6 +17,11 @@ export default function init(bot) {
                 //@ts-ignore
                 existingCommands.Vocal.listenInviteButtons(interaction);
             });
+
+            client.on('voiceStateUpdate', (oldState: VoiceState, newState: VoiceState) => {
+                //@ts-ignore
+                existingCommands.Vocal.listenVoiceChannelsConnects(oldState, newState);
+            })
         })
     }, 5000);
 }
