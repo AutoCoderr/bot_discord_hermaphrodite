@@ -190,7 +190,7 @@ export default class Vocal extends Command {
 
                 try {
                     await user.send({
-                        content: "<@" + this.message.author.id + "> souhaite pouvoir écouter vos connexions vocales sur le serveur '" + this.message.guild.name + "'",
+                        content: (this.message.member?.nickname??this.message.author.username)+" souhaite pouvoir écouter vos connexions vocales sur le serveur '" + this.message.guild.name + "'",
                         components: [
                             new MessageActionRow().addComponents(
                                 new MessageButton()
@@ -651,7 +651,7 @@ export default class Vocal extends Command {
                     continue;
                 }
                 try {
-                    await listener.send("<@" + newState.member.id + "> s'est connecté sur le channel vocal #" + newState.channel.name + " sur le serveur " + newState.guild.name);
+                    await listener.send((newState.member.nickname??newState.member.user.username)+" s'est connecté sur le channel vocal #" + newState.channel.name + " sur le serveur " + newState.guild.name);
                 } catch (_) {
                     continue;
                 }
@@ -704,12 +704,12 @@ export default class Vocal extends Command {
                                 enabled: listenerConfig.listening
                             });
                             try {
-                                await requester.send("<@" + invite.requestedId + "> a accepté votre invitation sur '" + server.name + "'"+(!listenerConfig.listening ? " (Attention votre écoute n'est pas activée sur ce serveur)" : ""));
+                                await requester.send((requested.nickname??requested.user.username)+" a accepté(e) votre invitation sur '" + server.name + "'"+(!listenerConfig.listening ? " (Attention votre écoute n'est pas activée sur ce serveur)" : ""));
                             } catch (_) {}
                             await interaction.editReply({content: "Invitation acceptée"});
                         } else {
                             try {
-                                await requester.send("<@" + invite.requestedId + "> a refusé votre invitation sur '" + server.name + "'");
+                                await requester.send((requested.nickname??requested.user.username)+" a refusé(e) votre invitation sur '" + server.name + "'");
                             } catch (_) {}
                             await interaction.editReply({content: "Invitation refusée"});
                         }
