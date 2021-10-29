@@ -148,6 +148,7 @@ export default class Vocal extends Command {
             const inviteds: GuildMember[] = [];
             const alreadyInviteds: GuildMember[] = [];
             const alreadySubscribeds: GuildMember[] = [];
+            const usersCantBeDM: GuildMember[] = [];
 
             for (const user of users) {
                 const subscribe = await VocalSubscribe.findOne({
@@ -187,24 +188,8 @@ export default class Vocal extends Command {
                 const acceptButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "a";
                 const denyButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "d";
 
-                inviteds.push(user);
-
-                await Promise.all([
-                    VocalInvite.create({
-                        buttonId: acceptButtonId,
-                        requesterId: this.message.author.id,
-                        requestedId: user.id,
-                        accept: true,
-                        serverId: this.message.guild.id
-                    }),
-                    VocalInvite.create({
-                        buttonId: denyButtonId,
-                        requesterId: this.message.author.id,
-                        requestedId: user.id,
-                        accept: false,
-                        serverId: this.message.guild.id
-                    }),
-                    user.send({
+                try {
+                    await user.send({
                         content: "<@" + this.message.author.id + "> souhaite pouvoir écouter vos connexions vocales sur le serveur '" + this.message.guild.name + "'",
                         components: [
                             new MessageActionRow().addComponents(
@@ -219,7 +204,27 @@ export default class Vocal extends Command {
                             )
                         ]
                     })
-                ]);
+                } catch (_) {
+                    usersCantBeDM.push(user);
+                    continue;
+                }
+
+                VocalInvite.create({
+                    buttonId: acceptButtonId,
+                    requesterId: this.message.author.id,
+                    requestedId: user.id,
+                    accept: true,
+                    serverId: this.message.guild.id
+                });
+                VocalInvite.create({
+                    buttonId: denyButtonId,
+                    requesterId: this.message.author.id,
+                    requestedId: user.id,
+                    accept: false,
+                    serverId: this.message.guild.id
+                });
+
+                inviteds.push(user);
             }
             if (forbiddens.length > 0)
                 embed.addFields({
@@ -241,6 +246,11 @@ export default class Vocal extends Command {
                     name: "Invités avec succès :",
                     value: inviteds.map(user => "<@" + user.id + ">").join("\n")
                 });
+            if (usersCantBeDM.length > 0)
+                embed.addFields({
+                    name: "Ces utilisateurs refusent les messages privés :",
+                    value: usersCantBeDM.map(user => "<@" + user.id + ">").join("\n")
+                })
             if (!ownUserConfig.listening) {
                 embed.addFields({
                     name: "Votre écoute est désactivée",
@@ -592,9 +602,67 @@ export default class Vocal extends Command {
         return false;
     }
 
-    static listenVoiceChannelsConnects(oldState: VoiceState, newState: VoiceState) {
-        if (oldState.channelId === null && newState.channelId !== null) {
-            console.log("user "+newState.member?.id+" connected on voice channel "+newState.channelId+" on server "+newState.guild.id);
+    static async listenVoiceChannelsConnects(oldState: VoiceState, newState: VoiceState) {
+        if (oldState.channelId !== newState.channelId && newState.channelId !== null && newState.channel !== null && newState.member !== null) {
+            const vocalConfig: IVocalConfig = await VocalConfig.findOne({serverId: newState.guild.id, enabled: true});
+            if (vocalConfig === null) return;
+
+            if (vocalConfig.channelBlacklist.includes(newState.channelId)) return;
+
+            const vocalSubscribes: IVocalSubscribe[] = await VocalSubscribe.find({
+                serverId: newState.guild.id,
+                listenedId: newState.member.id,
+                enabled: true
+            });
+
+            for (const vocalSubscribe of vocalSubscribes) {
+                let listenerConfig: IVocalUserConfig|typeof VocalUserConfig= await VocalUserConfig.findOne({
+                    serverId: newState.guild.id,
+                    userId: vocalSubscribe.listenerId
+                });
+
+                if (listenerConfig === null) {
+                    listenerConfig = await VocalUserConfig.create({
+                        serverId: newState.guild.id,
+                        userId: vocalSubscribe.listenerId,
+                        blocked: {users: [], roles: []},
+                        listening: true,
+                        limit: 0
+                    });
+                }
+
+                if (
+                    listenerConfig.lastMute instanceof Date &&
+                    typeof(listenerConfig.mutedFor) == "number" &&
+                    Date.now()-listenerConfig.lastMute.getTime() < listenerConfig.mutedFor
+                ) continue;
+
+                let listener: null|GuildMember = null;
+                try {
+                    listener = await newState.guild.members.fetch(vocalSubscribe.listenerId);
+                } catch (_) {}
+
+                if (listener === null) {
+                    VocalSubscribe.deleteMany({
+                        serverId: newState.guild.id,
+                        listener: vocalSubscribe.listenerId
+                    });
+                    listenerConfig.remove()
+                    continue;
+                }
+                try {
+                    await listener.send("<@" + newState.member.id + "> s'est connecté sur le channel vocal #" + newState.channel.name + " sur le serveur " + newState.guild.name);
+                } catch (_) {
+                    continue;
+                }
+
+                if (listenerConfig.limit > 0) {
+                    listenerConfig.lastMute = new Date(Math.floor(Date.now()/1000)*1000);
+                    listenerConfig.mutedFor = listenerConfig.limit;
+                    listenerConfig.save();
+                }
+            }
+
         }
     }
 
@@ -610,24 +678,43 @@ export default class Vocal extends Command {
                 await interaction.deferReply();
                 if ((server = client.guilds.cache.get(invite.serverId)) === undefined) {
                     await interaction.editReply({content: "Le serveur associé à cette invitation semble inaccessible au bot"});
-                } else if (invite.accept) {
-                    const listenerConfig: IVocalUserConfig = await VocalUserConfig.findOne({serverId: server.id, listenerId: invite.requesterId});
-
-                    await VocalSubscribe.create({
-                        serverId: invite.serverId,
-                        listenerId: invite.requesterId,
-                        listenedId: invite.requestedId,
-                        enabled: listenerConfig.listening
-                    });
-                    const requester = await server.members.fetch(invite.requesterId);
-                    await requester.send("<@" + invite.requestedId + "> a accepté votre invitation sur '" + server.name + "'"+(!listenerConfig.listening ? " (Attention votre écoute n'est pas activée sur ce serveur)" : ""));
-                    await interaction.editReply({content: "Invitation acceptée"});
                 } else {
-                    const requester = await server.members.fetch(invite.requesterId);
-                    await requester.send("<@" + invite.requestedId + "> a refusé votre invitation sur '" + server.name + "'");
-                    await interaction.editReply({content: "Invitation refusée"});
-                }
+                    let requested: null|GuildMember = null;
+                    try {
+                        requested = await server.members.fetch(invite.requestedId);
+                    } catch (_) {
+                        await interaction.editReply("Vous ne vous trouvez visiblement plus sur le serveur "+server.name);
+                    }
+                    let requester: null|GuildMember = null;
+                    if (requested !== null) {
+                        try {
+                            requester = await server.members.fetch(invite.requesterId);
+                        } catch(_) {
+                            await interaction.editReply("L'envoyeur de cette invitation est introuvable sur le serveur "+server.name);
+                        }
+                    }
 
+                    if (requested !== null && requester !== null) {
+                        if (invite.accept) {
+                            const listenerConfig: IVocalUserConfig = await VocalUserConfig.findOne({serverId: server.id, listenerId: invite.requesterId});
+                            await VocalSubscribe.create({
+                                serverId: invite.serverId,
+                                listenerId: invite.requesterId,
+                                listenedId: invite.requestedId,
+                                enabled: listenerConfig.listening
+                            });
+                            try {
+                                await requester.send("<@" + invite.requestedId + "> a accepté votre invitation sur '" + server.name + "'"+(!listenerConfig.listening ? " (Attention votre écoute n'est pas activée sur ce serveur)" : ""));
+                            } catch (_) {}
+                            await interaction.editReply({content: "Invitation acceptée"});
+                        } else {
+                            try {
+                                await requester.send("<@" + invite.requestedId + "> a refusé votre invitation sur '" + server.name + "'");
+                            } catch (_) {}
+                            await interaction.editReply({content: "Invitation refusée"});
+                        }
+                    }
+                }
                 await VocalInvite.deleteMany({
                     serverId: invite.serverId,
                     requesterId: invite.requesterId,
