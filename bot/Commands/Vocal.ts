@@ -13,7 +13,7 @@ import VocalConfig, {IVocalConfig} from "../Models/VocalConfig";
 import VocalUserConfig, {IVocalUserConfig} from "../Models/VocalUserConfig";
 import VocalInvite, {IVocalInvite} from "../Models/VocalInvite";
 import client from "../client";
-import {decomposeMsTime, showTime} from "../Classes/OtherFunctions";
+import {decomposeMsTime, showTime, splitFieldsEmbed} from "../Classes/OtherFunctions";
 
 export default class Vocal extends Command {
     static display = true;
@@ -33,6 +33,12 @@ export default class Vocal extends Command {
                 type: "string",
                 description: "L'action à effectuer : sub|add, unsub|remove, block|ghost, unsub|unghost, stop, start, limit, mute, unmute, status",
                 valid: (field) => ['sub', 'add', 'unsub', 'remove', 'block', 'ghost', 'unblock', 'unghost', 'stop', 'start', 'limit', 'mute', 'unmute', 'status'].includes(field)
+            },
+            subAction: {
+                required: false,
+                type: "string",
+                description: "Obtenir plus de détails concernant les écoutes : subs",
+                valid: (field) => ['sub', 'subs'].includes(field)
             },
             roles: {
                 required: false,
@@ -89,8 +95,8 @@ export default class Vocal extends Command {
         }
     }
 
-    async action(args: { help: boolean, action: string, users: GuildMember[], roles: Role[], time: number }) {
-        const {help, action, roles, users, time} = args;
+    async action(args: { help: boolean, action: string, subAction: string, users: GuildMember[], roles: Role[], time: number }) {
+        const {help, action, subAction, roles, users, time} = args;
 
         if (help) {
             this.displayHelp();
@@ -190,7 +196,7 @@ export default class Vocal extends Command {
 
                 try {
                     await user.send({
-                        content: (this.message.member?.nickname??this.message.author.username)+" souhaite pouvoir écouter vos connexions vocales sur le serveur '" + this.message.guild.name + "'",
+                        content: (this.message.member?.nickname ?? this.message.author.username) + " souhaite pouvoir écouter vos connexions vocales sur le serveur '" + this.message.guild.name + "'",
                         components: [
                             new MessageActionRow().addComponents(
                                 new MessageButton()
@@ -480,7 +486,7 @@ export default class Vocal extends Command {
             });
 
             for (const vocalSubscribe of vocalSubscribes) {
-                const listenedConfig: null|IVocalUserConfig = await VocalUserConfig.findOne({
+                const listenedConfig: null | IVocalUserConfig = await VocalUserConfig.findOne({
                     serverId: this.message.guild.id,
                     userId: vocalSubscribe.listenedId
                 });
@@ -506,10 +512,10 @@ export default class Vocal extends Command {
         }
 
         if (action === "mute") {
-            ownUserConfig.lastMute = new Date(Math.floor(Date.now()/1000)*1000);
+            ownUserConfig.lastMute = new Date(Math.floor(Date.now() / 1000) * 1000);
             ownUserConfig.mutedFor = time
 
-            this.message.channel.send("Vous ne recevrez plus de notification pendant"+showTime(decomposeMsTime(time)));
+            this.message.channel.send("Vous ne recevrez plus de notification pendant" + showTime(decomposeMsTime(time)));
 
             ownUserConfig.save();
             return true;
@@ -517,9 +523,9 @@ export default class Vocal extends Command {
 
         if (action == 'unmute') {
             if (
-                typeof(ownUserConfig.mutedFor) === "number" &&
+                typeof (ownUserConfig.mutedFor) === "number" &&
                 ownUserConfig.lastMute instanceof Date &&
-                Date.now()-ownUserConfig.lastMute.getTime() < ownUserConfig.mutedFor
+                Date.now() - ownUserConfig.lastMute.getTime() < ownUserConfig.mutedFor
             ) {
                 ownUserConfig.lastMute = null;
                 ownUserConfig.mutedFor = null;
@@ -536,11 +542,9 @@ export default class Vocal extends Command {
         if (action == 'limit') {
             ownUserConfig.limit = time;
 
-            const decomposedTime = decomposeMsTime(time);
-
-            this.message.channel.send((decomposedTime.h+decomposedTime.m+decomposedTime.s === 0) ?
+            this.message.channel.send((time == 0) ?
                 "Il n'y aura maintenant aucun répit entre les notifications" :
-                "Il y aura maintenant un répit de"+showTime(decomposedTime)+" entre chaque notification"
+                "Il y aura maintenant un répit de" + showTime(decomposeMsTime(time)) + " entre chaque notification"
             );
             ownUserConfig.save();
 
@@ -548,54 +552,141 @@ export default class Vocal extends Command {
         }
 
         if (action == "status") {
-            const now = Math.floor(Date.now()/1000)*1000;
+            let embeds: MessageEmbed[] = [embed];
 
-            const muted = typeof(ownUserConfig.mutedFor) == "number" &&
-                ownUserConfig.lastMute instanceof Date &&
-                now-ownUserConfig.lastMute.getTime() < ownUserConfig.mutedFor;
+            if (["sub", 'subs'].includes(subAction)) {
 
-            let sinceTimeMuted;
-            let remaningTimeMuted;
-            if (muted) {
-                sinceTimeMuted = decomposeMsTime(now-ownUserConfig.lastMute.getTime());
-                remaningTimeMuted = decomposeMsTime(ownUserConfig.mutedFor-now+ownUserConfig.lastMute.getTime());
-            }
-            embed.addFields({
-                name: muted ? "Vous êtes mute" : "Vous n'est pas mute",
-                value: muted ? "Vous êtes mute depuis"+showTime(sinceTimeMuted)+
-                    ".\nIl reste"+showTime(remaningTimeMuted)+"." : "Vous n'êtes pas mute"
-            });
+                const subscribings: IVocalSubscribe[] = await VocalSubscribe.find({
+                    serverId: this.message.guild.id,
+                    listenerId: this.message.author.id
+                })
 
-            embed.addFields({
-                name: "Répit entre chaque notifications : ",
-                value: (ownUserConfig.limit >  0 ? "Vous avez"+showTime(decomposeMsTime(ownUserConfig.limit)) : "Vous n'avez pas")+
-                    " de répit entre chaque notification"
-            });
+                if (subscribings.length > 0) {
+                    const subscribingsEmbeds = splitFieldsEmbed(15, await Promise.all(subscribings.map(async subscribe => {
+                        let member: null | GuildMember = null;
+                        try {
+                            member = (await this.message.guild?.members.fetch(subscribe.listenedId)) ?? null;
+                        } catch (_) {
+                        }
+                        return {
+                            name: member ? (member.nickname ?? member.user.username) : 'Not found user',
+                            value: "Vous écoutez <@" + subscribe.listenedId + ">" + (!subscribe.enabled ? " (écoute désactivée)" : "")
+                        }
+                    })), (embed: MessageEmbed, nbPart) => {
+                        if (nbPart == 1)
+                            embed.setTitle("Vous écoutez " + subscribings.length + " personnes");
+                    });
+                    embeds = [...embeds, ...subscribingsEmbeds]
+                } else {
+                    embed.addFields({
+                        name: "Vous n'écoutez personnes",
+                        value: "Vous n'écoutez personnes",
+                    })
+                }
 
-            embed.addFields({
-                name: "Ecoute "+(ownUserConfig.listening ? "activée" : "désactivée"),
-                value: "L'écoute est "+(ownUserConfig.listening ? "activée" : "désactivée")
-            });
+                const subscribeds: IVocalSubscribe[] = await VocalSubscribe.find({
+                    serverId: this.message.guild.id,
+                    listenedId: this.message.author.id
+                })
 
-            if (ownUserConfig.blocked.users.length > 0) {
+                if (subscribeds.length > 0) {
+                    const subscribedsEmbeds = splitFieldsEmbed(15, await Promise.all(subscribeds.map(async subscribe => {
+                        let member: null | GuildMember = null;
+                        try {
+                            member = (await this.message.guild?.members.fetch(subscribe.listenerId)) ?? null;
+                        } catch (_) {
+                        }
+                        return {
+                            name: member ? (member.nickname ?? member.user.username) : 'Not found user',
+                            value: "<@" + subscribe.listenerId + "> vous écoute" + (!subscribe.enabled ? " (écoute désactivée)" : "")
+                        }
+                    })), (embed: MessageEmbed, nbPart) => {
+                        if (nbPart == 1)
+                            embed.setTitle("Vous êtes écouté par " + subscribeds.length + " personnes");
+                    });
+                    embeds = [...embeds, ...subscribedsEmbeds]
+                } else {
+                    embed.addFields({
+                        name: "Vous n'êtes écouté par personne",
+                        value: "Vous n'êtes écouté par personne",
+                    })
+                }
+            } else {
+                const now = Math.floor(Date.now() / 1000) * 1000;
+
+                const muted = typeof (ownUserConfig.mutedFor) == "number" &&
+                    ownUserConfig.lastMute instanceof Date &&
+                    now - ownUserConfig.lastMute.getTime() < ownUserConfig.mutedFor;
+
+                let sinceTimeMuted;
+                let remaningTimeMuted;
+                if (muted) {
+                    sinceTimeMuted = decomposeMsTime(now - ownUserConfig.lastMute.getTime());
+                    remaningTimeMuted = decomposeMsTime(ownUserConfig.mutedFor - now + ownUserConfig.lastMute.getTime());
+                }
                 embed.addFields({
-                    name: "Les utilisateurs que vous avez bloqué",
-                    value: ownUserConfig.blocked.users.map(userId => "<@"+userId+">").join("\n")
+                    name: muted ? "Vous êtes mute" : "Vous n'est pas mute",
+                    value: muted ? "Vous êtes mute depuis" + showTime(sinceTimeMuted) +
+                        ".\nIl reste" + showTime(remaningTimeMuted) + "." : "Vous n'êtes pas mute"
+                });
+
+                embed.addFields({
+                    name: "Répit entre chaque notifications : ",
+                    value: (ownUserConfig.limit > 0 ? "Vous avez" + showTime(decomposeMsTime(ownUserConfig.limit)) : "Vous n'avez pas") +
+                        " de répit entre chaque notification"
+                });
+
+                embed.addFields({
+                    name: "Ecoute " + (ownUserConfig.listening ? "activée" : "désactivée"),
+                    value: "L'écoute est " + (ownUserConfig.listening ? "activée" : "désactivée")
+                });
+
+                if (ownUserConfig.blocked.users.length > 0) {
+                    embed.addFields({
+                        name: "Les utilisateurs que vous avez bloqué",
+                        value: ownUserConfig.blocked.users.map(userId => "<@" + userId + ">").join("\n")
+                    });
+                }
+                if (ownUserConfig.blocked.roles.length > 0) {
+                    embed.addFields({
+                        name: "Les roles que vous avez bloqué",
+                        value: ownUserConfig.blocked.roles.map(userId => "<@&" + userId + ">").join("\n")
+                    });
+                }
+                if (ownUserConfig.blocked.users.length + ownUserConfig.blocked.roles.length == 0) {
+                    embed.addFields({
+                        name: "Blacklist vide",
+                        value: "Vous n'avez bloqué aucun utilisateur ni aucun role"
+                    });
+                }
+
+                const nbSubscribings: number = await VocalSubscribe.count({
+                    serverId: this.message.guild.id,
+                    listenerId: this.message.author.id
+                })
+
+                embed.addFields({
+                    name: nbSubscribings == 0 ? "Aucune écoute" : "Vous écoutez " + nbSubscribings + " personnes",
+                    value: nbSubscribings == 0 ?
+                        "Vous n'écoutez personne" :
+                        "Vous écoutez " + nbSubscribings + " personnes, faites '" + config.command_prefix + this.commandName + " status subs' pour plus de détails"
+                });
+
+                const nbSubscribeds: number = await VocalSubscribe.count({
+                    serverId: this.message.guild.id,
+                    listenedId: this.message.author.id
+                })
+
+                embed.addFields({
+                    name: nbSubscribeds == 0 ? "Ecouté par personne" : "Vous êtes écouté par " + nbSubscribeds + " personnes",
+                    value: nbSubscribeds == 0 ?
+                        "Personne ne vous écoute" :
+                        "Vous êtes écouteé par " + nbSubscribeds + " personnes, faites '" + config.command_prefix + this.commandName + " status subs' pour plus de détails"
                 });
             }
-            if (ownUserConfig.blocked.roles.length > 0) {
-                embed.addFields({
-                    name: "Les roles que vous avez bloqué",
-                    value: ownUserConfig.blocked.roles.map(userId => "<@&"+userId+">").join("\n")
-                });
-            }
-            if (ownUserConfig.blocked.users.length+ownUserConfig.blocked.roles.length == 0) {
-                embed.addFields({
-                    name: "Blacklist vide",
-                    value: "Vous n'avez bloqué aucun utilisateur ni aucun role"
-                });
-            }
-            this.message.channel.send({embeds: [embed]});
+
+
+            this.message.channel.send({embeds});
             return true;
         }
 
@@ -616,7 +707,7 @@ export default class Vocal extends Command {
             });
 
             for (const vocalSubscribe of vocalSubscribes) {
-                let listenerConfig: IVocalUserConfig|typeof VocalUserConfig= await VocalUserConfig.findOne({
+                let listenerConfig: IVocalUserConfig | typeof VocalUserConfig = await VocalUserConfig.findOne({
                     serverId: newState.guild.id,
                     userId: vocalSubscribe.listenerId
                 });
@@ -633,31 +724,32 @@ export default class Vocal extends Command {
 
                 if (
                     listenerConfig.lastMute instanceof Date &&
-                    typeof(listenerConfig.mutedFor) == "number" &&
-                    Date.now()-listenerConfig.lastMute.getTime() < listenerConfig.mutedFor
+                    typeof (listenerConfig.mutedFor) == "number" &&
+                    Date.now() - listenerConfig.lastMute.getTime() < listenerConfig.mutedFor
                 ) continue;
 
-                let listener: null|GuildMember = null;
+                let listener: null | GuildMember = null;
                 try {
                     listener = await newState.guild.members.fetch(vocalSubscribe.listenerId);
-                } catch (_) {}
+                } catch (_) {
+                }
 
                 if (listener === null) {
                     VocalSubscribe.deleteMany({
                         serverId: newState.guild.id,
-                        listener: vocalSubscribe.listenerId
+                        listenerId: vocalSubscribe.listenerId
                     });
                     listenerConfig.remove()
                     continue;
                 }
                 try {
-                    await listener.send((newState.member.nickname??newState.member.user.username)+" s'est connecté sur le channel vocal #" + newState.channel.name + " sur le serveur " + newState.guild.name);
+                    await listener.send("'" + (newState.member.nickname ?? newState.member.user.username) + "' s'est connecté sur le channel vocal '#" + newState.channel.name + "' sur le serveur '" + newState.guild.name + "'");
                 } catch (_) {
                     continue;
                 }
 
                 if (listenerConfig.limit > 0) {
-                    listenerConfig.lastMute = new Date(Math.floor(Date.now()/1000)*1000);
+                    listenerConfig.lastMute = new Date(Math.floor(Date.now() / 1000) * 1000);
                     listenerConfig.mutedFor = listenerConfig.limit;
                     listenerConfig.save();
                 }
@@ -679,24 +771,27 @@ export default class Vocal extends Command {
                 if ((server = client.guilds.cache.get(invite.serverId)) === undefined) {
                     await interaction.editReply({content: "Le serveur associé à cette invitation semble inaccessible au bot"});
                 } else {
-                    let requested: null|GuildMember = null;
+                    let requested: null | GuildMember = null;
                     try {
                         requested = await server.members.fetch(invite.requestedId);
                     } catch (_) {
-                        await interaction.editReply("Vous ne vous trouvez visiblement plus sur le serveur "+server.name);
+                        await interaction.editReply("Vous ne vous trouvez visiblement plus sur le serveur " + server.name);
                     }
-                    let requester: null|GuildMember = null;
+                    let requester: null | GuildMember = null;
                     if (requested !== null) {
                         try {
                             requester = await server.members.fetch(invite.requesterId);
-                        } catch(_) {
-                            await interaction.editReply("L'envoyeur de cette invitation est introuvable sur le serveur "+server.name);
+                        } catch (_) {
+                            await interaction.editReply("L'envoyeur de cette invitation est introuvable sur le serveur " + server.name);
                         }
                     }
 
                     if (requested !== null && requester !== null) {
                         if (invite.accept) {
-                            const listenerConfig: IVocalUserConfig = await VocalUserConfig.findOne({serverId: server.id, listenerId: invite.requesterId});
+                            const listenerConfig: IVocalUserConfig = await VocalUserConfig.findOne({
+                                serverId: server.id,
+                                listenerId: invite.requesterId
+                            });
                             await VocalSubscribe.create({
                                 serverId: invite.serverId,
                                 listenerId: invite.requesterId,
@@ -704,13 +799,15 @@ export default class Vocal extends Command {
                                 enabled: listenerConfig.listening
                             });
                             try {
-                                await requester.send((requested.nickname??requested.user.username)+" a accepté(e) votre invitation sur '" + server.name + "'"+(!listenerConfig.listening ? " (Attention votre écoute n'est pas activée sur ce serveur)" : ""));
-                            } catch (_) {}
+                                await requester.send((requested.nickname ?? requested.user.username) + " a accepté(e) votre invitation sur '" + server.name + "'" + (!listenerConfig.listening ? " (Attention votre écoute n'est pas activée sur ce serveur)" : ""));
+                            } catch (_) {
+                            }
                             await interaction.editReply({content: "Invitation acceptée"});
                         } else {
                             try {
-                                await requester.send((requested.nickname??requested.user.username)+" a refusé(e) votre invitation sur '" + server.name + "'");
-                            } catch (_) {}
+                                await requester.send((requested.nickname ?? requested.user.username) + " a refusé(e) votre invitation sur '" + server.name + "'");
+                            } catch (_) {
+                            }
                             await interaction.editReply({content: "Invitation refusée"});
                         }
                     }
@@ -740,6 +837,7 @@ export default class Vocal extends Command {
                 config.command_prefix + this.commandName + " mute 'time' \nNe plus recevoir de notif pendant x temps\n\n" +
                 config.command_prefix + this.commandName + " unmute \nDe nouveaux recevoir les notifs\n\n" +
                 config.command_prefix + this.commandName + " status \nAfficher toutes les infos vous concernant\n\n" +
+                config.command_prefix + this.commandName + " status subs\nAfficher les écoutes vous concernant\n\n" +
                 config.command_prefix + this.commandName + " -h \nPour afficher l'aide"
         });
     }
