@@ -1,7 +1,7 @@
 import config from "../config";
 import Command from "../Classes/Command";
 import WelcomeMessage, {IWelcomeMessage} from "../Models/WelcomeMessage";
-import {Message} from "discord.js";
+import {Message, MessageEmbed} from "discord.js";
 
 export default class ConfigWelcome extends Command {
 
@@ -106,14 +106,33 @@ export default class ConfigWelcome extends Command {
         return false;
     }
 
-    help(Embed) {
-        Embed.addFields({
-                name: "Exemples : ",
-                value: config.command_prefix+this.commandName+" disable\n"+
-                       config.command_prefix+this.commandName+" enable\n"+
-                       config.command_prefix+this.commandName+" set => Le bot vous demande de rentrer le MP => Rentrez le message et validez\n"+
-                       config.command_prefix+this.commandName+" show\n"+
-                       config.command_prefix+this.commandName+" --help"
-            });
+    help() {
+        return new MessageEmbed()
+            .setTitle("Exemples :")
+            .addFields([
+                {
+                    name: "disable",
+                    value: "Désactiver le message de bienvenue"
+                },
+                {
+                    name: "enable",
+                    value: "Activer le message de bienvenue"
+                },
+                {
+                    name: "set",
+                    value: "Définir le message de bienvenue qui sera envoyé en MP au nouveaux arrivant."
+                },
+                {
+                    name: "show",
+                    value: "Afficher le message bienvenue"
+                },
+                {
+                    name: "-h",
+                    value: "Afficher l'aide"
+                }
+            ].map(field => ({
+                name: config.command_prefix+this.commandName+" "+field.name,
+                value: field.value
+            })));
     }
 }

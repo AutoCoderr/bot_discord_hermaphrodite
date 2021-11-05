@@ -141,7 +141,7 @@ export default class Command {
 
         if (embeds.length > 0) {
             if (displayHelp)
-                this.help(embeds[embeds.length-1])
+                embeds.push(this.help())
             else
                 embeds[embeds.length-1].addFields({
                    name: "Voir l'aide : ",
@@ -581,7 +581,9 @@ export default class Command {
         return out;
     }
 
-    help(Embed) {} // To be overloaded
+    help(): MessageEmbed { // To be overloaded
+        return new MessageEmbed();
+    }
 
     async action(args: any,bot) { // To be overloaded
         return true;

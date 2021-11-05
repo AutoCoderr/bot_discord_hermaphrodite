@@ -214,7 +214,7 @@ export default class ConfigTicket extends Command {
                     return false;
                 }
 
-                if (ticketConfig.categoryId == null || <CategoryChannel>this.message.guild.channels.cache.get(ticketConfig.categoryId) == undefined) {
+                if (<CategoryChannel>this.message.guild.channels.cache.get(<string>ticketConfig.categoryId) == undefined) {
                     this.message.channel.send("On dirait que vous n'avez pas encore configuré les tickets sur ce serveur, vous pouvez le faire en définissant la catégorie via : "+config.command_prefix+this.commandName+" set idDeLaCategorie")
                     return false;
                 }
@@ -557,28 +557,89 @@ export default class ConfigTicket extends Command {
         console.log("All ticketing message listened");
     }
 
-    help(Embed) {
-        Embed.addFields({
-            name: "Exemples :",
-            value: config.command_prefix+this.commandName+" set 475435899654125637\n"+
-                   config.command_prefix+this.commandName+" show\n"+
-                   config.command_prefix+this.commandName+" enable\n"+
-                   config.command_prefix+this.commandName+" disable\n"+
-                   config.command_prefix+this.commandName+" blacklist add @unUtilisateur\n"+
-                   config.command_prefix+this.commandName+" blacklist remove @unUtilisateur\n"+
-                   config.command_prefix+this.commandName+" blacklist show\n"+
-                   config.command_prefix+this.commandName+" listen add #channel idDuMessageAEcouter :emote:\n"+
-                   config.command_prefix+this.commandName+" listen remove #channel idDuMessageANePlusEcouter :emote:\n"+
-                   config.command_prefix+this.commandName+" listen remove #channel idDuMessageANePlusEcouter (s'applique à toutes les émotes)\n"+
-                   config.command_prefix+this.commandName+" listen remove #channel (s'applique à toutes les émotes de tout les messages du channel)\n"+
-                   config.command_prefix+this.commandName+" listen remove --all|-a (s'applique à toutes les émotes de tout les messages de tout les channels)\n"+
-                   config.command_prefix+this.commandName+" listen show\n"+
-                   config.command_prefix+this.commandName+" listen show #channel\n"+
-                   config.command_prefix+this.commandName+" listen show #channel idDunMessage\n"+
-                   config.command_prefix+this.commandName+" set-moderator @moderateurs\n"+
-                   config.command_prefix+this.commandName+" unset-moderator\n"+
-                   config.command_prefix+this.commandName+" show-moderator\n"+
-                   config.command_prefix+this.commandName+" --help"
-        })
+    help() {
+        return new MessageEmbed()
+            .setTitle("Exemples :")
+            .addFields([
+                {
+                    name: "set 475435899654125637",
+                    value: "Définir la catégorie dans l'aquelle apparaitrons les tickets"
+                },
+                {
+                    name: "show",
+                    value: "Afficher cette catégorie"
+                },
+                {
+                    name: "enable",
+                    value: "Activer les tickets sur ce serveur"
+                },
+                {
+                    name: "disable",
+                    value: "Désactiver les tickets sur ce serveur"
+                },
+                {
+                    name: "blacklist add @unUtilisateur",
+                    value: "Interdir @unUtilisateur de créer des tickets"
+                },
+                {
+                    name: "blacklist remove @unUtilisateur",
+                    value: "Ré autoriser @unUtilisateur à créer des tickets"
+                },
+                {
+                    name: "blacklist show",
+                    value: "Afficher la blacklist"
+                },
+                {
+                    name: "listen add #channel idDuMessageAEcouter :emote:",
+                    value: "Ajouter une écoute de réaction permettant de créer des tickets"
+                },
+                {
+                    name: "listen remove #channel idDuMessageANePlusEcouter :emote:",
+                    value: "Retirer une écoute de réaction"
+                },
+                {
+                    name: "listen remove #channel idDuMessageANePlusEcouter",
+                    value: "Retirer toutes les écoutes de réaction d'un message spécifié sur un channel spécifié"
+                },
+                {
+                    name: "listen remove #channel",
+                    value: "Retirer toutes les écoutes de réaction du channel spécifié"
+                },
+                {
+                    name: "listen remove --all|-a",
+                    value: "Retirer toutes les écoutes de réaction du serveur"
+                },
+                {
+                    name: "listen show",
+                    value: "Afficher les écoutes du serveur"
+                },
+                {
+                    name: "listen show #channel",
+                    value: "Afficher les écoutes sur channel spécifié"
+                },
+                {
+                    name: "listen show #channel idDunMessage",
+                    value: "Afficher les écoutes d'un message spécifié sur channel spécifié"
+                },
+                {
+                    name: "set-moderator @&moderateurs",
+                    value: "Définir le rôle modérateurs qui sera pingé à chaque création d'un ticket"
+                },
+                {
+                    name: "unset-moderator",
+                    value: "'Déconfigurer' le rôle modérateur"
+                },
+                {
+                    name: "show-moderator",
+                    value: "Afficher la rôle modérateur configuré"
+                },
+                {
+                    name: "-h",
+                    value: "Afficher l'aide"
+                }
+            ].map(field => ({
+                name: config.command_prefix+this.commandName+" "+field.name,
+                value: field.value
+            })));
     }
 }

@@ -13,7 +13,7 @@ import VocalConfig, {IVocalConfig} from "../Models/VocalConfig";
 import VocalUserConfig, {IVocalUserConfig} from "../Models/VocalUserConfig";
 import VocalInvite, {IVocalInvite} from "../Models/VocalInvite";
 import client from "../client";
-import {decomposeMsTime, showTime, splitFieldsEmbed} from "../Classes/OtherFunctions";
+import {decomposeMsTime, durationUnits, showTime, splitFieldsEmbed} from "../Classes/OtherFunctions";
 
 export default class Vocal extends Command {
     static display = true;
@@ -821,24 +821,73 @@ export default class Vocal extends Command {
         }
     }
 
-    help(Embed: MessageEmbed) {
-        Embed.addFields({
-            name: "Exemples :",
-            value:
-                config.command_prefix + this.commandName + " sub|add @user \nDemander à @user si on peut écouter ses connexions vocales\n\n" +
-                config.command_prefix + this.commandName + " sub|add '@user1, @user2' \nDemander à @user1 et @user2 si ou peut écouter leurs connexions vocales\n\n" +
-                config.command_prefix + this.commandName + " unsub|remove @user1 \nSe désabonner de @user1\n\n" +
-                config.command_prefix + this.commandName + " block|ghost @user\nIgnorer les invitations de @user et l'empêcher de nous écouter\n\n" +
-                config.command_prefix + this.commandName + " block|ghost @&role\nIgnorer les invitations des membres du role @&role et les empêcher de nous écouter\n\n" +
-                config.command_prefix + this.commandName + " unblock|unghost '@user1, @user2' @&role\nPermettre à nouveau à @user1, @user2 et aux membdre du role @&role de nous écouter\n\n" +
-                config.command_prefix + this.commandName + " stop \nCesser d'écouter les connexions au vocal\n\n" +
-                config.command_prefix + this.commandName + " start \nDe nouveau écouter les connexions au vocal\n\n" +
-                config.command_prefix + this.commandName + " limit 'time' \nAttendre un temps minimum entre chaque notif \nexemples pour time: 30s, 1h, 5m, 1j\n\n" +
-                config.command_prefix + this.commandName + " mute 'time' \nNe plus recevoir de notif pendant x temps\n\n" +
-                config.command_prefix + this.commandName + " unmute \nDe nouveaux recevoir les notifs\n\n" +
-                config.command_prefix + this.commandName + " status \nAfficher toutes les infos vous concernant\n\n" +
-                config.command_prefix + this.commandName + " status subs\nAfficher les écoutes vous concernant\n\n" +
-                config.command_prefix + this.commandName + " -h \nPour afficher l'aide"
-        });
+    help() {
+        return new MessageEmbed()
+            .setTitle("Exemples :")
+            .addFields([
+                {
+                    name: "sub|add @user",
+                    value: "Demander à @user si on peut écouter ses connexions vocales"
+                },
+                {
+                    name: "sub|add '@user1, @user2'",
+                    value: "Demander à @user1 et @user2 si ou peut écouter leurs connexions vocales"
+                },
+                {
+                    name: "unsub|remove @user1",
+                    value: "Se désabonner de @user1"
+                },
+                {
+                    name: "block|ghost @user",
+                    value: "Ignorer les invitations de @user et l'empêcher de nous écouter"
+                },
+                {
+                    name: "block|ghost @&role",
+                    value: "Ignorer les invitations des membres du role @&role et les empêcher de nous écouter"
+                },
+                {
+                    name: "unblock|unghost '@user1, @user2' @&role",
+                    value: "Permettre à nouveau à @user1, @user2 et aux membdre du role @&role de nous écouter"
+                },
+                {
+                    name: "stop",
+                    value: "Cesser d'écouter les connexions au vocal"
+                },
+                {
+                    name: "start",
+                    value: "De nouveau écouter les connexions au vocal"
+                },
+                {
+                    name: "limit <time>",
+                    value: "Attendre un temps minimum entre chaque notif \nexemples pour time: 30s, 1h, 5m (unitées possibles : "+
+                        Object.values(durationUnits).reduce((acc,units) => [
+                            ...acc,
+                            ...units
+                        ], []).join(", ")+")"
+                },
+                {
+                    name: "mute",
+                    value: "Ne plus recevoir de notif pendant x temps"
+                },
+                {
+                    name: "unmute",
+                    value: "De nouveaux recevoir les notifs"
+                },
+                {
+                    name: "status",
+                    value: "Afficher toutes les infos vous concernant"
+                },
+                {
+                    name: "status subs",
+                    value: "Afficher les écoutes vous concernant"
+                },
+                {
+                    name: "-h",
+                    value: "Pour afficher l'aide"
+                }
+            ].map(field => ({
+                name: config.command_prefix+this.commandName+" "+field.name,
+                value: field.value
+            })));
     }
 }

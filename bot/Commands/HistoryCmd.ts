@@ -69,11 +69,15 @@ export default class HistoryCmd extends Command {
         return true;
     }
 
-    help(Embed) {
-        Embed.addFields({
-                name: "Exemples :",
-                value: config.command_prefix+"history --command notifyOnReact -l 10 --channel #blabla"
-            })
+    help() {
+        return new MessageEmbed()
+            .setTitle("Exemples")
+            .addFields([
+                {
+                    name: config.command_prefix+this.commandName+" --command notifyOnReact -l 10 --channel #blabla -s desc -u @toto",
+                    value: "Afficher les 10 dernières commandes notifyOnReact dans l'ordre décroissant, sur le channel #blabla, effectuées par l'utilisateur @toto"
+                }
+            ]);
     }
 
     saveHistory() {} // overload saveHistory of Command class to save nothing in the history

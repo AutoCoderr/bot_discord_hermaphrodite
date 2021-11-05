@@ -258,19 +258,49 @@ export default class ConfigVocal extends Command {
     }
 
 
-    help(Embed: MessageEmbed) {
-        Embed.addFields({
-            name: "Exemples :",
-            value:
-                config.command_prefix+this.commandName+" enable\n"+
-                config.command_prefix+this.commandName+" disable\n"+
-                config.command_prefix+this.commandName+" blacklist add listener @user1,@user2 \n"+
-                config.command_prefix+this.commandName+" blacklist add listener @role1,@role2 \n"+
-                config.command_prefix+this.commandName+" blacklist remove listener @user1,@user2 @role1,@role2 \n"+
-                config.command_prefix+this.commandName+" blacklist remove channel '#channel1, #channel2' \n"+
-                config.command_prefix+this.commandName+" blacklist clear channel \n"+
-                config.command_prefix+this.commandName+" blacklist show listener \n"+
-                config.command_prefix+this.commandName+" -h"
-        });
+    help() {
+        return new MessageEmbed()
+            .setTitle("Exemples :")
+            .addFields([
+                {
+                    name: "enable",
+                    value: "Activer les écoutes vocales sur ce serveur"
+                },
+                {
+                    name: "disable",
+                    value: "Déactiver les écoutes vocales sur ce serveur"
+                },
+                {
+                    name: "blacklist add listener @user1,@user2",
+                    value: "Ajouter @user1 et @user2 dans la blacklist des listeners (ils n'auront plus le droit d'utiliser l'écoute vocale)"
+                },
+                {
+                    name: "blacklist add listener @role1,@role2",
+                    value: "Ajouter @&role1 et @&role2 dans la blacklist des listeners"
+                },
+                {
+                    name: "blacklist remove listener @user1,@user2 @role1,@role2",
+                    value: "Retirer @user1, @user2, @&role1 et @&role2 de la blacklist des listeners"
+                },
+                {
+                    name: "blacklist remove channel '#channel1, #channel2'",
+                    value: "Retirer #channel1 et #channel2 de la backlist channels (Les channels présents dans cette liste ne peuvent pas être écoutés)"
+                },
+                {
+                    name: "blacklist clear channel",
+                    value: "Vider la blacklist channel"
+                },
+                {
+                    name: "blacklist show listener",
+                    value: "Afficher la blacklist listener"
+                },
+                {
+                    name: "-h",
+                    value: "Afficher l'aide"
+                }
+            ].map(field => ({
+                name: config.command_prefix+this.commandName+" "+field.name,
+                value: field.value
+            })));
     }
 }
