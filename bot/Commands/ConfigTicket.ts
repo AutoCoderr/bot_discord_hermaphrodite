@@ -209,13 +209,9 @@ export default class ConfigTicket extends Command {
                 return true;
             case "listen":
                 ticketConfig = await TicketConfig.findOne({serverId: this.message.guild.id, categoryId: { $ne: null }});
-                if (ticketConfig == null) {
+                if (ticketConfig == null ||
+                    <CategoryChannel>this.message.guild.channels.cache.get(<string>ticketConfig.categoryId) == undefined) {
                     this.message.channel.send("On dirait que vous n'avez pas encore configuré les tickets sur ce serveur, vous pouvez le faire en définissant la catégorie via : "+config.command_prefix+this.commandName+" set idDeLaCategorie");
-                    return false;
-                }
-
-                if (<CategoryChannel>this.message.guild.channels.cache.get(<string>ticketConfig.categoryId) == undefined) {
-                    this.message.channel.send("On dirait que vous n'avez pas encore configuré les tickets sur ce serveur, vous pouvez le faire en définissant la catégorie via : "+config.command_prefix+this.commandName+" set idDeLaCategorie")
                     return false;
                 }
                 if (!(ticketConfig.messagesToListen instanceof Array)) ticketConfig.messagesToListen = [];
@@ -538,7 +534,6 @@ export default class ConfigTicket extends Command {
             let category: CategoryChannel|undefined = undefined;
             if (ticketConfig.categoryId == undefined || (category = <CategoryChannel>guild.channels.cache.get(ticketConfig.categoryId)) == undefined) {
                 console.log("Category of "+guild.name+" is not defined or not found");
-                continue;
             }
 
             if (!(ticketConfig.messagesToListen instanceof Array)) continue;
