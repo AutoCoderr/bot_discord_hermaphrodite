@@ -1,5 +1,6 @@
 import Command from "../Classes/Command";
 import {
+    Guild,
     GuildMember, Interaction,
     Message,
     MessageActionRow,
@@ -31,8 +32,8 @@ export default class Vocal extends Command {
             action: {
                 required: (args) => args.help == undefined,
                 type: "string",
-                description: "L'action à effectuer : sub|add, unsub|remove, block|ghost, unsub|unghost, stop, start, limit, mute, unmute, status",
-                valid: (field) => ['sub', 'add', 'unsub', 'remove', 'block', 'ghost', 'unblock', 'unghost', 'stop', 'start', 'limit', 'mute', 'unmute', 'status'].includes(field)
+                description: "L'action à effectuer : add, remove, block, unblock, stop, start, limit, mute, unmute, status",
+                valid: (field) => ['add', 'remove', 'block',  'unblock', 'stop', 'start', 'limit', 'mute', 'unmute', 'status'].includes(field)
             },
             subAction: {
                 required: false,
@@ -62,7 +63,7 @@ export default class Vocal extends Command {
             },
             users: {
                 required: (args) => args.help == undefined &&
-                    (['sub', 'add', 'unsub', 'remove'].includes(args.action) || (['ghost', 'block', 'unghost', 'unblock'].includes(args.action) && args.roles == undefined)),
+                    (['add', 'remove'].includes(args.action) || (['block', 'unblock'].includes(args.action) && args.roles == undefined)),
                 displayValidError: true,
                 displayExtractError: true,
                 type: "users",
@@ -76,7 +77,7 @@ export default class Vocal extends Command {
                     }
                     return true;
                 },
-                errorMessage: (value, args) => (value == undefined && args.channels == undefined && ['ghost', 'block', 'unghost', 'unblock'].includes(args.action)) ?
+                errorMessage: (value, args) => (value == undefined && args.channels == undefined && ['block', 'unblock'].includes(args.action)) ?
                     {
                         name: "Rentrez au moins l'un des deux",
                         value: "Vous devez avoir mentionné au moins un utilisateur ou un role."
@@ -119,7 +120,7 @@ export default class Vocal extends Command {
             });
             return false;
         }
-        if (['add', 'sub', 'remove', 'unsub'].includes(action) &&
+        if (['add', 'remove'].includes(action) &&
             (vocalConfig.listenerBlacklist.users.includes(this.message.author.id) ||
                 vocalConfig.listenerBlacklist.roles.some(roleId => this.message.member && this.message.member.roles.cache.some(role => role.id === roleId)))) {
             this.sendErrors({
@@ -145,11 +146,9 @@ export default class Vocal extends Command {
         }
 
         const embed = new MessageEmbed()
-            .setTitle("Resultat de la commande : ")
-            .setDescription("Resultat de la commande : " + this.message.content)
             .setAuthor("Herma bot");
 
-        if (['add', 'sub'].includes(action)) {
+        if (action == 'add') {
             const forbiddens: GuildMember[] = [];
             const inviteds: GuildMember[] = [];
             const alreadyInviteds: GuildMember[] = [];
@@ -269,7 +268,7 @@ export default class Vocal extends Command {
 
         }
 
-        if (['unsub', 'remove'].includes(action)) {
+        if (action == 'remove') {
             const doesntExist: GuildMember[] = [];
             const deleted: GuildMember[] = [];
 
@@ -305,7 +304,7 @@ export default class Vocal extends Command {
         }
 
 
-        if (['block', 'ghost'].includes(action)) {
+        if (action == 'block') {
             const alreadyBlocked: Array<GuildMember | Role> = [];
             const blocked: Array<GuildMember | Role> = [];
             const notFoundUsersId: string[] = [];
@@ -342,6 +341,7 @@ export default class Vocal extends Command {
                 try {
                     listener = await this.message.guild.members.fetch(vocalSubscribe.listenerId);
                 } catch (e) {
+                    vocalSubscribe.remove();
                     notFoundUsersId.push(vocalSubscribe.listenerId);
                     continue;
                 }
@@ -375,7 +375,7 @@ export default class Vocal extends Command {
             return true;
         }
 
-        if (['unblock', 'unghost'].includes(action)) {
+        if (action == 'unblock') {
             const unBlocked: Array<GuildMember | Role> = [];
             const alreadyUnblocked: Array<GuildMember | Role> = [];
             const notFoundUsersId: string[] = [];
@@ -416,6 +416,7 @@ export default class Vocal extends Command {
                 try {
                     listener = await this.message.guild.members.fetch(vocalSubscribe.listenerId);
                 } catch (e) {
+                    vocalSubscribe.remove();
                     notFoundUsersId.push(vocalSubscribe.listenerId);
                     continue;
                 }
@@ -556,7 +557,7 @@ export default class Vocal extends Command {
 
             if (["sub", 'subs'].includes(subAction)) {
 
-                const subscribings: IVocalSubscribe[] = await VocalSubscribe.find({
+                const subscribings: Array<IVocalSubscribe|typeof VocalSubscribe> = await VocalSubscribe.find({
                     serverId: this.message.guild.id,
                     listenerId: this.message.author.id
                 })
@@ -567,10 +568,13 @@ export default class Vocal extends Command {
                         try {
                             member = (await this.message.guild?.members.fetch(subscribe.listenedId)) ?? null;
                         } catch (_) {
+                            subscribe.remove();
                         }
                         return {
-                            name: member ? (member.nickname ?? member.user.username) : 'Not found user',
-                            value: "Vous écoutez <@" + subscribe.listenedId + ">" + (!subscribe.enabled ? " (écoute désactivée)" : "")
+                            name: member ? (member.nickname ?? member.user.username) : 'Not found user ('+subscribe.listenedId+')',
+                            value: member ?
+                                "Vous écoutez <@" + subscribe.listenedId + ">" + (!subscribe.enabled ? " (écoute désactivée)" : "") :
+                                "N'est plus présent sur le serveur, écoute supprimée"
                         }
                     })), (embed: MessageEmbed, nbPart) => {
                         if (nbPart == 1)
@@ -584,7 +588,7 @@ export default class Vocal extends Command {
                     })
                 }
 
-                const subscribeds: IVocalSubscribe[] = await VocalSubscribe.find({
+                const subscribeds: Array<IVocalSubscribe|typeof VocalSubscribe> = await VocalSubscribe.find({
                     serverId: this.message.guild.id,
                     listenedId: this.message.author.id
                 })
@@ -595,10 +599,25 @@ export default class Vocal extends Command {
                         try {
                             member = (await this.message.guild?.members.fetch(subscribe.listenerId)) ?? null;
                         } catch (_) {
+                            subscribe.remove();
+                        }
+                        let muted = false;
+                        if (member) {
+                            const userConfig: IVocalUserConfig = await VocalUserConfig.findOne({
+                                serverId: (<Guild>this.message.guild).id,
+                                userId: subscribe.listenerId
+                            })
+                            muted = userConfig != null &&
+                                typeof(userConfig.mutedFor) == "number" &&
+                                userConfig.lastMute instanceof Date &&
+                                Date.now()-userConfig.lastMute.getTime() < userConfig.mutedFor;
                         }
                         return {
-                            name: member ? (member.nickname ?? member.user.username) : 'Not found user',
-                            value: "<@" + subscribe.listenerId + "> vous écoute" + (!subscribe.enabled ? " (écoute désactivée)" : "")
+                            name: member ? (member.nickname ?? member.user.username) : 'Not found user ('+subscribe.listenerId+')',
+                            value: member ? "<@" + subscribe.listenerId + "> vous écoute" +
+                                (!subscribe.enabled ? " (écoute désactivée)" :
+                                    muted ? " (il/elle est mute)" : ""
+                                ) : "N'est plus présent sur le serveur, écoute supprimée"
                         }
                     })), (embed: MessageEmbed, nbPart) => {
                         if (nbPart == 1)
@@ -826,27 +845,27 @@ export default class Vocal extends Command {
             .setTitle("Exemples :")
             .addFields([
                 {
-                    name: "sub|add @user",
+                    name: "add @user",
                     value: "Demander à @user si on peut écouter ses connexions vocales"
                 },
                 {
-                    name: "sub|add '@user1, @user2'",
+                    name: "add '@user1, @user2'",
                     value: "Demander à @user1 et @user2 si ou peut écouter leurs connexions vocales"
                 },
                 {
-                    name: "unsub|remove @user1",
+                    name: "remove @user1",
                     value: "Se désabonner de @user1"
                 },
                 {
-                    name: "block|ghost @user",
+                    name: "block @user",
                     value: "Ignorer les invitations de @user et l'empêcher de nous écouter"
                 },
                 {
-                    name: "block|ghost @&role",
+                    name: "block @&role",
                     value: "Ignorer les invitations des membres du role @&role et les empêcher de nous écouter"
                 },
                 {
-                    name: "unblock|unghost '@user1, @user2' @&role",
+                    name: "unblock '@user1, @user2' @&role",
                     value: "Permettre à nouveau à @user1, @user2 et aux membdre du role @&role de nous écouter"
                 },
                 {
@@ -858,8 +877,8 @@ export default class Vocal extends Command {
                     value: "De nouveau écouter les connexions au vocal"
                 },
                 {
-                    name: "limit <time>",
-                    value: "Attendre un temps minimum entre chaque notif \nexemples pour time: 30s, 1h, 5m (unitées possibles : "+
+                    name: "limit 30sec",
+                    value: "Attendre 30 secondes entre chaque notif (limit 0 pour remettre ce temps à 0) \nexemples pour time: 30s, 1h, 5m (unitées possibles : "+
                         Object.values(durationUnits).reduce((acc,units) => [
                             ...acc,
                             ...units
