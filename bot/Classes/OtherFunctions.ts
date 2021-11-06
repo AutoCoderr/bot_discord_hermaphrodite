@@ -199,6 +199,20 @@ export function splitFieldsEmbed(nbByPart: number,
     return Embeds;
 }
 
+export function splitOneFieldLinesEmbed(title: string, nbByPart: number, lines: string[]) {
+    let embeds: MessageEmbed[] = [];
+    for (let i=0;i<Math.floor(lines.length/nbByPart)+(lines.length%nbByPart != 0 ? 1 : 0);i++) {
+        embeds.push(new MessageEmbed()
+            .setColor('#0099ff')
+            .setTimestamp()
+            .addFields({
+                name: title,
+                value: lines.slice(i*nbByPart,Math.min((i+1)*nbByPart,lines.length)).join("\n")
+            }));
+    }
+    return embeds;
+}
+
 export function isNumber(num) {
     return (typeof(num) == 'number' && !isNaN(num)) || (
       typeof(num) == 'string' && parseInt(num).toString() == num && num != "NaN"

@@ -42,7 +42,7 @@ export default class HistoryCmd extends Command {
                 const user = this.message.guild.members.cache.get(history.userId); //@ts-ignore
                 const channel = this.message.guild.channels.cache.get(history.channelId);
 
-                const userName = user != undefined ? (user.nickname ?? user.user.username) : "<@"+history.userId+">";
+                const userName = user != undefined ? (user.nickname ?? user.user.username) : history.userId+" (user not found)";
                 const channelName = channel != undefined ? channel.name : history.channelId
 
                 return {
