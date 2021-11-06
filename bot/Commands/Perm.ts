@@ -156,12 +156,29 @@ export default class Perm extends Command {
         return true;
     }
 
-    help(Embed) {
-        Embed.addFields({
-               name: "Exemples :",
-               value: config.command_prefix+"perm add notifyOnReact @Admins\n"+
-                    "Ou "+config.command_prefix+"perm set notifyOnReact '@Admins, @Maintainers'\n"+
-                    "Ou "+config.command_prefix+"perm show notifyOnReact"
-            });
+    help() {
+        return new MessageEmbed()
+            .setTitle("Exemples :")
+            .addFields([
+                {
+                    name: "add notifyOnReact @Admins",
+                    value: "Ajouter le role @&Admins dans la liste des rôles autoriser à utiliser la commande notifyOnReact"
+                },
+                {
+                    name: "set notifyOnReact '@Admins, @Maintainers'",
+                    value: "Définir @Admins et @Maintainers comme les rôles autorisés à utiliser la commande notifyOnReact"
+                },
+                {
+                    name: "set notifyOnReact ''",
+                    value: "Vider la liste des rôles autorisés à utiliser la commande notifyOnReact"
+                },
+                {
+                    name: "show notifyOnReact",
+                    value: "Afficher les rôles autorisés à utiliser la commande notifyOnReact"
+                }
+            ].map(field => ({
+                name: config.command_prefix+this.commandName+" "+field.name,
+                value: field.value
+            })));
     }
 }

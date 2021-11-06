@@ -428,18 +428,49 @@ export default class Monitor extends Command {
         console.log("All monitorings listened");
     }
 
-    help(Embed: MessageEmbed) {
-        Embed.addFields({
-            name: "Exemples :",
-            value: config.command_prefix+this.commandName+" add (prend par défaut le channel de l'utilisateur)\n"+
-                   config.command_prefix+this.commandName+" add #unAutreChannelSurLequelMonitorer\n"+
-                   config.command_prefix+this.commandName+" add -ec -d false (avec le nombre d'emojis, sans la description)\n"+
-                   config.command_prefix+this.commandName+" remove #leChannelSurLequelNePlusMonitorer idDuMessage\n"+
-                   config.command_prefix+this.commandName+" remove idDuMessageDeMonitoring (sans channel spécifié, prend le channel courant)\n"+
-                   config.command_prefix+this.commandName+" refresh #leChannelSurLequelRefraichir idDuMessage\n"+
-                   config.command_prefix+this.commandName+" refresh idDuMessageDeMonitoring (sans channel spécifié, prend le channel courant)\n"+
-                   config.command_prefix+this.commandName+" show\n"+
-                   config.command_prefix+this.commandName+" -h\n"
-        });
+    help() {
+        return new MessageEmbed()
+            .setTitle("Exemples :")
+            .addFields([
+                {
+                    name: "add",
+                    value: "Ajouter un monitoring (par défaut sur la channel courant)"
+                },
+                {
+                    name: "add #unAutreChannelSurLequelMonitorer",
+                    value: "Ajouter un monitoring sur le channel spécifié"
+                },
+                {
+                    name: "add -ec -d false",
+                    value: "Ajouter un moniroting avec le nombre d'émojis, sans la description"
+                },
+                {
+                    name: "remove #leChannelSurLequelNePlusMonitorer idDuMessage",
+                    value: "Retirer le monitoring sur le message spécifié dans le channel spécifié"
+                },
+                {
+                    name: "remove idDuMessageDeMonitoring",
+                    value: "Retire le moniting sur le message spéficié, sur le channel courant par défaut"
+                },
+                {
+                    name: "refresh #leChannelSurLequelRefraichir idDuMessage",
+                    value: "Rafraichir le monitoring sur la messagé spécifié dans le channel spécifié"
+                },
+                {
+                    name: "refresh idDuMessageDeMonitoring",
+                    value: "rafraichir le moniting sur le message spéficié, sur le channel courant par défaut"
+                },
+                {
+                    name: "show",
+                    value: "Afficher les monitoring en cours sur ce serveur"
+                },
+                {
+                    name: "-h",
+                    value: "Afficher l'aide"
+                }
+            ].map(field => ({
+                name: config.command_prefix+this.commandName+" "+field.name,
+                value: field.value
+            })));
     }
 }

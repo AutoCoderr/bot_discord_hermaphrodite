@@ -1,6 +1,6 @@
 import { existingCommands } from "./CommandsDescription";
-import History, {IHistory} from "../Models/History";
-import {GuildChannel, GuildMember, Message, MessageEmbed} from "discord.js";
+import History from "../Models/History";
+import {EmbedFieldData, GuildChannel, GuildMember, Message, MessageEmbed} from "discord.js";
 import Command from "./Command";
 
 export function addMissingZero(number, n = 2) {
@@ -49,14 +49,14 @@ export function getArgsModelHistory(message: Message) {
             type: "string",
             required: false,
             description: "'asc' ou 'desc/dsc' ('desc' par défaut) pour trier du debut à la fin ou de la fin au début dans l'ordre chronologique",
-            valid: (value, _) => ['asc','desc','dsc'].includes(value),
+            valid: (value, _) => ['asc','desc','dsc'].includes(value.toLowerCase()),
             default: "desc"
         },
         limit: {
             fields: ['-l', '--limit'],
             type: "number",
             required: false,
-            description: "Pour afficher les n dernières commandes de la listes"
+            description: "Pour afficher les n premieres commandes de la listes"
         },
         channels: {
             fields: ['-ch', '--channel'],
@@ -180,7 +180,7 @@ export async function forEachNotifyOnReact(callback, channel: GuildChannel, mess
 }
 
 export function splitFieldsEmbed(nbByPart: number,
-                                     fields: Array<{name: string, value: string}>,
+                                     fields: EmbedFieldData[],
                                      atEachPart: Function): Array<MessageEmbed> {
     let Embed: MessageEmbed;
     let Embeds: Array<MessageEmbed> = [];
@@ -199,8 +199,48 @@ export function splitFieldsEmbed(nbByPart: number,
     return Embeds;
 }
 
+export function splitOneFieldLinesEmbed(title: string, nbByPart: number, lines: string[]) {
+    let embeds: MessageEmbed[] = [];
+    for (let i=0;i<Math.floor(lines.length/nbByPart)+(lines.length%nbByPart != 0 ? 1 : 0);i++) {
+        embeds.push(new MessageEmbed()
+            .setColor('#0099ff')
+            .setTimestamp()
+            .addFields({
+                name: title,
+                value: lines.slice(i*nbByPart,Math.min((i+1)*nbByPart,lines.length)).join("\n")
+            }));
+    }
+    return embeds;
+}
+
 export function isNumber(num) {
     return (typeof(num) == 'number' && !isNaN(num)) || (
       typeof(num) == 'string' && parseInt(num).toString() == num && num != "NaN"
     );
+}
+
+export const durationUnits = {
+    second: ['s','seconde','secondes','second','seconds','sec'],
+    minute: ['m','minute','minutes','min'],
+    hour: ['h','hour','hours','heure','heures']
+}
+
+export const durationUnitsMult = {
+    second: 1000,
+    minute: 60*1000,
+    hour: 60*60*1000
+}
+
+export function decomposeMsTime(ms: number): {h: number, m: number, s: number} {
+    return {
+        h: Math.floor(ms/1000/60/60),
+        m: Math.floor(ms/1000/60)%60,
+        s: Math.floor(ms/1000)%60
+    }
+}
+
+export function showTime(time: {h: number, m: number, s: number}): string {
+    return (time.h > 0 ? ' '+time.h+' heure'+(time.h > 1 ? 's' : '') : '')+
+        (time.m > 0 ? ' '+time.m+' minute'+(time.m > 1 ? 's' : '') : '')+
+        (time.s > 0 ? ' '+time.s+' seconde'+(time.s > 1 ? 's' : '') : '')
 }

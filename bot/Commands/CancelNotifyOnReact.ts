@@ -3,7 +3,7 @@ import Command from "../Classes/Command";
 import { forEachNotifyOnReact } from "../Classes/OtherFunctions";
 import { existingCommands } from "../Classes/CommandsDescription";
 import StoredNotifyOnReact from "../Models/StoredNotifyOnReact";
-import Discord, {GuildChannel, GuildEmoji, Message} from "discord.js";
+import Discord, {GuildChannel, GuildEmoji, Message, MessageEmbed} from "discord.js";
 
 export default class CancelNotifyOnReact extends Command {
 
@@ -124,14 +124,34 @@ export default class CancelNotifyOnReact extends Command {
         });
     }
 
-    help(Embed) {
-            Embed.addFields({
-                name: "Exemples :",
-                value: config.command_prefix+this.commandName+" --channel #leChannel\n"+
-                    config.command_prefix+this.commandName+" --channel #leChannel --message idDuMessage\n"+
-                    config.command_prefix+this.commandName+" -ch #leChannel -m idDuMessage -e :emote: \n"+
-                    config.command_prefix+this.commandName+" --all"
-            });
+    help() {
+        return new MessageEmbed()
+            .setTitle("Exemples :")
+            .addFields([
+                {
+                    name: "--channel #channel",
+                    value: "Désactiver les écoutes de réaction du channel #channel"
+                },
+                {
+                    name: "--channel #channel --message idDuMessage",
+                    value: "Désactiver les écoutes de réaction du channel #channel sur le message spécifié par son id"
+                },
+                {
+                    name: "-ch #channel -m idDuMessage -e :emote:",
+                    value: "Désactiver les écoutes de réaction du channel #channel sur le message spécifié par son id, sur l'émote mentionnée"
+                },
+                {
+                    name: "--all",
+                    value: "Désactiver toutes les écoutes de réactions du serveur"
+                },
+                {
+                    name: "-h",
+                    value: "Afficher l'aide"
+                }
+            ].map(field => ({
+                name: config.command_prefix+this.commandName+" "+field.name,
+                value: field.value
+            })))
     }
 
 }
