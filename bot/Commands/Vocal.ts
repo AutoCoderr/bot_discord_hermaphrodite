@@ -45,17 +45,11 @@ export default class Vocal extends Command {
                 required: false,
                 displayValidError: true,
                 displayExtractError: true,
-                type: "roles",
+                type: "role",
+                multi: true,
                 description: "Le ou les roles à ignorer",
-                valid: (roles: Role[]) => {
-                    const alreadySpecified = {};
-                    for (const role of roles) {
-                        if (alreadySpecified[role.id])
-                            return false;
-                        alreadySpecified[role.id] = true
-                    }
-                    return true;
-                },
+                valid: (role: Role, args) =>
+                    !args.roles.some(eachRole => eachRole.id === role.id),
                 errorMessage: () => ({
                     name: "Roles mal rentrés",
                     value: "Vous avez mal renseigné vos roles. Vous ne pouvez pas renseigner plus d'une fois le même role"
@@ -63,20 +57,14 @@ export default class Vocal extends Command {
             },
             users: {
                 required: (args) => args.help == undefined &&
-                    (['add', 'remove'].includes(args.action) || (['block', 'unblock'].includes(args.action) && args.roles == undefined)),
-                displayValidError: true,
+                    (['add', 'remove'].includes(args.action) || (['block', 'unblock'].includes(args.action) && args.roles.length == 0)),
+                displayValidErrorEvenIfFound: true,
                 displayExtractError: true,
-                type: "users",
+                type: "user",
+                multi: true,
                 description: "Le ou les utilisateurs à ignorer ou écouter quand ils se connectent sur un vocal",
-                valid: (users: GuildMember[]) => {
-                    const alreadySpecified = {};
-                    for (const user of users) {
-                        if (user.id === this.message.author.id || alreadySpecified[user.id])
-                            return false;
-                        alreadySpecified[user.id] = true
-                    }
-                    return true;
-                },
+                valid: (user: GuildMember, args) =>
+                    user.id !== this.message.author.id && !args.users.some(eachUser => eachUser.id === user.id),
                 errorMessage: (value, args) => (value == undefined && args.channels == undefined && ['block', 'unblock'].includes(args.action)) ?
                     {
                         name: "Rentrez au moins l'un des deux",
@@ -84,7 +72,7 @@ export default class Vocal extends Command {
                     } : {
                         name: "Utilisateurs non ou mal renseigné",
                         value: "Vous n'avez pas ou mal renseigné les utilisateurs.\n" +
-                            "Vous ne pouvez pas vous renseignez vous même, ni renseigner plusieurs les mêmes personnes"
+                            "Vous ne pouvez pas vous renseignez vous même, ni renseigner plusieurs fois les mêmes personnes"
                     }
             },
             time: {

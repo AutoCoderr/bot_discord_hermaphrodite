@@ -91,9 +91,10 @@ export default class ListNotifyOnReact extends Command {
                     });
                 }
             }, channel, message, this.message);
-        } else if (listenings && listenings[channel.id] && listenings[channel.id][message.id] && listenings[channel.id][message.id][emoteName]) { // @ts-ignore
+        } else if (listenings && listenings[channel.id] && listenings[channel.id][message.id] && listenings[channel.id][message.id][emoteName]) {
+            const contentMessage = message.content.substring(0,Math.min(20,message.content.length)) + "...";
             Embed.addFields({
-                name: "sur '#" + channel.name + "' (" + message.content + ") :" + emoteName + ":",
+                name: "sur '#" + channel.name + "' (" + contentMessage + ") :" + emoteName + ":",
                 value: "Cette écoute de réaction a été supprimée"
             });
         } else {

@@ -19,20 +19,12 @@ export default class Perm extends Command {
             },
             {
                 field: "commands",
-                type: "commands",
+                type: "command",
+                multi: true,
                 required: args => args.help == undefined,
                 description: "La ou les commandes sur laquelle ajouter ou définir la permission",
-                valid: async (commandList: typeof Command[], _) => { // Vérifie si une commande n'a pas été tapée plusieurs fois
-                    const alreadySpecifiedCommands = {};
-                    for (const command of commandList) {
-                        if (alreadySpecifiedCommands[<string>command.commandName] === undefined) {
-                            alreadySpecifiedCommands[<string>command.commandName] = true;
-                        } else {
-                            return false;
-                        }
-                    }
-                    return true;
-                },
+                valid: async (command: typeof Command, args) =>  // Vérifie si une commande n'a pas été tapée plusieurs fois
+                    !args.commands.some(eachCommand => eachCommand.commandName == command.commandName),
                 errorMessage: (value, _) => {
                     if (value != undefined) {
                         return {
@@ -48,7 +40,8 @@ export default class Perm extends Command {
             },
             {
                 field: "roles",
-                type: "roles",
+                type: "role",
+                multi: true,
                 required: args => args.help == undefined && args.action == "add",
                 description: "Le ou les rôles autorisés à taper cette commande"
             }

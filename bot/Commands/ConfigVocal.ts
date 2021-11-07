@@ -46,7 +46,8 @@ export default class ConfigVocal extends Command {
             users: {
                 required: false,
                 displayExtractError: true,
-                type: "users",
+                type: "user",
+                multi: true,
                 description: "Le ou les utilisateurs à ajouter ou supprimer",
                 errorMessage: (_) => ({
                     name: "Utilisateurs pas ou mal renseignés",
@@ -57,7 +58,8 @@ export default class ConfigVocal extends Command {
                 displayExtractError: true,
                 required: (args) => args.help == undefined && args.action === "blacklist" &&
                     ['add','remove'].includes(args.subAction) && args.blacklistType == 'listener' && args.users === undefined,
-                type: 'roles',
+                type: 'role',
+                multi: true,
                 description: "Les roles à ajouter ou retirer de la blacklist",
                 errorMessage: (value, args) => (value === undefined && args.users === undefined) ? {
                     name: "Au moins l'un des deux",
@@ -70,9 +72,11 @@ export default class ConfigVocal extends Command {
             channels: {
                 required: (args) => args.help == undefined && args.action === "blacklist" &&
                     ['add','remove'].includes(args.subAction) && args.blacklistType == "channel",
-                type: 'channels',
+                type: 'channel',
+                multi: true,
+                displayValidErrorEvenIfFound: true,
                 description: "Le ou les channels vocaux à supprimer ou ajouter",
-                valid: (channels: GuildChannel[]) => !channels.some(channel => channel.type != "GUILD_VOICE"),
+                valid: (channel: GuildChannel) => channel.type === "GUILD_VOICE",
                 errorMessage: (_) => ({
                     name: "Channels non ou mal renseigné",
                     value: "Ils ne peuvent être que des channels vocaux"
