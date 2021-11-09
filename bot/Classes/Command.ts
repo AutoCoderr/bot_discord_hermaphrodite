@@ -461,35 +461,27 @@ export default class Command {
                                 )
                             ))
                         ) {
+                            let data = argType == "string" ? args[i].toString() : args[i];
                             if (extractTypes[<string>argType]) {
                                 const moreDatas = typeof(argModel.moreDatas) == "function" ? await argModel.moreDatas(out,argType) : null
-                                const data = await extractTypes[<string>argType](args[i],this.message,moreDatas);
-                                if (data !== false) {
-                                    if (typeof(argModel.valid) != "function" || await argModel.valid(data,out)) {
-                                        found = true;
-                                        if (argModel.multi)
-                                            out[argModel.field].push(data)
-                                        else
-                                            out[argModel.field] = data;
-                                    } else {
-                                        triedValue = args[i];
-                                        incorrectField = true;
-                                    }
-                                } else {
+                                data = await extractTypes[<string>argType](data,this.message,moreDatas);
+                                if (data === false) {
                                     failsExtract.push({...argModel, value: args[i]});
                                     extractFailed = true;
                                 }
-                            } else if (typeof(argModel.valid) != "function" || await argModel.valid(args[i],out)) {
-                                const data = argType == "string" ? args[i].toString() : args[i];
+                            }
+
+                            if (!extractFailed && (typeof(argModel.valid) != "function" || await argModel.valid(data,out))) {
                                 if (argModel.multi)
                                     out[argModel.field].push(data)
                                 else
                                     out[argModel.field] = data
                                 found = true;
-                            } else {
+                            } else if (!extractFailed) {
                                 triedValue = args[i];
                                 incorrectField = true;
                             }
+
                             if (incorrectField || extractFailed) {
                                 currentIndex = i;
                                 break;
@@ -577,37 +569,27 @@ export default class Command {
                                 )
                             ))
                         ) {
+                            let data = argType == "string" ? args[i].toString() : args[i];
                             if (extractTypes[<string>argType]) {
                                 const moreDatas = typeof(argsByType[attr].moreDatas) == "function" ? await argsByType[attr].moreDatas(out,argType) : null
-                                const data = await extractTypes[<string>argType](args[i],this.message,moreDatas);
-                                if (data !== false) {
-                                    if (typeof(argsByType[attr].valid) != "function" || await argsByType[attr].valid(data,out)) {
-                                        if (argsByType[attr].multi)
-                                            out[attr].push(data);
-                                        else
-                                            out[attr] = data;
-                                        found = true;
-                                        alreadyDefineds[i] = true;
-                                    } else {
-                                        validFailed = true;
-                                        triedValue = args[i];
-                                    }
-                                } else {
+                                data = await extractTypes[<string>argType](data,this.message,moreDatas);
+                                if (data === false) {
                                     extractFailed = true;
                                     triedValue = args[i];
                                 }
-                            } else if (typeof(argsByType[attr].valid) != "function" || await argsByType[attr].valid(args[i],out)) {
-                                const data = argType == "string" ? args[i].toString() : args[i];
+                            }
+                            if (!extractFailed && (typeof(argsByType[attr].valid) != "function" || await argsByType[attr].valid(data,out))) {
                                 if (argsByType[attr].multi)
                                     out[attr].push(data);
                                 else
                                     out[attr] = data;
                                 found = true;
                                 alreadyDefineds[i] = true;
-                            } else {
+                            } else if (!extractFailed) {
                                 validFailed = true;
                                 triedValue = args[i];
                             }
+
                             if (found && (!argsByType[attr].multi || validFailed || extractFailed))
                                 break;
                         } else if (found)
@@ -623,7 +605,7 @@ export default class Command {
                     }
                     if (!found && extractFailed && (required || displayExtractError)) {
                         failsExtract.push({...argsByType[attr], value: triedValue, field: attr});
-                    } else if ((!found && required || (validFailed && displayValidError)) || (found && validFailed && displayValidErrorEvenIfFound)) {
+                    } else if ((!found && (required || (validFailed && displayValidError)) ) || (found && validFailed && displayValidErrorEvenIfFound)) {
                         fails.push({...argsByType[attr], value: triedValue, field: attr});
                     }
                 }
