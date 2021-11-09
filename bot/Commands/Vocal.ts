@@ -298,17 +298,15 @@ export default class Vocal extends Command {
             const notFoundUsersId: string[] = [];
 
             for (const [name, list] of Object.entries({users, roles})) {
-                if (list !== undefined) {
-                    for (const elem of list) {
-                        if (ownUserConfig.blocked[name].includes(elem.id)) {
-                            alreadyBlocked.push(elem);
-                            continue;
-                        }
-
-                        blocked.push(elem);
-
-                        ownUserConfig.blocked[name].push(elem.id);
+                for (const elem of list) {
+                    if (ownUserConfig.blocked[name].includes(elem.id)) {
+                        alreadyBlocked.push(elem);
+                        continue;
                     }
+
+                    blocked.push(elem);
+
+                    ownUserConfig.blocked[name].push(elem.id);
                 }
             }
 
