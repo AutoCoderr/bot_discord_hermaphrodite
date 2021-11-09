@@ -139,16 +139,22 @@ export default class Command {
 
         }
 
-        if (embeds.length > 0) {
-            if (displayHelp)
-                embeds.push(this.help())
-            else
-                embeds[embeds.length-1].addFields({
-                   name: "Voir l'aide : ",
-                   value: "Tapez : "+config.command_prefix+this.commandName+" -h"
-                });
-            this.message.channel.send({embeds});
-        }
+
+        if (this.argsModel.$argsByOrder !== undefined && this.argsModel.$argsByOrder.length > 1)
+            embeds[embeds.length-1].addFields({
+                name: "Ordre des arguments :",
+                value: config.command_prefix+this.commandName+" "+this.argsModel.$argsByOrder.map(model => "<"+model.field+'>').join(" ")
+            });
+
+        if (displayHelp)
+            embeds.push(this.help())
+        else
+            embeds[embeds.length-1].addFields({
+                name: "Voir l'aide : ",
+                value: "Tapez : "+config.command_prefix+this.commandName+" -h"
+            });
+        this.message.channel.send({embeds});
+
     }
 
     getArgsList(args: Array<any>) {
@@ -460,6 +466,7 @@ export default class Command {
                                 const data = await extractTypes[<string>argType](args[i],this.message,moreDatas);
                                 if (data !== false) {
                                     if (typeof(argModel.valid) != "function" || await argModel.valid(data,out)) {
+                                        found = true;
                                         if (argModel.multi)
                                             out[argModel.field].push(data)
                                         else
@@ -478,6 +485,7 @@ export default class Command {
                                     out[argModel.field].push(data)
                                 else
                                     out[argModel.field] = data
+                                found = true;
                             } else {
                                 triedValue = args[i];
                                 incorrectField = true;
@@ -486,8 +494,7 @@ export default class Command {
                                 currentIndex = i;
                                 break;
                             }
-                            if (out[argModel.field] !== undefined && (!argModel || out[argModel.field].length > 0)) {
-                                found = true;
+                            if (found) {
                                 currentIndex = i+1;
                                 if (!argModel.multi)
                                     break;

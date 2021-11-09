@@ -14,9 +14,7 @@ export default class ConfigWelcome extends Command {
                 type: "string",
                 required: args => args.help == undefined,
                 description: "L'action à effectuer: set, show, disable ou enable",
-                valid: (elem,_) => {
-                    return ["set","show","disable","enable"].includes(elem)
-                }
+                valid: (elem,_) => ["set","show","disable","enable"].includes(elem)
             }
         ]
     }
