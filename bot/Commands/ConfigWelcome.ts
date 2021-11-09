@@ -14,9 +14,7 @@ export default class ConfigWelcome extends Command {
                 type: "string",
                 required: args => args.help == undefined,
                 description: "L'action à effectuer: set, show, disable ou enable",
-                valid: (elem,_) => {
-                    return ["set","show","disable","enable"].includes(elem)
-                }
+                valid: (elem,_) => ["set","show","disable","enable"].includes(elem)
             }
         ]
     }
@@ -49,7 +47,7 @@ export default class ConfigWelcome extends Command {
         switch(action) {
             case "set":
                 this.message.channel.send("Veuillez rentrer le message, qui sera envoyé en MP aux nouveaux arrivants sur ce serveur :")
-                    .then(sentMessage => {
+                    .then(_ => {
                         const listener = async (response: Message) => {
                             if (response.author.id == this.message.author.id) { // @ts-ignore
                                 let welcomeMessage: IWelcomeMessage = await WelcomeMessage.findOne({serverId: this.message.guild.id});
@@ -68,10 +66,10 @@ export default class ConfigWelcome extends Command {
                                 }
                                 this.message.channel.send("Votre message a été enregistré et sera envoyé en MP aux nouveaux arrivants de ce serveur"+
                                                         (create ?  "\n(L'envoie de MP aux nouveaux a été activé)" : ""));
-                                bot.off('message', listener);
+                                bot.off('messageCreate', listener);
                             }
                         };
-                        bot.on('message', listener);
+                        bot.on('messageCreate', listener);
                     });
                 return true;
             case "show":

@@ -39,7 +39,7 @@ export const extractTypes = {
     message: async (field, _: Message, channel: GuildChannel|boolean): Promise<Message|false> => {
         if (channel) {
             try { // @ts-ignore
-                return await channel.messages.fetch(field)
+                return await channel.messages.fetch(field.toString())
             } catch (e) {
                 return false;
             }

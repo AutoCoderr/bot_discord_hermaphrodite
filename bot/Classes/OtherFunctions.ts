@@ -118,7 +118,8 @@ export async function forEachNotifyOnReact(callback, channel: GuildChannel, mess
                 if (typeof(listenings[channel.id][message.id]) != "undefined") { // Si un channel et un message ont été spécifiés, regarde dans le message
                     for (let emote in listenings[channel.id][message.id]) {
                         if (listenings[channel.id][message.id][emote]) {
-                            callback(true, channel, message.id, message.content, emote);
+                            const contentMessage = message.content.substring(0,Math.min(20,message.content.length)) + "...";
+                            callback(true, channel, message.id, contentMessage, emote);
                             nbListeneds += 1;
                         }
                     }

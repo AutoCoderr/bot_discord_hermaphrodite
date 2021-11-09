@@ -197,7 +197,8 @@ export default class Monitor extends Command {
                 valid: (elem: GuildChannel, _) => elem.type == "GUILD_TEXT"
             },
             messages: {
-                type: "messages",
+                type: "message",
+                multi: true,
                 description: "L'id du message à supprimer ou rafraichir",
                 required: (args) => args.help == undefined && ["refresh","remove"].includes(args.action),
                 moreDatas: (args) => args.channel

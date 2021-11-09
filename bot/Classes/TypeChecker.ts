@@ -35,4 +35,4 @@ const regex: any = {};
 regex.role = "\<@&[0-9]{18}\>";
 regex.channel = "\<#(!)?[0-9]{18}\>";
 regex.user = "\<@(!)?[0-9]{18}\>";
-regex.command = "[a-zA-Z]";
+regex.command = "[a-zA-Z]+";

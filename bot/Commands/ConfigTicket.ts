@@ -59,7 +59,8 @@ export default class ConfigTicket extends Command {
             user: {
                 required: args => args.help == undefined && args.action == "blacklist" && ['add','remove'].includes(args.subAction),
                 type: "user",
-                description: "L'utilisateur à ajouter ou retirer de la blacklist"
+                multi: true,
+                description: "Le ou les utilisateurs à ajouter ou retirer de la blacklist"
             },
             channelListen: {
                 required: args => args.help == undefined && args.action == "listen" && (args.subAction == "add" || (args.subAction == "remove" && !args.allListen)),
