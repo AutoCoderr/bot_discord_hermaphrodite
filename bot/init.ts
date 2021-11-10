@@ -2,6 +2,7 @@ import {existingCommands} from "./Classes/CommandsDescription";
 import {getExistingCommands} from "./Classes/CommandsDescription";
 import client from "./client";
 import {Interaction, VoiceState} from "discord.js";
+import initSlashCommands, {listenSlashCommands} from "./initSlashCommands";
 
 export default function init(bot) {
     setTimeout(async () => {
@@ -13,9 +14,13 @@ export default function init(bot) {
             //@ts-ignore
             existingCommands.ConfigTicket.initListeningAllMessages();
 
+            initSlashCommands()
+
             client.on('interactionCreate', (interaction: Interaction) => {
                 //@ts-ignore
                 existingCommands.Vocal.listenInviteButtons(interaction);
+
+                listenSlashCommands(interaction);
             });
 
             client.on('voiceStateUpdate', (oldState: VoiceState, newState: VoiceState) => {
