@@ -217,7 +217,7 @@ export default class Command {
             commandName = this.commandName;
         }
 
-        if (message.channel.type == "DM" || config.roots.includes(message.author.id) || (message.member && message.member.permissions.has("ADMINISTRATOR"))) return true;
+        if (message.channel.type == "DM" || config.roots.includes(message.author.id) || (message.guild && message.guild.ownerId == message.author.id)) return true;
 
         if (message.member && message.guild) {
             const permission: IPermissions = await Permissions.findOne({

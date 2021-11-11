@@ -16,7 +16,8 @@ export default class HistoryCmd extends Command {
         super(message, HistoryCmd.commandName);
     }
 
-    async action(args: {help: boolean, commands: typeof Command[], sort: string, limit: number, channels: GuildChannel[], users: GuildMember[]}, bot) {
+    async action(args: {help: boolean, commands: string, sort: string, limit: number, channels: GuildChannel[], users: GuildMember[]}, bot) {
+        const {help, commands, sort, limit, channels, users} = args;
 
         if (args.help) {
             this.displayHelp();
@@ -35,7 +36,7 @@ export default class HistoryCmd extends Command {
 
         let embeds: Array<MessageEmbed> = [];
 
-        const historByEmbed = 25;
+        const historByEmbed = 15;
 
         if (histories.length > 0) {
             embeds = splitFieldsEmbed(historByEmbed,histories.map(history => { //@ts-ignore
@@ -50,9 +51,15 @@ export default class HistoryCmd extends Command {
                     value: config.command_prefix+history.command
                 };
             }), (Embed: MessageEmbed, partNb: number) => {
-                Embed
-                    .setTitle("L'historique des commandes (Partie "+partNb+") "+(<number>args.limit > 0 ? "(limité à "+args.limit+")" : "(Sans limite)")+" :")
-                    .setDescription("Liste des commandes qui ont été tapées :");
+                if (partNb == 1)
+                    Embed
+                        .setTitle("L'historique des commandes "+(limit > 0 ? "(les "+limit+" premiers)" : "(Sans limite)")+" :")
+                        .setDescription("Liste des commandes qui ont été tapées \n\n"+
+                            (sort !== undefined ? "Ordre "+(sort === 'asc' ? 'croissant' : "décroissant")+"\n" : '')+
+                            (limit !== undefined ? "Les "+limit+" premiers de la liste\n" : '')+
+                            (commands !== undefined ? "Les commandes : "+commands+"\n" : '')+
+                            (channels !== undefined ? (channels.length > 1 ? "Sur les channels" : "Sur le channel")+" : "+channels.map(channel => "<#"+channel.id+">" ).join(", ")+"\n" : '')+
+                            (users !== undefined ? (users.length > 1 ? "Par les utilisateurs" : "Par l'utilisateur")+" : "+users.map(user => "<@"+user.id+">" ).join(", ")+"\n" : ''));
             });
         } else {
             embeds.push(new MessageEmbed()
@@ -65,7 +72,8 @@ export default class HistoryCmd extends Command {
                     value: "Aucun élément n'a été trouvé dans l'historique"
                 }));
         }
-        this.message.channel.send({embeds});
+        for (const embed of embeds)
+            this.message.channel.send({embeds: [embed]});
         return true;
     }
 
