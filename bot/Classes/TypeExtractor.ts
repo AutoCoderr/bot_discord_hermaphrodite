@@ -1,15 +1,27 @@
-import {CategoryChannel, GuildChannel, GuildEmoji, GuildMember, Message, Role, ThreadChannel} from "discord.js";
+import {
+    CategoryChannel,
+    GuildChannel,
+    GuildEmoji,
+    GuildMember,
+    Message,
+    Role,
+    ThreadChannel,
+    VoiceChannel
+} from "discord.js";
 import client from "../client";
+import {existingCommands} from "./CommandsDescription";
+import Command from "./Command";
+import {isNumber,durationUnits,durationUnitsMult} from "./OtherFunctions";
 
 export const extractTypes = {
-    channel: (field, message: Message): GuildChannel|ThreadChannel|false => {
+    channel: (field, message: Message): GuildChannel|ThreadChannel|VoiceChannel|false => {
         if (message.guild == null) return false;
         let channelId = field.split("<#")[1];
         channelId = channelId.substring(0,channelId.length-1);
         const channel = message.guild.channels.cache.get(channelId);
         return channel != undefined ? channel : false;
     },
-    channels: (field, message: Message): Array<GuildChannel|ThreadChannel>|false => {
+    channels: (field, message: Message): Array<GuildChannel|ThreadChannel|VoiceChannel>|false => {
         const channelsMentions = field.split(",");
         const channels: Array<GuildChannel|ThreadChannel> = [];
         for (const channelMention of channelsMentions) {
@@ -27,7 +39,7 @@ export const extractTypes = {
     message: async (field, _: Message, channel: GuildChannel|boolean): Promise<Message|false> => {
         if (channel) {
             try { // @ts-ignore
-                return await channel.messages.fetch(field)
+                return await channel.messages.fetch(field.toString())
             } catch (e) {
                 return false;
             }
@@ -100,5 +112,60 @@ export const extractTypes = {
             roles.push(role);
         }
         return roles;
+    },
+    command: async (field, message: Message): Promise<typeof Command|false>=> {
+        const commandList: typeof Command[] = Object.values(existingCommands);
+        let commandFound: typeof Command|false = false;
+        for (const command of commandList) {
+            if (command.commandName === field && command.display && await command.staticCheckPermissions(message,false)) {
+                commandFound = command;
+                break;
+            }
+        }
+        return commandFound;
+    },
+    commands: async (field, message: Message): Promise<typeof Command[]|false> => {
+        let commands: typeof Command[] = [];
+        for (let commandName of field.split(",")) {
+            commandName = commandName.trim();
+            const command = await extractTypes.command(commandName,message);
+            if (!command) return false;
+            commands.push(command);
+        }
+        return commands;
+    },
+    duration: (field,_) => {
+        if (field === 0 || (typeof(field) == "string" && parseInt(field) === 0)) return 0;
+        const unitByName = Object.entries(durationUnits).reduce((acc,[key,values]) => ({
+                ...acc,
+                ...values.reduce((acc, value) => ({
+                    ...acc,
+                    [value]: key
+                }), {})
+            }), {});
+
+        let ms = 0;
+        let i=0;
+        while (i<field.length) {
+            while (field[i] === " ") {
+                i++
+            }
+            let numStr = ''
+            while (isNumber(field[i])) {
+                numStr += field[i];
+                i++;
+            }
+            while (field[i] === " ") {
+                i++
+            }
+            let unitName = ''
+            while (i<field.length && field[i] !== " " && !isNumber(field[i])) {
+                unitName += field[i];
+                i++;
+            }
+            ms += parseInt(numStr)*durationUnitsMult[unitByName[unitName]]
+        }
+
+        return ms;
     }
 };

@@ -1,7 +1,7 @@
 import config from "../config";
 import Command from "../Classes/Command";
 import StoredNotifyOnReact, { IStoredNotifyOnReact } from "../Models/StoredNotifyOnReact";
-import {GuildChannel, GuildEmoji, Message} from "discord.js";
+import {GuildChannel, GuildEmoji, Message, MessageEmbed} from "discord.js";
 import TicketConfig, {ITicketConfig} from "../Models/TicketConfig";
 import {existingCommands} from "../Classes/CommandsDescription";
 
@@ -240,10 +240,14 @@ export default class NotifyOnReact extends Command {
         }
     }
 
-    help(Embed) {
-        Embed.addFields({
-            name: "Exemple :",
-            value: config.command_prefix+"notifyOnReact --listen #ChannelAEcouter/IdDuMessageAEcouter -e :emoteAEcouter: --message '$user$ a réagit à ce message' --writeChannel #channelSurLequelEcrire"
-        });
+    help() {
+        return new MessageEmbed()
+            .setTitle("Exemples :")
+            .addFields([
+                {
+                    name: config.command_prefix+this.commandName+" --listen #ChannelAEcouter/IdDuMessageAEcouter -e :emoteAEcouter: --message '$user$ a réagit à ce message' --writeChannel #channelSurLequelEcrire",
+                    value: "Créer une écoute pour qu'un message '$user$ a réagit à ce message' soit posté sur le channel #channelSurLequelEcrire à chaque fois qu'on réagit avec l'émote :emoteAEcouter: sur le message ayant l'id IdDuMessageAEcouter dans le channel #ChannelAEcouter"
+                }
+            ]);
     }
 }

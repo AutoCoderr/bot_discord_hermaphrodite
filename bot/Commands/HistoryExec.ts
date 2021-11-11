@@ -1,6 +1,6 @@
 import Command from "../Classes/Command";
 import config from "../config";
-import {GuildChannel, GuildMember, Message} from "discord.js";
+import {GuildChannel, GuildMember, Message, MessageEmbed} from "discord.js";
 import {getArgsModelHistory, getHistory} from "../Classes/OtherFunctions";
 
 export default class HistoryExec extends Command {
@@ -16,7 +16,7 @@ export default class HistoryExec extends Command {
     }
 
 
-    async action(args: {help: boolean, commands: string, sort: string, limit: number, channels: GuildChannel[], users: GuildMember[]}, bot) {
+    async action(args: {help: boolean, commands: typeof Command[], sort: string, limit: number, channels: GuildChannel[], users: GuildMember[]}, bot) {
 
         if (args.help) {
             this.displayHelp();
@@ -40,17 +40,14 @@ export default class HistoryExec extends Command {
 
     saveHistory() {} // overload saveHistory of Command class to save nothing in the history
 
-    help(Embed) {
-        Embed.addFields({
-            name: "Arguments :",
-            value: "-c ou --command, la commande dont on souhaite executer l'historique\n"+
-                "-s ou --sort, 'asc' ou 'desc/dsc' ('asc' par défaut) pour trier du debut à la fin ou de la fin au début dans l'ordre chronologique\n"+
-                "-l ou --limit, Pour executer les n premières commandes de la listes\n"+
-                "-ch ou --channel, Pour éxecuté les commandes ayant été executées dans un channel spécifique\n"+
-                "-u ou --user, Pour éxecuter les commandes ayant été executées par un utilisateur spécifique"
-        }).addFields({
-            name: "Exemples :",
-            value: config.command_prefix+"historyExec --command notifyOnReact -l 10 --channel #blabla"
-        })
+    help() {
+        return new MessageEmbed()
+            .setTitle("Exemples")
+            .addFields([
+                {
+                    name: config.command_prefix+this.commandName+" --command notifyOnReact -l 10 --channel #blabla -s desc -u @toto",
+                    value: "Executer les 10 dernières commandes notifyOnReact dans l'ordre décroissant, sur le channel #blabla, effectuées par l'utilisateur @toto"
+                }
+            ]);
     }
 }

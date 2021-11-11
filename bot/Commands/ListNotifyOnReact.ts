@@ -1,7 +1,7 @@
 import config from "../config";
 import {forEachNotifyOnReact} from "../Classes/OtherFunctions";
 import Command from "../Classes/Command";
-import Discord, {GuildChannel, GuildEmoji, Message} from "discord.js";
+import Discord, {GuildChannel, GuildEmoji, Message, MessageEmbed} from "discord.js";
 import {existingCommands} from "../Classes/CommandsDescription";
 
 export default class ListNotifyOnReact extends Command {
@@ -91,9 +91,10 @@ export default class ListNotifyOnReact extends Command {
                     });
                 }
             }, channel, message, this.message);
-        } else if (listenings && listenings[channel.id] && listenings[channel.id][message.id] && listenings[channel.id][message.id][emoteName]) { // @ts-ignore
+        } else if (listenings && listenings[channel.id] && listenings[channel.id][message.id] && listenings[channel.id][message.id][emoteName]) {
+            const contentMessage = message.content.substring(0,Math.min(20,message.content.length)) + "...";
             Embed.addFields({
-                name: "sur '#" + channel.name + "' (" + message.content + ") :" + emoteName + ":",
+                name: "sur '#" + channel.name + "' (" + contentMessage + ") :" + emoteName + ":",
                 value: "Cette écoute de réaction a été supprimée"
             });
         } else {
@@ -107,12 +108,25 @@ export default class ListNotifyOnReact extends Command {
         return true;
     }
 
-    help(Embed) {
-        Embed.addFields({
-                name: "Exemples :",
-                value: config.command_prefix+this.commandName+" --channel #leChannel\n"+
-                    config.command_prefix+this.commandName+" --channel #leChannel -m idDuMessage\n"+
-                    config.command_prefix+this.commandName+" --all\n"
-            });
+    help() {
+        return new MessageEmbed()
+            .setTitle("Exemples :")
+            .addFields([
+                {
+                    name: "--channel #leChannel",
+                    value: "Lister les écoutes de réaction du channel #leChannel"
+                },
+                {
+                    name: "--channel #leChannel -m idDuMessage",
+                    value: "Lister les écoutes de réaction du channel #leChannel sur le message mentionné"
+                },
+                {
+                    name: "--all",
+                    value: "Afficher toutes les écoutes de réaction du serveur"
+                }
+            ].map(field => ({
+                name: config.command_prefix+this.commandName+" "+field.name,
+                value: field.value
+            })));
     }
 }

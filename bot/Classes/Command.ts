@@ -51,9 +51,9 @@ export default class Command {
         this.message.channel.send({embeds: [Embed]});
     }
 
-    displayHelp(fails: null|Array<any> = null, failsExtract: null|Array<any> = null, args = null) {
+    displayHelp(displayHelp = true, fails: null|Array<any> = null, failsExtract: null|Array<any> = null, args = null) {
         const commandName = this.message.content.split(" ")[0];
-        let Embeds: Array<MessageEmbed> = [
+        let embeds: Array<MessageEmbed> = [
             new MessageEmbed()
                 .setTitle("Aide pour la commande "+commandName)
                 .setColor('#0099ff')
@@ -74,7 +74,7 @@ export default class Command {
                         }
                     }
                 }
-                Embeds = [...Embeds, ...splitFieldsEmbed(25, subFields, (Embed: MessageEmbed, partNb) => {
+                embeds = [...embeds, ...splitFieldsEmbed(25, subFields, (Embed: MessageEmbed, partNb) => {
                     if (partNb == 1) {
                         Embed.setTitle("Arguments manquants ou invalides :");
                     }
@@ -97,7 +97,7 @@ export default class Command {
                     }
                 }
 
-                Embeds = [...Embeds, ...splitFieldsEmbed(25, subFields, (Embed: MessageEmbed, partNb) => {
+                embeds = [...embeds, ...splitFieldsEmbed(25, subFields, (Embed: MessageEmbed, partNb) => {
                     if (partNb == 1) {
                         Embed.setTitle("Données introuvables");
                     }
@@ -131,7 +131,7 @@ export default class Command {
                 }
             }
 
-            Embeds = [...Embeds, ...splitFieldsEmbed(25, subFields, (Embed: MessageEmbed, partNb) => {
+            embeds = [...embeds, ...splitFieldsEmbed(25, subFields, (Embed: MessageEmbed, partNb) => {
                 if (partNb == 1) {
                     Embed.setTitle("Champs");
                 }
@@ -139,12 +139,22 @@ export default class Command {
 
         }
 
-        if (Embeds.length > 0) {
-            this.help(Embeds[Embeds.length-1]);
-            for (const Embed of Embeds) {
-                this.message.channel.send({embeds: [Embed]});
-            }
-        }
+
+        if (this.argsModel.$argsByOrder !== undefined && this.argsModel.$argsByOrder.length > 1)
+            embeds[embeds.length-1].addFields({
+                name: "Ordre des arguments :",
+                value: config.command_prefix+this.commandName+" "+this.argsModel.$argsByOrder.map(model => "<"+model.field+'>').join(" ")
+            });
+
+        if (displayHelp)
+            embeds.push(this.help())
+        else
+            embeds[embeds.length-1].addFields({
+                name: "Voir l'aide : ",
+                value: "Tapez : "+config.command_prefix+this.commandName+" -h"
+            });
+        this.message.channel.send({embeds});
+
     }
 
     getArgsList(args: Array<any>) {
@@ -233,13 +243,39 @@ export default class Command {
     }
 
     getValueInCorrectType(value: string) {
+        value = value.trim();
         if (value == "true" || value == "false") {
             return value == "true";
         } else if (isNumber(value)) {
             return parseInt(value);
         } else {
-            return  value;
+            return value;
         }
+    }
+
+    checkIfModelValid() {
+        if (this.commandName != null && validModelCommands[this.commandName]) return true;
+
+        let valid = true;
+        if (this.commandName != null && validModelCommands[this.commandName] == false) valid = false;
+
+        if (valid && this.argsModel.$argsByType && this.argsModel.$argsByOrder) valid = false;
+
+
+        if (this.commandName != null && !validModelCommands[this.commandName]) {
+            validModelCommands[this.commandName] = valid;
+        }
+        if (!valid) {
+            this.message.channel.send({embeds: [
+                    new MessageEmbed()
+                        .setTitle("Modèle de la commande invalide")
+                        .setDescription("Le modèle de la commande est invalide")
+                        .setColor('#0099ff')
+                        .setTimestamp()
+                ]})
+            return false;
+        }
+        return true;
     }
 
     parseCommand(): any {
@@ -314,31 +350,6 @@ export default class Command {
         return argsObject;
     }
 
-    checkIfModelValid() {
-        if (this.commandName != null && validModelCommands[this.commandName]) return true;
-
-        let valid = true;
-        if (this.commandName != null && validModelCommands[this.commandName] == false) valid = false;
-
-        if (valid && this.argsModel.$argsByType && this.argsModel.$argsByOrder) valid = false;
-
-
-        if (this.commandName != null && !validModelCommands[this.commandName]) {
-            validModelCommands[this.commandName] = valid;
-        }
-        if (!valid) {
-            this.message.channel.send({embeds: [
-                        new MessageEmbed()
-                            .setTitle("Modèle de la commande invalide")
-                            .setDescription("Le modèle de la commande est invalide")
-                            .setColor('#0099ff')
-                            .setTimestamp()
-                    ]})
-            return false;
-        }
-        return true;
-    }
-
     async computeArgs(args,model) {
         let out: any = {};
         let fails: Array<any> = [];
@@ -350,7 +361,7 @@ export default class Command {
                 let found = false;
                 let incorrectField = false;
                 let extractFailed = false;
-                let triedValue = null;
+                let triedValue;
 
                 for (let field of model[attr].fields) {
                     let argType: Array<string>|string = model[attr].type ?? model[attr].types;
@@ -375,12 +386,12 @@ export default class Command {
                         if (extractTypes[<string>argType]) {
                             const moreDatas = typeof(model[attr].moreDatas) == "function" ? await model[attr].moreDatas(out,argType) : null
                             const data = await extractTypes[<string>argType](args[field],this.message,moreDatas);
-                            if (data) {
+                            if (data !== false) {
                                 if (typeof(model[attr].valid) != "function" || await model[attr].valid(data,out))
                                     out[attr] = data;
                                 else {
                                     incorrectField = true;
-                                    triedValue = data;
+                                    triedValue = args[field];
                                 }
                             } else {
                                 extractFailed = true;
@@ -422,13 +433,19 @@ export default class Command {
                 }
             } else if (attr == "$argsByOrder" && !argsWithoutKeyDefined) {
                 argsWithoutKeyDefined = true;
+                let currentIndex = 0;
                 const argsByOrder = model[attr];
-                for (let i=0;i<argsByOrder.length;i++) {
-                    let argType: Array<string>|string = argsByOrder[i].type ?? argsByOrder[i].types;
+                for (let j=0;j<argsByOrder.length;j++) {
+                    const argModel = argsByOrder[j];
+                    if (argModel.multi)
+                        out[argModel.field] = [];
+                    let argType: Array<string>|string = argModel.type ?? argModel.types;
                     let found = false;
                     let incorrectField = false;
+                    let triedValue;
                     let extractFailed = false;
-                    if (args[i] != undefined && (
+                    for (let i=currentIndex;args[i] !== undefined;i++) {
+                        if (args[i] != undefined && (
                             (
                                 argType instanceof Array &&
                                 await Promise.all(argType.map(async type => {
@@ -443,43 +460,61 @@ export default class Command {
                                     argType == "string" || await checkTypes[argType](args[i])
                                 )
                             ))
-                    ) {
-                        if (extractTypes[<string>argType]) {
-                            const moreDatas = typeof(argsByOrder[i].moreDatas) == "function" ? await argsByOrder[i].moreDatas(out,argType) : null
-                            const data = await extractTypes[<string>argType](args[i],this.message,moreDatas);
-                            if (data) {
-                                if (typeof(argsByOrder[i].valid) != "function" || await argsByOrder[i].valid(data,out))
-                                    out[argsByOrder[i].field] = data;
-                                else
-                                    incorrectField = true;
-                            } else {
-                                failsExtract.push({...argsByOrder[i], value: args[i]});
-                                extractFailed = true;
+                        ) {
+                            let data = argType == "string" ? args[i].toString() : args[i];
+                            if (extractTypes[<string>argType]) {
+                                const moreDatas = typeof(argModel.moreDatas) == "function" ? await argModel.moreDatas(out,argType) : null
+                                data = await extractTypes[<string>argType](data,this.message,moreDatas);
+                                if (data === false) {
+                                    failsExtract.push({...argModel, value: args[i]});
+                                    extractFailed = true;
+                                }
                             }
-                        } else if (typeof(argsByOrder[i].valid) != "function" || await argsByOrder[i].valid(args[i],out)) {
-                            out[argsByOrder[i].field] = argType == "string" ? args[i].toString() : args[i];
+
+                            if (!extractFailed && (typeof(argModel.valid) != "function" || await argModel.valid(data,out))) {
+                                if (argModel.multi)
+                                    out[argModel.field].push(data)
+                                else
+                                    out[argModel.field] = data
+                                found = true;
+                            } else if (!extractFailed) {
+                                triedValue = args[i];
+                                incorrectField = true;
+                            }
+
+                            if (incorrectField || extractFailed) {
+                                currentIndex = i;
+                                break;
+                            }
+                            if (found) {
+                                currentIndex = i+1;
+                                if (!argModel.multi)
+                                    break;
+                            }
                         } else {
-                            incorrectField = true;
+                            if (j == argsByOrder.length - 1) {
+                                triedValue = args[i];
+                                incorrectField = true;
+                            }
+                            currentIndex = i;
+                            break;
                         }
-                        if (out[argsByOrder[i].field] != undefined) found = true;
-                    } else if (args[i] != undefined) {
-                        incorrectField = true;
                     }
-                    const required = argsByOrder[i].required == undefined ||
-                        (typeof(argsByOrder[i].required) == "boolean" && argsByOrder[i].required) ||
-                        (typeof(argsByOrder[i].required) == "function" && await argsByOrder[i].required(out));
+                    const required = argModel.required == undefined ||
+                        (typeof(argModel.required) == "boolean" && argModel.required) ||
+                        (typeof(argModel.required) == "function" && await argModel.required(out));
 
                     if (required) {
-                        const defaultValue = typeof (argsByOrder[i].default) == "function" ? argsByOrder[i].default(out) : argsByOrder[i].default;
+                        const defaultValue = typeof (argModel.default) == "function" ? argModel.default(out) : argModel.default;
                         if (!found && !incorrectField && defaultValue != undefined) {
-                            out[argsByOrder[i].field] = defaultValue;
+                            out[argModel.field] = defaultValue;
                             found = true;
                         }
                     }
                     if (
                         !found && !extractFailed && (incorrectField || required )
                     ) {
-                        fails.push({...argsByOrder[i], value: args[i]});
+                        fails.push({...argModel, value: triedValue});
                     }
                 }
             } else if (attr == "$argsByType" && !argsWithoutKeyDefined) {
@@ -488,17 +523,36 @@ export default class Command {
                 const alreadyDefineds = {};
 
                 for (let attr in argsByType) {
+                    if (argsByType[attr].multi)
+                        out[attr] = [];
+
                     let found = false;
                     let extractFailed = false;
-                    let triedValue = null;
+                    let validFailed = false;
+                    let triedValue;
                     let argType: Array<string>|string = argsByType[attr].type ?? argsByType[attr].types;
+
                     const required = argsByType[attr].required == undefined ||
                         (typeof(argsByType[attr].required) == "boolean" && argsByType[attr].required) ||
                         (typeof(argsByType[attr].required) == "function" && await argsByType[attr].required(out));
 
+                    const displayExtractError = (typeof(argsByType[attr].displayExtractError) == "boolean" && argsByType[attr].displayExtractError) ||
+                        (typeof(argsByType[attr].displayExtractError) == "function" && await argsByType[attr].displayExtractError(out));
 
-                    for (let i=0;args[i];i++) {
-                        if (alreadyDefineds[i]) continue;
+                    const displayValidErrorEvenIfFound = (typeof(argsByType[attr].displayValidErrorEvenIfFound) == "boolean" && argsByType[attr].displayValidErrorEvenIfFound) ||
+                        (typeof(argsByType[attr].displayValidErrorEvenIfFound) == "function" && await argsByType[attr].displayValidErrorEvenIfFound(out));
+
+                    const displayValidError = (typeof(argsByType[attr].displayValidError) == "boolean" && argsByType[attr].displayValidError) ||
+                        (typeof(argsByType[attr].displayValidError) == "function" && await argsByType[attr].displayValidError(out)) ||
+                        displayValidErrorEvenIfFound;
+
+                    for (let i=0;args[i] !== undefined;i++) {
+                        if (alreadyDefineds[i]) {
+                            if (found)
+                                break;
+                            else
+                                continue;
+                        }
 
                         if (args[i] != undefined && (
                             (
@@ -515,31 +569,31 @@ export default class Command {
                                 )
                             ))
                         ) {
+                            let data = argType == "string" ? args[i].toString() : args[i];
                             if (extractTypes[<string>argType]) {
                                 const moreDatas = typeof(argsByType[attr].moreDatas) == "function" ? await argsByType[attr].moreDatas(out,argType) : null
-                                const data = await extractTypes[<string>argType](args[i],this.message,moreDatas);
-                                if (data) {
-                                    if (typeof(argsByType[attr].valid) != "function" || await argsByType[attr].valid(data,out)) {
-                                        out[attr] = data;
-                                        alreadyDefineds[i] = true;
-                                    } else {
-                                        triedValue = data;
-                                    }
-                                } else if (required) {
+                                data = await extractTypes[<string>argType](data,this.message,moreDatas);
+                                if (data === false) {
                                     extractFailed = true;
                                     triedValue = args[i];
                                 }
-                            } else if (typeof(argsByType[attr].valid) != "function" || await argsByType[attr].valid(args[i],out)) {
-                                out[attr] = argType == "string" ? args[i].toString() : args[i];
+                            }
+                            if (!extractFailed && (typeof(argsByType[attr].valid) != "function" || await argsByType[attr].valid(data,out))) {
+                                if (argsByType[attr].multi)
+                                    out[attr].push(data);
+                                else
+                                    out[attr] = data;
+                                found = true;
                                 alreadyDefineds[i] = true;
-                            } else if (required){
+                            } else if (!extractFailed) {
+                                validFailed = true;
                                 triedValue = args[i];
                             }
-                            if (out[attr] != undefined) {
-                                found = true;
+
+                            if (found && (!argsByType[attr].multi || validFailed || extractFailed))
                                 break;
-                            }
-                        }
+                        } else if (found)
+                            break;
                     }
 
                     if (required) {
@@ -549,24 +603,24 @@ export default class Command {
                             found = true;
                         }
                     }
-                    if (!found) {
-                        if (extractFailed) {
-                            failsExtract.push({...argsByType[attr], value: triedValue, field: attr});
-                        } else if (required) {
-                            fails.push({...argsByType[attr], value: triedValue, field: attr});
-                        }
+                    if (!found && extractFailed && (required || displayExtractError)) {
+                        failsExtract.push({...argsByType[attr], value: triedValue, field: attr});
+                    } else if ((!found && (required || (validFailed && displayValidError)) ) || (found && validFailed && displayValidErrorEvenIfFound)) {
+                        fails.push({...argsByType[attr], value: triedValue, field: attr});
                     }
                 }
             }
         }
         if (fails.length > 0 || failsExtract.length > 0) {
-            this.displayHelp(fails, failsExtract, out);
+            this.displayHelp(false, fails, failsExtract, out);
             return false;
         }
         return out;
     }
 
-    help(Embed) {} // To be overloaded
+    help(): MessageEmbed { // To be overloaded
+        return new MessageEmbed();
+    }
 
     async action(args: any,bot) { // To be overloaded
         return true;

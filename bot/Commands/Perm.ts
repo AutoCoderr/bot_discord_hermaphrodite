@@ -19,35 +19,17 @@ export default class Perm extends Command {
             },
             {
                 field: "commands",
-                type: "string",
+                type: "command",
+                multi: true,
                 required: args => args.help == undefined,
                 description: "La ou les commandes sur laquelle ajouter ou définir la permission",
-                valid: async (commandList, _) => { // Vérifie si l'utilisateur à le droit d'accéder à cette commande
-                    const alreadySpecifiedCommands = {};
-                    const commands: typeof Command[] = Object.values(existingCommands);
-                    for (let specifiedCommandName of commandList.split(",")) {
-                        specifiedCommandName = specifiedCommandName.trim();
-                        if (alreadySpecifiedCommands[specifiedCommandName] === undefined) {
-                            let commandExists = false
-                            for (const command of commands) {
-                                if (command.commandName == specifiedCommandName && command.display && await command.staticCheckPermissions(this.message, false)) {
-                                    commandExists = true;
-                                    break;
-                                }
-                            }
-                            if (!commandExists) return false;
-                        } else {
-                            return false;
-                        }
-                    }
-                    return true;
-                },
-
+                valid: async (command: typeof Command, args) =>  // Vérifie si une commande n'a pas été tapée plusieurs fois
+                    !args.commands.some(eachCommand => eachCommand.commandName == command.commandName),
                 errorMessage: (value, _) => {
                     if (value != undefined) {
                         return {
-                            name: "La commande n'existe pas",
-                            value: "La commande '" + value + "' n'existe pas, ou vous est inaccessible"
+                            name: "Liste de commandes invalide",
+                            value: value+" : Une de ces commandes n'existe pas, vous est inaccesible, ou a été spécifiée plusieurs fois"
                         };
                     }
                     return {
@@ -58,7 +40,8 @@ export default class Perm extends Command {
             },
             {
                 field: "roles",
-                type: "roles",
+                type: "role",
+                multi: true,
                 required: args => args.help == undefined && args.action == "add",
                 description: "Le ou les rôles autorisés à taper cette commande"
             }
@@ -73,10 +56,8 @@ export default class Perm extends Command {
         super(message, Perm.commandName);
     }
 
-    async action(args: {help: boolean, action: string, commands: string, roles: Array<Role>}, bot) { //%perm set commandName @role
+    async action(args: {help: boolean, action: string, commands: typeof Command[], roles: Array<Role>}, bot) { //%perm set commandName @role
         const {help, action, commands, roles} = args;
-
-        const commandsList = commands.split(",").map(commandName => commandName.trim());
 
         if (help) {
             this.displayHelp();
@@ -95,17 +76,17 @@ export default class Perm extends Command {
 
             const embeds: MessageEmbed[] = [];
 
-            for (const commandName of commandsList) {
-                const permission: IPermissions|null = await Permissions.findOne({command: commandName, serverId: this.message.guild.id});
+            for (const command of commands) {
+                const permission: IPermissions|null = await Permissions.findOne({command: command.commandName, serverId: this.message.guild.id});
                 let embed = new MessageEmbed()
                     .setColor('#0099ff')
-                    .setTitle("Les permissions pour '"+commandName+"' :")
-                    .setDescription("Liste des permissions pour '"+commandName+"'")
+                    .setTitle("Les permissions pour '"+command.commandName+"' :")
+                    .setDescription("Liste des permissions pour '"+command.commandName+"'")
                     .setTimestamp();
                 if (permission == null || permission.roles.length == 0) {
                     embed.addFields({
                         name: "Aucune permission",
-                        value: "Il n'y a aucune permission trouvée pour la commande " + commandName
+                        value: "Il n'y a aucune permission trouvée pour la commande " + command.commandName
                     });
                 } else {
                     let roles: Array<string> = [];
@@ -136,12 +117,12 @@ export default class Perm extends Command {
 
         const rolesId = roles ? roles.map(role => role.id) : [];
 
-        for (const commandName of commandsList) {
-            const permission = await Permissions.findOne({serverId: serverId, command: commandName});
+        for (const command of commands) {
+            const permission = await Permissions.findOne({serverId: serverId, command: command.commandName});
 
             if (permission == null) {
                 const permission: IPermissions = {
-                    command: commandName,
+                    command: <string>command.commandName,
                     roles: rolesId,
                     serverId: serverId
                 }
@@ -163,17 +144,34 @@ export default class Perm extends Command {
                 }
                 await permission.save();
             }
-            this.message.channel.send("Permission added or setted successfully for the '"+commandName+"' command!");
+            this.message.channel.send("Permission added or setted successfully for the '"+command.commandName+"' command!");
         }
         return true;
     }
 
-    help(Embed) {
-        Embed.addFields({
-               name: "Exemples :",
-               value: config.command_prefix+"perm add notifyOnReact @Admins\n"+
-                    "Ou "+config.command_prefix+"perm set notifyOnReact '@Admins, @Maintainers'\n"+
-                    "Ou "+config.command_prefix+"perm show notifyOnReact"
-            });
+    help() {
+        return new MessageEmbed()
+            .setTitle("Exemples :")
+            .addFields([
+                {
+                    name: "add notifyOnReact @Admins",
+                    value: "Ajouter le role @&Admins dans la liste des rôles autoriser à utiliser la commande notifyOnReact"
+                },
+                {
+                    name: "set notifyOnReact '@Admins, @Maintainers'",
+                    value: "Définir @Admins et @Maintainers comme les rôles autorisés à utiliser la commande notifyOnReact"
+                },
+                {
+                    name: "set notifyOnReact ''",
+                    value: "Vider la liste des rôles autorisés à utiliser la commande notifyOnReact"
+                },
+                {
+                    name: "show notifyOnReact",
+                    value: "Afficher les rôles autorisés à utiliser la commande notifyOnReact"
+                }
+            ].map(field => ({
+                name: config.command_prefix+this.commandName+" "+field.name,
+                value: field.value
+            })));
     }
 }
