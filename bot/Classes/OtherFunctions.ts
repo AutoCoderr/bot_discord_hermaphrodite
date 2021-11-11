@@ -56,7 +56,7 @@ export function getArgsModelHistory(message: Message) {
         sort: {
             fields: ['-s', '--sort'],
             type: "string",
-            required: false,
+            required: true,
             description: "'asc' ou 'desc/dsc' ('desc' par défaut) pour trier du debut à la fin ou de la fin au début dans l'ordre chronologique",
             valid: (value, _) => ['asc','desc','dsc'].includes(value),
             default: "desc"
@@ -64,7 +64,8 @@ export function getArgsModelHistory(message: Message) {
         limit: {
             fields: ['-l', '--limit'],
             type: "number",
-            required: false,
+            required: true,
+            default: 15,
             description: "Pour afficher les n dernières commandes de la listes"
         },
         channels: {
