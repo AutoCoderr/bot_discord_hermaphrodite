@@ -1,6 +1,7 @@
 import client from "./client";
-import {Interaction} from "discord.js";
+import {GuildApplicationCommandManager, Interaction} from "discord.js";
 import {ApplicationCommandOptionTypes} from "discord.js/typings/enums";
+import Command from "./Classes/Command";
 
 export default async function initSlashCommands() {
     console.log("initSlashCommands");
@@ -11,14 +12,17 @@ export default async function initSlashCommands() {
         try {
             const commands = guild.commands;
 
-            console.log({commands});
-            console.log(commands?.cache.map(command => command.name));
+            //@ts-ignore
+            //generateSlashCommandFromModel(existingCommands.Vocal,commands);
+
+            //console.log({commands});
+            //console.log(commands?.cache.map(command => command.name));
             let res
             res = await commands?.create({
                 name: 'ping',
                 description: 'Make a ping'
             });
-            console.log({ping: res});
+            //console.log({ping: res});
             res = await commands?.create({
                 name: 'add',
                 description: 'Additionner',
@@ -36,7 +40,7 @@ export default async function initSlashCommands() {
                         required: true
                     }]
             });
-            console.log({add: res});
+            //console.log({add: res});
 
             res = await commands?.create({
                 name: 'test',
@@ -120,16 +124,20 @@ export default async function initSlashCommands() {
                     }*/
                 ]
             })
-            console.log({test: res})
+            //console.log({test: res})
 
-            console.log("created");
-            console.log(commands?.cache.map(command => command.name));
+            //console.log("created");
+            //console.log(commands?.cache.map(command => command.name));
         } catch (e) {
             console.error(e)
             console.log("Command can't be created on the '" + guild.name + "' server");
         }
     }
 }
+
+/*function generateSlashCommandFromModel(command: typeof Command, slashCommands: GuildApplicationCommandManager) {
+    for (const attr of command)
+}*/
 
 export async function listenSlashCommands(interaction: Interaction) {
     if (!interaction.isCommand()) return;

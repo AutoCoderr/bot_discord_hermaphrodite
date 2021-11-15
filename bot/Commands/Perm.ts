@@ -5,6 +5,9 @@ import {Message, MessageEmbed, Role} from "discord.js";
 import Permissions, {IPermissions} from "../Models/Permissions";
 
 export default class Perm extends Command {
+    static display = true;
+    static description = "Pour configurer les permissions.";
+    static commandName = "perm";
 
     argsModel = {
         help: { fields: ['-h','--help'], type: "boolean", required: false, description: "Pour afficher l'aide" },
@@ -48,12 +51,8 @@ export default class Perm extends Command {
         ]
     };
 
-    static display = true;
-    static description = "Pour configurer les permissions.";
-    static commandName = "perm";
-
     constructor(message: Message) {
-        super(message, Perm.commandName);
+        super(message, Perm.commandName, Perm.argsModel);
     }
 
     async action(args: {help: boolean, action: string, commands: typeof Command[], roles: Array<Role>}, bot) { //%perm set commandName @role

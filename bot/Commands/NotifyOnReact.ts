@@ -6,6 +6,20 @@ import TicketConfig, {ITicketConfig} from "../Models/TicketConfig";
 import {existingCommands} from "../Classes/CommandsDescription";
 
 export default class NotifyOnReact extends Command {
+    static listenings = {}; /* example : {
+    "773657730388852746": { // id d'un serveur
+        "775101704638169148": { // id d'un channel
+                "784849560765464586": { //id d'un message
+                    yoyo: true, // une emote (écoute activée)
+                    nod: false // une autre emote (écoute désactivée)
+                }
+            }
+         }
+        }*/
+
+    static display = true;
+    static description = "Pour envoyer un message sur un channel indiqué, quand une réaction à été detectée sur un autre message.";
+    static commandName = "notifyOnReact";
 
     argsModel = {
         help: {
@@ -40,23 +54,8 @@ export default class NotifyOnReact extends Command {
         },
     };
 
-    static listenings = {}; /* example : {
-    "773657730388852746": { // id d'un serveur
-        "775101704638169148": { // id d'un channel
-                "784849560765464586": { //id d'un message
-                    yoyo: true, // une emote (écoute activée)
-                    nod: false // une autre emote (écoute désactivée)
-                }
-            }
-         }
-        }*/
-
-    static display = true;
-    static description = "Pour envoyer un message sur un channel indiqué, quand une réaction à été detectée sur un autre message.";
-    static commandName = "notifyOnReact";
-
     constructor(message: Message) {
-        super(message, NotifyOnReact.commandName);
+        super(message, NotifyOnReact.commandName, NotifyOnReact.argsModel);
         this.listenings = NotifyOnReact.listenings;
     }
 

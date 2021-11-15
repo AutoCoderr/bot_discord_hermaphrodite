@@ -9,7 +9,7 @@ export default class Help extends Command {
     static commandName = "help";
 
     constructor(message: Message) {
-        super(message, Help.commandName);
+        super(message, Help.commandName, Help.argsModel);
     }
 
     async action(_,bot) {

@@ -4,15 +4,14 @@ import {GuildChannel, GuildMember, Message, MessageEmbed} from "discord.js";
 import {getArgsModelHistory, getHistory} from "../Classes/OtherFunctions";
 
 export default class HistoryExec extends Command {
-
-    argsModel = getArgsModelHistory(this.message);
-
     static display = true;
     static description = "Pour executer des commandes de l'historique.";
     static commandName = "historyExec";
 
+    argsModel = getArgsModelHistory();
+
     constructor(message: Message) {
-        super(message, HistoryExec.commandName);
+        super(message, HistoryExec.commandName, HistoryExec.argsModel);
     }
 
 

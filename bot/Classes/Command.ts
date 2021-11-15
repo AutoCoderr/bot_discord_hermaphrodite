@@ -15,14 +15,16 @@ export default class Command {
     static commandName: null|string = null;
     static display: boolean = false;
     static description: null|string = null;
+    static argsModel: any = {};
 
     commandName: null|string;
     message: Message;
     argsModel: any = {};
 
-    constructor(message: Message, commandName: null|string) {
+    constructor(message: Message, commandName: null|string, argModel: any) {
         this.message = message;
-        this.commandName = commandName
+        this.commandName = commandName;
+        this.argsModel = argModel;
     }
 
     async match() {
@@ -384,10 +386,10 @@ export default class Command {
                         )
                     ) {
                         if (extractTypes[<string>argType]) {
-                            const moreDatas = typeof(model[attr].moreDatas) == "function" ? await model[attr].moreDatas(out,argType) : null
+                            const moreDatas = typeof(model[attr].moreDatas) == "function" ? await model[attr].moreDatas(out,argType, this.message) : null
                             const data = await extractTypes[<string>argType](args[field],this.message,moreDatas);
                             if (data !== false) {
-                                if (typeof(model[attr].valid) != "function" || await model[attr].valid(data,out))
+                                if (typeof(model[attr].valid) != "function" || await model[attr].valid(data,out, this.message))
                                     out[attr] = data;
                                 else {
                                     incorrectField = true;
@@ -397,7 +399,7 @@ export default class Command {
                                 extractFailed = true;
                                 triedValue = args[field];
                             }
-                        } else if (typeof(model[attr].valid) != "function" || await model[attr].valid(args[field],out))
+                        } else if (typeof(model[attr].valid) != "function" || await model[attr].valid(args[field],out, this.message))
                             out[attr] = argType == "string" ? args[field].toString() : args[field];
                         else {
                             incorrectField = true;
@@ -415,10 +417,10 @@ export default class Command {
                 }
                 const required = model[attr].required == undefined ||
                     (typeof(model[attr].required) == "boolean" && model[attr].required) ||
-                    (typeof(model[attr].required) == "function" && await model[attr].required(out));
+                    (typeof(model[attr].required) == "function" && await model[attr].required(out, this.message));
 
                 if (required) {
-                    const defaultValue = typeof (model[attr].default) == "function" ? model[attr].default(out) : model[attr].default;
+                    const defaultValue = typeof (model[attr].default) == "function" ? model[attr].default(out, this.message) : model[attr].default;
                     if (defaultValue != undefined && !found && !incorrectField && !extractFailed) {
                         out[attr] = defaultValue;
                         found = true;
@@ -449,7 +451,7 @@ export default class Command {
                             (
                                 argType instanceof Array &&
                                 await Promise.all(argType.map(async type => {
-                                    if (type == "string" || await checkTypes[type](args[i])) {
+                                    if (type == "string" || await checkTypes[type](args[i]) || (type == "boolean" && args[i] === argModel.field)) {
                                         argType = type;
                                         return true;
                                     }
@@ -457,13 +459,13 @@ export default class Command {
                                 })).then(goodTypes => goodTypes.some(type => type))
                             ) || (
                                 typeof(argType) == "string" && (
-                                    argType == "string" || await checkTypes[argType](args[i])
+                                    argType == "string" || await checkTypes[argType](args[i]) || (argType == "boolean" && args[i] === argModel.field)
                                 )
                             ))
                         ) {
                             let data = argType == "string" ? args[i].toString() : args[i];
                             if (extractTypes[<string>argType]) {
-                                const moreDatas = typeof(argModel.moreDatas) == "function" ? await argModel.moreDatas(out,argType) : null
+                                const moreDatas = typeof(argModel.moreDatas) == "function" ? await argModel.moreDatas(out,argType, this.message) : null
                                 data = await extractTypes[<string>argType](data,this.message,moreDatas);
                                 if (data === false) {
                                     failsExtract.push({...argModel, value: args[i]});
@@ -471,7 +473,12 @@ export default class Command {
                                 }
                             }
 
-                            if (!extractFailed && (typeof(argModel.valid) != "function" || await argModel.valid(data,out))) {
+                            if (!extractFailed &&
+                                (typeof(argModel.valid) != "function" || await argModel.valid(data,out, this.message)) &&
+                                (!(argModel.choices instanceof Array) || argModel.choices.includes(data))
+                            ) {
+                                if (argType === "boolean" && data === argModel.field)
+                                    data = true;
                                 if (argModel.multi)
                                     out[argModel.field].push(data)
                                 else
@@ -502,10 +509,10 @@ export default class Command {
                     }
                     const required = argModel.required == undefined ||
                         (typeof(argModel.required) == "boolean" && argModel.required) ||
-                        (typeof(argModel.required) == "function" && await argModel.required(out));
+                        (typeof(argModel.required) == "function" && await argModel.required(out, this.message));
 
                     if (required) {
-                        const defaultValue = typeof (argModel.default) == "function" ? argModel.default(out) : argModel.default;
+                        const defaultValue = typeof (argModel.default) == "function" ? argModel.default(out, this.message) : argModel.default;
                         if (!found && !incorrectField && defaultValue != undefined) {
                             out[argModel.field] = defaultValue;
                             found = true;
@@ -534,16 +541,16 @@ export default class Command {
 
                     const required = argsByType[attr].required == undefined ||
                         (typeof(argsByType[attr].required) == "boolean" && argsByType[attr].required) ||
-                        (typeof(argsByType[attr].required) == "function" && await argsByType[attr].required(out));
+                        (typeof(argsByType[attr].required) == "function" && await argsByType[attr].required(out, this.message));
 
                     const displayExtractError = (typeof(argsByType[attr].displayExtractError) == "boolean" && argsByType[attr].displayExtractError) ||
-                        (typeof(argsByType[attr].displayExtractError) == "function" && await argsByType[attr].displayExtractError(out));
+                        (typeof(argsByType[attr].displayExtractError) == "function" && await argsByType[attr].displayExtractError(out, this.message));
 
                     const displayValidErrorEvenIfFound = (typeof(argsByType[attr].displayValidErrorEvenIfFound) == "boolean" && argsByType[attr].displayValidErrorEvenIfFound) ||
-                        (typeof(argsByType[attr].displayValidErrorEvenIfFound) == "function" && await argsByType[attr].displayValidErrorEvenIfFound(out));
+                        (typeof(argsByType[attr].displayValidErrorEvenIfFound) == "function" && await argsByType[attr].displayValidErrorEvenIfFound(out, this.message));
 
                     const displayValidError = (typeof(argsByType[attr].displayValidError) == "boolean" && argsByType[attr].displayValidError) ||
-                        (typeof(argsByType[attr].displayValidError) == "function" && await argsByType[attr].displayValidError(out)) ||
+                        (typeof(argsByType[attr].displayValidError) == "function" && await argsByType[attr].displayValidError(out,this.message)) ||
                         displayValidErrorEvenIfFound;
 
                     for (let i=0;args[i] !== undefined;i++) {
@@ -557,7 +564,7 @@ export default class Command {
                         if (args[i] != undefined && (
                             (
                                 argType instanceof Array && await Promise.all(argType.map(async type => {
-                                    if (type == "string" || await checkTypes[type](args[i])) {
+                                    if (type == "string" || await checkTypes[type](args[i]) || (type == "boolean" && args[i] === attr)) {
                                         argType = type;
                                         return true;
                                     }
@@ -565,20 +572,24 @@ export default class Command {
                                 })).then(goodTypes => goodTypes.some(type => type))
                             ) || (
                                 typeof(argType) == "string" && (
-                                    argType == "string" || checkTypes[argType](args[i])
+                                    argType == "string" || checkTypes[argType](args[i]) || (argType == "boolean" && args[i] === attr)
                                 )
                             ))
                         ) {
                             let data = argType == "string" ? args[i].toString() : args[i];
                             if (extractTypes[<string>argType]) {
-                                const moreDatas = typeof(argsByType[attr].moreDatas) == "function" ? await argsByType[attr].moreDatas(out,argType) : null
+                                const moreDatas = typeof(argsByType[attr].moreDatas) == "function" ? await argsByType[attr].moreDatas(out,argType, this.message) : null
                                 data = await extractTypes[<string>argType](data,this.message,moreDatas);
                                 if (data === false) {
                                     extractFailed = true;
                                     triedValue = args[i];
                                 }
                             }
-                            if (!extractFailed && (typeof(argsByType[attr].valid) != "function" || await argsByType[attr].valid(data,out))) {
+                            if (!extractFailed &&
+                                (typeof(argsByType[attr].valid) != "function" || await argsByType[attr].valid(data,out, this.message)) &&
+                                (!(argsByType[attr].choices instanceof Array) || argsByType[attr].choices.includes(data)) ) {
+                                if (argType === "boolean" && data === attr)
+                                    data = true
                                 if (argsByType[attr].multi)
                                     out[attr].push(data);
                                 else
@@ -597,7 +608,7 @@ export default class Command {
                     }
 
                     if (required) {
-                        const defaultValue = typeof (argsByType[attr].default) == "function" ? argsByType[attr].default(out) : argsByType[attr].default;
+                        const defaultValue = typeof (argsByType[attr].default) == "function" ? argsByType[attr].default(out, this.message) : argsByType[attr].default;
                         if (!found && defaultValue != undefined) {
                             out[attr] = defaultValue;
                             found = true;

@@ -21,27 +21,25 @@ export default class Vocal extends Command {
     static description = "Être alerté quand une ou plusieurs personnes se connectent à un ou plusieurs channels";
     static commandName = "vocal";
 
-    constructor(message: Message) {
-        super(message, Vocal.commandName);
-    }
-
     argsModel = {
         help: {fields: ["-h", "--help"], type: "boolean", required: false, description: "Pour afficher l'aide"},
 
         $argsByType: {
             action: {
+                subCommand: true,
                 required: (args) => args.help == undefined,
                 type: "string",
                 description: "L'action à effectuer : add, remove, block, unblock, stop, start, limit, mute, unmute, status",
-                valid: (field) => ['add', 'remove', 'block',  'unblock', 'stop', 'start', 'limit', 'mute', 'unmute', 'status'].includes(field)
+                choices: ['add', 'remove', 'block',  'unblock', 'stop', 'start', 'limit', 'mute', 'unmute', 'status']
             },
-            subAction: {
+            subs: {
+                referToSubCommands: ['status'],
                 required: false,
-                type: "string",
-                description: "Obtenir plus de détails concernant les écoutes : subs",
-                valid: (field) => ['sub', 'subs'].includes(field)
+                type: "boolean",
+                description: "Obtenir plus de détails concernant les écoutes : subs"
             },
             roles: {
+                referToSubCommands: ['block','unblock'],
                 required: false,
                 displayValidError: true,
                 displayExtractError: true,
@@ -56,6 +54,7 @@ export default class Vocal extends Command {
                 })
             },
             users: {
+                referToSubCommands: ['block','unblock','add','remove'],
                 required: (args) => args.help == undefined &&
                     (['add', 'remove'].includes(args.action) || (['block', 'unblock'].includes(args.action) && args.roles.length == 0)),
                 displayValidErrorEvenIfFound: true,
@@ -63,8 +62,8 @@ export default class Vocal extends Command {
                 type: "user",
                 multi: true,
                 description: "Le ou les utilisateurs à ignorer ou écouter quand ils se connectent sur un vocal",
-                valid: (user: GuildMember, args) =>
-                    user.id !== this.message.author.id && !args.users.some(eachUser => eachUser.id === user.id),
+                valid: (user: GuildMember, args, message: Message) =>
+                    user.id !== message.author.id && !args.users.some(eachUser => eachUser.id === user.id),
                 errorMessage: (value, args) => (value == undefined && args.channels == undefined && ['block', 'unblock'].includes(args.action)) ?
                     {
                         name: "Rentrez au moins l'un des deux",
@@ -76,6 +75,7 @@ export default class Vocal extends Command {
                     }
             },
             time: {
+                referToSubCommands: ['time','mute'],
                 required: (args) => args.help == undefined && ["limit", "mute"].includes(args.action),
                 type: "duration",
                 description: "Le temps durant lequel on souhaite ne pas recevoir de notif (ex: 30s, 5m, 3h, 2j)",
@@ -84,8 +84,12 @@ export default class Vocal extends Command {
         }
     }
 
-    async action(args: { help: boolean, action: string, subAction: string, users: GuildMember[], roles: Role[], time: number }) {
-        const {help, action, subAction, roles, users, time} = args;
+    constructor(message: Message) {
+        super(message, Vocal.commandName, Vocal.argsModel);
+    }
+
+    async action(args: { help: boolean, action: string, subs: boolean, users: GuildMember[], roles: Role[], time: number }) {
+        const {help, action, subs, roles, users, time} = args;
 
         if (help) {
             this.displayHelp();
@@ -541,7 +545,7 @@ export default class Vocal extends Command {
         if (action == "status") {
             let embeds: MessageEmbed[] = [embed];
 
-            if (["sub", 'subs'].includes(subAction)) {
+            if (subs) {
 
                 const subscribings: Array<IVocalSubscribe|typeof VocalSubscribe> = await VocalSubscribe.find({
                     serverId: this.message.guild.id,

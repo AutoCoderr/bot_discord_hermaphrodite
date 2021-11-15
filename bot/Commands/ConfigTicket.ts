@@ -28,6 +28,9 @@ const toAllowToAuthorAndModerators: Array<PermissionString> = [
     'READ_MESSAGE_HISTORY'];
 
 export default class ConfigTicket extends Command {
+    static display = true;
+    static description = "Pour définir la catégorie pour les channels des tickets, activer, ou désactiver les ticket.";
+    static commandName = "configTicket";
 
     argsModel = {
         help: { fields: ["-h","--help"], type: "boolean", required: false, description: "Pour afficher l'aide" },
@@ -82,12 +85,8 @@ export default class ConfigTicket extends Command {
         },
     }
 
-    static display = true;
-    static description = "Pour définir la catégorie pour les channels des tickets, activer, ou désactiver les ticket.";
-    static commandName = "configTicket";
-
     constructor(message: Message) {
-        super(message, ConfigTicket.commandName);
+        super(message, ConfigTicket.commandName, ConfigTicket.argsModel);
     }
 
     async action(args: {help: boolean, action: string, category: CategoryChannel, subAction: string, user: GuildMember, channelListen: TextChannel, messageListen: Message, emoteListen: GuildEmoji|string, moderatorRole: Role}, bot) {

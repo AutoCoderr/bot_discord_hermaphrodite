@@ -6,8 +6,11 @@ import StoredNotifyOnReact from "../Models/StoredNotifyOnReact";
 import Discord, {GuildChannel, GuildEmoji, Message, MessageEmbed} from "discord.js";
 
 export default class CancelNotifyOnReact extends Command {
+    static description = "Pour désactiver l'écoute d'une réaction sur un ou plusieurs messages.";
+    static display = true;
+    static commandName = "cancelNotifyOnReact"
 
-    argsModel = {
+    static argsModel = {
         help: {
             fields: ["--help", "-h"],
             type: "boolean",
@@ -41,12 +44,8 @@ export default class CancelNotifyOnReact extends Command {
         }
     };
 
-    static description = "Pour désactiver l'écoute d'une réaction sur un ou plusieurs messages.";
-    static display = true;
-    static commandName = "cancelNotifyOnReact"
-
     constructor(message: Message) {
-        super(message, CancelNotifyOnReact.commandName);
+        super(message, CancelNotifyOnReact.commandName, CancelNotifyOnReact.argsModel);
     }
 
     async action(args: {help: boolean, channel: GuildChannel, message: Message, emote: GuildEmoji|string},bot) {

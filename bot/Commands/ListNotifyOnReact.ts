@@ -5,6 +5,9 @@ import Discord, {GuildChannel, GuildEmoji, Message, MessageEmbed} from "discord.
 import {existingCommands} from "../Classes/CommandsDescription";
 
 export default class ListNotifyOnReact extends Command {
+    static display = true;
+    static description = "Pour lister les messages, sur lesquels il y a une écoute de réaction.";
+    static commandName = "listNotifyOnReact";
 
     argsModel = {
         help: {
@@ -40,12 +43,8 @@ export default class ListNotifyOnReact extends Command {
         }
     };
 
-    static display = true;
-    static description = "Pour lister les messages, sur lesquels il y a une écoute de réaction.";
-    static commandName = "listNotifyOnReact";
-
     constructor(message: Message) {
-        super(message, ListNotifyOnReact.commandName);
+        super(message, ListNotifyOnReact.commandName, ListNotifyOnReact.argsModel);
     }
 
     async action(args: {help: boolean, channel: GuildChannel, message: Message, emote: GuildEmoji|string}, bot) {

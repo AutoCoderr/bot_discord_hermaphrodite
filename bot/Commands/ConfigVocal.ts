@@ -18,10 +18,6 @@ export default class ConfigVocal extends Command {
     static description = "Pour s'abonner un ou plusieurs utilisateurs et un ou plusieurs channels vocaux, afin de recevoir un MP à chaque connexion ou déconnexion au vocal";
     static commandName = "configVocal";
 
-    constructor(message: Message) {
-        super(message, ConfigVocal.commandName);
-    }
-
     argsModel = {
         help: { fields: ["-h","--help"], type: "boolean", required: false, description: "Pour afficher l'aide" },
         $argsByType: {
@@ -83,6 +79,10 @@ export default class ConfigVocal extends Command {
                 })
             }
         }
+    }
+
+    constructor(message: Message) {
+        super(message, ConfigVocal.commandName, ConfigVocal.argsModel);
     }
 
     async action(args: {help: boolean, action: string, subAction: string, blacklistType: string, users: GuildMember[], roles: Role[], channels: VoiceChannel[]}) {

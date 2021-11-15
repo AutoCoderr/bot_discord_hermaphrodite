@@ -22,7 +22,9 @@ interface messageChannelAndGuild {
 
 export default class Monitor extends Command {
 
-    static listeneds = {};
+    static display = true;
+    static description = "Pour afficher en temps réel des infos relatives au serveur";
+    static commandName = "monitor";
 
     static datasCanBeDisplayed = {
         userCount: {
@@ -117,14 +119,7 @@ export default class Monitor extends Command {
     };
 
     static nbListeners = Object.keys(Monitor.datasCanBeDisplayed).filter(data => typeof(Monitor.datasCanBeDisplayed[data].listen) == "function").length;
-
-    static display = true;
-    static description = "Pour afficher en temps réel des infos relatives au serveur";
-    static commandName = "monitor";
-
-    constructor(message: Message) {
-        super(message, Monitor.commandName);
-    }
+    static listeneds = {};
 
     argsModel = {
         help: {
@@ -192,7 +187,7 @@ export default class Monitor extends Command {
             channel: {
                 type: "channel",
                 description: "Le channel sur lequel monitorer le serveur",
-                default: this.message.channel,
+                default: (_, message: Message) => message.channel,
                 required: (args) => args.help == undefined && args.action != "show",
                 valid: (elem: GuildChannel, _) => elem.type == "GUILD_TEXT"
             },
@@ -204,6 +199,10 @@ export default class Monitor extends Command {
                 moreDatas: (args) => args.channel
             }
         }
+    }
+
+    constructor(message: Message) {
+        super(message, Monitor.commandName, Monitor.argsModel);
     }
 
     async action(args: {help: boolean, action: string, channel: TextChannel, messages: Array<Message>}, bot) {

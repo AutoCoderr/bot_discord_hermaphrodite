@@ -5,15 +5,14 @@ import {GuildChannel, GuildMember, Message, MessageEmbed} from "discord.js";
 import {IHistory} from "../Models/History";
 
 export default class HistoryCmd extends Command {
-
-    argsModel = getArgsModelHistory(this.message);
-
     static display = true;
     static description = "Pour accéder à l'historique des commandes.";
     static commandName = "history";
 
+    argsModel = getArgsModelHistory();
+
     constructor(message: Message) {
-        super(message, HistoryCmd.commandName);
+        super(message, HistoryCmd.commandName, HistoryCmd.argsModel);
     }
 
     async action(args: {help: boolean, commands: typeof Command[], sort: string, limit: number, channels: GuildChannel[], users: GuildMember[]}, bot) {
