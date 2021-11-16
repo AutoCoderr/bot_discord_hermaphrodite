@@ -1,5 +1,5 @@
 import client from "./client";
-import {ApplicationCommandDataResolvable, Interaction} from "discord.js";
+import {ChatInputApplicationCommandData, Interaction} from "discord.js";
 import {ApplicationCommandOptionTypes} from "discord.js/typings/enums";
 import Command from "./Classes/Command";
 import {existingCommands} from "./Classes/CommandsDescription";
@@ -24,7 +24,8 @@ export default async function initSlashCommands() {
 
             //@ts-ignore
             const model = generateSlashCommandFromModel(existingCommands.Vocal);
-            console.log(model);
+            console.log(model);// @ts-ignore
+            console.log(model.options?.find(option => option.name == "add")?.options)
 
             const vocalSlashCommand = await commands?.create(model);
             console.log({vocalSlashCommand});
@@ -149,9 +150,9 @@ export default async function initSlashCommands() {
     }
 }
 
-function generateSlashCommandFromModel(command: typeof Command): ApplicationCommandDataResolvable {
+function generateSlashCommandFromModel(command: typeof Command): ChatInputApplicationCommandData {
     console.log("generateSlashCommandFromModel");
-    let slashCommandModel: ApplicationCommandDataResolvable = {
+    let slashCommandModel: ChatInputApplicationCommandData = {
         name: <string>command.commandName,
         description: <string>command.description
     };
@@ -163,14 +164,16 @@ function generateSlashCommandFromModel(command: typeof Command): ApplicationComm
         if (attr === '$argsByType') {
             for (const [attr,argModel] of <Array<any>>Object.entries(command.argsModel.$argsByType)) {
                 console.log({attrType: attr});
-                const chooseSubCommands = argModel.referToSubCommands instanceof Array ?
-                    argModel.referToSubCommands.reduce((acc,subCommandName) => ([
-                        ...acc,
-                        ...(subCommands[subCommandName] ? [subCommands[subCommandName]] : [])
-                    ]), []) : [slashCommandModel];
-                console.log("chooseSubCommands");
-                console.log(chooseSubCommands);
-                for (const chooseSubCommand of chooseSubCommands) {
+                const chooseSubCommands: any[] = [];
+                if (argModel.referToSubCommands instanceof Array)
+                    for (const referedSubCommand of argModel.referToSubCommands) {
+                        if (subCommands[referedSubCommand]) {
+                            chooseSubCommands.push([referedSubCommand, subCommands[referedSubCommand]]);
+                        }
+                    }
+                else
+                    chooseSubCommands.push([null,slashCommandModel]);
+                for (const [chooseSubCommandName,chooseSubCommand] of chooseSubCommands) {
                     if (!(chooseSubCommand.options instanceof Array))
                         chooseSubCommand.options = [];
                     if (argModel.isSubCommand) {
@@ -185,7 +188,7 @@ function generateSlashCommandFromModel(command: typeof Command): ApplicationComm
                                 actionName: attr
                             };
                             chooseSubCommand.options.push(option);
-                            subCommands[choice] = option;
+                            subCommands[chooseSubCommandName === null ? choice : chooseSubCommandName+"."+choice] = option;
                         }
                         if (chooseSubCommand.type == ApplicationCommandOptionTypes.SUB_COMMAND)
                             chooseSubCommand.type = ApplicationCommandOptionTypes.SUB_COMMAND_GROUP;
@@ -198,7 +201,7 @@ function generateSlashCommandFromModel(command: typeof Command): ApplicationComm
                             name: attr,
                             description: "ANANAS",
                             type: ApplicationCommandOptionTypes.STRING,
-                            required: //argModel.required === true
+                            required:
                                 argModel.required === undefined ||
                                 (
                                     typeof(argModel.required) == "function" &&
