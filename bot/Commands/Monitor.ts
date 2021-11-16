@@ -121,7 +121,7 @@ export default class Monitor extends Command {
     static nbListeners = Object.keys(Monitor.datasCanBeDisplayed).filter(data => typeof(Monitor.datasCanBeDisplayed[data].listen) == "function").length;
     static listeneds = {};
 
-    argsModel = {
+    static argsModel = {
         help: {
             fields: ["-h","--help"],
             type: "boolean",

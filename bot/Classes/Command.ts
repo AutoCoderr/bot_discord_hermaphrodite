@@ -21,10 +21,10 @@ export default class Command {
     message: Message;
     argsModel: any = {};
 
-    constructor(message: Message, commandName: null|string, argModel: any) {
+    constructor(message: Message, commandName: null|string, argsModel: any) {
         this.message = message;
         this.commandName = commandName;
-        this.argsModel = argModel;
+        this.argsModel = argsModel;
     }
 
     async match() {

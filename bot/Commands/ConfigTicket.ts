@@ -32,7 +32,7 @@ export default class ConfigTicket extends Command {
     static description = "Pour définir la catégorie pour les channels des tickets, activer, ou désactiver les ticket.";
     static commandName = "configTicket";
 
-    argsModel = {
+    static argsModel = {
         help: { fields: ["-h","--help"], type: "boolean", required: false, description: "Pour afficher l'aide" },
         allListen: {fields: ['-a','--all'], type: "boolean", required: false, description: "Pour viser toutes les écoutes de message"},
 

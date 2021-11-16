@@ -1,7 +1,17 @@
 import client from "./client";
-import {GuildApplicationCommandManager, Interaction} from "discord.js";
+import {ApplicationCommandDataResolvable, Interaction} from "discord.js";
 import {ApplicationCommandOptionTypes} from "discord.js/typings/enums";
 import Command from "./Classes/Command";
+import {existingCommands} from "./Classes/CommandsDescription";
+
+interface optionCommandType {
+    type: ApplicationCommandOptionTypes.BOOLEAN | ApplicationCommandOptionTypes.CHANNEL | ApplicationCommandOptionTypes.INTEGER | ApplicationCommandOptionTypes.MENTIONABLE | ApplicationCommandOptionTypes.NUMBER | ApplicationCommandOptionTypes.ROLE | ApplicationCommandOptionTypes.STRING | ApplicationCommandOptionTypes.SUB_COMMAND | ApplicationCommandOptionTypes.SUB_COMMAND_GROUP | ApplicationCommandOptionTypes.USER;
+    name: string;
+    description: string;
+    required?: boolean;
+    noSubCommandGroup?: boolean;
+    actionName?: string;
+}
 
 export default async function initSlashCommands() {
     console.log("initSlashCommands");
@@ -13,11 +23,15 @@ export default async function initSlashCommands() {
             const commands = guild.commands;
 
             //@ts-ignore
-            //generateSlashCommandFromModel(existingCommands.Vocal,commands);
+            const model = generateSlashCommandFromModel(existingCommands.Vocal);
+            console.log(model);
+
+            const vocalSlashCommand = await commands?.create(model);
+            console.log({vocalSlashCommand});
 
             //console.log({commands});
             //console.log(commands?.cache.map(command => command.name));
-            let res
+            /*let res
             res = await commands?.create({
                 name: 'ping',
                 description: 'Make a ping'
@@ -122,8 +136,8 @@ export default async function initSlashCommands() {
                             }
                         ]
                     }*/
-                ]
-            })
+                //]
+            //})
             //console.log({test: res})
 
             //console.log("created");
@@ -135,9 +149,74 @@ export default async function initSlashCommands() {
     }
 }
 
-/*function generateSlashCommandFromModel(command: typeof Command, slashCommands: GuildApplicationCommandManager) {
-    for (const attr of command)
-}*/
+function generateSlashCommandFromModel(command: typeof Command): ApplicationCommandDataResolvable {
+    console.log("generateSlashCommandFromModel");
+    let slashCommandModel: ApplicationCommandDataResolvable = {
+        name: <string>command.commandName,
+        description: <string>command.description
+    };
+    const subCommands = {};
+    console.log("argsModel => ")
+    console.log(command.argsModel);
+    for (const attr in command.argsModel) {
+        console.log({attr});
+        if (attr === '$argsByType') {
+            for (const [attr,argModel] of <Array<any>>Object.entries(command.argsModel.$argsByType)) {
+                console.log({attrType: attr});
+                const chooseSubCommands = argModel.referToSubCommands instanceof Array ?
+                    argModel.referToSubCommands.reduce((acc,subCommandName) => ([
+                        ...acc,
+                        ...(subCommands[subCommandName] ? [subCommands[subCommandName]] : [])
+                    ]), []) : [slashCommandModel];
+                console.log("chooseSubCommands");
+                console.log(chooseSubCommands);
+                for (const chooseSubCommand of chooseSubCommands) {
+                    if (!(chooseSubCommand.options instanceof Array))
+                        chooseSubCommand.options = [];
+                    if (argModel.isSubCommand) {
+                        if (chooseSubCommand.noSubCommandGroup)
+                            throw new Error("You cannot blend normal arguments and sub commands in another sub command");
+
+                        for (const choice of argModel.choices ?? []) {
+                            const option: optionCommandType = {
+                                name: choice,
+                                description: 'WESH',
+                                type: ApplicationCommandOptionTypes.SUB_COMMAND,
+                                actionName: attr
+                            };
+                            chooseSubCommand.options.push(option);
+                            subCommands[choice] = option;
+                        }
+                        if (chooseSubCommand.type == ApplicationCommandOptionTypes.SUB_COMMAND)
+                            chooseSubCommand.type = ApplicationCommandOptionTypes.SUB_COMMAND_GROUP;
+                    } else {
+                        if (chooseSubCommand.type == ApplicationCommandOptionTypes.SUB_COMMAND_GROUP)
+                            throw new Error("You cannot add normal argument to a sub command group");
+                        if (chooseSubCommand.type == ApplicationCommandOptionTypes.SUB_COMMAND)
+                            chooseSubCommand.noSubCommandGroup = true;
+                        const option: optionCommandType = {
+                            name: attr,
+                            description: "ANANAS",
+                            type: ApplicationCommandOptionTypes.STRING,
+                            required: //argModel.required === true
+                                argModel.required === undefined ||
+                                (
+                                    typeof(argModel.required) == "function" &&
+                                    argModel.required(chooseSubCommand.type == ApplicationCommandOptionTypes.SUB_COMMAND ?
+                                        {[chooseSubCommand.actionName]: chooseSubCommand.name} : {})
+                                ) || (
+                                    typeof(argModel.required) == "boolean" &&
+                                    argModel.required
+                                )
+                        }
+                        chooseSubCommand.options.push(option);
+                    }
+                }
+            }
+        }
+    }
+    return slashCommandModel;
+}
 
 export async function listenSlashCommands(interaction: Interaction) {
     if (!interaction.isCommand()) return;

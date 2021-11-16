@@ -21,7 +21,7 @@ export default class NotifyOnReact extends Command {
     static description = "Pour envoyer un message sur un channel indiqué, quand une réaction à été detectée sur un autre message.";
     static commandName = "notifyOnReact";
 
-    argsModel = {
+    static argsModel = {
         help: {
             fields: ["--help", "-h"],
             type: "boolean",

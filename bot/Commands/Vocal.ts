@@ -21,12 +21,12 @@ export default class Vocal extends Command {
     static description = "Être alerté quand une ou plusieurs personnes se connectent à un ou plusieurs channels";
     static commandName = "vocal";
 
-    argsModel = {
+    static argsModel = {
         help: {fields: ["-h", "--help"], type: "boolean", required: false, description: "Pour afficher l'aide"},
 
         $argsByType: {
             action: {
-                subCommand: true,
+                isSubCommand: true,
                 required: (args) => args.help == undefined,
                 type: "string",
                 description: "L'action à effectuer : add, remove, block, unblock, stop, start, limit, mute, unmute, status",
@@ -56,7 +56,7 @@ export default class Vocal extends Command {
             users: {
                 referToSubCommands: ['block','unblock','add','remove'],
                 required: (args) => args.help == undefined &&
-                    (['add', 'remove'].includes(args.action) || (['block', 'unblock'].includes(args.action) && args.roles.length == 0)),
+                    (['add', 'remove'].includes(args.action) || (['block', 'unblock'].includes(args.action) && args.roles instanceof Array && args.roles.length == 0)),
                 displayValidErrorEvenIfFound: true,
                 displayExtractError: true,
                 type: "user",
@@ -75,7 +75,7 @@ export default class Vocal extends Command {
                     }
             },
             time: {
-                referToSubCommands: ['time','mute'],
+                referToSubCommands: ['limit','mute'],
                 required: (args) => args.help == undefined && ["limit", "mute"].includes(args.action),
                 type: "duration",
                 description: "Le temps durant lequel on souhaite ne pas recevoir de notif (ex: 30s, 5m, 3h, 2j)",

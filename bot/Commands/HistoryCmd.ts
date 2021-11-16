@@ -9,7 +9,7 @@ export default class HistoryCmd extends Command {
     static description = "Pour accéder à l'historique des commandes.";
     static commandName = "history";
 
-    argsModel = getArgsModelHistory();
+    static argsModel = getArgsModelHistory();
 
     constructor(message: Message) {
         super(message, HistoryCmd.commandName, HistoryCmd.argsModel);

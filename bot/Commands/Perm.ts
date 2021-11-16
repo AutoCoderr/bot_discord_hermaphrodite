@@ -9,7 +9,7 @@ export default class Perm extends Command {
     static description = "Pour configurer les permissions.";
     static commandName = "perm";
 
-    argsModel = {
+    static argsModel = {
         help: { fields: ['-h','--help'], type: "boolean", required: false, description: "Pour afficher l'aide" },
 
         $argsByOrder: [

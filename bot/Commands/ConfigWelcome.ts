@@ -8,7 +8,7 @@ export default class ConfigWelcome extends Command {
     static description = "Pour activer, désactiver, ou définir le message privé à envoyer automatiquement aux nouveaux arrivants."
     static commandName = "configWelcome";
 
-    argsModel = {
+    static argsModel = {
         help: { fields: ["-h","--help"], type: "boolean", required: false, description: "Pour afficher l'aide" },
 
         $argsByOrder: [

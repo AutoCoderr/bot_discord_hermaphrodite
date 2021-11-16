@@ -18,7 +18,7 @@ export default class ConfigVocal extends Command {
     static description = "Pour s'abonner un ou plusieurs utilisateurs et un ou plusieurs channels vocaux, afin de recevoir un MP à chaque connexion ou déconnexion au vocal";
     static commandName = "configVocal";
 
-    argsModel = {
+    static argsModel = {
         help: { fields: ["-h","--help"], type: "boolean", required: false, description: "Pour afficher l'aide" },
         $argsByType: {
             action: {

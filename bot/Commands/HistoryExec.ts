@@ -8,7 +8,7 @@ export default class HistoryExec extends Command {
     static description = "Pour executer des commandes de l'historique.";
     static commandName = "historyExec";
 
-    argsModel = getArgsModelHistory();
+    static argsModel = getArgsModelHistory();
 
     constructor(message: Message) {
         super(message, HistoryExec.commandName, HistoryExec.argsModel);
