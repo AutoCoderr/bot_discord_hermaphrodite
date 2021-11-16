@@ -3,6 +3,7 @@ import {ChatInputApplicationCommandData, Interaction} from "discord.js";
 import {ApplicationCommandOptionTypes} from "discord.js/typings/enums";
 import Command from "./Classes/Command";
 import {existingCommands} from "./Classes/CommandsDescription";
+import slashCommandsTypeDefinitions from "./Classes/slashCommandsTypeDefinitions";
 
 interface optionCommandType {
     type: ApplicationCommandOptionTypes.BOOLEAN | ApplicationCommandOptionTypes.CHANNEL | ApplicationCommandOptionTypes.INTEGER | ApplicationCommandOptionTypes.MENTIONABLE | ApplicationCommandOptionTypes.NUMBER | ApplicationCommandOptionTypes.ROLE | ApplicationCommandOptionTypes.STRING | ApplicationCommandOptionTypes.SUB_COMMAND | ApplicationCommandOptionTypes.SUB_COMMAND_GROUP | ApplicationCommandOptionTypes.USER;
@@ -197,10 +198,20 @@ function generateSlashCommandFromModel(command: typeof Command): ChatInputApplic
                             throw new Error("You cannot add normal argument to a sub command group");
                         if (chooseSubCommand.type == ApplicationCommandOptionTypes.SUB_COMMAND)
                             chooseSubCommand.noSubCommandGroup = true;
+                        let type = ApplicationCommandOptionTypes.STRING;
+                        if (slashCommandsTypeDefinitions[argModel.type]) {
+                            let typeDefinition = slashCommandsTypeDefinitions[argModel.type];
+                            if (typeDefinition.mono || typeDefinition.multi)
+                                typeDefinition = typeDefinition[argModel.multi ? 'multi' : 'mono'];
+                            if (typeDefinition && typeDefinition.commandType === "slash") {
+                                type = typeDefinition.type;
+                            }
+                        }
+
                         const option: optionCommandType = {
                             name: attr,
                             description: "ANANAS",
-                            type: ApplicationCommandOptionTypes.STRING,
+                            type,
                             required:
                                 argModel.required === undefined ||
                                 (
