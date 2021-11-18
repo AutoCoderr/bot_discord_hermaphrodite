@@ -30,7 +30,18 @@ export default class Vocal extends Command {
                 required: (args) => args.help == undefined,
                 type: "string",
                 description: "L'action à effectuer : add, remove, block, unblock, stop, start, limit, mute, unmute, status",
-                choices: ['add', 'remove', 'block',  'unblock', 'stop', 'start', 'limit', 'mute', 'unmute', 'status']
+                choices: {
+                    add: "Envoyer une demande d'écoute",
+                    remove: "Supprimer une écoute en cours",
+                    block: "Bloquer un/des utilisateurs et/ou un/des rôles pour les empêcher de vous écouter",
+                    unblock: "Débloquer un/des utilisateurs et/ou un/des rôles",
+                    stop: "Désactiver les notifications d'écoute",
+                    start: "Réactiver les notification d'écoute",
+                    limit: "Avoir un répit entre chaque notification (exemple de temps: 30s, 5min, 3j)",
+                    mute: "Bloquer les notifications pendant un certain temps (exemple de temps: 30s, 5min, 3j)",
+                    unmute: "Se démuter",
+                    status: "Voir ses infos"
+                }
             },
             subs: {
                 referToSubCommands: ['status'],

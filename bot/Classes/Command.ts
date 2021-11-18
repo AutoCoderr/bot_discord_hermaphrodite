@@ -475,7 +475,7 @@ export default class Command {
 
                             if (!extractFailed &&
                                 (typeof(argModel.valid) != "function" || await argModel.valid(data,out, this.message)) &&
-                                (!(argModel.choices instanceof Array) || argModel.choices.includes(data))
+                                (argModel.choices === undefined || Object.keys(argModel.choices).includes(data))
                             ) {
                                 if (argType === "boolean" && data === argModel.field)
                                     data = true;
@@ -587,7 +587,7 @@ export default class Command {
                             }
                             if (!extractFailed &&
                                 (typeof(argsByType[attr].valid) != "function" || await argsByType[attr].valid(data,out, this.message)) &&
-                                (!(argsByType[attr].choices instanceof Array) || argsByType[attr].choices.includes(data)) ) {
+                                (argsByType[attr].choices === undefined || Object.keys(argsByType[attr].choices).includes(data)) ) {
                                 if (argType === "boolean" && data === attr)
                                     data = true
                                 if (argsByType[attr].multi)

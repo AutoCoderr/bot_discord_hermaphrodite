@@ -25,11 +25,8 @@ export default async function initSlashCommands() {
 
             //@ts-ignore
             const model = generateSlashCommandFromModel(existingCommands.Vocal);
-            console.log(model);// @ts-ignore
-            console.log(model.options?.find(option => option.name == "add")?.options)
 
-            const vocalSlashCommand = await commands?.create(model);
-            console.log({vocalSlashCommand});
+            await commands?.create(model);
 
             //console.log({commands});
             //console.log(commands?.cache.map(command => command.name));
@@ -158,13 +155,9 @@ function generateSlashCommandFromModel(command: typeof Command): ChatInputApplic
         description: <string>command.description
     };
     const subCommands = {};
-    console.log("argsModel => ")
-    console.log(command.argsModel);
     for (const attr in command.argsModel) {
-        console.log({attr});
         if (attr === '$argsByType') {
             for (const [attr,argModel] of <Array<any>>Object.entries(command.argsModel.$argsByType)) {
-                console.log({attrType: attr});
                 const chooseSubCommands: any[] = [];
                 if (argModel.referToSubCommands instanceof Array)
                     for (const referedSubCommand of argModel.referToSubCommands) {
@@ -181,10 +174,10 @@ function generateSlashCommandFromModel(command: typeof Command): ChatInputApplic
                         if (chooseSubCommand.noSubCommandGroup)
                             throw new Error("You cannot blend normal arguments and sub commands in another sub command");
 
-                        for (const choice of argModel.choices ?? []) {
+                        for (const [choice,description] of argModel.choices ? Object.entries(argModel.choices) : []) {
                             const option: optionCommandType = {
                                 name: choice,
-                                description: 'WESH',
+                                description: <string>description,
                                 type: ApplicationCommandOptionTypes.SUB_COMMAND,
                                 actionName: attr
                             };
@@ -210,7 +203,7 @@ function generateSlashCommandFromModel(command: typeof Command): ChatInputApplic
 
                         const option: optionCommandType = {
                             name: attr,
-                            description: "ANANAS",
+                            description: argModel.description,
                             type,
                             required:
                                 argModel.required === undefined ||
