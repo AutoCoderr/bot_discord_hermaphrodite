@@ -21,7 +21,7 @@ export default class Help extends Command {
         let allowedCommands: Array<string> = [];
         for (let commandName in existingCommands) {
             const command = existingCommands[commandName];
-            if (command.display && await command.staticCheckPermissions(this.message, false)) {
+            if (command.display && command.customCommand && await command.staticCheckPermissions(this.message, false)) {
                 allowedCommands.push(commandName);
             }
         }

@@ -17,6 +17,9 @@ export default class Command {
     static description: null|string = null;
     static argsModel: any = {};
 
+    static customCommand: boolean = true;
+    static slashCommand: boolean = false;
+
     commandName: null|string;
     message: Message;
     argsModel: any = {};

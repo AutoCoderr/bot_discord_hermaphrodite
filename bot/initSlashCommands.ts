@@ -18,15 +18,16 @@ export default async function initSlashCommands() {
     console.log("initSlashCommands");
 
     for (const [,guild] of client.guilds.cache) {
-        console.log('Create commandes for ' + guild.name + ' server');
+        console.log('Create commands for ' + guild.name + ' server');
 
         try {
             const commands = guild.commands;
 
-            //@ts-ignore
-            const model = generateSlashCommandFromModel(existingCommands.Vocal);
-
-            await commands?.create(model);
+            for (const command of <Array<typeof Command>>Object.values(existingCommands)) {
+                if (command.slashCommand) {
+                    await commands?.create(generateSlashCommandFromModel(command));
+                }
+            }
 
             //console.log({commands});
             //console.log(commands?.cache.map(command => command.name));
@@ -149,7 +150,7 @@ export default async function initSlashCommands() {
 }
 
 function generateSlashCommandFromModel(command: typeof Command): ChatInputApplicationCommandData {
-    console.log("generateSlashCommandFromModel");
+    console.log("generateSlashCommandFromModel "+command.commandName);
     let slashCommandModel: ChatInputApplicationCommandData = {
         name: <string>command.commandName,
         description: <string>command.description

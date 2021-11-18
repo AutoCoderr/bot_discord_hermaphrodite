@@ -21,6 +21,8 @@ export default class Vocal extends Command {
     static description = "Être alerté quand une ou plusieurs personnes se connectent à un ou plusieurs channels";
     static commandName = "vocal";
 
+    static slashCommand = true;
+
     static argsModel = {
         help: {fields: ["-h", "--help"], type: "boolean", required: false, description: "Pour afficher l'aide"},
 

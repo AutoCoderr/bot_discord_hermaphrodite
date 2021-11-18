@@ -11,8 +11,10 @@ import init from "./init";
 client.on('messageCreate', async message => {
     for (let commandName in existingCommands) {
         const commandClass = existingCommands[commandName];
-        const command = new commandClass(message);
-        command.check(client);
+        if (commandClass.customCommand) {
+            const command = new commandClass(message);
+            command.check(client);
+        }
     }
 
     if (!message.author.bot) {
