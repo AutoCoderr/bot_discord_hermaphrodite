@@ -3,7 +3,7 @@ import {ChatInputApplicationCommandData, Interaction} from "discord.js";
 import {ApplicationCommandOptionTypes} from "discord.js/typings/enums";
 import Command from "./Classes/Command";
 import {existingCommands} from "./Classes/CommandsDescription";
-import slashCommandsTypeDefinitions from "./Classes/slashCommandsTypeDefinitions";
+import {slashCommandsTypeDefinitions, getterNameBySlashType} from "./Classes/slashCommandsTypeDefinitions";
 
 interface optionCommandType {
     type: ApplicationCommandOptionTypes.BOOLEAN | ApplicationCommandOptionTypes.CHANNEL | ApplicationCommandOptionTypes.INTEGER | ApplicationCommandOptionTypes.MENTIONABLE | ApplicationCommandOptionTypes.NUMBER | ApplicationCommandOptionTypes.ROLE | ApplicationCommandOptionTypes.STRING | ApplicationCommandOptionTypes.SUB_COMMAND | ApplicationCommandOptionTypes.SUB_COMMAND_GROUP | ApplicationCommandOptionTypes.USER;
@@ -192,20 +192,11 @@ function generateSlashCommandFromModel(command: typeof Command): ChatInputApplic
                             throw new Error("You cannot add normal argument to a sub command group");
                         if (chooseSubCommand.type == ApplicationCommandOptionTypes.SUB_COMMAND)
                             chooseSubCommand.noSubCommandGroup = true;
-                        let type = ApplicationCommandOptionTypes.STRING;
-                        if (slashCommandsTypeDefinitions[argModel.type]) {
-                            let typeDefinition = slashCommandsTypeDefinitions[argModel.type];
-                            if (typeDefinition.mono || typeDefinition.multi)
-                                typeDefinition = typeDefinition[argModel.multi ? 'multi' : 'mono'];
-                            if (typeDefinition && typeDefinition.commandType === "slash") {
-                                type = typeDefinition.type;
-                            }
-                        }
 
                         const option: optionCommandType = {
                             name: attr,
                             description: argModel.description,
-                            type,
+                            type: getSlashType(argModel),
                             required:
                                 argModel.required === undefined ||
                                 (
@@ -231,7 +222,25 @@ export async function listenSlashCommands(interaction: Interaction) {
 
     const {commandName, options} = interaction;
 
-    switch (commandName) {
+    for (const command of <Array<typeof Command>>Object.values(existingCommands)) {
+        if (command.slashCommand && command.commandName === commandName) {
+            const args = {};
+            for (const [attr,obj] of Object.entries(command.argsModel)) {
+                if (attr === "$argsByType") {
+                    for (const [attr,argModel] of Object.entries(<{ [attr: string]: {type: string} }>obj)) {
+                        args[attr] = options[getSlashTypeGetterName(argModel)](attr);
+                    }
+                }
+            }
+            console.log(args);
+            await interaction.reply({
+                content: "TEST",
+                ephemeral: true
+            });
+        }
+    }
+
+    /*switch (commandName) {
         case 'ping':
             await interaction.deferReply({
                 ephemeral: true
@@ -261,7 +270,40 @@ export async function listenSlashCommands(interaction: Interaction) {
                 content: "CECI EST UNE COMMANDE TEST",
                 ephemeral: true
             })
+    }*/
+}
+
+function getSlashTypeDefinition(argModel) {
+    let typeDefinition: any = null;
+    if (slashCommandsTypeDefinitions[argModel.type]) {
+        typeDefinition = slashCommandsTypeDefinitions[argModel.type];
+        if (typeDefinition.mono || typeDefinition.multi)
+            typeDefinition = typeDefinition[argModel.multi ? 'multi' : 'mono'];
     }
+    return typeDefinition
+}
+
+function getSlashType(argModel) {
+    const slashTypeDefinition = getSlashTypeDefinition(argModel);
+    return (slashTypeDefinition && slashTypeDefinition.commandType == 'slash')
+        ? slashTypeDefinition.type :
+        ApplicationCommandOptionTypes.STRING
+}
+
+function getCustomType(argModel) {
+    const slashTypeDefinition = getSlashTypeDefinition(argModel);
+
+    if (slashTypeDefinition && slashTypeDefinition.commandType == 'slash')
+        return null;
+
+    if (slashTypeDefinition && slashTypeDefinition.commandType == 'custom')
+        return slashTypeDefinition.type
+
+    return argModel.type;
+}
+
+function getSlashTypeGetterName(argModel) {
+    return getterNameBySlashType[getSlashType(argModel)]
 }
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve,ms));

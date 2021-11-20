@@ -1,6 +1,6 @@
 import {ApplicationCommandOptionTypes} from "discord.js/typings/enums";
 
-const slashCommandsTypeDefinitions = {
+export const slashCommandsTypeDefinitions = {
     string: {commandType: "slash", type: ApplicationCommandOptionTypes.STRING},
     number: {commandType: "slash", type: ApplicationCommandOptionTypes.NUMBER},
     boolean: {commandType: "slash", type: ApplicationCommandOptionTypes.BOOLEAN},
@@ -24,4 +24,13 @@ const slashCommandsTypeDefinitions = {
     }
 }
 
-export default slashCommandsTypeDefinitions;
+export const getterNameBySlashType = {
+    [ApplicationCommandOptionTypes.STRING]: 'getString',
+    [ApplicationCommandOptionTypes.INTEGER]: 'getInteger',
+    [ApplicationCommandOptionTypes.BOOLEAN]: 'getBoolean',
+    [ApplicationCommandOptionTypes.USER]: 'getUser',
+    [ApplicationCommandOptionTypes.CHANNEL]: 'getChannel',
+    [ApplicationCommandOptionTypes.ROLE]: 'getRole',
+    [ApplicationCommandOptionTypes.MENTIONABLE]: 'getMentionable',
+    [ApplicationCommandOptionTypes.NUMBER]: 'getNumber'
+}
