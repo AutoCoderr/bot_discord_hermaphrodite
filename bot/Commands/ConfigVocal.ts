@@ -94,7 +94,7 @@ export default class ConfigVocal extends Command {
             return this.response(false,
                 this.sendErrors( {
                     name: "Missing guild",
-                    value: "We couldn't find the message guild"
+                    value: "We couldn't find the guild"
                 })
             );
 

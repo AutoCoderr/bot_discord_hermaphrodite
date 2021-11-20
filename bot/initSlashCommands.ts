@@ -4,6 +4,8 @@ import {ApplicationCommandOptionTypes} from "discord.js/typings/enums";
 import Command from "./Classes/Command";
 import {existingCommands} from "./Classes/CommandsDescription";
 import {slashCommandsTypeDefinitions, getterNameBySlashType} from "./Classes/slashCommandsTypeDefinitions";
+import {checkTypes} from "./Classes/TypeChecker";
+import {extractTypes} from "./Classes/TypeExtractor";
 
 interface optionCommandType {
     type: ApplicationCommandOptionTypes.BOOLEAN | ApplicationCommandOptionTypes.CHANNEL | ApplicationCommandOptionTypes.INTEGER | ApplicationCommandOptionTypes.MENTIONABLE | ApplicationCommandOptionTypes.NUMBER | ApplicationCommandOptionTypes.ROLE | ApplicationCommandOptionTypes.STRING | ApplicationCommandOptionTypes.SUB_COMMAND | ApplicationCommandOptionTypes.SUB_COMMAND_GROUP | ApplicationCommandOptionTypes.USER;
@@ -225,10 +227,17 @@ export async function listenSlashCommands(interaction: Interaction) {
     for (const command of <Array<typeof Command>>Object.values(existingCommands)) {
         if (command.slashCommand && command.commandName === commandName) {
             const args = {};
+            //const fails: any[] = [];
             for (const [attr,obj] of Object.entries(command.argsModel)) {
                 if (attr === "$argsByType") {
                     for (const [attr,argModel] of Object.entries(<{ [attr: string]: {type: string} }>obj)) {
                         args[attr] = options[getSlashTypeGetterName(argModel)](attr);
+                        /*const customType = getCustomType(argModel);
+                        if (customType && !checkTypes[customType](data)) {
+                            fails.push({...argModel, value: data});
+                        } else if (customType){
+                            data = extractTypes[customType]()
+                        }*/
                     }
                 }
             }

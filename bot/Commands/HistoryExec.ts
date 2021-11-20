@@ -1,6 +1,6 @@
 import Command from "../Classes/Command";
 import config from "../config";
-import {GuildChannel, GuildMember, Message, MessageEmbed} from "discord.js";
+import {Guild, GuildChannel, GuildMember, Message, MessageEmbed, TextBasedChannels, User} from "discord.js";
 import {getArgsModelHistory, getHistory} from "../Classes/OtherFunctions";
 
 export default class HistoryExec extends Command {
@@ -10,31 +10,31 @@ export default class HistoryExec extends Command {
 
     static argsModel = getArgsModelHistory();
 
-    constructor(message: Message) {
-        super(message, HistoryExec.commandName, HistoryExec.argsModel);
+    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommand: null|string = null) {
+        super(channel, member, guild, writtenCommand, HistoryExec.commandName, HistoryExec.argsModel);
     }
 
 
     async action(args: {help: boolean, commands: typeof Command[], sort: string, limit: number, channels: GuildChannel[], users: GuildMember[]}, bot) {
 
-        if (args.help) {
-            this.displayHelp();
-            return false;
-        }
+        if (args.help)
+            return this.response(false, this.displayHelp());
 
-        const histories = await getHistory(this.message,args);
+        const histories = await getHistory(this,args);
 
-        this.message.channel.send("Execute : ");
+        const messages: string[] = [];
+
+        messages.push("Execute : ");
 
         if (histories.length > 0) {
             for (let history of histories) {
-                this.message.channel.send(config.command_prefix+history.command);
+                messages.push(config.command_prefix+history.command);
             }
         } else {
-            this.message.channel.send("Aucune commande trouvée")
+            messages.push("Aucune commande trouvée")
         }
 
-        return true;
+        return this.response(true, messages);
     }
 
     saveHistory() {} // overload saveHistory of Command class to save nothing in the history

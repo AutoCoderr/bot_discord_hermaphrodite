@@ -1,7 +1,7 @@
 import config from "../config";
 import Command from "../Classes/Command";
 import WelcomeMessage, {IWelcomeMessage} from "../Models/WelcomeMessage";
-import {Message, MessageEmbed} from "discord.js";
+import {Guild, GuildMember, Message, MessageEmbed, TextBasedChannels, User} from "discord.js";
 
 export default class ConfigWelcome extends Command {
     static display = true;
@@ -22,33 +22,32 @@ export default class ConfigWelcome extends Command {
         ]
     }
 
-    constructor(message: Message) {
-        super(message, ConfigWelcome.commandName, ConfigWelcome.argsModel);
+    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommand: null|string = null) {
+        super(channel, member, guild, writtenCommand, ConfigWelcome.commandName, ConfigWelcome.argsModel);
     }
 
     async action(args: {help: boolean, action: string}, bot) {
         const {help, action} = args;
 
-        if (this.message.guild == null) {
-            this.sendErrors( {
-                name: "Missing guild",
-                value: "We couldn't find the message guild"
-            });
-            return false;
-        }
+        if (this.guild == null)
+            return this.response(false,
+                this.sendErrors( {
+                    name: "Missing guild",
+                    value: "We couldn't find the guild"
+                })
+            );
 
-        if (help) {
-            this.displayHelp();
-            return false;
-        }
+        if (help)
+            return this.response(false, this.displayHelp());
 
+        let resultContent: string;
         let welcomeMessage: IWelcomeMessage;
         switch(action) {
             case "set":
-                this.message.channel.send("Veuillez rentrer le message, qui sera envoyé en MP aux nouveaux arrivants sur ce serveur :")
-                    .then(_ => {
+                return this.response(true, "Veuillez rentrer le message, qui sera envoyé en MP aux nouveaux arrivants sur ce serveur :",
+                    _ => {
                         const listener = async (response: Message) => {
-                            if (response.author.id == this.message.author.id) { // @ts-ignore
+                            if (response.author.id == this.member.id) { // @ts-ignore
                                 let welcomeMessage: IWelcomeMessage = await WelcomeMessage.findOne({serverId: this.message.guild.id});
                                 let create = false;
                                 if (welcomeMessage == null) {
@@ -63,44 +62,43 @@ export default class ConfigWelcome extends Command {
                                     welcomeMessage.message = response.content; // @ts-ignore
                                     welcomeMessage.save();
                                 }
-                                this.message.channel.send("Votre message a été enregistré et sera envoyé en MP aux nouveaux arrivants de ce serveur"+
-                                                        (create ?  "\n(L'envoie de MP aux nouveaux a été activé)" : ""));
+                                this.channel.send("Votre message a été enregistré et sera envoyé en MP aux nouveaux arrivants de ce serveur"+
+                                    (create ?  "\n(L'envoie de MP aux nouveaux a été activé)" : ""));
                                 bot.off('messageCreate', listener);
                             }
                         };
                         bot.on('messageCreate', listener);
                     });
-                return true;
             case "show":
-                welcomeMessage = await WelcomeMessage.findOne({serverId: this.message.guild.id});
+                welcomeMessage = await WelcomeMessage.findOne({serverId: this.guild.id});
                 if (welcomeMessage == null) {
-                    this.message.channel.send("Il n'y a pas de message définit, vous pouvez le définir avec : "+config.command_prefix+this.commandName+" set");
+                    resultContent = "Il n'y a pas de message définit, vous pouvez le définir avec : "+config.command_prefix+this.commandName+" set";
                 } else {
-                    this.message.channel.send("Message définit : \n\n---------------------------------\n\n"+welcomeMessage.message);
+                    resultContent = "Message définit : \n\n---------------------------------\n\n"+welcomeMessage.message;
                 }
-                return true;
+                return this.response(true, resultContent);
             case "disable":
-                welcomeMessage = await WelcomeMessage.findOne({serverId: this.message.guild.id});
+                welcomeMessage = await WelcomeMessage.findOne({serverId: this.guild.id});
                 if (welcomeMessage == null) {
-                    this.message.channel.send("Il n'y a pas de message définit, vous pouvez le définir avec : "+config.command_prefix+this.commandName+" set");
+                    resultContent = "Il n'y a pas de message définit, vous pouvez le définir avec : "+config.command_prefix+this.commandName+" set";
                 } else {
                     welcomeMessage.enabled = false; // @ts-ignore
                     welcomeMessage.save();
-                    this.message.channel.send("L'envoie de MP aux nouveaux a été désactivé.");
+                    resultContent = "L'envoie de MP aux nouveaux a été désactivé.";
                 }
-                return true;
+                return this.response(true, resultContent);
             case "enable":
-                welcomeMessage = await WelcomeMessage.findOne({serverId: this.message.guild.id});
+                welcomeMessage = await WelcomeMessage.findOne({serverId: this.guild.id});
                 if (welcomeMessage == null) {
-                    this.message.channel.send("Il n'y a pas de message définit, vous pouvez le définir avec : "+config.command_prefix+this.commandName+" set");
+                    resultContent = "Il n'y a pas de message définit, vous pouvez le définir avec : "+config.command_prefix+this.commandName+" set";
                 } else {
                     welcomeMessage.enabled = true; // @ts-ignore
                     welcomeMessage.save();
-                    this.message.channel.send("L'envoie de MP aux nouveaux a été activé, faite '"+config.command_prefix+this.commandName+" show' pour voir le MP qui sera envoyé aux nouveaux");
+                    resultContent = "L'envoie de MP aux nouveaux a été activé, faite '"+config.command_prefix+this.commandName+" show' pour voir le MP qui sera envoyé aux nouveaux";
                 }
-                return true;
+                return this.response(true, resultContent);
         }
-        return false;
+        return this.response(false, "Aucun action mentionnée");
     }
 
     help() {

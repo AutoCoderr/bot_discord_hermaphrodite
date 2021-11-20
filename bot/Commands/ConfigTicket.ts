@@ -100,7 +100,7 @@ export default class ConfigTicket extends Command {
             return this.response(false,
                 this.sendErrors({
                     name: "Datas missing",
-                    value: "Nor message guild nor message membre has been found"
+                    value: "Nor guild nor member has been found"
                 })
             );
         }

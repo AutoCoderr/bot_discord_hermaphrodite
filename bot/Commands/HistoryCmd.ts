@@ -1,7 +1,7 @@
 import config from "../config";
 import Command from "../Classes/Command";
 import {getArgsModelHistory, getHistory, splitFieldsEmbed} from "../Classes/OtherFunctions";
-import {GuildChannel, GuildMember, Message, MessageEmbed} from "discord.js";
+import {Guild, GuildChannel, GuildMember, Message, MessageEmbed, TextBasedChannels, User} from "discord.js";
 import {IHistory} from "../Models/History";
 
 export default class HistoryCmd extends Command {
@@ -11,26 +11,24 @@ export default class HistoryCmd extends Command {
 
     static argsModel = getArgsModelHistory();
 
-    constructor(message: Message) {
-        super(message, HistoryCmd.commandName, HistoryCmd.argsModel);
+    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommand: null|string = null) {
+        super(channel, member, guild, writtenCommand, HistoryCmd.commandName, HistoryCmd.argsModel);
     }
 
     async action(args: {help: boolean, commands: typeof Command[], sort: string, limit: number, channels: GuildChannel[], users: GuildMember[]}, bot) {
 
-        if (args.help) {
-            this.displayHelp();
-            return false;
-        }
+        if (args.help)
+            return this.response(false, this.displayHelp());
 
-        if (this.message.guild == null) {
-            this.sendErrors({
-                name: "Guild missing",
-                value: "We cannot find the message guild"
-            });
-            return false;
-        }
+        if (this.guild == null)
+            return this.response(false,
+                this.sendErrors({
+                    name: "Guild missing",
+                    value: "We cannot find the guild"
+                })
+            );
 
-        const histories: Array<IHistory> = await getHistory(this.message,args);
+        const histories: Array<IHistory> = await getHistory(this,args);
 
         let embeds: Array<MessageEmbed> = [];
 
@@ -64,8 +62,7 @@ export default class HistoryCmd extends Command {
                     value: "Aucun élément n'a été trouvé dans l'historique"
                 }));
         }
-        this.message.channel.send({embeds});
-        return true;
+        return this.response(true, {embeds});
     }
 
     help() {

@@ -660,10 +660,11 @@ export default class Command {
         return {success: true, result: out};
     }
 
-    response(success: boolean, result: Array<string | MessagePayload | MessageOptions>|string | MessagePayload | MessageOptions):  {success: boolean, result: Array<string | MessagePayload | MessageOptions>} {
+    response(success: boolean, result: Array<string | MessagePayload | MessageOptions>|string | MessagePayload | MessageOptions, callback: null|Function = null):  {success: boolean, result: Array<string | MessagePayload | MessageOptions>, callback?: Function} {
         return {
             success,
-            result: result instanceof Array ? result : [result]
+            result: result instanceof Array ? result : [result],
+            ...(callback ? {callback}: {})
         };
     }
 
@@ -671,7 +672,7 @@ export default class Command {
         return new MessageEmbed();
     }
 
-    async action(args: any,bot): Promise<{success: boolean, result: Array<string | MessagePayload | MessageOptions>}> { // To be overloaded
+    async action(args: any,bot): Promise<{success: boolean, result: Array<string | MessagePayload | MessageOptions>, callback?: Function}> { // To be overloaded
         return this.response(true, 'Hello');
     }
 }

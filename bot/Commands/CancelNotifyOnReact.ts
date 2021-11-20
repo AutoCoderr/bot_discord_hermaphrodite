@@ -68,7 +68,7 @@ export default class CancelNotifyOnReact extends Command {
                 false,
                 this.sendErrors({
                     name: "Missing data",
-                    value: "We can't find guild or member in the message object"
+                    value: "We can't find guild or member"
                 })
             );
         }
@@ -77,7 +77,7 @@ export default class CancelNotifyOnReact extends Command {
                 false,
                 this.sendErrors({
                     name: "Missing data",
-                    value: "We can't find guild in the given message"
+                    value: "We can't find guild"
                 })
             );
         }

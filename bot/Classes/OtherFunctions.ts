@@ -1,8 +1,11 @@
 import { existingCommands } from "./CommandsDescription";
 import History from "../Models/History";
-import {EmbedFieldData, GuildChannel, GuildMember, Message, MessageEmbed} from "discord.js";
+import {EmbedFieldData, Guild, GuildChannel, GuildMember, Message, MessageEmbed} from "discord.js";
 import Command from "./Command";
 import CancelNotifyOnReact from "../Commands/CancelNotifyOnReact";
+import HistoryExec from "../Commands/HistoryExec";
+import HistoryCmd from "../Commands/HistoryCmd";
+import ListNotifyOnReact from "../Commands/ListNotifyOnReact";
 
 export function addMissingZero(number, n = 2) {
     number = number.toString();
@@ -76,10 +79,10 @@ export function getArgsModelHistory() {
 }
 
 
-export async function getHistory(message,args: {commands: typeof Command[], sort: string, limit: number, channels: GuildChannel[], users: GuildMember[]}) {
+export async function getHistory(currentCommand: HistoryCmd|HistoryExec,args: {commands: typeof Command[], sort: string, limit: number, channels: GuildChannel[], users: GuildMember[]}) {
     let { commands, sort, limit, channels, users } = args;
 
-    let where:any = {serverId: message.guild.id};
+    let where:any = {serverId: (<Guild>currentCommand.guild).id};
     if (users != undefined) {
         where.userId = {$in: users.map(user => user.id)};
     }
@@ -94,7 +97,7 @@ export async function getHistory(message,args: {commands: typeof Command[], sort
     } else {
         where.commandName = { $nin: [] };
         for (let aCommand in existingCommands) {
-            if (!await existingCommands[aCommand].staticCheckPermissions(message,false)) {
+            if (!await existingCommands[aCommand].staticCheckPermissions(currentCommand.channel, currentCommand.member, currentCommand.guild, false)) {
                 where.commandName.$nin.push(aCommand);
             }
         }
@@ -105,7 +108,7 @@ export async function getHistory(message,args: {commands: typeof Command[], sort
     return await History.find(where).limit(limit).sort({dateTime: sort});
 }
 
-export async function forEachNotifyOnReact(callback, channel: GuildChannel, message: Message, command: CancelNotifyOnReact) {
+export async function forEachNotifyOnReact(callback, channel: GuildChannel, message: Message, command: CancelNotifyOnReact|ListNotifyOnReact) {
     if (command.guild == null) {
         callback(false);
         return;

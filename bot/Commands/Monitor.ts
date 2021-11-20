@@ -6,8 +6,8 @@ import {
     Message,
     MessageEmbed,
     PartialGuildMember,
-    Role,
-    TextChannel
+    Role, TextBasedChannels,
+    TextChannel, User
 } from "discord.js";
 import config from "../config";
 import MonitoringMessage, {IMonitoringMessage} from "../Models/MonitoringMessage";
@@ -187,7 +187,7 @@ export default class Monitor extends Command {
             channel: {
                 type: "channel",
                 description: "Le channel sur lequel monitorer le serveur",
-                default: (_, message: Message) => message.channel,
+                default: (_, command: Command) => command.channel,
                 required: (args) => args.help == undefined && args.action != "show",
                 valid: (elem: GuildChannel, _) => elem.type == "GUILD_TEXT"
             },
@@ -201,25 +201,24 @@ export default class Monitor extends Command {
         }
     }
 
-    constructor(message: Message) {
-        super(message, Monitor.commandName, Monitor.argsModel);
+    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommand: null|string = null) {
+        super(channel, member, guild, writtenCommand, Monitor.commandName, Monitor.argsModel);
     }
 
     async action(args: {help: boolean, action: string, channel: TextChannel, messages: Array<Message>}, bot) {
         const {help, action, channel, messages} = args;
 
-        if (help) {
-            this.displayHelp();
-            return false;
-        }
+        if (help)
+            return this.response(false, this.displayHelp());
 
-        if (this.message.guild == null) {
-            this.sendErrors({
-                name: "Datas missing",
-                value: "Nor message guild nor message membre has been found"
-            });
-            return false;
-        }
+        if (this.guild == null)
+            return this.response(false,
+                this.sendErrors({
+                    name: "Datas missing",
+                    value: "Nor guild nor member has been found"
+                })
+            );
+
         let monitoringMessage: IMonitoringMessage;
         switch (action) {
             case "add":
@@ -255,42 +254,40 @@ export default class Monitor extends Command {
                     }
                 }
 
-                const createdMessage: Message = await channel.send({ embeds: [await Monitor.getMonitorMessage(this.message.guild, datasToDisplay)]});
+                const createdMessage: Message = await channel.send({ embeds: [await Monitor.getMonitorMessage(this.guild, datasToDisplay)]});
                 monitoringMessage = await MonitoringMessage.create({
-                    serverId: this.message.guild.id,
+                    serverId: this.guild.id,
                     datas: datasToDisplay,
                     channelId: channel.id,
                     messageId: createdMessage.id
                 });
                 Monitor.startMonitoringMessageEvent(monitoringMessage);
-                this.message.channel.send("Un message de monitoring a été créé sur le channel <#"+channel.id+">");
-                return true;
+                return this.response(true, "Un message de monitoring a été créé sur le channel <#"+channel.id+">");
             case "refresh":
                 for (const message of messages) {
                     monitoringMessage = await MonitoringMessage.findOne({
-                        serverId: this.message.guild.id,
+                        serverId: this.guild.id,
                         channelId: channel.id,
                         messageId: message.id
                     });
                     if (monitoringMessage == null) {
-                        this.message.channel.send("Il n'y a pas de monitoring sur le message "+message.id);
+                        return this.response(false, "Il n'y a pas de monitoring sur le message "+message.id);
                     }
-                    await message.edit({embeds: [await Monitor.getMonitorMessage(this.message.guild, monitoringMessage.datas)]});
+                    await message.edit({embeds: [await Monitor.getMonitorMessage(this.guild, monitoringMessage.datas)]});
                 }
 
-                this.message.channel.send("Monitoring mis à jour");
-                return true;
+                return this.response(true, "Monitoring mis à jour");
             case "show":
                 const channelsById = {};
                 const monitoringMessages: Array<IMonitoringMessage> = await MonitoringMessage.find({
-                    serverId: this.message.guild.id
+                    serverId: this.guild.id
                 });
                 if (monitoringMessages.length > 0) {
                     const Embeds = splitFieldsEmbed(25, await Promise.all(monitoringMessages.map(async monitoringMessage => {
                         if (channelsById[monitoringMessage.channelId] == undefined) { // @ts-ignore
                             channelsById[monitoringMessage.channelId] = this.message.guild.channels.cache.get(monitoringMessage.channelId);
                         }
-                        const exist = await Monitor.checkMonitoringMessageExist(monitoringMessage, this.message.guild, channelsById[monitoringMessage.channelId]);
+                        const exist = await Monitor.checkMonitoringMessageExist(monitoringMessage, this.guild, channelsById[monitoringMessage.channelId]);
                         return {
                             name: exist ? "Sur la channel #" + exist.channel.name : "Ce message et/ou ce salon n'existe plus",
                             value: exist ?
@@ -309,31 +306,27 @@ export default class Monitor extends Command {
                             Embed.setTitle("Les messages de monitoring")
                         }
                     });
-                    for (const Embed of Embeds) {
-                        this.message.channel.send({embeds: [Embed]});
-                    }
-                } else {
-                    this.message.channel.send("Il n'y a aucun monitoring sur ce serveur");
+                    return this.response(true, Embeds.map(Embed => ({embeds: [Embed]})));
                 }
-
-                return true;
+                return this.response(true, "Il n'y a aucun monitoring sur ce serveur");
             case "remove":
+                const responses: string[] = [];
                 for (const message of messages) {
                     const res = await MonitoringMessage.deleteOne({
-                        serverId: this.message.guild.id,
+                        serverId: this.guild.id,
                         channelId: channel.id,
                         messageId: message.id
                     });
                     if (res.deletedCount > 0) {
                         await message.delete();
-                        this.message.channel.send("Monitoring supprimé avec succès sur le message "+message.id);
+                        responses.push("Monitoring supprimé avec succès sur le message "+message.id);
                     } else {
-                        this.message.channel.send("Il n'y a pas de monitoring sur le message "+message.id);
+                        responses.push("Il n'y a pas de monitoring sur le message "+message.id);
                     }
                 }
-                return true;
+                return this.response(true, responses);
         }
-        return false;
+        return this.response(false, "Aucune action spécifiée");
     }
 
     static async checkMonitoringMessageExist(monitoringMessage: IMonitoringMessage, guild: null|undefined|Guild = null, channel: null|undefined|TextChannel = null) {

@@ -1,7 +1,16 @@
 import config from "../config";
 import {forEachNotifyOnReact} from "../Classes/OtherFunctions";
 import Command from "../Classes/Command";
-import Discord, {GuildChannel, GuildEmoji, Message, MessageEmbed} from "discord.js";
+import Discord, {
+    Guild,
+    GuildChannel,
+    GuildEmoji,
+    GuildMember,
+    Message,
+    MessageEmbed,
+    TextBasedChannels,
+    User
+} from "discord.js";
 import {existingCommands} from "../Classes/CommandsDescription";
 
 export default class ListNotifyOnReact extends Command {
@@ -43,25 +52,22 @@ export default class ListNotifyOnReact extends Command {
         }
     };
 
-    constructor(message: Message) {
-        super(message, ListNotifyOnReact.commandName, ListNotifyOnReact.argsModel);
+    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommand: null|string = null) {
+        super(channel, member, guild, writtenCommand, ListNotifyOnReact.commandName, ListNotifyOnReact.argsModel);
     }
 
     async action(args: {help: boolean, channel: GuildChannel, message: Message, emote: GuildEmoji|string}, bot) {
         let {help,channel,message,emote} = args;
 
-        if (help) {
-            this.displayHelp();
-            return false;
-        }
+        if (help)
+            return this.response(false, this.displayHelp());
 
-        if (this.message.guild == null) {
+        if (this.guild == null) return this.response(false,
             this.sendErrors({
-                name: "Missing data",
-                value: "We can't find guild in the message object"
-            });
-            return false;
-        }
+                name: "Guild missing",
+                value: "We cannot find the guild"
+            })
+        );
 
         let emoteName = emote ? (emote instanceof GuildEmoji ? emote.name : emote) : undefined;
 
@@ -89,7 +95,7 @@ export default class ListNotifyOnReact extends Command {
                         value: "Aucune réaction n'a été trouvée"
                     });
                 }
-            }, channel, message, this.message);
+            }, channel, message, this);
         } else if (listenings && listenings[channel.id] && listenings[channel.id][message.id] && listenings[channel.id][message.id][emoteName]) {
             const contentMessage = message.content.substring(0,Math.min(20,message.content.length)) + "...";
             Embed.addFields({
@@ -103,8 +109,7 @@ export default class ListNotifyOnReact extends Command {
             });
         }
 
-        this.message.channel.send({embeds: [Embed]});
-        return true;
+        return this.response(true, {embeds: [Embed]});
     }
 
     help() {
