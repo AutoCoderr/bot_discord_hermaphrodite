@@ -3,7 +3,16 @@ import Command from "../Classes/Command";
 import { forEachNotifyOnReact } from "../Classes/OtherFunctions";
 import { existingCommands } from "../Classes/CommandsDescription";
 import StoredNotifyOnReact from "../Models/StoredNotifyOnReact";
-import Discord, {GuildChannel, GuildEmoji, Message, MessageEmbed} from "discord.js";
+import Discord, {
+    Guild,
+    GuildChannel,
+    GuildEmoji,
+    GuildMember,
+    Message,
+    MessageEmbed,
+    TextBasedChannels,
+    User
+} from "discord.js";
 
 export default class CancelNotifyOnReact extends Command {
     static description = "Pour désactiver l'écoute d'une réaction sur un ou plusieurs messages.";
@@ -44,31 +53,33 @@ export default class CancelNotifyOnReact extends Command {
         }
     };
 
-    constructor(message: Message) {
-        super(message, CancelNotifyOnReact.commandName, CancelNotifyOnReact.argsModel);
+    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommand: null|string = null) {
+        super(channel, member, guild, writtenCommand, CancelNotifyOnReact.commandName, CancelNotifyOnReact.argsModel);
     }
 
     async action(args: {help: boolean, channel: GuildChannel, message: Message, emote: GuildEmoji|string},bot) {
         let {help,channel,message,emote} = args;
 
-        if (help) {
-            this.displayHelp();
-            return false;
-        }
+        if (help)
+            return this.response(false, this.displayHelp());
 
-        if (this.message.guild == null || this.message.member == null) {
-            this.sendErrors({
-                name: "Missing data",
-                value: "We can't find guild or member in the message object"
-            });
-            return false;
+        if (this.guild == null || this.member == null) {
+            return this.response(
+                false,
+                this.sendErrors({
+                    name: "Missing data",
+                    value: "We can't find guild or member in the message object"
+                })
+            );
         }
         if (message && message.guild == null) {
-            this.sendErrors({
-                name: "Missing data",
-                value: "We can't find guild in the given message"
-            });
-            return false;
+            return this.response(
+                false,
+                this.sendErrors({
+                    name: "Missing data",
+                    value: "We can't find guild in the given message"
+                })
+            );
         }
 
         let emoteName = emote ? (emote instanceof GuildEmoji ? emote.name : emote) : undefined;
@@ -95,7 +106,7 @@ export default class CancelNotifyOnReact extends Command {
                         value: "Aucune réaction n'a été trouvée et supprimée"
                     });
                 }
-            }, channel, message, this.message);
+            }, channel, message, this);
         } else if (listenings && listenings[channel.id] && listenings[channel.id][message.id] && listenings[channel.id][message.id][emoteName]) { // @ts-ignore
             CancelNotifyOnReact.deleteNotifyOnReactInBdd(message.guild.id,channel.id,message.id,emoteName);
             listenings[channel.id][message.id][emoteName] = false;
@@ -109,9 +120,7 @@ export default class CancelNotifyOnReact extends Command {
                 value: "Aucune réaction n'a été trouvée et supprimée"
             });
         }
-
-        this.message.channel.send({embeds: [Embed]});
-        return true;
+        return this.response(true, {embeds: [Embed]});
     }
 
     static async deleteNotifyOnReactInBdd(serverId,channelId,messageId,emoteName) {

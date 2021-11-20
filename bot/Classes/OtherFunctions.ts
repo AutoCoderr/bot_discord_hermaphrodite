@@ -2,6 +2,7 @@ import { existingCommands } from "./CommandsDescription";
 import History from "../Models/History";
 import {EmbedFieldData, GuildChannel, GuildMember, Message, MessageEmbed} from "discord.js";
 import Command from "./Command";
+import CancelNotifyOnReact from "../Commands/CancelNotifyOnReact";
 
 export function addMissingZero(number, n = 2) {
     number = number.toString();
@@ -104,8 +105,12 @@ export async function getHistory(message,args: {commands: typeof Command[], sort
     return await History.find(where).limit(limit).sort({dateTime: sort});
 }
 
-export async function forEachNotifyOnReact(callback, channel: GuildChannel, message: Message, messageCommand) {
-    const serverId = messageCommand.guild.id;
+export async function forEachNotifyOnReact(callback, channel: GuildChannel, message: Message, command: CancelNotifyOnReact) {
+    if (command.guild == null) {
+        callback(false);
+        return;
+    }
+    const serverId = command.guild.id;
     // @ts-ignore
     let listenings = existingCommands.NotifyOnReact.listenings[serverId];
 
@@ -156,10 +161,10 @@ export async function forEachNotifyOnReact(callback, channel: GuildChannel, mess
     } else { // Si rien n'a été spécifié en argument, regarde sur tout les messaqes de tout les channels
         let nbListeneds = 0;
         for (let channelId in listenings) {
-            let channel = messageCommand.guild.channels.cache.get(channelId);
+            let channel = command.guild.channels.cache.get(channelId);
             for (let messageId in listenings[channelId]) {
                 let messageListened;
-                try {
+                try { //@ts-ignore
                     messageListened = await channel.messages.fetch(messageId);
                 } catch (e) {
                 }

@@ -1,11 +1,10 @@
 import Command from "../Classes/Command";
 import {
-    EmbedFieldData,
+    EmbedFieldData, Guild,
     GuildChannel,
     GuildMember,
-    Message,
-    MessageEmbed, Role,
-    ThreadChannel,
+    MessageEmbed, Role, TextBasedChannels,
+    ThreadChannel, User,
     VoiceChannel
 } from "discord.js";
 import VocalConfig from "../Models/VocalConfig";
@@ -81,30 +80,27 @@ export default class ConfigVocal extends Command {
         }
     }
 
-    constructor(message: Message) {
-        super(message, ConfigVocal.commandName, ConfigVocal.argsModel);
+    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommand: null|string = null) {
+        super(channel, member, guild, writtenCommand, ConfigVocal.commandName, ConfigVocal.argsModel);
     }
 
     async action(args: {help: boolean, action: string, subAction: string, blacklistType: string, users: GuildMember[], roles: Role[], channels: VoiceChannel[]}) {
         const {help, action, subAction, blacklistType, users, roles, channels} = args;
 
-        if (help) {
-            this.displayHelp();
-            return false;
-        }
+        if (help)
+            return this.response(false, this.displayHelp());
 
-        if (this.message.guild == null) {
-            this.sendErrors( {
-                name: "Missing guild",
-                value: "We couldn't find the message guild"
-            });
-            return false;
-        }
+        if (this.guild == null)
+            return this.response(false,
+                this.sendErrors( {
+                    name: "Missing guild",
+                    value: "We couldn't find the message guild"
+                })
+            );
 
-        let vocalConfig: typeof VocalConfig = await VocalConfig.findOne({serverId: this.message.guild.id})
+        let vocalConfig: typeof VocalConfig = await VocalConfig.findOne({serverId: this.guild.id})
 
         if (action == "enable" || action == "disable") {
-
             if (vocalConfig == null) {
                 VocalConfig.create({
                     enabled: action == "enable",
@@ -112,22 +108,22 @@ export default class ConfigVocal extends Command {
                     channelBlacklist: [],
                     listenableDenies: {},
                     userMutes: {},
-                    serverId: this.message.guild.id
+                    serverId: this.guild.id
                 })
             } else {
                 vocalConfig.enabled = action == "enable";
                 vocalConfig.save();
             }
-            this.message.channel.send("L'abonnement vocal a été "+(action == "enable" ? "activé" : "désactivé")+" sur ce serveur");
+            return this.response(true, "L'abonnement vocal a été "+(action == "enable" ? "activé" : "désactivé")+" sur ce serveur");
 
         } else { // if action is 'blacklist'
-            if (vocalConfig == null || !vocalConfig.enabled) {
-                this.sendErrors( {
-                    name: "Vocal désactivé",
-                    value: "Vous devez d'abord activer l'abonnement vocal sur ce serveur avec : \n"+config.command_prefix+this.commandName+" enable"
-                });
-                return false;
-            }
+            if (vocalConfig == null || !vocalConfig.enabled)
+                return this.response(false,
+                    this.sendErrors( {
+                        name: "Vocal désactivé",
+                        value: "Vous devez d'abord activer l'abonnement vocal sur ce serveur avec : \n"+config.command_prefix+this.commandName+" enable"
+                    })
+                );
             switch (subAction) {
                 case 'add':
                     const notFoundUserId: string[] = [];
@@ -139,7 +135,7 @@ export default class ConfigVocal extends Command {
                         if (roles)
                             vocalConfig.listenerBlacklist.roles = this.addIdsToList(vocalConfig.listenerBlacklist.roles, roles.map(role => role.id));
                         const vocalSubscribes: Array<IVocalSubscribe|typeof VocalSubscribe> = await VocalSubscribe.find({
-                            serverId: this.message.guild.id
+                            serverId: this.guild.id
                         });
                         for (const vocalSubscribe of vocalSubscribes) {
                             if (users !== undefined && users.some(user => user.id === vocalSubscribe.listenerId)) {
@@ -149,7 +145,7 @@ export default class ConfigVocal extends Command {
 
                             let member: null|GuildMember = null;
                             try {
-                                member = await this.message.guild.members.fetch(vocalSubscribe.listenerId);
+                                member = await this.guild.members.fetch(vocalSubscribe.listenerId);
                             } catch (e) {
                                 notFoundUserId.push(vocalSubscribe.listenerId);
                             }
@@ -162,8 +158,7 @@ export default class ConfigVocal extends Command {
                     if (notFoundUserId.length > 0) {
                         msg += "\n" + notFoundUserId.map(id => "L'utilisateur avec l'id " + id + " est introuvable, son écoute a été supprimée").join("\n")
                     }
-                    this.message.channel.send(msg);
-                    break;
+                    return this.response(true, msg);
                 case 'remove':
                     if (blacklistType == "channel") {
                         vocalConfig.channelBlacklist = this.removeIdsToList(vocalConfig.channelBlacklist, channels.map(channel => channel.id))
@@ -173,8 +168,9 @@ export default class ConfigVocal extends Command {
                         if (roles)
                             vocalConfig.listenerBlacklist.roles = this.removeIdsToList(vocalConfig.listenerBlacklist.roles, roles.map(role => role.id));
                     }
-                    this.message.channel.send("Les "+(blacklistType == "channel" ? "channels" : "utilisateurs/roles")+" ont été retirés de la blacklist '"+blacklistType+"'");
-                    break;
+                    return this.response(true,
+                        "Les "+(blacklistType == "channel" ? "channels" : "utilisateurs/roles")+" ont été retirés de la blacklist '"+blacklistType+"'"
+                    );
                 case 'clear':
                     if (blacklistType == "channel") {
                         vocalConfig.channelBlacklist = [];
@@ -182,8 +178,7 @@ export default class ConfigVocal extends Command {
                         vocalConfig.listenerBlacklist.users = [];
                         vocalConfig.listenerBlacklist.roles = [];
                     }
-                    this.message.channel.send("La blacklist '"+blacklistType+"' a été vidée");
-                    break;
+                    return this.response(true, "La blacklist '"+blacklistType+"' a été vidée");
                 case 'show':
                     let fields: EmbedFieldData[];
                     if (blacklistType == "channel") {
@@ -197,14 +192,12 @@ export default class ConfigVocal extends Command {
                             embed.setTitle("Contenu de la blacklist '"+blacklistType+"'");
                         }
                     })
-                    this.message.channel.send({embeds});
+                    return this.response(true, {embeds});
             }
             if (subAction != 'show')
                 vocalConfig.save();
-
         }
-
-        return true;
+        return this.response(false, "Aucune action spécifiée");
     }
 
     async createEmbedFieldList(lists, types): Promise<EmbedFieldData[]> {
@@ -219,17 +212,17 @@ export default class ConfigVocal extends Command {
                 let name: string = "introuvable";
                 switch (types[i]) {
                     case 'channel':
-                        channel = this.message.guild?.channels.cache.get(id);
+                        channel = this.guild?.channels.cache.get(id);
                         if (channel)
                             name = '#!'+channel.name;
                         break;
                     case 'user':
-                        member = await this.message.guild?.members.fetch(id);
+                        member = await this.guild?.members.fetch(id);
                         if (member)
                             name = '@'+(member.nickname??member.user.username);
                         break;
                     case 'role':
-                        role = this.message.guild?.roles.cache.get(id);
+                        role = this.guild?.roles.cache.get(id);
                         if (role)
                             name = '@&'+role.name;
                 }

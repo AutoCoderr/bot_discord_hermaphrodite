@@ -4,7 +4,14 @@ import {addMissingZero, splitFieldsEmbed} from "./OtherFunctions";
 import Permissions, { IPermissions } from "../Models/Permissions";
 import History, {IHistory} from "../Models/History";
 import {isNumber} from "./OtherFunctions";
-import {Message, MessageEmbed} from "discord.js";
+import {
+    Guild,
+    GuildMember,
+    MessageEmbed,
+    MessageOptions,
+    MessagePayload, TextBasedChannels,
+    User
+} from "discord.js";
 import {checkTypes} from "./TypeChecker";
 import {extractTypes} from "./TypeExtractor";
 
@@ -21,25 +28,32 @@ export default class Command {
     static slashCommand: boolean = false;
 
     commandName: null|string;
-    message: Message;
+    guild: null|Guild;
+    channel: TextBasedChannels;
+    member: User|GuildMember;
     argsModel: any = {};
 
-    constructor(message: Message, commandName: null|string, argsModel: any) {
-        this.message = message;
+    writtenCommand: null|string; // If command called by the custom way, get the message typed by the user
+
+    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommand: null|string = null, commandName: null|string, argsModel: any) {
+        this.guild = guild;
+        this.channel = channel;
+        this.member = member;
         this.commandName = commandName;
         this.argsModel = argsModel;
+        this.writtenCommand = writtenCommand
     }
 
     async match() {
-        if (this.commandName == null) return false;
-        return this.message.content.split(" ")[0] == config.command_prefix+this.commandName;
+        if (this.writtenCommand == null || this.commandName == null) return false;
+        return this.writtenCommand.split(" ")[0] == config.command_prefix+this.commandName;
     }
 
-    sendErrors(errors: Object|Array<Object>){
+    sendErrors(errors: Object|Array<Object>): Array<string | MessagePayload | MessageOptions> {
         if (!(errors instanceof Array)) {
             errors = [errors];
         }
-        const commandName = this.message.content.split(" ")[0];
+        const commandName = this.commandName;
         let Embed = new Discord.MessageEmbed()
             .setColor('#0099ff')
             .setTitle('Erreur sur la commande '+commandName)
@@ -53,11 +67,11 @@ export default class Command {
             )
         }
 
-        this.message.channel.send({embeds: [Embed]});
+        return [{embeds: [Embed]}];
     }
 
-    displayHelp(displayHelp = true, fails: null|Array<any> = null, failsExtract: null|Array<any> = null, args = null) {
-        const commandName = this.message.content.split(" ")[0];
+    displayHelp(displayHelp = true, fails: null|Array<any> = null, failsExtract: null|Array<any> = null, args: null|{[attr: string]: any} = null): Array<string | MessagePayload | MessageOptions> {
+        const commandName = this.commandName;
         let embeds: Array<MessageEmbed> = [
             new MessageEmbed()
                 .setTitle("Aide pour la commande "+commandName)
@@ -158,8 +172,7 @@ export default class Command {
                 name: "Voir l'aide : ",
                 value: "Tapez : "+config.command_prefix+this.commandName+" -h"
             });
-        this.message.channel.send({embeds});
-
+        return [{embeds}];
     }
 
     getArgsList(args: Array<any>) {
@@ -173,17 +186,33 @@ export default class Command {
             );
     }
 
-    async check(bot) {
-        if (await this.match() && await this.checkPermissions() && this.checkIfModelValid()) {
-            const args = await this.computeArgs(this.parseCommand(),this.argsModel);
-            if (args && await this.action(args,bot)) {
-                this.saveHistory();
+    async check(bot): Promise<false|Array<string | MessagePayload | MessageOptions>> {
+        if (this.writtenCommand === null || await this.match()) {
+            const permissionRes = await this.checkPermissions();
+            if (permissionRes !== true)
+                return permissionRes;
+
+            const modelValidRes = this.checkIfModelValid();
+            if (modelValidRes !== true) {
+                return modelValidRes;
             }
+
+            const {success: computeArgsSuccess, result: computeArgsResult} = await this.computeArgs(this.parseCommand(),this.argsModel);
+            if (!computeArgsSuccess) return <Array<string | MessagePayload | MessageOptions>>computeArgsResult;
+
+            const {success: actionSuccess, result: actionResult} = await this.action(computeArgsResult, bot);
+
+            if (actionSuccess)
+                this.saveHistory();
+            return actionResult;
         }
+        return false;
     }
 
     saveHistory() {
-        if (this.message.author.bot) return; // Do nothing if the message is typed by a bot
+        if (this.writtenCommand == null ||
+            (this.member instanceof GuildMember && this.member.user.bot) ||
+            (this.member instanceof User && this.member.bot)) return; // Do nothing if the message is typed by a bot
 
         const date = new Date();
 
@@ -194,12 +223,12 @@ export default class Command {
             minute = addMissingZero(date.getMinutes()),
             seconds = addMissingZero(date.getSeconds());
 
-        const commandName = this.message.content.slice(1).split(" ")[0],
-            command = this.message.content.slice(1),
+        const commandName = this.writtenCommand.slice(1).split(" ")[0],
+            command = this.writtenCommand.slice(1),
             dateTime = year+"-"+month+"-"+day+" "+hour+":"+minute+":"+seconds,
-            channelId = this.message.channel.id,
-            userId = this.message.member != null ? this.message.member.id : "nobody",
-            serverId = this.message.guild != null ? this.message.guild.id : "nothing";
+            channelId = this.channel.id,
+            userId = this.member.id,
+            serverId = this.guild != null ? this.guild.id : "nothing";
 
         const history: IHistory = {
             commandName,
@@ -213,25 +242,25 @@ export default class Command {
         History.create(history);
     }
 
-    checkPermissions(displayMsg = true) {
-        return Command.staticCheckPermissions(this.message,displayMsg,this.commandName);
+    checkPermissions(displayMsg = true): Promise<boolean|Array<string | MessagePayload | MessageOptions>> {
+        return Command.staticCheckPermissions(this.channel, this.member, this.guild, displayMsg, this.commandName);
     }
 
-    static async staticCheckPermissions(message: Message, displayMsg = true, commandName: string|null = null) {
+    static async staticCheckPermissions(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, displayMsg = true, commandName: string|null = null): Promise<boolean|Array<string | MessagePayload | MessageOptions>> {
         if (commandName == null) {
             commandName = this.commandName;
         }
 
-        if (message.channel.type == "DM" || config.roots.includes(message.author.id) || (message.member && message.member.permissions.has("ADMINISTRATOR"))) return true;
+        if (channel.type == "DM" || config.roots.includes(member.id) || (member instanceof GuildMember && member.permissions.has("ADMINISTRATOR"))) return true;
 
-        if (message.member && message.guild) {
+        if (guild && member instanceof GuildMember) {
             const permission: IPermissions = await Permissions.findOne({
-                serverId: message.guild.id,
+                serverId: guild.id,
                 command: commandName
             });
             if (permission != null) {
                 // @ts-ignore
-                for (let roleId of message.member._roles) {
+                for (let roleId of member._roles) {
                     if (permission.roles.includes(roleId)) return true;
                 }
             }
@@ -242,7 +271,7 @@ export default class Command {
                 .setTitle('Permission denied')
                 .setDescription("Vous n'avez pas le droit d'executer la commande '" + commandName + "'")
                 .setTimestamp();
-            message.channel.send({embeds: [Embed]});
+            return [{embeds: [Embed]}];
         }
         return false;
     }
@@ -258,11 +287,11 @@ export default class Command {
         }
     }
 
-    checkIfModelValid() {
+    checkIfModelValid(): true|Array<string | MessagePayload | MessageOptions> {
         if (this.commandName != null && validModelCommands[this.commandName]) return true;
 
         let valid = true;
-        if (this.commandName != null && validModelCommands[this.commandName] == false) valid = false;
+        if (this.commandName != null && validModelCommands[this.commandName] === false) valid = false;
 
         if (valid && this.argsModel.$argsByType && this.argsModel.$argsByOrder) valid = false;
 
@@ -271,22 +300,22 @@ export default class Command {
             validModelCommands[this.commandName] = valid;
         }
         if (!valid) {
-            this.message.channel.send({embeds: [
+            return [{embeds: [
                     new MessageEmbed()
                         .setTitle("Modèle de la commande invalide")
                         .setDescription("Le modèle de la commande est invalide")
                         .setColor('#0099ff')
                         .setTimestamp()
-                ]})
-            return false;
+                ]}];
         }
         return true;
     }
 
     parseCommand(): any {
+        if (this.writtenCommand === null) return {};
         let argsObject = {};
         let args = "";
-        const commandSplitted = this.message.content.split(" ");
+        const commandSplitted = this.writtenCommand.split(" ");
         for (let i=1;i<commandSplitted.length;i++) {
             if (i > 1) {
                 args += " ";
@@ -355,8 +384,8 @@ export default class Command {
         return argsObject;
     }
 
-    async computeArgs(args,model) {
-        let out: any = {};
+    async computeArgs(args,model): Promise<{ success: boolean, result: {[attr: string]: any}|Array<string | MessagePayload | MessageOptions> }> {
+        let out: {[attr: string]: any} = {};
         let fails: Array<any> = [];
         let failsExtract: Array<any> = [];
         let argsWithoutKeyDefined = false;
@@ -389,10 +418,10 @@ export default class Command {
                         )
                     ) {
                         if (extractTypes[<string>argType]) {
-                            const moreDatas = typeof(model[attr].moreDatas) == "function" ? await model[attr].moreDatas(out,argType, this.message) : null
-                            const data = await extractTypes[<string>argType](args[field],this.message,moreDatas);
+                            const moreDatas = typeof(model[attr].moreDatas) == "function" ? await model[attr].moreDatas(out,argType, this) : null
+                            const data = await extractTypes[<string>argType](args[field],this,moreDatas);
                             if (data !== false) {
-                                if (typeof(model[attr].valid) != "function" || await model[attr].valid(data,out, this.message))
+                                if (typeof(model[attr].valid) != "function" || await model[attr].valid(data,out, this))
                                     out[attr] = data;
                                 else {
                                     incorrectField = true;
@@ -402,7 +431,7 @@ export default class Command {
                                 extractFailed = true;
                                 triedValue = args[field];
                             }
-                        } else if (typeof(model[attr].valid) != "function" || await model[attr].valid(args[field],out, this.message))
+                        } else if (typeof(model[attr].valid) != "function" || await model[attr].valid(args[field],out, this))
                             out[attr] = argType == "string" ? args[field].toString() : args[field];
                         else {
                             incorrectField = true;
@@ -420,10 +449,10 @@ export default class Command {
                 }
                 const required = model[attr].required == undefined ||
                     (typeof(model[attr].required) == "boolean" && model[attr].required) ||
-                    (typeof(model[attr].required) == "function" && await model[attr].required(out, this.message));
+                    (typeof(model[attr].required) == "function" && await model[attr].required(out, this));
 
                 if (required) {
-                    const defaultValue = typeof (model[attr].default) == "function" ? model[attr].default(out, this.message) : model[attr].default;
+                    const defaultValue = typeof (model[attr].default) == "function" ? model[attr].default(out, this) : model[attr].default;
                     if (defaultValue != undefined && !found && !incorrectField && !extractFailed) {
                         out[attr] = defaultValue;
                         found = true;
@@ -468,8 +497,8 @@ export default class Command {
                         ) {
                             let data = argType == "string" ? args[i].toString() : args[i];
                             if (extractTypes[<string>argType]) {
-                                const moreDatas = typeof(argModel.moreDatas) == "function" ? await argModel.moreDatas(out,argType, this.message) : null
-                                data = await extractTypes[<string>argType](data,this.message,moreDatas);
+                                const moreDatas = typeof(argModel.moreDatas) == "function" ? await argModel.moreDatas(out,argType, this) : null
+                                data = await extractTypes[<string>argType](data,this,moreDatas);
                                 if (data === false) {
                                     failsExtract.push({...argModel, value: args[i]});
                                     extractFailed = true;
@@ -477,7 +506,7 @@ export default class Command {
                             }
 
                             if (!extractFailed &&
-                                (typeof(argModel.valid) != "function" || await argModel.valid(data,out, this.message)) &&
+                                (typeof(argModel.valid) != "function" || await argModel.valid(data,out, this)) &&
                                 (argModel.choices === undefined || Object.keys(argModel.choices).includes(data))
                             ) {
                                 if (argType === "boolean" && data === argModel.field)
@@ -512,10 +541,10 @@ export default class Command {
                     }
                     const required = argModel.required == undefined ||
                         (typeof(argModel.required) == "boolean" && argModel.required) ||
-                        (typeof(argModel.required) == "function" && await argModel.required(out, this.message));
+                        (typeof(argModel.required) == "function" && await argModel.required(out, this));
 
                     if (required) {
-                        const defaultValue = typeof (argModel.default) == "function" ? argModel.default(out, this.message) : argModel.default;
+                        const defaultValue = typeof (argModel.default) == "function" ? argModel.default(out, this) : argModel.default;
                         if (!found && !incorrectField && defaultValue != undefined) {
                             out[argModel.field] = defaultValue;
                             found = true;
@@ -544,16 +573,16 @@ export default class Command {
 
                     const required = argsByType[attr].required == undefined ||
                         (typeof(argsByType[attr].required) == "boolean" && argsByType[attr].required) ||
-                        (typeof(argsByType[attr].required) == "function" && await argsByType[attr].required(out, this.message));
+                        (typeof(argsByType[attr].required) == "function" && await argsByType[attr].required(out, this));
 
                     const displayExtractError = (typeof(argsByType[attr].displayExtractError) == "boolean" && argsByType[attr].displayExtractError) ||
-                        (typeof(argsByType[attr].displayExtractError) == "function" && await argsByType[attr].displayExtractError(out, this.message));
+                        (typeof(argsByType[attr].displayExtractError) == "function" && await argsByType[attr].displayExtractError(out, this));
 
                     const displayValidErrorEvenIfFound = (typeof(argsByType[attr].displayValidErrorEvenIfFound) == "boolean" && argsByType[attr].displayValidErrorEvenIfFound) ||
-                        (typeof(argsByType[attr].displayValidErrorEvenIfFound) == "function" && await argsByType[attr].displayValidErrorEvenIfFound(out, this.message));
+                        (typeof(argsByType[attr].displayValidErrorEvenIfFound) == "function" && await argsByType[attr].displayValidErrorEvenIfFound(out, this));
 
                     const displayValidError = (typeof(argsByType[attr].displayValidError) == "boolean" && argsByType[attr].displayValidError) ||
-                        (typeof(argsByType[attr].displayValidError) == "function" && await argsByType[attr].displayValidError(out,this.message)) ||
+                        (typeof(argsByType[attr].displayValidError) == "function" && await argsByType[attr].displayValidError(out,this)) ||
                         displayValidErrorEvenIfFound;
 
                     for (let i=0;args[i] !== undefined;i++) {
@@ -581,15 +610,15 @@ export default class Command {
                         ) {
                             let data = argType == "string" ? args[i].toString() : args[i];
                             if (extractTypes[<string>argType]) {
-                                const moreDatas = typeof(argsByType[attr].moreDatas) == "function" ? await argsByType[attr].moreDatas(out,argType, this.message) : null
-                                data = await extractTypes[<string>argType](data,this.message,moreDatas);
+                                const moreDatas = typeof(argsByType[attr].moreDatas) == "function" ? await argsByType[attr].moreDatas(out,argType, this) : null
+                                data = await extractTypes[<string>argType](data,this,moreDatas);
                                 if (data === false) {
                                     extractFailed = true;
                                     triedValue = args[i];
                                 }
                             }
                             if (!extractFailed &&
-                                (typeof(argsByType[attr].valid) != "function" || await argsByType[attr].valid(data,out, this.message)) &&
+                                (typeof(argsByType[attr].valid) != "function" || await argsByType[attr].valid(data,out, this)) &&
                                 (argsByType[attr].choices === undefined || Object.keys(argsByType[attr].choices).includes(data)) ) {
                                 if (argType === "boolean" && data === attr)
                                     data = true
@@ -611,7 +640,7 @@ export default class Command {
                     }
 
                     if (required) {
-                        const defaultValue = typeof (argsByType[attr].default) == "function" ? argsByType[attr].default(out, this.message) : argsByType[attr].default;
+                        const defaultValue = typeof (argsByType[attr].default) == "function" ? argsByType[attr].default(out, this) : argsByType[attr].default;
                         if (!found && defaultValue != undefined) {
                             out[attr] = defaultValue;
                             found = true;
@@ -626,17 +655,23 @@ export default class Command {
             }
         }
         if (fails.length > 0 || failsExtract.length > 0) {
-            this.displayHelp(false, fails, failsExtract, out);
-            return false;
+            return {success: false, result: this.displayHelp(false, fails, failsExtract, out)};
         }
-        return out;
+        return {success: true, result: out};
+    }
+
+    response(success: boolean, result: Array<string | MessagePayload | MessageOptions>|string | MessagePayload | MessageOptions):  {success: boolean, result: Array<string | MessagePayload | MessageOptions>} {
+        return {
+            success,
+            result: result instanceof Array ? result : [result]
+        };
     }
 
     help(): MessageEmbed { // To be overloaded
         return new MessageEmbed();
     }
 
-    async action(args: any,bot) { // To be overloaded
-        return true;
+    async action(args: any,bot): Promise<{success: boolean, result: Array<string | MessagePayload | MessageOptions>}> { // To be overloaded
+        return this.response(true, 'Hello');
     }
 }
