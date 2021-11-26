@@ -1,8 +1,7 @@
 import config from "../config";
 import Command from "../Classes/Command";
 import StoredNotifyOnReact, { IStoredNotifyOnReact } from "../Models/StoredNotifyOnReact";
-import {GuildChannel, GuildEmoji, Message, MessageEmbed} from "discord.js";
-import TicketConfig, {ITicketConfig} from "../Models/TicketConfig";
+import {Guild, GuildChannel, GuildEmoji, GuildMember, Message, MessageEmbed, TextBasedChannels, User} from "discord.js";
 import {existingCommands} from "../Classes/CommandsDescription";
 
 export default class NotifyOnReact extends Command {
@@ -54,9 +53,8 @@ export default class NotifyOnReact extends Command {
         },
     };
 
-    constructor(message: Message) {
-        super(message, NotifyOnReact.commandName, NotifyOnReact.argsModel);
-        this.listenings = NotifyOnReact.listenings;
+    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommand: null|string = null) {
+        super(channel, member, guild, writtenCommand, NotifyOnReact.commandName, NotifyOnReact.argsModel);
     }
 
     listenings: any;
@@ -71,43 +69,43 @@ export default class NotifyOnReact extends Command {
             messageToListen = listen.message
         }
 
-        if (help) {
-            this.displayHelp();
-            return false;
-        }
+        if (help)
+            return this.response(false, this.displayHelp());
 
-        if (this.message.guild == null) {
-            this.sendErrors({
-                name: "Guild missing",
-                value: "We cannot find the message guild"
-            });
-            return false;
+        if (this.guild == null) {
+            return this.response(false,
+                this.sendErrors({
+                    name: "Guild missing",
+                    value: "We cannot find the guild"
+                })
+            );
         }
 
         if (messageToListen.guild == null) {
-            this.sendErrors({
-                name: "Guild missing in the message to listen",
-                value: "We cannot find the guild in the message to listen"
-            });
-            return false;
+            return this.response(false,
+                this.sendErrors({
+                    name: "Guild missing in the message to listen",
+                    value: "We cannot find the guild in the message to listen"
+                })
+            );
         }
 
         const emoteName = emoteToReact instanceof GuildEmoji ? emoteToReact.name : emoteToReact;
 
         if (emoteName == null) {
-            this.message.channel.send("L'émoji spécifié semble invalide");
-            return false;
+            return this.response(false, "L'émoji spécifié semble invalide");
         }
 
-        if (this.listenings[this.message.guild.id] &&
-            this.listenings[this.message.guild.id][listen.channel.id] &&
-            this.listenings[this.message.guild.id][listen.channel.id][listen.message.id] &&
-            this.listenings[this.message.guild.id][listen.channel.id][listen.message.id][emoteName]) {
-            this.sendErrors({
-                name: "Déjà écouté",
-                value: "Ce message est déjà écouté sur cette émote"
-            });
-            return false;
+        if (this.listenings[this.guild.id] &&
+            this.listenings[this.guild.id][listen.channel.id] &&
+            this.listenings[this.guild.id][listen.channel.id][listen.message.id] &&
+            this.listenings[this.guild.id][listen.channel.id][listen.message.id][emoteName]) {
+            return this.response(false,
+                this.sendErrors({
+                    name: "Déjà écouté",
+                    value: "Ce message est déjà écouté sur cette émote"
+                })
+            );
         }
 
         const serverId = messageToListen.guild.id;
@@ -126,8 +124,7 @@ export default class NotifyOnReact extends Command {
         NotifyOnReact.saveNotifyOnReact(messageToListen, channelToWrite, messageToWrite, emoteName, channelToListen);
         NotifyOnReact.reactingAndNotifyOnMessage(messageToListen, channelToWrite, messageToWrite, emoteName, channelToListen);
 
-        this.message.channel.send("Command sucessfully executed, all reactions to this message will be notified");
-        return true;
+        return this.response(true, "Command sucessfully executed, all reactions to this message will be notified");
     }
 
     static async reactingAndNotifyOnMessage(messageToListen, channelToWrite, messageToWrite, emoteName, channelToListen) {

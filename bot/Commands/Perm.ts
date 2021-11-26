@@ -1,7 +1,6 @@
 import config from "../config";
 import Command from "../Classes/Command";
-import { existingCommands } from "../Classes/CommandsDescription";
-import {Message, MessageEmbed, Role} from "discord.js";
+import {Guild, GuildMember, MessageEmbed, Role, TextBasedChannels, User} from "discord.js";
 import Permissions, {IPermissions} from "../Models/Permissions";
 
 export default class Perm extends Command {
@@ -51,24 +50,23 @@ export default class Perm extends Command {
         ]
     };
 
-    constructor(message: Message) {
-        super(message, Perm.commandName, Perm.argsModel);
+    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommand: null|string = null) {
+        super(channel, member, guild, writtenCommand, Perm.commandName, Perm.argsModel);
     }
 
     async action(args: {help: boolean, action: string, commands: typeof Command[], roles: Array<Role>}, bot) { //%perm set commandName @role
         const {help, action, commands, roles} = args;
 
-        if (help) {
-            this.displayHelp();
-            return false;
-        }
+        if (help)
+            return this.response(false, this.displayHelp());
 
-        if (this.message.guild == null) {
-            this.sendErrors({
-                name: "Guild missing",
-                value: "We cannot find the message guild"
-            });
-            return false;
+        if (this.guild == null) {
+            return this.response(false,
+                this.sendErrors({
+                    name: "Guild missing",
+                    value: "We cannot find the guild"
+                })
+            );
         }
 
         if (action == "show") { // Show the roles which are allowed to execute the specified command
@@ -76,7 +74,7 @@ export default class Perm extends Command {
             const embeds: MessageEmbed[] = [];
 
             for (const command of commands) {
-                const permission: IPermissions|null = await Permissions.findOne({command: command.commandName, serverId: this.message.guild.id});
+                const permission: IPermissions|null = await Permissions.findOne({command: command.commandName, serverId: this.guild.id});
                 let embed = new MessageEmbed()
                     .setColor('#0099ff')
                     .setTitle("Les permissions pour '"+command.commandName+"' :")
@@ -107,15 +105,15 @@ export default class Perm extends Command {
                 embeds.push(embed);
             }
 
-            this.message.channel.send({embeds});
-            return true;
+            return this.response(true, {embeds});
         }
 
 
-        const serverId = this.message.guild.id;
+        const serverId = this.guild.id;
 
         const rolesId = roles ? roles.map(role => role.id) : [];
 
+        const responses: string[] = [];
         for (const command of commands) {
             const permission = await Permissions.findOne({serverId: serverId, command: command.commandName});
 
@@ -130,11 +128,12 @@ export default class Perm extends Command {
                 if (action == "add") {
                     for (let roleId of rolesId) {
                         if (permission.roles.includes(roleId)) {
-                            this.sendErrors({
-                                name: "Role already added",
-                                value: "That role is already attributed for that command"
-                            });
-                            return false;
+                            return this.response(false,
+                                this.sendErrors({
+                                    name: "Role already added",
+                                    value: "That role is already attributed for that command"
+                                })
+                            );
                         }
                     }
                     permission.roles = [...permission.roles, ...rolesId]
@@ -143,9 +142,9 @@ export default class Perm extends Command {
                 }
                 await permission.save();
             }
-            this.message.channel.send("Permission added or setted successfully for the '"+command.commandName+"' command!");
+            responses.push("Permission added or setted successfully for the '"+command.commandName+"' command!");
         }
-        return true;
+        return this.response(true, responses.join('\n'));
     }
 
     help() {

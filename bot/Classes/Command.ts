@@ -193,9 +193,8 @@ export default class Command {
                 return permissionRes;
 
             const modelValidRes = this.checkIfModelValid();
-            if (modelValidRes !== true) {
+            if (modelValidRes !== true)
                 return modelValidRes;
-            }
 
             const {success: computeArgsSuccess, result: computeArgsResult} = await this.computeArgs(this.parseCommand(),this.argsModel);
             if (!computeArgsSuccess) return <Array<string | MessagePayload | MessageOptions>>computeArgsResult;
