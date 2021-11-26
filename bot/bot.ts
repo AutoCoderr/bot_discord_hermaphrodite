@@ -5,7 +5,18 @@ import WelcomeMessage, {IWelcomeMessage} from "./Models/WelcomeMessage";
 import client from "./client";
 
 import init from "./init";
+import {Message, MessageOptions, MessagePayload} from "discord.js";
 
+function getAndDisplayCustomCommandsResponse(message: Message, response: false| { result: Array<string | MessagePayload | MessageOptions>, callback?: Function }) {
+    if (response !== false) {
+        for (const payload of response.result)
+            message.channel.send(payload).then(sendedMessage => {
+                if (response.callback) {
+                    response.callback(sendedMessage).then(response => getAndDisplayCustomCommandsResponse(message, response));
+                }
+            });
+    }
+}
 
 // check all commands
 client.on('messageCreate', async message => {
@@ -13,12 +24,7 @@ client.on('messageCreate', async message => {
         const commandClass = existingCommands[commandName];
         if (commandClass.customCommand) {
             const command = new commandClass(message.channel, message.member, message.guild, message.content);
-            command.executeCustomCommand(client).then(result => {
-                if (result !== false) {
-                    for (const payload of result)
-                        message.channel.send(payload);
-                }
-            });
+            command.executeCustomCommand(client).then(response => getAndDisplayCustomCommandsResponse(message, response));
         }
     }
 

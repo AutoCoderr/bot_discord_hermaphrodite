@@ -49,24 +49,24 @@ export default class Command {
         return this.writtenCommand.split(" ")[0] == config.command_prefix+this.commandName;
     }
 
-    async executeCustomCommand(bot): Promise<false|Array<string | MessagePayload | MessageOptions>> {
+    async executeCustomCommand(bot): Promise<false| { result: Array<string | MessagePayload | MessageOptions>, callback?: Function }> {
         if (this.writtenCommand === null || await this.match()) {
             const permissionRes = await this.checkPermissions();
             if (permissionRes !== true)
-                return permissionRes;
+                return permissionRes ? {result: permissionRes} : false;
 
             const modelValidRes = this.checkIfModelValid();
             if (modelValidRes !== true)
-                return modelValidRes;
+                return {result: modelValidRes};
 
             const {success: computeArgsSuccess, result: computeArgsResult} = await this.computeArgs(this.parseCommand(),this.argsModel);
-            if (!computeArgsSuccess) return <Array<string | MessagePayload | MessageOptions>>computeArgsResult;
+            if (!computeArgsSuccess) return { result: < Array < string | MessagePayload | MessageOptions >> computeArgsResult};
 
-            const {success: actionSuccess, result: actionResult} = await this.action(computeArgsResult, bot);
+            const {success: actionSuccess, result: actionResult, callback} = await this.action(computeArgsResult, bot);
 
             if (actionSuccess)
                 this.saveHistory();
-            return actionResult;
+            return {result: actionResult, callback};
         }
         return false;
     }
