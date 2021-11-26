@@ -285,7 +285,7 @@ export default class Monitor extends Command {
                 if (monitoringMessages.length > 0) {
                     const Embeds = splitFieldsEmbed(25, await Promise.all(monitoringMessages.map(async monitoringMessage => {
                         if (channelsById[monitoringMessage.channelId] == undefined) { // @ts-ignore
-                            channelsById[monitoringMessage.channelId] = this.message.guild.channels.cache.get(monitoringMessage.channelId);
+                            channelsById[monitoringMessage.channelId] = this.guild.channels.cache.get(monitoringMessage.channelId);
                         }
                         const exist = await Monitor.checkMonitoringMessageExist(monitoringMessage, this.guild, channelsById[monitoringMessage.channelId]);
                         return {

@@ -90,11 +90,11 @@ export default class CancelNotifyOnReact extends Command {
             .setDescription("Ceci est la liste des écoutes de réactions désactivées :")
             .setTimestamp();
         // @ts-ignore
-        let listenings = existingCommands.NotifyOnReact.listenings[this.message.guild.id];
+        let listenings = existingCommands.NotifyOnReact.listenings[this.guild.id];
         if (emoteName == undefined) {
             await forEachNotifyOnReact((found, channel, messageId, contentMessage, emoteName) => {
                 if (found) { // @ts-ignore
-                    CancelNotifyOnReact.deleteNotifyOnReactInBdd(this.message.guild.id,channel.id,messageId,emoteName);
+                    CancelNotifyOnReact.deleteNotifyOnReactInBdd(this.guild.id,channel.id,messageId,emoteName);
                     listenings[channel.id][messageId][emoteName] = false;
                     Embed.addFields({
                         name: "Supprimée : sur '#" + channel.name + "' (" + contentMessage + ") :" + emoteName + ":",

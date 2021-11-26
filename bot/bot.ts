@@ -12,8 +12,13 @@ client.on('messageCreate', async message => {
     for (let commandName in existingCommands) {
         const commandClass = existingCommands[commandName];
         if (commandClass.customCommand) {
-            const command = new commandClass(message);
-            command.check(client);
+            const command = new commandClass(message.channel, message.member, message.guild, message.content);
+            command.executeCustomCommand(client).then(result => {
+                if (result !== false) {
+                    for (const payload of result)
+                        message.channel.send(payload);
+                }
+            });
         }
     }
 

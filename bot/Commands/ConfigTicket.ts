@@ -376,7 +376,7 @@ export default class ConfigTicket extends Command {
 
             for (const userId of list) {
                 try { // @ts-ignore
-                    const user = await this.message.guild.members.fetch(userId);
+                    const user = await this.guild.members.fetch(userId);
                     users.push({username: user.nickname ?? user.user.username, id: user.id});
                 } catch(e) {
                     users.push({username: "unknown", id: userId});

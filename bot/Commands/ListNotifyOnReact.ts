@@ -80,7 +80,7 @@ export default class ListNotifyOnReact extends Command {
             .setTimestamp();
 
         // @ts-ignore
-        let listenings = existingCommands.NotifyOnReact.listenings[this.message.guild.id];
+        let listenings = existingCommands.NotifyOnReact.listenings[this.guild.id];
 
         if (emoteName == undefined) {
             await forEachNotifyOnReact((found, channel, messageId, contentMessage, emoteName) => {

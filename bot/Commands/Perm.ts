@@ -88,7 +88,7 @@ export default class Perm extends Command {
                 } else {
                     let roles: Array<string> = [];
                     for (let roleId of permission.roles) { //@ts-ignore
-                        let role = this.message.guild.roles.cache.get(roleId);
+                        let role = this.guild.roles.cache.get(roleId);
                         let roleName: string;
                         if (role == undefined) {
                             roleName = "unknown";

@@ -55,6 +55,7 @@ export default class NotifyOnReact extends Command {
 
     constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommand: null|string = null) {
         super(channel, member, guild, writtenCommand, NotifyOnReact.commandName, NotifyOnReact.argsModel);
+        this.listenings = NotifyOnReact.listenings;
     }
 
     listenings: any;

@@ -49,6 +49,28 @@ export default class Command {
         return this.writtenCommand.split(" ")[0] == config.command_prefix+this.commandName;
     }
 
+    async executeCustomCommand(bot): Promise<false|Array<string | MessagePayload | MessageOptions>> {
+        if (this.writtenCommand === null || await this.match()) {
+            const permissionRes = await this.checkPermissions();
+            if (permissionRes !== true)
+                return permissionRes;
+
+            const modelValidRes = this.checkIfModelValid();
+            if (modelValidRes !== true)
+                return modelValidRes;
+
+            const {success: computeArgsSuccess, result: computeArgsResult} = await this.computeArgs(this.parseCommand(),this.argsModel);
+            if (!computeArgsSuccess) return <Array<string | MessagePayload | MessageOptions>>computeArgsResult;
+
+            const {success: actionSuccess, result: actionResult} = await this.action(computeArgsResult, bot);
+
+            if (actionSuccess)
+                this.saveHistory();
+            return actionResult;
+        }
+        return false;
+    }
+
     sendErrors(errors: Object|Array<Object>): Array<string | MessagePayload | MessageOptions> {
         if (!(errors instanceof Array)) {
             errors = [errors];
@@ -184,28 +206,6 @@ export default class Command {
                     value: arg.description + " | ( "+(arg.default != undefined ? "Par défaut : "+arg.default+" ; " : "")+"type attendu : " + (arg.type ?? arg.types) + " )"
                 })
             );
-    }
-
-    async check(bot): Promise<false|Array<string | MessagePayload | MessageOptions>> {
-        if (this.writtenCommand === null || await this.match()) {
-            const permissionRes = await this.checkPermissions();
-            if (permissionRes !== true)
-                return permissionRes;
-
-            const modelValidRes = this.checkIfModelValid();
-            if (modelValidRes !== true)
-                return modelValidRes;
-
-            const {success: computeArgsSuccess, result: computeArgsResult} = await this.computeArgs(this.parseCommand(),this.argsModel);
-            if (!computeArgsSuccess) return <Array<string | MessagePayload | MessageOptions>>computeArgsResult;
-
-            const {success: actionSuccess, result: actionResult} = await this.action(computeArgsResult, bot);
-
-            if (actionSuccess)
-                this.saveHistory();
-            return actionResult;
-        }
-        return false;
     }
 
     saveHistory() {

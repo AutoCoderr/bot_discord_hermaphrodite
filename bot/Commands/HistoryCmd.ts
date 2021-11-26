@@ -36,8 +36,8 @@ export default class HistoryCmd extends Command {
 
         if (histories.length > 0) {
             embeds = splitFieldsEmbed(historByEmbed,histories.map(history => { //@ts-ignore
-                const user = this.message.guild.members.cache.get(history.userId); //@ts-ignore
-                const channel = this.message.guild.channels.cache.get(history.channelId);
+                const user = this.guild.members.cache.get(history.userId); //@ts-ignore
+                const channel = this.guild.channels.cache.get(history.channelId);
 
                 const userName = user != undefined ? (user.nickname ?? user.user.username) : history.userId+" (user not found)";
                 const channelName = channel != undefined ? channel.name : history.channelId

@@ -63,7 +63,7 @@ export const extractTypes = {
         if (channel instanceof GuildChannel) {
             const messageId = field.split("/")[1].replaceAll(" ","");
             // @ts-ignore
-            messageToGet = await extractTypes.message(messageId,message,channel);
+            messageToGet = await extractTypes.message(messageId,command,channel);
         } else {
             return false;
         }

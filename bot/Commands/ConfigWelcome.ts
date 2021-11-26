@@ -48,14 +48,14 @@ export default class ConfigWelcome extends Command {
                     _ => {
                         const listener = async (response: Message) => {
                             if (response.author.id == this.member.id) { // @ts-ignore
-                                let welcomeMessage: IWelcomeMessage = await WelcomeMessage.findOne({serverId: this.message.guild.id});
+                                let welcomeMessage: IWelcomeMessage = await WelcomeMessage.findOne({serverId: this.guild.id});
                                 let create = false;
                                 if (welcomeMessage == null) {
                                     create = true;
                                     welcomeMessage = {
                                         enabled: true,
                                         message: response.content, // @ts-ignore
-                                        serverId: this.message.guild.id
+                                        serverId: this.guild.id
                                     };
                                     WelcomeMessage.create(welcomeMessage);
                                 } else {
