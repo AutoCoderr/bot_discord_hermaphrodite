@@ -17,39 +17,35 @@ export default class NotifyOnReact extends Command {
         }*/
 
     static display = true;
-    static description = "Pour envoyer un message sur un channel indiqué, quand une réaction à été detectée sur un autre message.";
+    static description = "Pour envoyer un message sur un channel indiqué, quand une réaction à été detectée sur un message.";
     static commandName = "notifyOnReact";
 
+    static slashCommand = true
+
     static argsModel = {
-        help: {
-            fields: ["--help", "-h"],
-            type: "boolean",
-            description: "Pour afficher l'aide",
-            required: false
-        },
         listen: {
             fields: ["--listen","-l"],
             type: "listenerReactMessage",
             description: "Indique le channel et le message à écouter, séparés d'un '/'",
-            required: args => args.help == undefined
+            required: true
         },
         messageToWrite: {
             fields: ["--message", "-m"],
             type: "string",
             description: "Le message à afficher dés qu'une réaction sur le message est detectée",
-            required: args => args.help == undefined
+            required: true
         },
         channelToWrite: {
             fields: ["--writeChannel", "-wc"],
             type: "channel",
             description: "le channel sur lequel écrire le message à chaque réaction",
-            required: args => args.help == undefined
+            required: true
         },
         emoteToReact: {
             fields: ["--emote", "-e"],
             type: "emote",
             description: "Indique l'emote à laquelle réagir",
-            required: args => args.help == undefined
+            required: true
         },
     };
 
@@ -60,18 +56,15 @@ export default class NotifyOnReact extends Command {
 
     listenings: any;
 
-    async action(args: { help: boolean, listen: {channel: GuildChannel, message: Message}, emoteToReact: GuildEmoji|string, messageToWrite: string, channelToWrite: GuildChannel },bot) { // notifyOnReact --listen #ChannelAEcouter/IdDuMessageAEcouter -e :emoteAEcouter: --message '$user$ a réagit à ce message' --writeChannel #channelSurLequelEcrire
+    async action(args: { listen: {channel: GuildChannel, message: Message}, emoteToReact: GuildEmoji|string, messageToWrite: string, channelToWrite: GuildChannel },bot) { // notifyOnReact --listen #ChannelAEcouter/IdDuMessageAEcouter -e :emoteAEcouter: --message '$user$ a réagit à ce message' --writeChannel #channelSurLequelEcrire
 
-        let { help, listen, emoteToReact, messageToWrite, channelToWrite } = args;
+        let { listen, emoteToReact, messageToWrite, channelToWrite } = args;
 
         let channelToListen,messageToListen;
         if (listen) {
             channelToListen = listen.channel;
             messageToListen = listen.message
         }
-
-        if (help)
-            return this.response(false, this.displayHelp());
 
         if (this.guild == null) {
             return this.response(false,

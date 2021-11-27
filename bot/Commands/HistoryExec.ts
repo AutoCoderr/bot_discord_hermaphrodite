@@ -15,10 +15,7 @@ export default class HistoryExec extends Command {
     }
 
 
-    async action(args: {help: boolean, commands: typeof Command[], sort: string, limit: number, channels: GuildChannel[], users: GuildMember[]}, bot) {
-
-        if (args.help)
-            return this.response(false, this.displayHelp());
+    async action(args: {commands: typeof Command[], sort: string, limit: number, channels: GuildChannel[], users: GuildMember[]}, bot) {
 
         const histories = await getHistory(this,args);
 

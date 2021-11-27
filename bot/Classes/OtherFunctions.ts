@@ -17,7 +17,6 @@ export function addMissingZero(number, n = 2) {
 
 export function getArgsModelHistory() {
     return {
-        help: { fields: ['-h', '--help'], type: "boolean", required: false, description: "Pour afficher l'aide" },
 
         commands: {
             fields: ['-c', '--command'],

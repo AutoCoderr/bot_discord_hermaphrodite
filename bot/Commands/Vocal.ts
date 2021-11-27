@@ -24,12 +24,10 @@ export default class Vocal extends Command {
     static slashCommand = true;
 
     static argsModel = {
-        help: {fields: ["-h", "--help"], type: "boolean", required: false, description: "Pour afficher l'aide"},
-
         $argsByType: {
             action: {
                 isSubCommand: true,
-                required: (args) => args.help == undefined,
+                required: true,
                 type: "string",
                 description: "L'action à effectuer : add, remove, block, unblock, stop, start, limit, mute, unmute, status",
                 choices: {
@@ -68,7 +66,7 @@ export default class Vocal extends Command {
             },
             users: {
                 referToSubCommands: ['block','unblock','add','remove'],
-                required: (args) => args.help == undefined &&
+                required: (args) =>
                     (['add', 'remove'].includes(args.action) || (['block', 'unblock'].includes(args.action) && args.roles instanceof Array && args.roles.length == 0)),
                 displayValidErrorEvenIfFound: true,
                 displayExtractError: true,
@@ -89,7 +87,7 @@ export default class Vocal extends Command {
             },
             time: {
                 referToSubCommands: ['limit','mute'],
-                required: (args) => args.help == undefined && ["limit", "mute"].includes(args.action),
+                required: (args) => ["limit", "mute"].includes(args.action),
                 type: "duration",
                 description: "Le temps durant lequel on souhaite ne pas recevoir de notif (ex: 30s, 5m, 3h, 2j)",
                 valid: (time, args) => args.action !== 'mute' || time > 0
@@ -101,11 +99,8 @@ export default class Vocal extends Command {
         super(channel, member, guild, writtenCommand, Vocal.commandName, Vocal.argsModel);
     }
 
-    async action(args: { help: boolean, action: string, subs: boolean, users: GuildMember[], roles: Role[], time: number }) {
-        const {help, action, subs, roles, users, time} = args;
-
-        if (help)
-            return this.response(false, this.displayHelp());
+    async action(args: { action: string, subs: boolean, users: GuildMember[], roles: Role[], time: number }) {
+        const {action, subs, roles, users, time} = args;
 
         if (this.guild === null) {
             return this.response(false,

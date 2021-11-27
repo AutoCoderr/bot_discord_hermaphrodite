@@ -9,13 +9,12 @@ export default class ConfigWelcome extends Command {
     static commandName = "configWelcome";
 
     static argsModel = {
-        help: { fields: ["-h","--help"], type: "boolean", required: false, description: "Pour afficher l'aide" },
 
         $argsByOrder: [
             {
                 field: "action",
                 type: "string",
-                required: args => args.help == undefined,
+                required: true,
                 description: "L'action à effectuer: set, show, disable ou enable",
                 valid: (elem,_) => ["set","show","disable","enable"].includes(elem)
             }
@@ -26,8 +25,8 @@ export default class ConfigWelcome extends Command {
         super(channel, member, guild, writtenCommand, ConfigWelcome.commandName, ConfigWelcome.argsModel);
     }
 
-    async action(args: {help: boolean, action: string}, bot) {
-        const {help, action} = args;
+    async action(args: {action: string}, bot) {
+        const {action} = args;
 
         if (this.guild == null)
             return this.response(false,
@@ -36,9 +35,6 @@ export default class ConfigWelcome extends Command {
                     value: "We couldn't find the guild"
                 })
             );
-
-        if (help)
-            return this.response(false, this.displayHelp());
 
         let resultContent: string;
         let welcomeMessage: IWelcomeMessage;

@@ -3,9 +3,7 @@ import {ChatInputApplicationCommandData, Interaction} from "discord.js";
 import {ApplicationCommandOptionTypes} from "discord.js/typings/enums";
 import Command from "./Classes/Command";
 import {existingCommands} from "./Classes/CommandsDescription";
-import {slashCommandsTypeDefinitions, getterNameBySlashType} from "./Classes/slashCommandsTypeDefinitions";
-import {checkTypes} from "./Classes/TypeChecker";
-import {extractTypes} from "./Classes/TypeExtractor";
+import {getterNameBySlashType, slashCommandsTypeDefinitions} from "./Classes/slashCommandsTypeDefinitions";
 
 interface optionCommandType {
     type: ApplicationCommandOptionTypes.BOOLEAN | ApplicationCommandOptionTypes.CHANNEL | ApplicationCommandOptionTypes.INTEGER | ApplicationCommandOptionTypes.MENTIONABLE | ApplicationCommandOptionTypes.NUMBER | ApplicationCommandOptionTypes.ROLE | ApplicationCommandOptionTypes.STRING | ApplicationCommandOptionTypes.SUB_COMMAND | ApplicationCommandOptionTypes.SUB_COMMAND_GROUP | ApplicationCommandOptionTypes.USER;
@@ -20,6 +18,7 @@ export default async function initSlashCommands() {
     console.log("initSlashCommands");
 
     for (const [,guild] of client.guilds.cache) {
+
         console.log('Create commands for ' + guild.name + ' server');
 
         try {
@@ -154,69 +153,82 @@ export default async function initSlashCommands() {
 function generateSlashCommandFromModel(command: typeof Command): ChatInputApplicationCommandData {
     console.log("generateSlashCommandFromModel "+command.commandName);
     let slashCommandModel: ChatInputApplicationCommandData = {
-        name: <string>command.commandName,
+        name: <string>command.commandName?.toLowerCase(),
         description: <string>command.description
     };
     const subCommands = {};
     for (const attr in command.argsModel) {
-        if (attr === '$argsByType') {
-            for (const [attr,argModel] of <Array<any>>Object.entries(command.argsModel.$argsByType)) {
-                const chooseSubCommands: any[] = [];
-                if (argModel.referToSubCommands instanceof Array)
-                    for (const referedSubCommand of argModel.referToSubCommands) {
-                        if (subCommands[referedSubCommand]) {
-                            chooseSubCommands.push([referedSubCommand, subCommands[referedSubCommand]]);
-                        }
-                    }
-                else
-                    chooseSubCommands.push([null,slashCommandModel]);
-                for (const [chooseSubCommandName,chooseSubCommand] of chooseSubCommands) {
-                    if (!(chooseSubCommand.options instanceof Array))
-                        chooseSubCommand.options = [];
-                    if (argModel.isSubCommand) {
-                        if (chooseSubCommand.noSubCommandGroup)
-                            throw new Error("You cannot blend normal arguments and sub commands in another sub command");
-
-                        for (const [choice,description] of argModel.choices ? Object.entries(argModel.choices) : []) {
-                            const option: optionCommandType = {
-                                name: choice,
-                                description: <string>description,
-                                type: ApplicationCommandOptionTypes.SUB_COMMAND,
-                                actionName: attr
-                            };
-                            chooseSubCommand.options.push(option);
-                            subCommands[chooseSubCommandName === null ? choice : chooseSubCommandName+"."+choice] = option;
-                        }
-                        if (chooseSubCommand.type == ApplicationCommandOptionTypes.SUB_COMMAND)
-                            chooseSubCommand.type = ApplicationCommandOptionTypes.SUB_COMMAND_GROUP;
-                    } else {
-                        if (chooseSubCommand.type == ApplicationCommandOptionTypes.SUB_COMMAND_GROUP)
-                            throw new Error("You cannot add normal argument to a sub command group");
-                        if (chooseSubCommand.type == ApplicationCommandOptionTypes.SUB_COMMAND)
-                            chooseSubCommand.noSubCommandGroup = true;
-
-                        const option: optionCommandType = {
-                            name: attr,
-                            description: argModel.description,
-                            type: getSlashType(argModel),
-                            required:
-                                argModel.required === undefined ||
-                                (
-                                    typeof(argModel.required) == "function" &&
-                                    argModel.required(chooseSubCommand.type == ApplicationCommandOptionTypes.SUB_COMMAND ?
-                                        {[chooseSubCommand.actionName]: chooseSubCommand.name} : {})
-                                ) || (
-                                    typeof(argModel.required) == "boolean" &&
-                                    argModel.required
-                                )
-                        }
-                        chooseSubCommand.options.push(option);
-                    }
+        if (attr[0] === '$') {
+            if (attr === '$argsByOrder') {
+                for (const argModel of command.argsModel[attr]) {
+                    generateSlashOptionFromModel(argModel.field, argModel, subCommands, slashCommandModel);
+                }
+            } else {
+                for (const [attr2, argModel] of <Array<any>>Object.entries(command.argsModel[attr])) {
+                    generateSlashOptionFromModel(attr2, argModel, subCommands, slashCommandModel);
                 }
             }
+        } else {
+            const argModel = command.argsModel[attr];
+            generateSlashOptionFromModel(attr, argModel, subCommands, slashCommandModel);
         }
     }
     return slashCommandModel;
+}
+
+function generateSlashOptionFromModel(attr: string, argModel: any, subCommands: {[attr: string]: any}, slashCommandModel: ChatInputApplicationCommandData) {
+    const chooseSubCommands: any[] = [];
+    if (argModel.referToSubCommands instanceof Array)
+        for (const referedSubCommand of argModel.referToSubCommands) {
+            if (subCommands[referedSubCommand]) {
+                chooseSubCommands.push([referedSubCommand, subCommands[referedSubCommand]]);
+            }
+        }
+    else
+        chooseSubCommands.push([null,slashCommandModel]);
+    for (const [chooseSubCommandName,chooseSubCommand] of chooseSubCommands) {
+        if (!(chooseSubCommand.options instanceof Array))
+            chooseSubCommand.options = [];
+        if (argModel.isSubCommand) {
+            if (chooseSubCommand.noSubCommandGroup)
+                throw new Error("You cannot blend normal arguments and sub commands in another sub command");
+
+            for (const [choice,description] of argModel.choices ? Object.entries(argModel.choices) : []) {
+                const option: optionCommandType = {
+                    name: choice.toLowerCase(),
+                    description: <string>description,
+                    type: ApplicationCommandOptionTypes.SUB_COMMAND,
+                    actionName: attr
+                };
+                chooseSubCommand.options.push(option);
+                subCommands[chooseSubCommandName === null ? choice : chooseSubCommandName+"."+choice] = option;
+            }
+            if (chooseSubCommand.type == ApplicationCommandOptionTypes.SUB_COMMAND)
+                chooseSubCommand.type = ApplicationCommandOptionTypes.SUB_COMMAND_GROUP;
+        } else {
+            if (chooseSubCommand.type == ApplicationCommandOptionTypes.SUB_COMMAND_GROUP)
+                throw new Error("You cannot add normal argument to a sub command group");
+            if (chooseSubCommand.type == ApplicationCommandOptionTypes.SUB_COMMAND)
+                chooseSubCommand.noSubCommandGroup = true;
+
+            const option: optionCommandType = {
+                name: attr.toLowerCase(),
+                description: argModel.description,
+                type: getSlashType(argModel),
+                required:
+                    argModel.required === undefined ||
+                    (
+                        typeof(argModel.required) == "function" &&
+                        argModel.required(chooseSubCommand.type == ApplicationCommandOptionTypes.SUB_COMMAND ?
+                            {[chooseSubCommand.actionName]: chooseSubCommand.name} : {}, true)
+                    ) || (
+                        typeof(argModel.required) == "boolean" &&
+                        argModel.required
+                    )
+            }
+            chooseSubCommand.options.push(option);
+        }
+    }
 }
 
 export async function listenSlashCommands(interaction: Interaction) {
@@ -241,7 +253,6 @@ export async function listenSlashCommands(interaction: Interaction) {
                     }
                 }
             }
-            console.log(args);
             await interaction.reply({
                 content: "TEST",
                 ephemeral: true

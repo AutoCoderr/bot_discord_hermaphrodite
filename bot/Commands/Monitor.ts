@@ -121,83 +121,102 @@ export default class Monitor extends Command {
     static nbListeners = Object.keys(Monitor.datasCanBeDisplayed).filter(data => typeof(Monitor.datasCanBeDisplayed[data].listen) == "function").length;
     static listeneds = {};
 
+    static slashCommand = true;
+
     static argsModel = {
-        help: {
-            fields: ["-h","--help"],
-            type: "boolean",
-            description: "Pour afficher l'aide",
-            required: false
-        },
-        showUserCount: {
-            fields: ["-uc", "--user-count", "--show-user-count"],
-            type: "boolean",
-            description: "Pour afficher ou non le nombre d'utilisateurs",
-            default: true
-        },
-        showDescription: {
-            fields: ["-d", "--description", "--show-description"],
-            type: "boolean",
-            description: "Pour afficher ou non la description",
-            default: true
-        },
-        showIcon: {
-            fields: ["-i", "--icon", "--show-icon"],
-            type: "boolean",
-            description: "Pour afficher ou non l'icone",
-            default: true
-        },
-        showOnlineUserCount: {
-            fields: ["-ouc", "--online-user-count", "--show-online-user-count"],
-            type: "boolean",
-            description: "Pour afficher ou non le nombre d'utilisateurs connectées",
-            default: true
-        },
-        showMemberMax: {
-            fields: ["-mm", "--member-max", "--show-member-max"],
-            type: "boolean",
-            description: "Pour afficher ou non le nombre maximum de membres",
-            default: false
-        },
-        showRoleMembersCount: {
-            fields: ["-rmc", "--role-members-count", "--show-role-members-count"],
-            type: "roles",
-            description: "Pour afficher le nombre de membres d'un ou de plusieurs rôles spécifiés (exemple: "+config.command_prefix+"monitor -rmc @moderateurs)",
-            required: false
-        },
-        showEmojiCount: {
-            fields: ["-ec", "--emoji-count", "--show-emoji-count"],
-            type: "boolean",
-            description: "Pour afficher ou non le nombre d'emotes",
-            default: false
-        },
-        showChannelCount: {
-            fields: ["-cc", "--channel-count", "--show-channel-count"],
-            type: "boolean",
-            description: "Pour afficher ou non le nombre de channels",
-            default: false
-        },
 
         $argsByType: {
             action: {
+                isSubCommand: true,
                 type: "string",
                 description: "L'action à effectuer : Ajout de monitoring (add), Suppression de monitoring (remove), les afficher (show), rafraichir (refresh)",
-                required: (args) => args.help == undefined,
-                valid: (elem: string, _) => ["add","remove","show","refresh"].includes(elem)
+                required: true,
+                choices: {
+                    add: "Ajouter un monitoring",
+                    remove: "Supprimer un ou des monitoring",
+                    show: "Afficher les monitoring",
+                    refresh: "Rafraichir un ou des monitoring"
+                }
             },
             channel: {
+                referToSubCommands: ["add","remove","refresh"],
                 type: "channel",
                 description: "Le channel sur lequel monitorer le serveur",
-                default: (_, command: Command) => command.channel,
-                required: (args) => args.help == undefined && args.action != "show",
+                required: (args) => args.action != "show",
                 valid: (elem: GuildChannel, _) => elem.type == "GUILD_TEXT"
             },
             messages: {
+                referToSubCommands: ["refresh","remove"],
                 type: "message",
                 multi: true,
                 description: "L'id du message à supprimer ou rafraichir",
-                required: (args) => args.help == undefined && ["refresh","remove"].includes(args.action),
+                required: (args) => ["refresh","remove"].includes(args.action),
                 moreDatas: (args) => args.channel
             }
+        },
+
+        showUserCount: {
+            referToSubCommands: ["add"],
+            fields: ["-uc", "--user-count", "--show-user-count"],
+            type: "boolean",
+            description: "Pour afficher ou non le nombre d'utilisateurs",
+            default: true,
+            required: false
+        },
+        showDescription: {
+            referToSubCommands: ["add"],
+            fields: ["-d", "--description", "--show-description"],
+            type: "boolean",
+            description: "Pour afficher ou non la description",
+            default: true,
+            required: false
+        },
+        showIcon: {
+            referToSubCommands: ["add"],
+            fields: ["-i", "--icon", "--show-icon"],
+            type: "boolean",
+            description: "Pour afficher ou non l'icone",
+            default: true,
+            required: false
+        },
+        showOnlineUserCount: {
+            referToSubCommands: ["add"],
+            fields: ["-ouc", "--online-user-count", "--show-online-user-count"],
+            type: "boolean",
+            description: "Pour afficher ou non le nombre d'utilisateurs connectées",
+            default: true,
+            required: false
+        },
+        showMemberMax: {
+            referToSubCommands: ["add"],
+            fields: ["-mm", "--member-max", "--show-member-max"],
+            type: "boolean",
+            description: "Pour afficher ou non le nombre maximum de membres",
+            default: false,
+            required: false
+        },
+        showRoleMembersCount: {
+            referToSubCommands: ["add"],
+            fields: ["-rmc", "--role-members-count", "--show-role-members-count"],
+            type: "roles",
+            description: "Pour afficher le nombre de membres d'un/des rôles spécifiés (exemple: "+config.command_prefix+"monitor -rmc @moderateurs)",
+            required: false
+        },
+        showEmojiCount: {
+            referToSubCommands: ["add"],
+            fields: ["-ec", "--emoji-count", "--show-emoji-count"],
+            type: "boolean",
+            description: "Pour afficher ou non le nombre d'emotes",
+            default: false,
+            required: false
+        },
+        showChannelCount: {
+            referToSubCommands: ["add"],
+            fields: ["-cc", "--channel-count", "--show-channel-count"],
+            type: "boolean",
+            description: "Pour afficher ou non le nombre de channels",
+            default: false,
+            required: false
         }
     }
 
@@ -205,11 +224,8 @@ export default class Monitor extends Command {
         super(channel, member, guild, writtenCommand, Monitor.commandName, Monitor.argsModel);
     }
 
-    async action(args: {help: boolean, action: string, channel: TextChannel, messages: Array<Message>}, bot) {
-        const {help, action, channel, messages} = args;
-
-        if (help)
-            return this.response(false, this.displayHelp());
+    async action(args: {action: string, channel: TextChannel, messages: Array<Message>}, bot) {
+        const {action, channel, messages} = args;
 
         if (this.guild == null)
             return this.response(false,

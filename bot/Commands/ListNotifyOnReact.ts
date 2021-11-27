@@ -19,12 +19,6 @@ export default class ListNotifyOnReact extends Command {
     static commandName = "listNotifyOnReact";
 
     static argsModel = {
-        help: {
-            fields: ["--help", "-h"],
-            type: "boolean",
-            description: "Pour afficher l'aide",
-            required: false
-        },
         all: {
             fields: ["--all"],
             type: "boolean",
@@ -35,7 +29,7 @@ export default class ListNotifyOnReact extends Command {
             fields: ["--channel","-ch"],
             type:"channel",
             description: "Spécifier le channel sur lequel afficher les écoutes de réaction",
-            required: args => (args.help == undefined || !args.help) && ( args.all == undefined || !args.all )
+            required: args => args.all == undefined || !args.all
         },
         emote: {
             fields: ["--emote", "-e"],
@@ -56,11 +50,8 @@ export default class ListNotifyOnReact extends Command {
         super(channel, member, guild, writtenCommand, ListNotifyOnReact.commandName, ListNotifyOnReact.argsModel);
     }
 
-    async action(args: {help: boolean, channel: GuildChannel, message: Message, emote: GuildEmoji|string}, bot) {
-        let {help,channel,message,emote} = args;
-
-        if (help)
-            return this.response(false, this.displayHelp());
+    async action(args: {channel: GuildChannel, message: Message, emote: GuildEmoji|string}, bot) {
+        let {channel,message,emote} = args;
 
         if (this.guild == null) return this.response(false,
             this.sendErrors({

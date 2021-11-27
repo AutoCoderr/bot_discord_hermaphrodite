@@ -8,22 +8,29 @@ export default class Perm extends Command {
     static description = "Pour configurer les permissions.";
     static commandName = "perm";
 
+    static slashCommand = true;
+
     static argsModel = {
-        help: { fields: ['-h','--help'], type: "boolean", required: false, description: "Pour afficher l'aide" },
 
         $argsByOrder: [
             {
+                isSubCommand: true,
                 field: "action",
                 type: "string",
-                required: args => args.help == undefined,
+                required: true,
                 description: "'add', 'set' ou 'show', pour ajouter une permission à celle déjà présente, les redéfinir avec set, ou les afficher avec 'show'",
-                valid: (value, _) => ['add','set','show'].includes(value)
+                choices: {
+                    add: 'Ajouter un ou des rôles à une commande',
+                    set: 'Définir un ou des rôles sur une commande',
+                    show: "Afficher les rôles d'une commande"
+                }
             },
             {
+                referToSubCommands: ['add','set','show'],
                 field: "commands",
                 type: "command",
                 multi: true,
-                required: args => args.help == undefined,
+                required: true,
                 description: "La ou les commandes sur laquelle ajouter ou définir la permission",
                 valid: async (command: typeof Command, args) =>  // Vérifie si une commande n'a pas été tapée plusieurs fois
                     !args.commands.some(eachCommand => eachCommand.commandName == command.commandName),
@@ -41,10 +48,11 @@ export default class Perm extends Command {
                 }
             },
             {
+                referToSubCommands: ['add','set'],
                 field: "roles",
                 type: "role",
                 multi: true,
-                required: args => args.help == undefined && args.action == "add",
+                required: args => args.action == "add",
                 description: "Le ou les rôles autorisés à taper cette commande"
             }
         ]
@@ -54,11 +62,8 @@ export default class Perm extends Command {
         super(channel, member, guild, writtenCommand, Perm.commandName, Perm.argsModel);
     }
 
-    async action(args: {help: boolean, action: string, commands: typeof Command[], roles: Array<Role>}, bot) { //%perm set commandName @role
-        const {help, action, commands, roles} = args;
-
-        if (help)
-            return this.response(false, this.displayHelp());
+    async action(args: {action: string, commands: typeof Command[], roles: Array<Role>}, bot) { //%perm set commandName @role
+        const {action, commands, roles} = args;
 
         if (this.guild == null) {
             return this.response(false,

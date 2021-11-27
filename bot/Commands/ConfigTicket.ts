@@ -33,51 +33,50 @@ export default class ConfigTicket extends Command {
     static commandName = "configTicket";
 
     static argsModel = {
-        help: { fields: ["-h","--help"], type: "boolean", required: false, description: "Pour afficher l'aide" },
         allListen: {fields: ['-a','--all'], type: "boolean", required: false, description: "Pour viser toutes les écoutes de message"},
 
         $argsByType: {
             action: {
-                required: args => args.help == undefined,
+                required: true,
                 type: "string",
                 description: "L'action à effectuer : set, set-moderator, unset-moderator, show, show-moderator, disable, enable, listen ou blacklist",
                 valid: (elem,_) => ['set','set-moderator','unset-moderator','show','show-moderator','disable','enable','listen','blacklist'].includes(elem)
             },
             moderatorRole: {
-                required: args => args.help == undefined && args.action == "set-moderator",
+                required: args => args.action == "set-moderator",
                 type: "role",
                 description: "Le role désignant les modérateurs sur ce serveur"
             },
             category: {
-                required: args => args.help == undefined && args.action == "set",
+                required: args => args.action == "set",
                 type: "category",
                 description: "L'id de la catégorie à définir avec 'set'"
             },
             subAction: {
-                required: args => args.help == undefined && ["blacklist","listen"].includes(args.action),
+                required: args => ["blacklist","listen"].includes(args.action),
                 type: "string",
                 description: "L'action à effectuer : add, remove ou show",
                 valid: (elem,_) => ['add','remove','show'].includes(elem)
             },
             user: {
-                required: args => args.help == undefined && args.action == "blacklist" && ['add','remove'].includes(args.subAction),
+                required: args => args.action == "blacklist" && ['add','remove'].includes(args.subAction),
                 type: "user",
                 multi: true,
                 description: "Le ou les utilisateurs à ajouter ou retirer de la blacklist"
             },
             channelListen: {
-                required: args => args.help == undefined && args.action == "listen" && (args.subAction == "add" || (args.subAction == "remove" && !args.allListen)),
+                required: args => args.action == "listen" && (args.subAction == "add" || (args.subAction == "remove" && !args.allListen)),
                 type: "channel",
                 description: "Le channel sur lequel ajouter, retirer, ou afficher les écoutes de réaction",
                 valid: (elem: GuildChannel,_) => elem.type == "GUILD_TEXT"
             },
             emoteListen: {
-                required: args => args.help == undefined && args.action == "listen" && args.subAction == "add",
+                required: args => args.action == "listen" && args.subAction == "add",
                 type: "emote",
                 description: "L'emote sur l'aquelle ajouter ou retirer une écoute de réaction"
             },
             messageListen: {
-                required: args => args.help == undefined && args.action == "listen" && (args.subAction == "add" || (args.subAction == "remove" && args.emoteListen != undefined)),
+                required: args => args.action == "listen" && (args.subAction == "add" || (args.subAction == "remove" && args.emoteListen != undefined)),
                 type: "message",
                 description: "L'id du message sur lequel ajouter, retirer, ou afficher les écoutes de réaction",
                 moreDatas: args => args.channelListen
@@ -89,12 +88,8 @@ export default class ConfigTicket extends Command {
         super(channel, member, guild, writtenCommand, ConfigTicket.commandName, ConfigTicket.argsModel);
     }
 
-    async action(args: {help: boolean, action: string, category: CategoryChannel, subAction: string, user: GuildMember, channelListen: TextChannel, messageListen: Message, emoteListen: GuildEmoji|string, moderatorRole: Role}, bot) {
-        const {help, action, category, subAction, user, channelListen, messageListen, emoteListen, moderatorRole} = args;
-
-        if (help)
-            return this.response(false, this.displayHelp());
-
+    async action(args: {action: string, category: CategoryChannel, subAction: string, user: GuildMember, channelListen: TextChannel, messageListen: Message, emoteListen: GuildEmoji|string, moderatorRole: Role}, bot) {
+        const {action, category, subAction, user, channelListen, messageListen, emoteListen, moderatorRole} = args;
 
         if (this.guild == null || !(this.member instanceof GuildMember)) {
             return this.response(false,

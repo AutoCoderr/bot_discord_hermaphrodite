@@ -383,7 +383,14 @@ export default class Command {
         return argsObject;
     }
 
+    helpAsked(args) {
+        return args['--help'] || args['-h'];
+    }
+
     async computeArgs(args,model): Promise<{ success: boolean, result: {[attr: string]: any}|Array<string | MessagePayload | MessageOptions> }> {
+        if (this.helpAsked(args))
+            return this.response(false, this.displayHelp());
+
         let out: {[attr: string]: any} = {};
         let fails: Array<any> = [];
         let failsExtract: Array<any> = [];
@@ -450,9 +457,9 @@ export default class Command {
                     (typeof(model[attr].required) == "boolean" && model[attr].required) ||
                     (typeof(model[attr].required) == "function" && await model[attr].required(out, this));
 
-                if (required) {
+                if (!found && !incorrectField && !extractFailed) {
                     const defaultValue = typeof (model[attr].default) == "function" ? model[attr].default(out, this) : model[attr].default;
-                    if (defaultValue != undefined && !found && !incorrectField && !extractFailed) {
+                    if (defaultValue != undefined) {
                         out[attr] = defaultValue;
                         found = true;
                     }
@@ -542,9 +549,9 @@ export default class Command {
                         (typeof(argModel.required) == "boolean" && argModel.required) ||
                         (typeof(argModel.required) == "function" && await argModel.required(out, this));
 
-                    if (required) {
+                    if (!found && !incorrectField) {
                         const defaultValue = typeof (argModel.default) == "function" ? argModel.default(out, this) : argModel.default;
-                        if (!found && !incorrectField && defaultValue != undefined) {
+                        if (defaultValue != undefined) {
                             out[argModel.field] = defaultValue;
                             found = true;
                         }
@@ -638,9 +645,9 @@ export default class Command {
                             break;
                     }
 
-                    if (required) {
+                    if (!found) {
                         const defaultValue = typeof (argsByType[attr].default) == "function" ? argsByType[attr].default(out, this) : argsByType[attr].default;
-                        if (!found && defaultValue != undefined) {
+                        if (defaultValue != undefined) {
                             out[attr] = defaultValue;
                             found = true;
                         }

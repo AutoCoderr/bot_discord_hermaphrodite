@@ -18,22 +18,21 @@ export default class ConfigVocal extends Command {
     static commandName = "configVocal";
 
     static argsModel = {
-        help: { fields: ["-h","--help"], type: "boolean", required: false, description: "Pour afficher l'aide" },
         $argsByType: {
             action: {
-                required: (args) => args.help == undefined,
+                required: true,
                 type: "string",
                 description: "L'action à effectuer : blacklist, enable, disable",
                 valid: field => ['blacklist','enable','disable'].includes(field)
             },
             subAction: {
-                required: (args) => args.help == undefined && args.action === "blacklist",
+                required: (args) => args.action === "blacklist",
                 type: "string",
                 description: "L'action à effectuer sur la blacklist: add, remove, clear, show",
                 valid: field => ['add','remove','clear', 'show'].includes(field)
             },
             blacklistType: {
-                required: (args) => args.help == undefined && args.action === "blacklist",
+                required: (args) => args.action === "blacklist",
                 type: "string",
                 description: "Le type de blacklist: listener, channel",
                 valid: field => ['listener','channel'].includes(field)
@@ -51,7 +50,7 @@ export default class ConfigVocal extends Command {
             },
             roles: {
                 displayExtractError: true,
-                required: (args) => args.help == undefined && args.action === "blacklist" &&
+                required: (args) => args.action === "blacklist" &&
                     ['add','remove'].includes(args.subAction) && args.blacklistType == 'listener' && args.users === undefined,
                 type: 'role',
                 multi: true,
@@ -65,7 +64,7 @@ export default class ConfigVocal extends Command {
                 }
             },
             channels: {
-                required: (args) => args.help == undefined && args.action === "blacklist" &&
+                required: (args) => args.action === "blacklist" &&
                     ['add','remove'].includes(args.subAction) && args.blacklistType == "channel",
                 type: 'channel',
                 multi: true,
@@ -84,11 +83,8 @@ export default class ConfigVocal extends Command {
         super(channel, member, guild, writtenCommand, ConfigVocal.commandName, ConfigVocal.argsModel);
     }
 
-    async action(args: {help: boolean, action: string, subAction: string, blacklistType: string, users: GuildMember[], roles: Role[], channels: VoiceChannel[]}) {
-        const {help, action, subAction, blacklistType, users, roles, channels} = args;
-
-        if (help)
-            return this.response(false, this.displayHelp());
+    async action(args: {action: string, subAction: string, blacklistType: string, users: GuildMember[], roles: Role[], channels: VoiceChannel[]}) {
+        const {action, subAction, blacklistType, users, roles, channels} = args;
 
         if (this.guild == null)
             return this.response(false,
