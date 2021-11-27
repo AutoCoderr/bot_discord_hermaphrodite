@@ -15,7 +15,7 @@ import {
 } from "discord.js";
 import {checkTypes} from "./TypeChecker";
 import {extractTypes} from "./TypeExtractor";
-import {getCustomType, getSlashTypeGetterName} from "../initSlashCommands";
+import {getCustomType, getSlashTypeGetterName} from "../slashCommands";
 
 const validModelCommands = {};
 
@@ -55,8 +55,9 @@ export default class Command {
         return this.writtenCommand.split(" ")[0] == config.command_prefix+this.commandName;
     }
 
-    async executeCommand(bot): Promise<false| { result: Array<string | MessagePayload | MessageOptions>, callback?: Function }> {
+    async executeCommand(bot, slashCommand = false): Promise<false| { result: Array<string | MessagePayload | MessageOptions>, callback?: Function }> {
         if (this.writtenCommand === null || await this.match()) {
+
             const permissionRes = await this.checkPermissions();
             if (permissionRes !== true)
                 return permissionRes ? {result: permissionRes} : false;
@@ -66,7 +67,7 @@ export default class Command {
                 return {result: modelValidRes};
 
             let args: any;
-            if (this.writtenCommand) {
+            if (!slashCommand) {
                 const {success, result} = await this.computeArgs(this.parseCommand(),this.argsModel);
                 if (!success) return { result: <Array<string | MessagePayload | MessageOptions >> result};
                 args = result;

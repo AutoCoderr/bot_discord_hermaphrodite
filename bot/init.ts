@@ -2,7 +2,7 @@ import {existingCommands} from "./Classes/CommandsDescription";
 import {getExistingCommands} from "./Classes/CommandsDescription";
 import client from "./client";
 import {Interaction, VoiceState} from "discord.js";
-import initSlashCommands, {listenSlashCommands} from "./initSlashCommands";
+import {initSlashCommands, listenSlashCommands} from "./slashCommands";
 
 export default function init(bot) {
     setTimeout(async () => {

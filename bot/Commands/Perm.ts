@@ -2,6 +2,7 @@ import config from "../config";
 import Command from "../Classes/Command";
 import {Guild, GuildMember, MessageEmbed, Role, TextBasedChannels, User} from "discord.js";
 import Permissions, {IPermissions} from "../Models/Permissions";
+import {addRoleToSlashCommandPermission, setRoleToSlashCommandPermission} from "../slashCommands";
 
 export default class Perm extends Command {
     static display = true;
@@ -141,9 +142,11 @@ export default class Perm extends Command {
                             );
                         }
                     }
-                    permission.roles = [...permission.roles, ...rolesId]
+                    permission.roles = [...permission.roles, ...rolesId];
+                    await addRoleToSlashCommandPermission(this.guild, <string>this.commandName, rolesId)
                 } else if (action == "set") {
                     permission.roles = rolesId;
+                    await setRoleToSlashCommandPermission(this.guild, <string>this.commandName, rolesId);
                 }
                 await permission.save();
             }
