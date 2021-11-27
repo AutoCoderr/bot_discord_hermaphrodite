@@ -5,6 +5,7 @@ import Permissions, { IPermissions } from "../Models/Permissions";
 import History, {IHistory} from "../Models/History";
 import {isNumber} from "./OtherFunctions";
 import {
+    CommandInteractionOptionResolver,
     Guild,
     GuildMember,
     MessageEmbed,
@@ -14,6 +15,7 @@ import {
 } from "discord.js";
 import {checkTypes} from "./TypeChecker";
 import {extractTypes} from "./TypeExtractor";
+import {getCustomType, getSlashTypeGetterName} from "../initSlashCommands";
 
 const validModelCommands = {};
 
@@ -33,15 +35,19 @@ export default class Command {
     member: User|GuildMember;
     argsModel: any = {};
 
-    writtenCommand: null|string; // If command called by the custom way, get the message typed by the user
+    writtenCommand: null|string = null; // If command called as a custom command, get the message typed by the user
+    slashCommandOptions: null|CommandInteractionOptionResolver = null; // If command called as a slash command, get options
 
-    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommand: null|string = null, commandName: null|string, argsModel: any) {
+    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandName: null|string, argsModel: any) {
         this.guild = guild;
         this.channel = channel;
         this.member = member;
         this.commandName = commandName;
         this.argsModel = argsModel;
-        this.writtenCommand = writtenCommand
+        if (writtenCommandOrSlashCommandOptions instanceof CommandInteractionOptionResolver)
+            this.slashCommandOptions = writtenCommandOrSlashCommandOptions;
+        else
+            this.writtenCommand = writtenCommandOrSlashCommandOptions
     }
 
     async match() {
@@ -49,7 +55,7 @@ export default class Command {
         return this.writtenCommand.split(" ")[0] == config.command_prefix+this.commandName;
     }
 
-    async executeCustomCommand(bot): Promise<false| { result: Array<string | MessagePayload | MessageOptions>, callback?: Function }> {
+    async executeCommand(bot): Promise<false| { result: Array<string | MessagePayload | MessageOptions>, callback?: Function }> {
         if (this.writtenCommand === null || await this.match()) {
             const permissionRes = await this.checkPermissions();
             if (permissionRes !== true)
@@ -59,14 +65,22 @@ export default class Command {
             if (modelValidRes !== true)
                 return {result: modelValidRes};
 
-            const {success: computeArgsSuccess, result: computeArgsResult} = await this.computeArgs(this.parseCommand(),this.argsModel);
-            if (!computeArgsSuccess) return { result: < Array < string | MessagePayload | MessageOptions >> computeArgsResult};
+            let args: any;
+            if (this.writtenCommand) {
+                const {success, result} = await this.computeArgs(this.parseCommand(),this.argsModel);
+                if (!success) return { result: <Array<string | MessagePayload | MessageOptions >> result};
+                args = result;
+            } else {
+                const {success, result} = await this.getArgsFromSlashOptions();
+                if (!success) return { result: <Array<string | MessagePayload | MessageOptions >> result};
+                args = result;
+            }
 
-            const {success: actionSuccess, result: actionResult, callback} = await this.action(computeArgsResult, bot);
+            const {success, result, callback} = await this.action(args, bot);
 
-            if (actionSuccess)
+            if (success && this.writtenCommand !== null)
                 this.saveHistory();
-            return {result: actionResult, callback};
+            return {result, callback};
         }
         return false;
     }
@@ -310,6 +324,87 @@ export default class Command {
         return true;
     }
 
+    async getSlashArgFromModel(attr: string, argModel: any, args: {[name: string]: any}, fails: Array<any>, failsExtract: Array<any>) {
+        if (this.slashCommandOptions === null) return;
+        if (!argModel.isSubCommand) {
+
+            args[attr] = this.slashCommandOptions[getSlashTypeGetterName(argModel)](attr);
+
+            let failed = false;
+
+            if (args[attr] === null) {
+                delete args[attr];
+                const required = argModel.required == undefined ||
+                    (typeof (argModel.required) == "boolean" && argModel.required) ||
+                    (typeof (argModel.required) == "function" && await argModel.required(args, this));
+
+                if (required) {
+                    fails.push(argModel);
+                } else if (argModel.multi) {
+                    args[attr] = [];
+                }
+                return;
+            }
+
+            const customType = getCustomType(argModel);
+            if (customType) {
+                if (checkTypes[customType](args[attr])) {
+                    if (extractTypes[customType]) {
+                        const moreDatas = typeof (argModel.moreDatas) == "function" ? await argModel.moreDatas(args, customType, this) : null
+                        const data = await extractTypes[customType](args[attr], this, moreDatas);
+                        if (data === false) {
+                            failed = true;
+                            failsExtract.push({...argModel, value: args[attr]});
+                        } else {
+                            args[attr] = data
+                        }
+                    }
+                } else {
+                    failed = true;
+                    fails.push({...argModel, value: args[attr]});
+                }
+            }
+            if (!failed && args[attr] && typeof(argModel.valid) == 'function' && !(await argModel.valid(args[attr],args,this))) {
+                fails.push({...argModel, value: args[attr]});
+            }
+        } else {
+            const subCommand = this.slashCommandOptions.getSubcommand();
+            const subCommandGroup = this.slashCommandOptions.getSubcommandGroup(false);
+
+            if (subCommand !== null && Object.keys(argModel.choices).includes(subCommand)) {
+                args[attr] = subCommand;
+            } else if (subCommand !== null && Object.keys(argModel.choices).includes(subCommand)) {
+                args[attr] = subCommandGroup;
+            }
+        }
+    }
+
+    async getArgsFromSlashOptions(): Promise<{ success: boolean, result: {[attr: string]: any}|Array<string | MessagePayload | MessageOptions> }> {
+        if (this.slashCommandOptions === null) return {success: false, result: {}};
+        let args: {[name: string]: any} = {};
+        let fails: Array<any> = [];
+        let failsExtract: Array<any> = [];
+        for (const attr in this.argsModel) {
+            if (attr[0] == '$') {
+                if (attr == '$argsByOrder') {
+                    for (const argModel of this.argsModel[attr]) {
+                        await this.getSlashArgFromModel(argModel.field,argModel,args, fails, failsExtract);
+                    }
+                } else {
+                    for (const [attr2,argModel] of Object.entries(this.argsModel[attr])) {
+                        await this.getSlashArgFromModel(attr2,argModel,args, fails, failsExtract);
+                    }
+                }
+            } else {
+                await this.getSlashArgFromModel(attr,this.argsModel[attr],args, fails, failsExtract);
+            }
+        }
+        if (fails.length > 0 || failsExtract.length > 0) {
+            return {success: false, result: this.displayHelp(false, fails, failsExtract, args)};
+        }
+        return {success: true, result: args};
+    }
+
     parseCommand(): any {
         if (this.writtenCommand === null) return {};
         let argsObject = {};
@@ -404,22 +499,11 @@ export default class Command {
                 let triedValue;
 
                 for (let field of model[attr].fields) {
-                    let argType: Array<string>|string = model[attr].type ?? model[attr].types;
+                    let argType: string = model[attr].type;
                     if (args[field] != undefined &&
                         (
-                            (
-                                argType instanceof Array &&
-                                    await Promise.all(argType.map(async type => {
-                                        if (type == "string" || await checkTypes[type](args[field])) {
-                                            argType = type;
-                                            return true;
-                                        }
-                                        return false
-                                    })).then(goodTypes => goodTypes.some(type => type))
-                            ) || (
-                                typeof(argType) == "string" && (
-                                    argType == "string" || await checkTypes[argType](args[field])
-                                )
+                            typeof(argType) == "string" && (
+                                argType == "string" || await checkTypes[argType](args[field])
                             )
                         )
                     ) {
@@ -479,28 +563,17 @@ export default class Command {
                     const argModel = argsByOrder[j];
                     if (argModel.multi)
                         out[argModel.field] = [];
-                    let argType: Array<string>|string = argModel.type ?? argModel.types;
+                    let argType: string = argModel.type;
                     let found = false;
                     let incorrectField = false;
                     let triedValue;
                     let extractFailed = false;
                     for (let i=currentIndex;args[i] !== undefined;i++) {
                         if (args[i] != undefined && (
-                            (
-                                argType instanceof Array &&
-                                await Promise.all(argType.map(async type => {
-                                    if (type == "string" || await checkTypes[type](args[i]) || (type == "boolean" && args[i] === argModel.field)) {
-                                        argType = type;
-                                        return true;
-                                    }
-                                    return false
-                                })).then(goodTypes => goodTypes.some(type => type))
-                            ) || (
-                                typeof(argType) == "string" && (
-                                    argType == "string" || await checkTypes[argType](args[i]) || (argType == "boolean" && args[i] === argModel.field)
-                                )
-                            ))
-                        ) {
+                            typeof(argType) == "string" && (
+                                argType == "string" || await checkTypes[argType](args[i]) || (argType == "boolean" && args[i] === argModel.field)
+                            )
+                        )) {
                             let data = argType == "string" ? args[i].toString() : args[i];
                             if (extractTypes[<string>argType]) {
                                 const moreDatas = typeof(argModel.moreDatas) == "function" ? await argModel.moreDatas(out,argType, this) : null
@@ -575,7 +648,7 @@ export default class Command {
                     let extractFailed = false;
                     let validFailed = false;
                     let triedValue;
-                    let argType: Array<string>|string = argsByType[attr].type ?? argsByType[attr].types;
+                    let argType: string = argsByType[attr].type;
 
                     const required = argsByType[attr].required == undefined ||
                         (typeof(argsByType[attr].required) == "boolean" && argsByType[attr].required) ||
@@ -600,18 +673,8 @@ export default class Command {
                         }
 
                         if (args[i] != undefined && (
-                            (
-                                argType instanceof Array && await Promise.all(argType.map(async type => {
-                                    if (type == "string" || await checkTypes[type](args[i]) || (type == "boolean" && args[i] === attr)) {
-                                        argType = type;
-                                        return true;
-                                    }
-                                    return false
-                                })).then(goodTypes => goodTypes.some(type => type))
-                            ) || (
-                                typeof(argType) == "string" && (
-                                    argType == "string" || checkTypes[argType](args[i]) || (argType == "boolean" && args[i] === attr)
-                                )
+                            typeof(argType) == "string" && (
+                                argType == "string" || checkTypes[argType](args[i]) || (argType == "boolean" && args[i] === attr)
                             ))
                         ) {
                             let data = argType == "string" ? args[i].toString() : args[i];

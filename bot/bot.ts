@@ -24,7 +24,7 @@ client.on('messageCreate', async message => {
         const commandClass = existingCommands[commandName];
         if (commandClass.customCommand) {
             const command = new commandClass(message.channel, message.member, message.guild, message.content);
-            command.executeCustomCommand(client).then(response => getAndDisplayCustomCommandsResponse(message, response));
+            command.executeCommand(client).then(response => getAndDisplayCustomCommandsResponse(message, response));
         }
     }
 

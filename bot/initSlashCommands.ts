@@ -236,27 +236,21 @@ export async function listenSlashCommands(interaction: Interaction) {
 
     const {commandName, options} = interaction;
 
-    for (const command of <Array<typeof Command>>Object.values(existingCommands)) {
-        if (command.slashCommand && command.commandName === commandName) {
-            const args = {};
-            //const fails: any[] = [];
-            for (const [attr,obj] of Object.entries(command.argsModel)) {
-                if (attr === "$argsByType") {
-                    for (const [attr,argModel] of Object.entries(<{ [attr: string]: {type: string} }>obj)) {
-                        args[attr] = options[getSlashTypeGetterName(argModel)](attr);
-                        /*const customType = getCustomType(argModel);
-                        if (customType && !checkTypes[customType](data)) {
-                            fails.push({...argModel, value: data});
-                        } else if (customType){
-                            data = extractTypes[customType]()
-                        }*/
-                    }
-                }
-            }
-            await interaction.reply({
-                content: "TEST",
+    for (const CommandClass of <any[]>Object.values(existingCommands)) {
+        if (CommandClass.slashCommand && CommandClass.commandName === commandName) {
+            await interaction.deferReply({
                 ephemeral: true
             });
+            const command = new CommandClass(interaction.channel, interaction.member, interaction.guild, options);
+
+            const response = await command.executeCommand(client);
+
+            if (response) {
+                for (const payload of response.result)
+                    await interaction.editReply(payload);
+            } else {
+                await interaction.editReply("Aucune réponse");
+            }
         }
     }
 
@@ -310,7 +304,7 @@ function getSlashType(argModel) {
         ApplicationCommandOptionTypes.STRING
 }
 
-function getCustomType(argModel) {
+export function getCustomType(argModel) {
     const slashTypeDefinition = getSlashTypeDefinition(argModel);
 
     if (slashTypeDefinition && slashTypeDefinition.commandType == 'slash')
@@ -322,7 +316,7 @@ function getCustomType(argModel) {
     return argModel.type;
 }
 
-function getSlashTypeGetterName(argModel) {
+export function getSlashTypeGetterName(argModel) {
     return getterNameBySlashType[getSlashType(argModel)]
 }
 

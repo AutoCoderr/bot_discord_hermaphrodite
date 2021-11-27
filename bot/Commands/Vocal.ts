@@ -2,7 +2,6 @@ import Command from "../Classes/Command";
 import {
     Guild,
     GuildMember, Interaction,
-    Message,
     MessageActionRow,
     MessageButton,
     MessageEmbed,
@@ -73,8 +72,20 @@ export default class Vocal extends Command {
                 type: "user",
                 multi: true,
                 description: "Le ou les utilisateurs à ignorer ou écouter quand ils se connectent sur un vocal",
-                valid: (user: GuildMember, args, message: Message) =>
-                    user.id !== message.author.id && !args.users.some(eachUser => eachUser.id === user.id),
+                valid: (users: GuildMember|GuildMember[], args, command: Command) => {
+                    if (users instanceof GuildMember && (users.id === command.member.id || args.users.some(eachUser => eachUser.id === users.id)))
+                        return false;
+                    if (users instanceof Array) {
+                        let alreadySpecifieds = {};
+                        for (const user of users) {
+                            if (user.id === command.member.id || alreadySpecifieds[user.id])
+                                return false;
+                            else
+                                alreadySpecifieds[user.id] = true;
+                        }
+                    }
+                    return true;
+                },
                 errorMessage: (value, args) => (value == undefined && args.channels == undefined && ['block', 'unblock'].includes(args.action)) ?
                     {
                         name: "Rentrez au moins l'un des deux",
