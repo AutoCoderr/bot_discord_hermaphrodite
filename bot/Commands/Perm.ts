@@ -143,10 +143,10 @@ export default class Perm extends Command {
                         }
                     }
                     permission.roles = [...permission.roles, ...rolesId];
-                    await addRoleToSlashCommandPermission(this.guild, <string>this.commandName, rolesId)
+                    await addRoleToSlashCommandPermission(this.guild, <string>command.commandName, rolesId)
                 } else if (action == "set") {
                     permission.roles = rolesId;
-                    await setRoleToSlashCommandPermission(this.guild, <string>this.commandName, rolesId);
+                    await setRoleToSlashCommandPermission(this.guild, <string>command.commandName, rolesId);
                 }
                 await permission.save();
             }

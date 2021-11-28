@@ -20,30 +20,27 @@ let slashCommandsByGuildAndName: {[guildId: string]: {[commandName: string]: App
 
 export async function initSlashCommands() {
 
-    for (const [,guild] of client.guilds.cache) {
+    const guilds: Guild[] = [];
+    for (const [,guild] of client.guilds.cache)
+        guilds.push(guild);
 
+    await Promise.all(guilds.map(async guild => {
         console.log('Create slash commands for ' + guild.name + ' server');
+        const commands = guild.commands;
+        return await Promise.all((<Array<typeof Command>>Object.values(existingCommands)).map(async command => {
+            if (command.slashCommand) {
+                console.log("generate slash command "+command.commandName);
 
-        try {
-            const commands = guild.commands;
+                const createdSlashCommand = await commands?.create(generateSlashCommandFromModel(command));
 
-            for (const command of <Array<typeof Command>>Object.values(existingCommands)) {
-                if (command.slashCommand) {
-                    const createdSlashCommand = await commands?.create(generateSlashCommandFromModel(command));
+                await initSlashCommandPermissions(guild, createdSlashCommand, <string>command.commandName);
 
-                    await initSlashCommandPermissions(guild, createdSlashCommand, <string>command.commandName);
-
-                    if (slashCommandsByGuildAndName[guild.id] === undefined)
-                        slashCommandsByGuildAndName[guild.id] = {}
-                    slashCommandsByGuildAndName[guild.id][<string>command.commandName] = createdSlashCommand;
-                }
+                if (slashCommandsByGuildAndName[guild.id] === undefined)
+                    slashCommandsByGuildAndName[guild.id] = {}
+                slashCommandsByGuildAndName[guild.id][<string>command.commandName] = createdSlashCommand;
             }
-
-        } catch (e) {
-            console.error(e)
-            console.log("Slash commands can't be created on the '" + guild.name + "' server");
-        }
-    }
+        }))
+    }));
 }
 
 export async function addRoleToSlashCommandPermission(guild: Guild, commandName: string, rolesId: string[]) {
@@ -102,7 +99,6 @@ async function initSlashCommandPermissions(guild: Guild, command: ApplicationCom
 }
 
 function generateSlashCommandFromModel(command: typeof Command): ChatInputApplicationCommandData {
-    console.log("generateSlashCommandFromModel "+command.commandName);
     let slashCommandModel: ChatInputApplicationCommandData = {
         name: <string>command.commandName?.toLowerCase(),
         description: <string>command.description,
