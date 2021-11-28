@@ -71,7 +71,12 @@ export async function setRoleToSlashCommandPermission(guild: Guild, commandName:
                 id,
                 type: 'USER',
                 permission: true
-            }))
+            })),
+            {
+                id: guild.ownerId,
+                type: 'USER',
+                permission: true
+            }
         ]
     })
 }
@@ -82,7 +87,7 @@ async function initSlashCommandPermissions(guild: Guild, command: ApplicationCom
         serverId: guild.id
     });
 
-    await command.permissions.add({
+    await command.permissions.set({
         permissions: [
             ...(permission != null ? permission.roles.map(roleId => ({
                 id: roleId,
@@ -93,7 +98,12 @@ async function initSlashCommandPermissions(guild: Guild, command: ApplicationCom
                 id,
                 type: 'USER',
                 permission: true
-            }))
+            })),
+            {
+                id: guild.ownerId,
+                type: 'USER',
+                permission: true
+            }
         ]
     });
 }
