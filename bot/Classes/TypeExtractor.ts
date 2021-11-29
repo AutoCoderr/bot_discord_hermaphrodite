@@ -22,10 +22,11 @@ export const extractTypes = {
         return channel != undefined ? channel : false;
     },
     channels: (field, command: Command): Array<GuildChannel|ThreadChannel|VoiceChannel>|false => {
-        const channelsMentions = field.split(",");
+        const channelsSplitted = field.split("<#");
         const channels: Array<GuildChannel|ThreadChannel> = [];
-        for (const channelMention of channelsMentions) {
-            const AChannel = extractTypes.channel(channelMention.trim(), command);
+        for (let i=1;i<channelsSplitted.length;i++) {
+            const channelMention = "<#"+channelsSplitted[i].trim();
+            const AChannel = extractTypes.channel(channelMention, command);
             if (!AChannel) return false;
             channels.push(AChannel);
         }
@@ -47,12 +48,18 @@ export const extractTypes = {
         return false;
     },
     messages: async (field, command: Command, mentionedChannel: GuildChannel|boolean):  Promise<Array<Message>|false> => {
-        const messagesIds = field.split(",");
         const messages: Array<Message> = [];
-        for (const messageId of messagesIds) {
-            const AMessage = await extractTypes.message(messageId.trim(), command, mentionedChannel);
-            if (!AMessage) return false;
-            messages.push(AMessage);
+        let messageId = "";
+        for (let i=0;i<field.length;i++) {
+            if (field[i] !== " " && field[i] != ",") {
+                messageId += field[i];
+            }
+            if (messageId.length == 18) {
+                const AMessage = await extractTypes.message(messageId, command, mentionedChannel);
+                if (!AMessage) return false;
+                messages.push(AMessage);
+                messageId = "";
+            }
         }
         return messages;
     },
@@ -86,10 +93,11 @@ export const extractTypes = {
         }
     },
     users: async (field, command: Command): Promise<Array<GuildMember>|false> => {
-        const userMentions = field.split(",");
+        const usersSplitted = field.split("<@");
         const users: Array<GuildMember> = [];
-        for (const userMention of userMentions) {
-            const AUser = await extractTypes.user(userMention.trim(), command);
+        for (let i=1;i<usersSplitted.length;i++) {
+            const userMention = "<@"+usersSplitted[i].replace(",","").trim();
+            const AUser = await extractTypes.user(userMention, command);
             if (!AUser) return false;
             users.push(AUser);
         }
@@ -102,12 +110,12 @@ export const extractTypes = {
         return role ?? false;
     },
     roles: (field, command: Command): Array<Role>|false => {
-        if (field.length-field.replace(",","") == 0) return [];
+        const rolesSplitted = field.split("<@");
 
         const roles: Array<Role> = [];
-        const rolesMentions = field.split(",");
-        for (const roleMention of rolesMentions) {
-            const role = extractTypes.role(roleMention.trim(), command);
+        for (let i=1;i<rolesSplitted.length;i++) {
+            const roleMention = "<@"+rolesSplitted[i].replace(",","").trim();
+            const role = extractTypes.role(roleMention, command);
             if (!(role instanceof Role)) return false;
             roles.push(role);
         }
@@ -124,8 +132,18 @@ export const extractTypes = {
     },
     commands: async (field, currentCommand: Command): Promise<typeof Command[]|false> => {
         let commands: typeof Command[] = [];
-        for (let commandName of field.split(",")) {
-            commandName = commandName.trim();
+        let commandName = "";
+        for (let i=0;i<field.length;i++) {
+            if (field[i] !== " " && field[i] !== ",") {
+                commandName += field[i];
+            } else {
+                const foundCommand = await extractTypes.command(commandName,currentCommand);
+                if (!foundCommand) return false;
+                commands.push(foundCommand);
+                commandName = "";
+            }
+        }
+        if (commandName != "") {
             const foundCommand = await extractTypes.command(commandName,currentCommand);
             if (!foundCommand) return false;
             commands.push(foundCommand);

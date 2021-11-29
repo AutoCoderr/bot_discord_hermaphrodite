@@ -143,7 +143,19 @@ export default class Monitor extends Command {
                 type: "channel",
                 description: "Le channel sur lequel monitorer le serveur",
                 required: (args) => args.action != "show",
-                valid: (elem: GuildChannel, _) => elem.type == "GUILD_TEXT"
+                valid: (elem: GuildChannel, _) => elem.type == "GUILD_TEXT",
+                errorMessage: (value, _) => {
+                    if (value != undefined) {
+                        return {
+                            name: "Channel mentionné invalide",
+                            value: "Vous ne pouvez mentionner que des channels de texte"
+                        };
+                    }
+                    return {
+                        name: "Channel non renseigné",
+                        value: "Vous n'avez pas renseigné de channel"
+                    }
+                }
             },
             messages: {
                 referToSubCommands: ["refresh","remove"],
@@ -340,7 +352,7 @@ export default class Monitor extends Command {
                         responses.push("Il n'y a pas de monitoring sur le message "+message.id);
                     }
                 }
-                return this.response(true, responses);
+                return this.response(true, responses.join("\n"));
         }
         return this.response(false, "Aucune action spécifiée");
     }

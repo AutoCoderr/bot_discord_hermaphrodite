@@ -340,34 +340,39 @@ export default class Command {
 
                 if (required) {
                     fails.push(argModel);
+                    return;
+                }
+                const defaultValue = typeof (argModel.default) == "function" ? argModel.default(args, this) : argModel.default;
+                if (defaultValue !== undefined) {
+                    args[attr] = defaultValue;
                 } else if (argModel.multi) {
                     args[attr] = [];
                 }
-                return;
-            }
-            const customType = getCustomType(argModel);
-            if (customType) {
-                if (checkTypes[customType](initialValue)) {
-                    if (extractTypes[customType]) {
-                        const moreDatas = typeof (argModel.moreDatas) == "function" ? await argModel.moreDatas(args, customType, this) : null
-                        const data = await extractTypes[customType](initialValue, this, moreDatas);
-                        if (data === false) {
-                            failed = true;
-                            failsExtract.push({...argModel, value: args[attr]});
-                        } else {
-                            args[attr] = data
+            } else {
+                const customType = getCustomType(argModel);
+                if (customType) {
+                    if (checkTypes[customType](initialValue)) {
+                        if (extractTypes[customType]) {
+                            const moreDatas = typeof (argModel.moreDatas) == "function" ? await argModel.moreDatas(args, customType, this) : null
+                            const data = await extractTypes[customType](initialValue, this, moreDatas);
+                            if (data === false) {
+                                failed = true;
+                                failsExtract.push({...argModel, field: attr, value: args[attr]});
+                            } else {
+                                args[attr] = data
+                            }
                         }
+                    } else {
+                        failed = true;
+                        fails.push({...argModel, field: attr, value: initialValue});
                     }
-                } else {
-                    failed = true;
-                    fails.push({...argModel, value: initialValue});
                 }
+                if (args[attr] == undefined)
+                    args[attr] = initialValue;
             }
-            if (args[attr] == undefined)
-                args[attr] = initialValue;
 
             if (!failed && args[attr] && typeof(argModel.valid) == 'function' && !(await argModel.valid(args[attr],args,this))) {
-                fails.push({...argModel, value: initialValue});
+                fails.push({...argModel, field: attr, value: initialValue});
             }
         } else {
             const subCommand = this.slashCommandOptions.getSubcommand();
