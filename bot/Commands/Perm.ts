@@ -2,7 +2,11 @@ import config from "../config";
 import Command from "../Classes/Command";
 import {Guild, GuildMember, MessageEmbed, Role, TextBasedChannels, User} from "discord.js";
 import Permissions, {IPermissions} from "../Models/Permissions";
-import {addRoleToSlashCommandPermission, setRoleToSlashCommandPermission} from "../slashCommands";
+import {
+    addRoleToSlashCommandPermission,
+    removeRoleFromSlashCommandPermission,
+    setRoleToSlashCommandPermission
+} from "../slashCommands";
 
 export default class Perm extends Command {
     static display = true;
@@ -19,15 +23,17 @@ export default class Perm extends Command {
                 field: "action",
                 type: "string",
                 required: true,
-                description: "'add', 'set' ou 'show', pour ajouter une permission à celle déjà présente, les redéfinir avec set, ou les afficher avec 'show'",
+                description: "'add', 'remove', 'set', 'clear' ou 'show'",
                 choices: {
                     add: 'Ajouter un ou des rôles à une commande',
+                    remove: 'Retirer un ou des rôles d\'une commande',
                     set: 'Définir un ou des rôles sur une commande',
+                    clear: 'Retirer tout les rôles autorisés à utiliser une commande',
                     show: "Afficher les rôles d'une commande"
                 }
             },
             {
-                referToSubCommands: ['add','set','show'],
+                referToSubCommands: ['add','remove','set','clear','show'],
                 field: "commands",
                 type: "command",
                 multi: true,
@@ -49,11 +55,11 @@ export default class Perm extends Command {
                 }
             },
             {
-                referToSubCommands: ['add','set'],
+                referToSubCommands: ['add','set','remove'],
                 field: "roles",
                 type: "role",
                 multi: true,
-                required: args => args.action == "add",
+                required: args => ["add","set","remove"].includes(args.action),
                 description: "Le ou les rôles autorisés à taper cette commande"
             }
         ]
@@ -143,14 +149,23 @@ export default class Perm extends Command {
                         }
                     }
                     permission.roles = [...permission.roles, ...rolesId];
-                    await addRoleToSlashCommandPermission(this.guild, <string>command.commandName, rolesId)
+                    await addRoleToSlashCommandPermission(this.guild, <string>command.commandName, rolesId);
+                    responses.push("Permission added successfully for the '"+command.commandName+"' command!");
                 } else if (action == "set") {
                     permission.roles = rolesId;
                     await setRoleToSlashCommandPermission(this.guild, <string>command.commandName, rolesId);
+                    responses.push("Permission setted successfully for the '"+command.commandName+"' command!");
+                } else if (action == "clear") {
+                    permission.roles = [];
+                    await setRoleToSlashCommandPermission(this.guild, <string>command.commandName, []);
+                    responses.push("Permission cleared successfully for the '"+command.commandName+"' command!");
+                } else if (action == "remove") {
+                    permission.roles = permission.roles.filter(roleId => !roles.some(role => role.id == roleId))
+                    await removeRoleFromSlashCommandPermission(this.guild, <string>command.commandName, roles);
+                    responses.push("Permission removed successfully for the '"+command.commandName+"' command!");
                 }
                 await permission.save();
             }
-            responses.push("Permission added or setted successfully for the '"+command.commandName+"' command!");
         }
         return this.response(true, responses.join('\n'));
     }
@@ -164,12 +179,16 @@ export default class Perm extends Command {
                     value: "Ajouter le role @&Admins dans la liste des rôles autoriser à utiliser la commande notifyOnReact"
                 },
                 {
-                    name: "set notifyOnReact '@Admins, @Maintainers'",
+                    name: "set notifyOnReact @Admins @Maintainers",
                     value: "Définir @Admins et @Maintainers comme les rôles autorisés à utiliser la commande notifyOnReact"
                 },
                 {
-                    name: "set notifyOnReact ''",
-                    value: "Vider la liste des rôles autorisés à utiliser la commande notifyOnReact"
+                    name: "clear notifyOnReact",
+                    value: "Retirer toutes les permissions de la commande notifyOnReact"
+                },
+                {
+                    name: "remove notifyOnReact @role1 @role2",
+                    value: "Retirer les roles @role1 et @role2 de la commande notifyOnReact"
                 },
                 {
                     name: "show notifyOnReact",

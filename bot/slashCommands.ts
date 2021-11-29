@@ -1,5 +1,5 @@
 import client from "./client";
-import {ApplicationCommand, ChatInputApplicationCommandData, Guild, Interaction} from "discord.js";
+import {ApplicationCommand, ChatInputApplicationCommandData, Guild, Interaction, Role} from "discord.js";
 import {ApplicationCommandOptionTypes} from "discord.js/typings/enums";
 import Command from "./Classes/Command";
 import {existingCommands} from "./Classes/CommandsDescription";
@@ -79,6 +79,15 @@ export async function setRoleToSlashCommandPermission(guild: Guild, commandName:
             }
         ]
     })
+}
+
+export async function removeRoleFromSlashCommandPermission(guild: Guild, commandName: string, roles: Role[]) {
+    if (slashCommandsByGuildAndName[guild.id] === undefined || slashCommandsByGuildAndName[guild.id][commandName] === undefined) return;
+    const command = slashCommandsByGuildAndName[guild.id][commandName];
+
+    await command.permissions.remove({
+       roles
+    });
 }
 
 async function initSlashCommandPermissions(guild: Guild, command: ApplicationCommand, commandName: string) {
