@@ -39,8 +39,20 @@ export default class Perm extends Command {
                 multi: true,
                 required: true,
                 description: "La ou les commandes sur laquelle ajouter ou définir la permission",
-                valid: async (command: typeof Command, args) =>  // Vérifie si une commande n'a pas été tapée plusieurs fois
-                    !args.commands.some(eachCommand => eachCommand.commandName == command.commandName),
+                valid: async (commands: typeof Command|Array<typeof Command>, args) => { // Vérifie si une commande n'a pas été tapée plusieurs fois
+                    if (!(commands instanceof Array) && args.commands.some(eachCommand => eachCommand.commandName == commands.commandName))
+                        return false;
+                    if (commands instanceof Array) {
+                        let alreadySpecifieds = {};
+                        for (const command of commands) {
+                            if (alreadySpecifieds[<string>command.commandName])
+                                return false;
+                            else
+                                alreadySpecifieds[<string>command.commandName] = true;
+                        }
+                    }
+                    return true;
+                },
                 errorMessage: (value, _) => {
                     if (value != undefined) {
                         return {

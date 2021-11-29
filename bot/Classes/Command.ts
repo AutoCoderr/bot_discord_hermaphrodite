@@ -329,12 +329,11 @@ export default class Command {
         if (this.slashCommandOptions === null) return;
         if (!argModel.isSubCommand) {
 
-            args[attr] = this.slashCommandOptions[getSlashTypeGetterName(argModel)](attr);
+            const initialValue = this.slashCommandOptions[getSlashTypeGetterName(argModel)](attr);
 
             let failed = false;
 
-            if (args[attr] === null) {
-                delete args[attr];
+            if (initialValue === null) {
                 const required = argModel.required == undefined ||
                     (typeof (argModel.required) == "boolean" && argModel.required) ||
                     (typeof (argModel.required) == "function" && await argModel.required(args, this));
@@ -346,13 +345,12 @@ export default class Command {
                 }
                 return;
             }
-
             const customType = getCustomType(argModel);
             if (customType) {
-                if (checkTypes[customType](args[attr])) {
+                if (checkTypes[customType](initialValue)) {
                     if (extractTypes[customType]) {
                         const moreDatas = typeof (argModel.moreDatas) == "function" ? await argModel.moreDatas(args, customType, this) : null
-                        const data = await extractTypes[customType](args[attr], this, moreDatas);
+                        const data = await extractTypes[customType](initialValue, this, moreDatas);
                         if (data === false) {
                             failed = true;
                             failsExtract.push({...argModel, value: args[attr]});
@@ -362,11 +360,14 @@ export default class Command {
                     }
                 } else {
                     failed = true;
-                    fails.push({...argModel, value: args[attr]});
+                    fails.push({...argModel, value: initialValue});
                 }
             }
+            if (args[attr] == undefined)
+                args[attr] = initialValue;
+
             if (!failed && args[attr] && typeof(argModel.valid) == 'function' && !(await argModel.valid(args[attr],args,this))) {
-                fails.push({...argModel, value: args[attr]});
+                fails.push({...argModel, value: initialValue});
             }
         } else {
             const subCommand = this.slashCommandOptions.getSubcommand();
