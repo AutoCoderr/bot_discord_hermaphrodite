@@ -204,7 +204,7 @@ export async function listenSlashCommands(interaction: Interaction) {
     const {commandName, options} = interaction;
 
     for (const CommandClass of <any[]>Object.values(existingCommands)) {
-        if (CommandClass.slashCommand && CommandClass.commandName === commandName) {
+        if (CommandClass.slashCommand && CommandClass.commandName.toLowerCase() === commandName) {
             await interaction.deferReply({
                 ephemeral: true
             });

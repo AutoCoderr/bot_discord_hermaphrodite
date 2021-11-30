@@ -329,7 +329,7 @@ export default class Command {
         if (this.slashCommandOptions === null) return;
         if (!argModel.isSubCommand) {
 
-            const initialValue = this.slashCommandOptions[getSlashTypeGetterName(argModel)](attr);
+            const initialValue = this.slashCommandOptions[getSlashTypeGetterName(argModel)](attr.toLowerCase());
 
             let failed = false;
 
