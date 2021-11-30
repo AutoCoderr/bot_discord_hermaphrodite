@@ -22,18 +22,17 @@ export default class CancelNotifyOnReact extends Command {
     static slashCommand = true;
 
     static argsModel = {
-        message: {
-            fields: ["--message", "-m"],
-            type: "message",
-            description: "Spécifier l'id du message sur lequel désactiver l'écoute (nécessite le champs --channel)",
-            required: args => args.emote != undefined,
-            moreDatas: (args) => args.channel
+        all: {
+            fields: ["--all"],
+            type: "boolean",
+            description: "à mettre sans rien d'autre, pour désactiver l'écoute sur tout les messages",
+            required: false
         },
         channel: {
             fields: ["--channel","-ch"],
             type:"channel",
             description: "Spécifier le channel sur lequel désactifier l'écoute de réaction",
-            required: (args, modelizeSlashCommand = false) => !modelizeSlashCommand && (args.all == undefined || !args.all)
+            required: (args, _, modelizeSlashCommand = false) => !modelizeSlashCommand && (args.all == undefined || !args.all)
         },
         emote: {
             fields: ["--emote", "-e"],
@@ -41,11 +40,12 @@ export default class CancelNotifyOnReact extends Command {
             description: "Spécifier l'émote pour laquelle il faut désactiver l'écoute (nécessite --channel et --message)",
             required: false
         },
-        all: {
-            fields: ["--all"],
-            type: "boolean",
-            description: "à mettre sans rien d'autre, pour désactiver l'écoute sur tout les messages",
-            required: false
+        message: {
+            fields: ["--message", "-m"],
+            type: "message",
+            description: "Spécifier l'id du message sur lequel désactiver l'écoute (nécessite le champs --channel)",
+            required: (args, _, modelizeSlashCommand = false) => !modelizeSlashCommand && args.emote != undefined,
+            moreDatas: (args) => args.channel
         }
     };
 

@@ -187,7 +187,7 @@ function generateSlashOptionFromModel(attr: string, argModel: any, subCommands: 
                     (
                         typeof(argModel.required) == "function" &&
                         argModel.required(chooseSubCommand.type == ApplicationCommandOptionTypes.SUB_COMMAND ?
-                            {[chooseSubCommand.actionName]: chooseSubCommand.name} : {}, true)
+                            {[chooseSubCommand.actionName]: chooseSubCommand.name} : {}, null, true)
                     ) || (
                         typeof(argModel.required) == "boolean" &&
                         argModel.required
