@@ -142,7 +142,8 @@ export default class Monitor extends Command {
                 referToSubCommands: ["add","remove","refresh"],
                 type: "channel",
                 description: "Le channel sur lequel monitorer le serveur",
-                required: (args) => args.action != "show",
+                default: (_, command: Command) => command.channel,
+                required: false,
                 valid: (elem: GuildChannel, _) => elem.type == "GUILD_TEXT",
                 errorMessage: (value, _) => {
                     if (value != undefined) {

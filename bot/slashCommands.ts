@@ -1,5 +1,10 @@
 import client from "./client";
-import {ApplicationCommand, ChatInputApplicationCommandData, Guild, Interaction, Role} from "discord.js";
+import {
+    ApplicationCommand, ApplicationCommandDataResolvable,
+    Guild,
+    Interaction,
+    Role
+} from "discord.js";
 import {ApplicationCommandOptionTypes} from "discord.js/typings/enums";
 import Command from "./Classes/Command";
 import {existingCommands} from "./Classes/CommandsDescription";
@@ -8,12 +13,14 @@ import Permissions, {IPermissions} from "./Models/Permissions";
 import config from "./config";
 
 interface optionCommandType {
-    type: ApplicationCommandOptionTypes.BOOLEAN | ApplicationCommandOptionTypes.CHANNEL | ApplicationCommandOptionTypes.INTEGER | ApplicationCommandOptionTypes.MENTIONABLE | ApplicationCommandOptionTypes.NUMBER | ApplicationCommandOptionTypes.ROLE | ApplicationCommandOptionTypes.STRING | ApplicationCommandOptionTypes.SUB_COMMAND | ApplicationCommandOptionTypes.SUB_COMMAND_GROUP | ApplicationCommandOptionTypes.USER;
+    type?: ApplicationCommandOptionTypes.BOOLEAN | ApplicationCommandOptionTypes.CHANNEL | ApplicationCommandOptionTypes.INTEGER | ApplicationCommandOptionTypes.MENTIONABLE | ApplicationCommandOptionTypes.NUMBER | ApplicationCommandOptionTypes.ROLE | ApplicationCommandOptionTypes.STRING | ApplicationCommandOptionTypes.SUB_COMMAND | ApplicationCommandOptionTypes.SUB_COMMAND_GROUP | ApplicationCommandOptionTypes.USER;
     name: string;
     description: string;
     required?: boolean;
     noSubCommandGroup?: boolean;
     actionName?: string;
+    options?: optionCommandType[];
+    defaultPermission?: boolean;
 }
 
 let slashCommandsByGuildAndName: {[guildId: string]: {[commandName: string]: ApplicationCommand}} = {};
@@ -31,7 +38,7 @@ export async function initSlashCommands() {
             if (command.slashCommand) {
                 console.log("generate slash command "+command.commandName);
 
-                const createdSlashCommand = await commands?.create(generateSlashCommandFromModel(command));
+                const createdSlashCommand = await commands?.create(<ApplicationCommandDataResolvable>generateSlashCommandFromModel(command));
 
                 await initSlashCommandPermissions(guild, createdSlashCommand, <string>command.commandName);
 
@@ -117,8 +124,8 @@ async function initSlashCommandPermissions(guild: Guild, command: ApplicationCom
     });
 }
 
-function generateSlashCommandFromModel(command: typeof Command): ChatInputApplicationCommandData {
-    let slashCommandModel: ChatInputApplicationCommandData = {
+function generateSlashCommandFromModel(command: typeof Command): optionCommandType {
+    let slashCommandModel: optionCommandType = {
         name: <string>command.commandName?.toLowerCase(),
         description: <string>command.description,
         defaultPermission: false
@@ -140,10 +147,35 @@ function generateSlashCommandFromModel(command: typeof Command): ChatInputApplic
             generateSlashOptionFromModel(attr, argModel, subCommands, slashCommandModel);
         }
     }
+    sortRequiredAndNotRequiredArgumentsInSlashCommand(slashCommandModel);
     return slashCommandModel;
 }
 
-function generateSlashOptionFromModel(attr: string, argModel: any, subCommands: {[attr: string]: any}, slashCommandModel: ChatInputApplicationCommandData) {
+function sortRequiredAndNotRequiredArgumentsInSlashCommand(node: optionCommandType) {
+    if (node.options === undefined) return;
+
+    let isSubCommandGroup = false;
+    const requireds: optionCommandType[] = [];
+    const notRequireds: optionCommandType[] = [];
+
+    for (const option of node.options) {
+        if (option.type == ApplicationCommandOptionTypes.SUB_COMMAND) {
+            sortRequiredAndNotRequiredArgumentsInSlashCommand(option);
+            isSubCommandGroup = true;
+        } else if (option.required)
+            requireds.push(option);
+        else
+            notRequireds.push(option);
+    }
+    if (!isSubCommandGroup) {
+        node.options = [
+            ...requireds,
+            ...notRequireds
+        ];
+    }
+}
+
+function generateSlashOptionFromModel(attr: string, argModel: any, subCommands: {[attr: string]: any}, slashCommandModel: optionCommandType) {
     const chooseSubCommands: any[] = [];
     if (argModel.referToSubCommands instanceof Array)
         for (const referedSubCommand of argModel.referToSubCommands) {
