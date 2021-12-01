@@ -20,11 +20,13 @@ function getAndDisplayCustomCommandsResponse(message: Message, response: false| 
 
 // check all commands
 client.on('messageCreate', async message => {
-    for (let commandName in existingCommands) {
-        const commandClass = existingCommands[commandName];
-        if (commandClass.customCommand) {
-            const command = new commandClass(message.channel, message.member, message.guild, message.content);
-            command.executeCommand(client).then(response => getAndDisplayCustomCommandsResponse(message, response));
+    if (message.content[0] === config.command_prefix) {
+        for (let commandName in existingCommands) {
+            const commandClass = existingCommands[commandName];
+            if (commandClass.customCommand) {
+                const command = new commandClass(message.channel, message.member, message.guild, message.content);
+                command.executeCommand(client).then(response => getAndDisplayCustomCommandsResponse(message, response));
+            }
         }
     }
 

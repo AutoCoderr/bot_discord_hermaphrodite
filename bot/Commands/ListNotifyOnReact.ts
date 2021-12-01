@@ -18,6 +18,8 @@ export default class ListNotifyOnReact extends Command {
     static description = "Pour lister les messages, sur lesquels il y a une écoute de réaction.";
     static commandName = "listNotifyOnReact";
 
+    static slashCommand = true;
+
     static argsModel = {
         all: {
             fields: ["--all"],
@@ -29,7 +31,7 @@ export default class ListNotifyOnReact extends Command {
             fields: ["--channel","-ch"],
             type:"channel",
             description: "Spécifier le channel sur lequel afficher les écoutes de réaction",
-            required: args => args.all == undefined || !args.all
+            required: (args, _, modelizeSlashCommand = false) => !modelizeSlashCommand && (args.all == undefined || !args.all)
         },
         emote: {
             fields: ["--emote", "-e"],
@@ -40,8 +42,8 @@ export default class ListNotifyOnReact extends Command {
         message: {
             fields: ["--message", "-m"],
             type: "message",
-            description: "Spécifier l'id du message sur lequel afficher les écoutes (nécessite le champs --channel pour savoir où est le message)",
-            required: args => args.emote != undefined,
+            description: "Spécifier l'id du message sur lequel afficher les écoutes (nécessite de spécifier le channel)",
+            required: (args, _, modelizeSlashCommand = false) => !modelizeSlashCommand && args.emote != undefined,
             moreDatas: (args) => args.channel
         }
     };
