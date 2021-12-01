@@ -23,11 +23,18 @@ export default class NotifyOnReact extends Command {
     static slashCommand = true
 
     static argsModel = {
-        listen: {
-            fields: ["--listen","-l"],
-            type: "listenerReactMessage",
-            description: "Indique le channel et le message à écouter, séparés d'un '/'",
+        channelToListen: {
+            fields: ['--listen-channel','-lc'],
+            type: "channel",
+            description: "Indique le channel sur lequel écouter",
             required: true
+        },
+        messageToListen: {
+            fields: ["--listen-message","-lm"],
+            type: "message",
+            description: "Indique le message à écouter (nécessite d'avoir spécifié le channel)",
+            required: true,
+            moreDatas: (args) => args.channelToListen
         },
         messageToWrite: {
             fields: ["--message", "-m"],
@@ -56,15 +63,9 @@ export default class NotifyOnReact extends Command {
 
     listenings: any;
 
-    async action(args: { listen: {channel: GuildChannel, message: Message}, emoteToReact: GuildEmoji|string, messageToWrite: string, channelToWrite: GuildChannel },bot) { // notifyOnReact --listen #ChannelAEcouter/IdDuMessageAEcouter -e :emoteAEcouter: --message '$user$ a réagit à ce message' --writeChannel #channelSurLequelEcrire
+    async action(args: { channelToListen: GuildChannel, messageToListen: Message, emoteToReact: GuildEmoji|string, messageToWrite: string, channelToWrite: GuildChannel },bot) { // notifyOnReact --listen #ChannelAEcouter/IdDuMessageAEcouter -e :emoteAEcouter: --message '$user$ a réagit à ce message' --writeChannel #channelSurLequelEcrire
 
-        let { listen, emoteToReact, messageToWrite, channelToWrite } = args;
-
-        let channelToListen,messageToListen;
-        if (listen) {
-            channelToListen = listen.channel;
-            messageToListen = listen.message
-        }
+        const { channelToListen, messageToListen, emoteToReact, messageToWrite, channelToWrite } = args;
 
         if (this.guild == null) {
             return this.response(false,
@@ -91,9 +92,9 @@ export default class NotifyOnReact extends Command {
         }
 
         if (this.listenings[this.guild.id] &&
-            this.listenings[this.guild.id][listen.channel.id] &&
-            this.listenings[this.guild.id][listen.channel.id][listen.message.id] &&
-            this.listenings[this.guild.id][listen.channel.id][listen.message.id][emoteName]) {
+            this.listenings[this.guild.id][channelToListen.id] &&
+            this.listenings[this.guild.id][channelToListen.id][messageToListen.id] &&
+            this.listenings[this.guild.id][channelToListen.id][messageToListen.id][emoteName]) {
             return this.response(false,
                 this.sendErrors({
                     name: "Déjà écouté",
@@ -235,7 +236,7 @@ export default class NotifyOnReact extends Command {
             .setTitle("Exemples :")
             .addFields([
                 {
-                    name: config.command_prefix+this.commandName+" --listen #ChannelAEcouter/IdDuMessageAEcouter -e :emoteAEcouter: --message '$user$ a réagit à ce message' --writeChannel #channelSurLequelEcrire",
+                    name: config.command_prefix+this.commandName+" -lc #ChannelAEcouter -lm IdDuMessageAEcouter -e :emoteAEcouter: --message '$user$ a réagit à ce message' --writeChannel #channelSurLequelEcrire",
                     value: "Créer une écoute pour qu'un message '$user$ a réagit à ce message' soit posté sur le channel #channelSurLequelEcrire à chaque fois qu'on réagit avec l'émote :emoteAEcouter: sur le message ayant l'id IdDuMessageAEcouter dans le channel #ChannelAEcouter"
                 }
             ]);
