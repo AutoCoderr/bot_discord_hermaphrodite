@@ -31,51 +31,79 @@ export default class ConfigTicket extends Command {
     static display = true;
     static description = "Pour définir la catégorie pour les channels des tickets, activer, ou désactiver les ticket.";
     static commandName = "configTicket";
+    static slashCommand = true;
 
     static argsModel = {
-        allListen: {fields: ['-a','--all'], type: "boolean", required: false, description: "Pour viser toutes les écoutes de message"},
-
         $argsByType: {
             action: {
+                isSubCommand: true,
                 required: true,
                 type: "string",
                 description: "L'action à effectuer : set, set-moderator, unset-moderator, show, show-moderator, disable, enable, listen ou blacklist",
-                valid: (elem,_) => ['set','set-moderator','unset-moderator','show','show-moderator','disable','enable','listen','blacklist'].includes(elem)
+                choices: {
+                    set: "Définir l'id de la catégorie dans laquelle apparaitrons les tickets",
+                    "set-moderator": "Définir le rôle des modérateurs",
+                    "unset-moderator": "'Déconfigurer' le rôle modérateur",
+                    show: "Afficher les écoutes de réactions",
+                    "show-moderator": "Afficher le role modérateur actuel",
+                    disable: "Désactiver les tickets sur ce serveur",
+                    enable: "Réactiver les tickets sur ce serveur",
+                    listen: "Créer une écoute de réaction sur un message pour la création de ticket",
+                    blacklist: "Manipuler la blacklist"
+                }
             },
             moderatorRole: {
+                referToSubCommands: ["set-moderator"],
                 required: args => args.action == "set-moderator",
                 type: "role",
                 description: "Le role désignant les modérateurs sur ce serveur"
             },
             category: {
+                referToSubCommands: ["set"],
                 required: args => args.action == "set",
                 type: "category",
                 description: "L'id de la catégorie à définir avec 'set'"
             },
             subAction: {
+                isSubCommand: true,
+                referToSubCommands: ["blacklist","listen"],
                 required: args => ["blacklist","listen"].includes(args.action),
                 type: "string",
                 description: "L'action à effectuer : add, remove ou show",
-                valid: (elem,_) => ['add','remove','show'].includes(elem)
+                choices: {
+                    add: "Ajouter",
+                    remove: "Retirer",
+                    show: "Afficher"
+                }
             },
             user: {
+                referToSubCommands: ["blacklist.add","blacklist.remove"],
                 required: args => args.action == "blacklist" && ['add','remove'].includes(args.subAction),
                 type: "user",
                 multi: true,
                 description: "Le ou les utilisateurs à ajouter ou retirer de la blacklist"
             },
+            allListen: {
+                referToSubCommands: ['listen.remove'],
+                type: "boolean",
+                required: false,
+                description: "Pour viser toutes les écoutes de message"
+            },
             channelListen: {
+                referToSubCommands: ["listen.add","listen.remove"],
                 required: args => args.action == "listen" && (args.subAction == "add" || (args.subAction == "remove" && !args.allListen)),
                 type: "channel",
                 description: "Le channel sur lequel ajouter, retirer, ou afficher les écoutes de réaction",
                 valid: (elem: GuildChannel,_) => elem.type == "GUILD_TEXT"
             },
             emoteListen: {
+                referToSubCommands: ["listen.add"],
                 required: args => args.action == "listen" && args.subAction == "add",
                 type: "emote",
                 description: "L'emote sur l'aquelle ajouter ou retirer une écoute de réaction"
             },
             messageListen: {
+                referToSubCommands: ["listen.add","listen.remove"],
                 required: args => args.action == "listen" && (args.subAction == "add" || (args.subAction == "remove" && args.emoteListen != undefined)),
                 type: "message",
                 description: "L'id du message sur lequel ajouter, retirer, ou afficher les écoutes de réaction",

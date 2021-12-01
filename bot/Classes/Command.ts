@@ -325,7 +325,7 @@ export default class Command {
         return true;
     }
 
-    async getSlashArgFromModel(attr: string, argModel: any, args: {[name: string]: any}, fails: Array<any>, failsExtract: Array<any>) {
+    async getSlashArgFromModel(attr: string, argModel: any, args: {[name: string]: any}, fails: Array<any>, failsExtract: Array<any>, additionalParams: {[key: string]: any}) {
         if (this.slashCommandOptions === null) return;
         if (!argModel.isSubCommand) {
 
@@ -339,7 +339,7 @@ export default class Command {
                     (typeof (argModel.required) == "function" && await argModel.required(args, this));
 
                 if (required) {
-                    fails.push(argModel);
+                    fails.push({...argModel, field: attr});
                     return;
                 }
                 const defaultValue = typeof (argModel.default) == "function" ? argModel.default(args, this) : argModel.default;
@@ -378,9 +378,10 @@ export default class Command {
             const subCommand = this.slashCommandOptions.getSubcommand();
             const subCommandGroup = this.slashCommandOptions.getSubcommandGroup(false);
 
-            if (subCommand !== null && Object.keys(argModel.choices).includes(subCommand)) {
+            if ((subCommandGroup === null || additionalParams.subCommandGroupSet) && additionalParams.subCommand !== null && Object.keys(argModel.choices).includes(subCommand)) {
                 args[attr] = subCommand;
-            } else if (subCommand !== null && Object.keys(argModel.choices).includes(subCommand)) {
+            } else if (subCommandGroup !== null && Object.keys(argModel.choices).includes(subCommandGroup)) {
+                additionalParams.subCommandGroupSet = true
                 args[attr] = subCommandGroup;
             }
         }
@@ -391,19 +392,24 @@ export default class Command {
         let args: {[name: string]: any} = {};
         let fails: Array<any> = [];
         let failsExtract: Array<any> = [];
+
+        const additionalParams = {
+            subCommandGroupSet: false
+        };
+
         for (const attr in this.argsModel) {
             if (attr[0] == '$') {
                 if (attr == '$argsByOrder') {
                     for (const argModel of this.argsModel[attr]) {
-                        await this.getSlashArgFromModel(argModel.field,argModel,args, fails, failsExtract);
+                        await this.getSlashArgFromModel(argModel.field,argModel,args, fails, failsExtract, additionalParams);
                     }
                 } else {
                     for (const [attr2,argModel] of Object.entries(this.argsModel[attr])) {
-                        await this.getSlashArgFromModel(attr2,argModel,args, fails, failsExtract);
+                        await this.getSlashArgFromModel(attr2,argModel,args, fails, failsExtract, additionalParams);
                     }
                 }
             } else {
-                await this.getSlashArgFromModel(attr,this.argsModel[attr],args, fails, failsExtract);
+                await this.getSlashArgFromModel(attr,this.argsModel[attr],args, fails, failsExtract, additionalParams);
             }
         }
         if (fails.length > 0 || failsExtract.length > 0) {

@@ -18,7 +18,7 @@ interface optionCommandType {
     description: string;
     required?: boolean;
     noSubCommandGroup?: boolean;
-    actionName?: string;
+    args?: { [attr: string]: string };
     options?: optionCommandType[];
     defaultPermission?: boolean;
 }
@@ -159,7 +159,7 @@ function sortRequiredAndNotRequiredArgumentsInSlashCommand(node: optionCommandTy
     const notRequireds: optionCommandType[] = [];
 
     for (const option of node.options) {
-        if (option.type == ApplicationCommandOptionTypes.SUB_COMMAND) {
+        if (option.type == ApplicationCommandOptionTypes.SUB_COMMAND || option.type == ApplicationCommandOptionTypes.SUB_COMMAND_GROUP) {
             sortRequiredAndNotRequiredArgumentsInSlashCommand(option);
             isSubCommandGroup = true;
         } else if (option.required)
@@ -197,7 +197,7 @@ function generateSlashOptionFromModel(attr: string, argModel: any, subCommands: 
                     name: choice.toLowerCase(),
                     description: <string>description,
                     type: ApplicationCommandOptionTypes.SUB_COMMAND,
-                    actionName: attr
+                    args: {...(chooseSubCommand.args??{}), [attr]: choice}
                 };
                 chooseSubCommand.options.push(option);
                 subCommands[chooseSubCommandName === null ? choice : chooseSubCommandName+"."+choice] = option;
@@ -218,8 +218,7 @@ function generateSlashOptionFromModel(attr: string, argModel: any, subCommands: 
                     argModel.required === undefined ||
                     (
                         typeof(argModel.required) == "function" &&
-                        argModel.required(chooseSubCommand.type == ApplicationCommandOptionTypes.SUB_COMMAND ?
-                            {[chooseSubCommand.actionName]: chooseSubCommand.name} : {}, null, true)
+                        argModel.required(chooseSubCommand.args ?? {}, null, true)
                     ) || (
                         typeof(argModel.required) == "boolean" &&
                         argModel.required
