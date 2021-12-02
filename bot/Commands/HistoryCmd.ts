@@ -1,38 +1,41 @@
 import config from "../config";
 import Command from "../Classes/Command";
 import {getArgsModelHistory, getHistory, splitFieldsEmbed} from "../Classes/OtherFunctions";
-import {GuildChannel, GuildMember, Message, MessageEmbed} from "discord.js";
+import {
+    CommandInteractionOptionResolver,
+    Guild,
+    GuildChannel,
+    GuildMember,
+    MessageEmbed,
+    TextBasedChannels,
+    User
+} from "discord.js";
 import {IHistory} from "../Models/History";
 
 export default class HistoryCmd extends Command {
-
-    argsModel = getArgsModelHistory(this.message);
-
     static display = true;
     static description = "Pour accéder à l'historique des commandes.";
     static commandName = "history";
 
-    constructor(message: Message) {
-        super(message, HistoryCmd.commandName);
+    static argsModel = getArgsModelHistory();
+
+    static slashCommand = false;
+
+    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: string) {
+        super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, HistoryCmd.commandName, HistoryCmd.argsModel);
     }
 
-    async action(args: {help: boolean, commands: string, sort: string, limit: number, channels: GuildChannel[], users: GuildMember[]}, bot) {
-        const {help, commands, sort, limit, channels, users} = args;
+    async action(args: {commands: typeof Command[], sort: string, limit: number, channels: GuildChannel[], users: GuildMember[]}, bot) {
 
-        if (args.help) {
-            this.displayHelp();
-            return false;
-        }
+        if (this.guild == null)
+            return this.response(false,
+                this.sendErrors({
+                    name: "Guild missing",
+                    value: "We cannot find the guild"
+                })
+            );
 
-        if (this.message.guild == null) {
-            this.sendErrors({
-                name: "Guild missing",
-                value: "We cannot find the message guild"
-            });
-            return false;
-        }
-
-        const histories: Array<IHistory> = await getHistory(this.message,args);
+        const histories: Array<IHistory> = await getHistory(this,args);
 
         let embeds: Array<MessageEmbed> = [];
 
@@ -40,8 +43,8 @@ export default class HistoryCmd extends Command {
 
         if (histories.length > 0) {
             embeds = splitFieldsEmbed(historByEmbed,histories.map(history => { //@ts-ignore
-                const user = this.message.guild.members.cache.get(history.userId); //@ts-ignore
-                const channel = this.message.guild.channels.cache.get(history.channelId);
+                const user = this.guild.members.cache.get(history.userId); //@ts-ignore
+                const channel = this.guild.channels.cache.get(history.channelId);
 
                 const userName = user != undefined ? (user.nickname ?? user.user.username) : history.userId+" (user not found)";
                 const channelName = channel != undefined ? channel.name : history.channelId
@@ -72,9 +75,8 @@ export default class HistoryCmd extends Command {
                     value: "Aucun élément n'a été trouvé dans l'historique"
                 }));
         }
-        for (const embed of embeds)
-            this.message.channel.send({embeds: [embed]});
-        return true;
+      
+        return this.response(true, embeds.map(embed => ({ embeds: [embed] })));
     }
 
     help() {

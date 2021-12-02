@@ -1,7 +1,11 @@
 import { existingCommands } from "./CommandsDescription";
 import History from "../Models/History";
-import {EmbedFieldData, GuildChannel, GuildMember, Message, MessageEmbed} from "discord.js";
+import {EmbedFieldData, Guild, GuildChannel, GuildMember, Message, MessageEmbed} from "discord.js";
 import Command from "./Command";
+import CancelNotifyOnReact from "../Commands/CancelNotifyOnReact";
+import HistoryExec from "../Commands/HistoryExec";
+import HistoryCmd from "../Commands/HistoryCmd";
+import ListNotifyOnReact from "../Commands/ListNotifyOnReact";
 
 export function addMissingZero(number, n = 2) {
     number = number.toString();
@@ -11,10 +15,8 @@ export function addMissingZero(number, n = 2) {
     return number;
 }
 
-export function getArgsModelHistory(message: Message) {
+export function getArgsModelHistory() {
     return {
-        help: { fields: ['-h', '--help'], type: "boolean", required: false, description: "Pour afficher l'aide" },
-
         commands: {
             fields: ['-c', '--command'],
             type: "commands",
@@ -47,8 +49,8 @@ export function getArgsModelHistory(message: Message) {
         sort: {
             fields: ['-s', '--sort'],
             type: "string",
-            required: true,
-            description: "'asc' ou 'desc/dsc' ('desc' par défaut) pour trier du debut à la fin ou de la fin au début dans l'ordre chronologique",
+            required: false,
+            description: "'asc' ou 'desc/dsc' ('desc' par défaut) pour trier dans l'ordre chronologique dans les deux sens",
             valid: (value, _) => ['asc','desc','dsc'].includes(value.toLowerCase()),
             default: "desc"
         },
@@ -76,10 +78,10 @@ export function getArgsModelHistory(message: Message) {
 }
 
 
-export async function getHistory(message,args: {commands: typeof Command[], sort: string, limit: number, channels: GuildChannel[], users: GuildMember[]}) {
+export async function getHistory(currentCommand: HistoryCmd|HistoryExec,args: {commands: typeof Command[], sort: string, limit: number, channels: GuildChannel[], users: GuildMember[]}) {
     let { commands, sort, limit, channels, users } = args;
 
-    let where:any = {serverId: message.guild.id};
+    let where:any = {serverId: (<Guild>currentCommand.guild).id};
     if (users != undefined) {
         where.userId = {$in: users.map(user => user.id)};
     }
@@ -94,7 +96,7 @@ export async function getHistory(message,args: {commands: typeof Command[], sort
     } else {
         where.commandName = { $nin: [] };
         for (let aCommand in existingCommands) {
-            if (!await existingCommands[aCommand].staticCheckPermissions(message,false)) {
+            if (!await existingCommands[aCommand].staticCheckPermissions(currentCommand.channel, currentCommand.member, currentCommand.guild, false)) {
                 where.commandName.$nin.push(aCommand);
             }
         }
@@ -105,8 +107,12 @@ export async function getHistory(message,args: {commands: typeof Command[], sort
     return await History.find(where).limit(limit).sort({dateTime: sort});
 }
 
-export async function forEachNotifyOnReact(callback, channel: GuildChannel, message: Message, messageCommand) {
-    const serverId = messageCommand.guild.id;
+export async function forEachNotifyOnReact(callback, channel: GuildChannel, message: Message, command: CancelNotifyOnReact|ListNotifyOnReact) {
+    if (command.guild == null) {
+        callback(false);
+        return;
+    }
+    const serverId = command.guild.id;
     // @ts-ignore
     let listenings = existingCommands.NotifyOnReact.listenings[serverId];
 
@@ -157,10 +163,10 @@ export async function forEachNotifyOnReact(callback, channel: GuildChannel, mess
     } else { // Si rien n'a été spécifié en argument, regarde sur tout les messaqes de tout les channels
         let nbListeneds = 0;
         for (let channelId in listenings) {
-            let channel = messageCommand.guild.channels.cache.get(channelId);
+            let channel = command.guild.channels.cache.get(channelId);
             for (let messageId in listenings[channelId]) {
                 let messageListened;
-                try {
+                try { //@ts-ignore
                     messageListened = await channel.messages.fetch(messageId);
                 } catch (e) {
                 }

@@ -1,12 +1,12 @@
 import Command from "../Classes/Command";
 import {
+    CommandInteractionOptionResolver,
     Guild,
     GuildMember, Interaction,
-    Message,
     MessageActionRow,
     MessageButton,
     MessageEmbed,
-    Role, VoiceState
+    Role, TextBasedChannels, User, VoiceState
 } from "discord.js";
 import config from "../config";
 import VocalSubscribe, {IVocalSubscribe} from "../Models/VocalSubscribe";
@@ -21,27 +21,36 @@ export default class Vocal extends Command {
     static description = "Être alerté quand une ou plusieurs personnes se connectent à un ou plusieurs channels";
     static commandName = "vocal";
 
-    constructor(message: Message) {
-        super(message, Vocal.commandName);
-    }
+    static slashCommand = true;
 
-    argsModel = {
-        help: {fields: ["-h", "--help"], type: "boolean", required: false, description: "Pour afficher l'aide"},
-
+    static argsModel = {
         $argsByType: {
             action: {
-                required: (args) => args.help == undefined,
+                isSubCommand: true,
+                required: true,
                 type: "string",
                 description: "L'action à effectuer : add, remove, block, unblock, stop, start, limit, mute, unmute, status",
-                valid: (field) => ['add', 'remove', 'block',  'unblock', 'stop', 'start', 'limit', 'mute', 'unmute', 'status'].includes(field)
+                choices: {
+                    add: "Envoyer une demande d'écoute",
+                    remove: "Supprimer une écoute en cours",
+                    block: "Bloquer un/des utilisateurs et/ou un/des rôles pour les empêcher de vous écouter",
+                    unblock: "Débloquer un/des utilisateurs et/ou un/des rôles",
+                    stop: "Désactiver les notifications d'écoute",
+                    start: "Réactiver les notification d'écoute",
+                    limit: "Avoir un répit entre chaque notification (exemple de temps: 30s, 5min, 3j)",
+                    mute: "Bloquer les notifications pendant un certain temps (exemple de temps: 30s, 5min, 3j)",
+                    unmute: "Se démuter",
+                    status: "Voir ses infos"
+                }
             },
-            subAction: {
+            subs: {
+                referToSubCommands: ['status'],
                 required: false,
-                type: "string",
-                description: "Obtenir plus de détails concernant les écoutes : subs",
-                valid: (field) => ['sub', 'subs'].includes(field)
+                type: "boolean",
+                description: "Obtenir plus de détails concernant les écoutes : subs"
             },
             roles: {
+                referToSubCommands: ['block','unblock'],
                 required: false,
                 displayValidError: true,
                 displayExtractError: true,
@@ -56,15 +65,28 @@ export default class Vocal extends Command {
                 })
             },
             users: {
-                required: (args) => args.help == undefined &&
-                    (['add', 'remove'].includes(args.action) || (['block', 'unblock'].includes(args.action) && args.roles.length == 0)),
+                referToSubCommands: ['block','unblock','add','remove'],
+                required: (args) =>
+                    (['add', 'remove'].includes(args.action) || (['block', 'unblock'].includes(args.action) && args.roles instanceof Array && args.roles.length == 0)),
                 displayValidErrorEvenIfFound: true,
                 displayExtractError: true,
                 type: "user",
                 multi: true,
                 description: "Le ou les utilisateurs à ignorer ou écouter quand ils se connectent sur un vocal",
-                valid: (user: GuildMember, args) =>
-                    user.id !== this.message.author.id && !args.users.some(eachUser => eachUser.id === user.id),
+                valid: (users: GuildMember|GuildMember[], args, command: Command) => {
+                    if (users instanceof GuildMember && (users.id === command.member.id || args.users.some(eachUser => eachUser.id === users.id)))
+                        return false;
+                    if (users instanceof Array) {
+                        let alreadySpecifieds = {};
+                        for (const user of users) {
+                            if (user.id === command.member.id || alreadySpecifieds[user.id])
+                                return false;
+                            else
+                                alreadySpecifieds[user.id] = true;
+                        }
+                    }
+                    return true;
+                },
                 errorMessage: (value, args) => (value == undefined && args.channels == undefined && ['block', 'unblock'].includes(args.action)) ?
                     {
                         name: "Rentrez au moins l'un des deux",
@@ -76,7 +98,8 @@ export default class Vocal extends Command {
                     }
             },
             time: {
-                required: (args) => args.help == undefined && ["limit", "mute"].includes(args.action),
+                referToSubCommands: ['limit','mute'],
+                required: (args) => ["limit", "mute"].includes(args.action),
                 type: "duration",
                 description: "Le temps durant lequel on souhaite ne pas recevoir de notif (ex: 30s, 5m, 3h, 2j)",
                 valid: (time, args) => args.action !== 'mute' || time > 0
@@ -84,49 +107,51 @@ export default class Vocal extends Command {
         }
     }
 
-    async action(args: { help: boolean, action: string, subAction: string, users: GuildMember[], roles: Role[], time: number }) {
-        const {help, action, subAction, roles, users, time} = args;
+    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: string) {
+        super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, Vocal.commandName, Vocal.argsModel);
+    }
 
-        if (help) {
-            this.displayHelp();
-            return false;
+    async action(args: { action: string, subs: boolean, users: GuildMember[], roles: Role[], time: number }) {
+        const {action, subs, roles, users, time} = args;
+
+        if (this.guild === null) {
+            return this.response(false,
+                this.sendErrors({
+                    name: "Missing guild",
+                    value: "We couldn't find the guild"
+                })
+            );
         }
 
-        if (this.message.guild === null) {
-            this.sendErrors({
-                name: "Missing guild",
-                value: "We couldn't find the message guild"
-            });
-            return false;
-        }
-
-        const vocalConfig: IVocalConfig = await VocalConfig.findOne({serverId: this.message.guild.id, enabled: true});
+        const vocalConfig: IVocalConfig = await VocalConfig.findOne({serverId: this.guild.id, enabled: true});
         if (vocalConfig == null) {
-            this.sendErrors({
-                name: "Vocal désactivé",
-                value: "Vous ne pouvez pas executer cette commande car l'option d'abonnement vocal n'est pas activée sur ce serveur"
-            });
-            return false;
+            return this.response(false,
+                this.sendErrors({
+                    name: "Vocal désactivé",
+                    value: "Vous ne pouvez pas executer cette commande car l'option d'abonnement vocal n'est pas activée sur ce serveur"
+                })
+            );
         }
         if (['add', 'remove'].includes(action) &&
-            (vocalConfig.listenerBlacklist.users.includes(this.message.author.id) ||
-                vocalConfig.listenerBlacklist.roles.some(roleId => this.message.member && this.message.member.roles.cache.some(role => role.id === roleId)))) {
-            this.sendErrors({
-                name: "Accès interdit",
-                value: "Vous n'avez visiblement pas le droit d'utiliser l'option d'abonnement vocal sur ce serveur"
-            });
-            return false;
+            (vocalConfig.listenerBlacklist.users.includes(this.member.id) ||
+                vocalConfig.listenerBlacklist.roles.some(roleId => this.member instanceof GuildMember && this.member.roles.cache.some(role => role.id === roleId)))) {
+            return this.response(false,
+                this.sendErrors({
+                    name: "Accès interdit",
+                    value: "Vous n'avez visiblement pas le droit d'utiliser l'option d'abonnement vocal sur ce serveur"
+                })
+            );
         }
 
         let ownUserConfig: IVocalUserConfig | typeof VocalUserConfig = await VocalUserConfig.findOne({
-            serverId: this.message.guild.id,
-            userId: this.message.author.id
+            serverId: this.guild.id,
+            userId: this.member.id
         });
 
         if (ownUserConfig === null) {
             ownUserConfig = await VocalUserConfig.create({
-                serverId: this.message.guild.id,
-                userId: this.message.author.id,
+                serverId: this.guild.id,
+                userId: this.member.id,
                 blocked: {users: [], roles: []},
                 listening: true,
                 limit: 0
@@ -145,9 +170,9 @@ export default class Vocal extends Command {
 
             for (const user of users) {
                 const subscribe = await VocalSubscribe.findOne({
-                    listenerId: this.message.author.id,
+                    listenerId: this.member.id,
                     listenedId: user.id,
-                    serverId: this.message.guild.id
+                    serverId: this.guild.id
                 });
 
                 if (subscribe !== null) {
@@ -156,8 +181,8 @@ export default class Vocal extends Command {
                 }
 
                 const invite = await VocalInvite.findOne({
-                    serverId: this.message.guild.id,
-                    requesterId: this.message.author.id,
+                    serverId: this.guild.id,
+                    requesterId: this.member.id,
                     requestedId: user.id
                 });
 
@@ -167,13 +192,13 @@ export default class Vocal extends Command {
                 }
 
                 const userConfig: null | IVocalUserConfig = await VocalUserConfig.findOne({
-                    serverId: this.message.guild.id,
+                    serverId: this.guild.id,
                     userId: user.id
                 });
                 if (userConfig !== null &&
                     (
-                        userConfig.blocked.users.includes(this.message.author.id) ||
-                        userConfig.blocked.roles.some(roleId => this.message.member && this.message.member.roles.cache.some(role => role.id === roleId))
+                        userConfig.blocked.users.includes(this.member.id) ||
+                        userConfig.blocked.roles.some(roleId => this.member instanceof GuildMember && this.member.roles.cache.some(role => role.id === roleId))
                     )) {
                     forbiddens.push(user);
                     continue;
@@ -183,7 +208,7 @@ export default class Vocal extends Command {
 
                 try {
                     await user.send({
-                        content: (this.message.member?.nickname ?? this.message.author.username) + " souhaite pouvoir écouter vos connexions vocales sur le serveur '" + this.message.guild.name + "'",
+                        content: (this.member instanceof GuildMember ? (this.member.nickname??this.member.user.username) : this.member.username) + " souhaite pouvoir écouter vos connexions vocales sur le serveur '" + this.guild.name + "'",
                         components: [
                             new MessageActionRow().addComponents(
                                 new MessageButton()
@@ -204,17 +229,17 @@ export default class Vocal extends Command {
 
                 VocalInvite.create({
                     buttonId: acceptButtonId,
-                    requesterId: this.message.author.id,
+                    requesterId: this.member.id,
                     requestedId: user.id,
                     accept: true,
-                    serverId: this.message.guild.id
+                    serverId: this.guild.id
                 });
                 VocalInvite.create({
                     buttonId: denyButtonId,
-                    requesterId: this.message.author.id,
+                    requesterId: this.member.id,
                     requestedId: user.id,
                     accept: false,
-                    serverId: this.message.guild.id
+                    serverId: this.guild.id
                 });
 
                 inviteds.push(user);
@@ -251,9 +276,7 @@ export default class Vocal extends Command {
                 });
             }
 
-            this.message.channel.send({embeds: [embed]});
-            return true;
-
+            return this.response(true, {embeds: [embed]});
         }
 
         if (action == 'remove') {
@@ -262,8 +285,8 @@ export default class Vocal extends Command {
 
             for (const user of users) {
                 const vocalSubscribe: typeof VocalSubscribe = await VocalSubscribe.findOne({
-                    serverId: this.message.guild.id,
-                    listenerId: this.message.author.id,
+                    serverId: this.guild.id,
+                    listenerId: this.member.id,
                     listenedId: user.id
                 });
 
@@ -287,8 +310,7 @@ export default class Vocal extends Command {
                     value: deleted.map(user => "<@" + user.id + ">").join("\n")
                 });
 
-            this.message.channel.send({embeds: [embed]});
-            return true;
+            return this.response(true, {embeds: [embed]});
         }
 
 
@@ -311,8 +333,8 @@ export default class Vocal extends Command {
             }
 
             const vocalSubscribes: Array<typeof VocalSubscribe | IVocalSubscribe> = await VocalSubscribe.find({
-                serverId: this.message.guild.id,
-                listenedId: this.message.author.id,
+                serverId: this.guild.id,
+                listenedId: this.member.id,
                 enabled: true
             });
 
@@ -325,7 +347,7 @@ export default class Vocal extends Command {
 
                 let listener: GuildMember;
                 try {
-                    listener = await this.message.guild.members.fetch(vocalSubscribe.listenerId);
+                    listener = await this.guild.members.fetch(vocalSubscribe.listenerId);
                 } catch (e) {
                     vocalSubscribe.remove();
                     notFoundUsersId.push(vocalSubscribe.listenerId);
@@ -356,9 +378,7 @@ export default class Vocal extends Command {
                     value: blocked.map(elem => "<@" + (elem instanceof Role ? "&" : "") + elem.id + "> (" + (elem instanceof Role ? 'role' : 'user') + ")").join("\n")
                 });
 
-            this.message.channel.send({embeds: [embed]});
-
-            return true;
+            return this.response(true, {embeds: [embed]});
         }
 
         if (action == 'unblock') {
@@ -382,8 +402,8 @@ export default class Vocal extends Command {
             }
 
             const vocalSubscribes: Array<typeof VocalSubscribe | IVocalSubscribe> = await VocalSubscribe.find({
-                serverId: this.message.guild.id,
-                listenedId: this.message.author.id,
+                serverId: this.guild.id,
+                listenedId: this.member.id,
                 enabled: false
             });
 
@@ -392,7 +412,7 @@ export default class Vocal extends Command {
                     continue;
 
                 const listenerConfig: null | IVocalUserConfig = await VocalUserConfig.findOne({
-                    serverId: this.message.guild.id,
+                    serverId: this.guild.id,
                     listenerId: vocalSubscribe.listenerId
                 });
                 if (listenerConfig != null && !listenerConfig.listening)
@@ -400,7 +420,7 @@ export default class Vocal extends Command {
 
                 let listener: GuildMember;
                 try {
-                    listener = await this.message.guild.members.fetch(vocalSubscribe.listenerId);
+                    listener = await this.guild.members.fetch(vocalSubscribe.listenerId);
                 } catch (e) {
                     vocalSubscribe.remove();
                     notFoundUsersId.push(vocalSubscribe.listenerId);
@@ -436,9 +456,7 @@ export default class Vocal extends Command {
                     value: "Vous avez désactivé votre écoute, donc vous ne recevrez pas de notif"
                 });
 
-            this.message.channel.send({embeds: [embed]});
-
-            return true;
+            return this.response(true, {embeds: [embed]});
         }
 
         if (action === "stop") {
@@ -446,8 +464,8 @@ export default class Vocal extends Command {
             ownUserConfig.save();
 
             await VocalSubscribe.updateMany({
-                serverId: this.message.guild.id,
-                listenerId: this.message.author.id,
+                serverId: this.guild.id,
+                listenerId: this.member.id,
                 enabled: true
             }, {
                 enabled: false
@@ -458,8 +476,7 @@ export default class Vocal extends Command {
                 value: "Ecoute désactivée avec succès"
             });
 
-            this.message.channel.send({embeds: [embed]});
-            return true;
+            return this.response(true, {embeds: [embed]});
         }
 
         if (action === "start") {
@@ -467,21 +484,21 @@ export default class Vocal extends Command {
             ownUserConfig.save();
 
             const vocalSubscribes: Array<typeof VocalSubscribe | IVocalSubscribe> = await VocalSubscribe.find({
-                serverId: this.message.guild.id,
-                listenerId: this.message.author.id,
+                serverId: this.guild.id,
+                listenerId: this.member.id,
                 enabled: false
             });
 
             for (const vocalSubscribe of vocalSubscribes) {
                 const listenedConfig: null | IVocalUserConfig = await VocalUserConfig.findOne({
-                    serverId: this.message.guild.id,
+                    serverId: this.guild.id,
                     userId: vocalSubscribe.listenedId
                 });
 
-                if (listenedConfig !== null && (listenedConfig.blocked.users.includes(this.message.author.id) ||
+                if (listenedConfig !== null && (listenedConfig.blocked.users.includes(this.member.id) ||
                     (
-                        this.message.member &&
-                        this.message.member.roles.cache.some(role => listenedConfig.blocked.roles.some(roleId => roleId === role.id))
+                        this.member instanceof GuildMember &&
+                        this.member.roles.cache.some(role => listenedConfig.blocked.roles.some(roleId => roleId === role.id))
                     ))
                 ) continue
 
@@ -494,18 +511,16 @@ export default class Vocal extends Command {
                 value: "Ecoute activée avec succès"
             });
 
-            this.message.channel.send({embeds: [embed]});
-            return true;
+            return this.response(true, {embeds: [embed]});
         }
 
         if (action === "mute") {
             ownUserConfig.lastMute = new Date(Math.floor(Date.now() / 1000) * 1000);
             ownUserConfig.mutedFor = time
 
-            this.message.channel.send("Vous ne recevrez plus de notification pendant" + showTime(decomposeMsTime(time)));
-
             ownUserConfig.save();
-            return true;
+
+            return this.response(true, "Vous ne recevrez plus de notification pendant" + showTime(decomposeMsTime(time)));
         }
 
         if (action == 'unmute') {
@@ -517,42 +532,40 @@ export default class Vocal extends Command {
                 ownUserConfig.lastMute = null;
                 ownUserConfig.mutedFor = null;
 
-                this.message.channel.send("Vous pouvez de nouveau recevoir des notifications");
-
                 ownUserConfig.save();
-                return true;
+
+                return this.response(true, "Vous pouvez de nouveau recevoir des notifications");
             }
 
-            this.message.channel.send("Vous n'êtes pas mute");
+            return this.response(false, "Vous n'êtes pas mute");
         }
 
         if (action == 'limit') {
             ownUserConfig.limit = time;
-
-            this.message.channel.send((time == 0) ?
-                "Il n'y aura maintenant aucun répit entre les notifications" :
-                "Il y aura maintenant un répit de" + showTime(decomposeMsTime(time)) + " entre chaque notification"
-            );
             ownUserConfig.save();
 
-            return true;
+            return this.response(true,
+                (time == 0) ?
+                    "Il n'y aura maintenant aucun répit entre les notifications" :
+                    "Il y aura maintenant un répit de" + showTime(decomposeMsTime(time)) + " entre chaque notification"
+            );
         }
 
         if (action == "status") {
             let embeds: MessageEmbed[] = [embed];
 
-            if (["sub", 'subs'].includes(subAction)) {
+            if (subs) {
 
                 const subscribings: Array<IVocalSubscribe|typeof VocalSubscribe> = await VocalSubscribe.find({
-                    serverId: this.message.guild.id,
-                    listenerId: this.message.author.id
+                    serverId: this.guild.id,
+                    listenerId: this.member.id
                 })
 
                 if (subscribings.length > 0) {
                     const subscribingsEmbeds = splitFieldsEmbed(15, await Promise.all(subscribings.map(async subscribe => {
                         let member: null | GuildMember = null;
                         try {
-                            member = (await this.message.guild?.members.fetch(subscribe.listenedId)) ?? null;
+                            member = (await this.guild?.members.fetch(subscribe.listenedId)) ?? null;
                         } catch (_) {
                             subscribe.remove();
                         }
@@ -575,22 +588,22 @@ export default class Vocal extends Command {
                 }
 
                 const subscribeds: Array<IVocalSubscribe|typeof VocalSubscribe> = await VocalSubscribe.find({
-                    serverId: this.message.guild.id,
-                    listenedId: this.message.author.id
+                    serverId: this.guild.id,
+                    listenedId: this.member.id
                 })
 
                 if (subscribeds.length > 0) {
                     const subscribedsEmbeds = splitFieldsEmbed(15, await Promise.all(subscribeds.map(async subscribe => {
                         let member: null | GuildMember = null;
                         try {
-                            member = (await this.message.guild?.members.fetch(subscribe.listenerId)) ?? null;
+                            member = (await this.guild?.members.fetch(subscribe.listenerId)) ?? null;
                         } catch (_) {
                             subscribe.remove();
                         }
                         let muted = false;
                         if (member) {
                             const userConfig: IVocalUserConfig = await VocalUserConfig.findOne({
-                                serverId: (<Guild>this.message.guild).id,
+                                serverId: (<Guild>this.guild).id,
                                 userId: subscribe.listenerId
                             })
                             muted = userConfig != null &&
@@ -643,8 +656,8 @@ export default class Vocal extends Command {
 
 
                 const nbSubscribings: number = await VocalSubscribe.count({
-                    serverId: this.message.guild.id,
-                    listenerId: this.message.author.id
+                    serverId: this.guild.id,
+                    listenerId: this.member.id
                 })
 
                 fieldLines.push(nbSubscribings == 0 ?
@@ -652,8 +665,8 @@ export default class Vocal extends Command {
                     "Vous écoutez " + nbSubscribings + " personnes, faites '" + config.command_prefix + this.commandName + " status subs' pour plus de détails");
 
                 const nbSubscribeds: number = await VocalSubscribe.count({
-                    serverId: this.message.guild.id,
-                    listenedId: this.message.author.id
+                    serverId: this.guild.id,
+                    listenedId: this.member.id
                 })
 
                 fieldLines.push(nbSubscribeds == 0 ?
@@ -683,12 +696,10 @@ export default class Vocal extends Command {
                 }
             }
 
-
-            this.message.channel.send({embeds});
-            return true;
+            return this.response(true, {embeds})
         }
 
-        return false;
+        return this.response(false, "Vous n'avez rentré aucune option");
     }
 
     static async listenVoiceChannelsConnects(oldState: VoiceState, newState: VoiceState) {

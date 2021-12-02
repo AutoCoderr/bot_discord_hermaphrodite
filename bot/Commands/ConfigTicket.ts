@@ -2,13 +2,13 @@ import Command from "../Classes/Command";
 import config from "../config";
 import TicketConfig, {ITicketConfig} from "../Models/TicketConfig";
 import Discord, {
-    CategoryChannel, ClientUser,
+    CategoryChannel, ClientUser, CommandInteractionOptionResolver,
     Guild,
     GuildChannel,
     GuildEmoji,
     GuildMember,
     Message,
-    MessageEmbed, PermissionString, Role,
+    MessageEmbed, PermissionString, Role, TextBasedChannels,
     TextChannel, User
 } from "discord.js";
 import {splitFieldsEmbed} from "../Classes/OtherFunctions";
@@ -28,53 +28,83 @@ const toAllowToAuthorAndModerators: Array<PermissionString> = [
     'READ_MESSAGE_HISTORY'];
 
 export default class ConfigTicket extends Command {
+    static display = true;
+    static description = "Pour définir la catégorie pour les channels des tickets, activer, ou désactiver les ticket.";
+    static commandName = "configTicket";
+    static slashCommand = true;
 
-    argsModel = {
-        help: { fields: ["-h","--help"], type: "boolean", required: false, description: "Pour afficher l'aide" },
-        allListen: {fields: ['-a','--all'], type: "boolean", required: false, description: "Pour viser toutes les écoutes de message"},
-
+    static argsModel = {
         $argsByType: {
             action: {
-                required: args => args.help == undefined,
+                isSubCommand: true,
+                required: true,
                 type: "string",
                 description: "L'action à effectuer : set, set-moderator, unset-moderator, show, show-moderator, disable, enable, listen ou blacklist",
-                valid: (elem,_) => ['set','set-moderator','unset-moderator','show','show-moderator','disable','enable','listen','blacklist'].includes(elem)
+                choices: {
+                    set: "Définir l'id de la catégorie dans laquelle apparaitrons les tickets",
+                    "set-moderator": "Définir le rôle des modérateurs",
+                    "unset-moderator": "'Déconfigurer' le rôle modérateur",
+                    show: "Afficher les écoutes de réactions",
+                    "show-moderator": "Afficher le role modérateur actuel",
+                    disable: "Désactiver les tickets sur ce serveur",
+                    enable: "Réactiver les tickets sur ce serveur",
+                    listen: "Créer une écoute de réaction sur un message pour la création de ticket",
+                    blacklist: "Manipuler la blacklist"
+                }
             },
             moderatorRole: {
-                required: args => args.help == undefined && args.action == "set-moderator",
+                referToSubCommands: ["set-moderator"],
+                required: args => args.action == "set-moderator",
                 type: "role",
                 description: "Le role désignant les modérateurs sur ce serveur"
             },
             category: {
-                required: args => args.help == undefined && args.action == "set",
+                referToSubCommands: ["set"],
+                required: args => args.action == "set",
                 type: "category",
                 description: "L'id de la catégorie à définir avec 'set'"
             },
             subAction: {
-                required: args => args.help == undefined && ["blacklist","listen"].includes(args.action),
+                isSubCommand: true,
+                referToSubCommands: ["blacklist","listen"],
+                required: args => ["blacklist","listen"].includes(args.action),
                 type: "string",
                 description: "L'action à effectuer : add, remove ou show",
-                valid: (elem,_) => ['add','remove','show'].includes(elem)
+                choices: {
+                    add: "Ajouter",
+                    remove: "Retirer",
+                    show: "Afficher"
+                }
             },
             user: {
-                required: args => args.help == undefined && args.action == "blacklist" && ['add','remove'].includes(args.subAction),
+                referToSubCommands: ["blacklist.add","blacklist.remove"],
+                required: args => args.action == "blacklist" && ['add','remove'].includes(args.subAction),
                 type: "user",
                 multi: true,
                 description: "Le ou les utilisateurs à ajouter ou retirer de la blacklist"
             },
+            allListen: {
+                referToSubCommands: ['listen.remove'],
+                type: "boolean",
+                required: false,
+                description: "Pour viser toutes les écoutes de message"
+            },
             channelListen: {
-                required: args => args.help == undefined && args.action == "listen" && (args.subAction == "add" || (args.subAction == "remove" && !args.allListen)),
+                referToSubCommands: ["listen.add","listen.remove"],
+                required: args => args.action == "listen" && (args.subAction == "add" || (args.subAction == "remove" && !args.allListen)),
                 type: "channel",
                 description: "Le channel sur lequel ajouter, retirer, ou afficher les écoutes de réaction",
                 valid: (elem: GuildChannel,_) => elem.type == "GUILD_TEXT"
             },
             emoteListen: {
-                required: args => args.help == undefined && args.action == "listen" && args.subAction == "add",
+                referToSubCommands: ["listen.add"],
+                required: args => args.action == "listen" && args.subAction == "add",
                 type: "emote",
                 description: "L'emote sur l'aquelle ajouter ou retirer une écoute de réaction"
             },
             messageListen: {
-                required: args => args.help == undefined && args.action == "listen" && (args.subAction == "add" || (args.subAction == "remove" && args.emoteListen != undefined)),
+                referToSubCommands: ["listen.add","listen.remove"],
+                required: args => args.action == "listen" && (args.subAction == "add" || (args.subAction == "remove" && args.emoteListen != undefined)),
                 type: "message",
                 description: "L'id du message sur lequel ajouter, retirer, ou afficher les écoutes de réaction",
                 moreDatas: args => args.channelListen
@@ -82,44 +112,36 @@ export default class ConfigTicket extends Command {
         },
     }
 
-    static display = true;
-    static description = "Pour définir la catégorie pour les channels des tickets, activer, ou désactiver les ticket.";
-    static commandName = "configTicket";
-
-    constructor(message: Message) {
-        super(message, ConfigTicket.commandName);
+    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: string) {
+        super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, ConfigTicket.commandName, ConfigTicket.argsModel);
     }
 
-    async action(args: {help: boolean, action: string, category: CategoryChannel, subAction: string, user: GuildMember, channelListen: TextChannel, messageListen: Message, emoteListen: GuildEmoji|string, moderatorRole: Role}, bot) {
-        const {help, action, category, subAction, user, channelListen, messageListen, emoteListen, moderatorRole} = args;
+    async action(args: {action: string, category: CategoryChannel, subAction: string, user: GuildMember, channelListen: TextChannel, messageListen: Message, emoteListen: GuildEmoji|string, moderatorRole: Role}, bot) {
+        const {action, category, subAction, user, channelListen, messageListen, emoteListen, moderatorRole} = args;
 
-        if (help) {
-            this.displayHelp();
-            return false;
-        }
-
-
-        if (this.message.guild == null || this.message.member == null) {
-            this.sendErrors({
-                name: "Datas missing",
-                value: "Nor message guild nor message membre has been found"
-            });
-            return false;
+        if (this.guild == null || !(this.member instanceof GuildMember)) {
+            return this.response(false,
+                this.sendErrors({
+                    name: "Datas missing",
+                    value: "Nor guild nor member has been found"
+                })
+            );
         }
 
         let ticketConfig: ITicketConfig;
         let emoteName: string|null;
+        let resultContent: string;
 
         switch(action) {
             case "set":
-                ticketConfig = await TicketConfig.findOne({serverId: this.message.guild.id});
+                ticketConfig = await TicketConfig.findOne({serverId: this.guild.id});
                 let toEnable = false;
                 if (ticketConfig == null) {
                     toEnable = true;
                     ticketConfig = {
                         enabled: true,
                         categoryId: category.id,
-                        serverId: this.message.guild.id,
+                        serverId: this.guild.id,
                         blacklist: [],
                         messagesToListen: [],
                         moderatorId: null,
@@ -134,16 +156,17 @@ export default class ConfigTicket extends Command {
                     ticketConfig.categoryId = category.id; // @ts-ignore
                     ticketConfig.save();
                 }
-                this.message.channel.send("Ce sera dorénavant dans la catégorie '"+category.name+"' que seront gérés les tickets"+
-                    (toEnable ?  "\n(La fonctionnalité des tickets a été activée)" : ""));
-                return true;
+                return this.response(true,
+                    "Ce sera dorénavant dans la catégorie '"+category.name+"' que seront gérés les tickets"+
+                    (toEnable ?  "\n(La fonctionnalité des tickets a été activée)" : "")
+                );
             case "set-moderator":
-                ticketConfig = await TicketConfig.findOne({serverId: this.message.guild.id});
+                ticketConfig = await TicketConfig.findOne({serverId: this.guild.id});
                 if (ticketConfig == null) {
                     ticketConfig = {
                         enabled: false,
                         categoryId: null,
-                        serverId: this.message.guild.id,
+                        serverId: this.guild.id,
                         blacklist: [],
                         messagesToListen: [],
                         moderatorId: moderatorRole.id,
@@ -155,88 +178,88 @@ export default class ConfigTicket extends Command {
                     // @ts-ignore
                     ticketConfig.save()
                 }
-                this.message.channel.send("Les modérateurs ont été définit sur le role <@&"+moderatorRole.id+">");
-                return true;
+                return this.response(true,
+                    "Les modérateurs ont été définit sur le role <@&"+moderatorRole.id+">"
+                );
             case "unset-moderator":
-                ticketConfig = await TicketConfig.findOne({serverId: this.message.guild.id});
+                ticketConfig = await TicketConfig.findOne({serverId: this.guild.id});
                 if (ticketConfig == null || !ticketConfig.moderatorId) {
-                    this.message.channel.send("Aucun rôle modérateur configuré");
+                    resultContent = "Aucun rôle modérateur configuré";
                 } else {
                     ticketConfig.moderatorId = null; //@ts-ignore
                     ticketConfig.save()
-                    this.message.channel.send("Le rôle modérateur a été retiré de la configuration");
+                    resultContent = "Le rôle modérateur a été retiré de la configuration";
                 }
-                return true;
+                return this.response(true, resultContent);
             case "show":
-                ticketConfig = await TicketConfig.findOne({serverId: this.message.guild.id, categoryId: { $ne: null }});
+                ticketConfig = await TicketConfig.findOne({serverId: this.guild.id, categoryId: { $ne: null }});
                 if (ticketConfig == null) {
-                    this.message.channel.send("On dirait que vous n'avez pas encore configuré les tickets sur ce serveur, vous pouvez le faire en définissant la catégorie via : "+config.command_prefix+this.commandName+" set idDeLaCategorie")
+                    resultContent = "On dirait que vous n'avez pas encore configuré les tickets sur ce serveur, vous pouvez le faire en définissant la catégorie via : "+config.command_prefix+this.commandName+" set idDeLaCategorie";
                 } else {
-                    const category = this.message.guild.channels.cache.get(<string>ticketConfig.categoryId);
+                    const category = this.guild.channels.cache.get(<string>ticketConfig.categoryId);
                     if (category == undefined) {
-                        this.message.channel.send("On dirait que la catégorie que vous aviez définie n'existe plus, vous pouvez la redéfinir avec : " + config.command_prefix + this.commandName + " set idDeLaCategorie");
+                        resultContent = "On dirait que la catégorie que vous aviez définie n'existe plus, vous pouvez la redéfinir avec : " + config.command_prefix + this.commandName + " set idDeLaCategorie";
                     } else {
-                        this.message.channel.send("Catégorie utilisée pour les tickets : " + category.name+" ("+(ticketConfig.enabled ? 'activé': 'désactivé')+")");
+                        resultContent = "Catégorie utilisée pour les tickets : " + category.name+" ("+(ticketConfig.enabled ? 'activé': 'désactivé')+")";
                     }
                 }
-                return true;
+                return this.response(true, resultContent);
             case "show-moderator":
-                ticketConfig = await TicketConfig.findOne({serverId: this.message.guild.id, moderatorId: { $ne: null }});
+                ticketConfig = await TicketConfig.findOne({serverId: this.guild.id, moderatorId: { $ne: null }});
                 if (ticketConfig) {
-                    this.message.channel.send("Role modérateur configuré : <@&"+ticketConfig.moderatorId+">");
+                    resultContent = "Role modérateur configuré : <@&"+ticketConfig.moderatorId+">";
                 } else {
-                    this.message.channel.send("Aucun rôle modérateur configuré");
+                    resultContent = "Aucun rôle modérateur configuré";
                 }
-                return true;
+                return this.response(true, resultContent);
             case "disable":
-                ticketConfig = await TicketConfig.findOne({serverId: this.message.guild.id, categoryId: { $ne: null }});
+                ticketConfig = await TicketConfig.findOne({serverId: this.guild.id, categoryId: { $ne: null }});
                 if (ticketConfig == null) {
-                    this.message.channel.send("On dirait que vous n'avez pas encore configuré les tickets sur ce serveur, vous pouvez le faire en définissant la catégorie via : "+config.command_prefix+this.commandName+" set idDeLaCategorie")
+                    resultContent = "On dirait que vous n'avez pas encore configuré les tickets sur ce serveur, vous pouvez le faire en définissant la catégorie via : "+config.command_prefix+this.commandName+" set idDeLaCategorie";
                 } else {
                     ticketConfig.enabled = false; // @ts-ignore
                     ticketConfig.save();
-                    this.message.channel.send("La fonctionalité des tickets a été désactivée.");
+                    resultContent = "La fonctionalité des tickets a été désactivée.";
                 }
-                return true;
+                return this.response(true, resultContent);
             case "enable":
-                ticketConfig = await TicketConfig.findOne({serverId: this.message.guild.id, categoryId: { $ne: null }});
+                ticketConfig = await TicketConfig.findOne({serverId: this.guild.id, categoryId: { $ne: null }});
                 if (ticketConfig == null) {
-                    this.message.channel.send("On dirait que vous n'avez pas encore configuré les tickets sur ce serveur, vous pouvez le faire en définissant la catégorie via : "+config.command_prefix+this.commandName+" set idDeLaCategorie")
+                    resultContent = "On dirait que vous n'avez pas encore configuré les tickets sur ce serveur, vous pouvez le faire en définissant la catégorie via : "+config.command_prefix+this.commandName+" set idDeLaCategorie";
                 } else {
                     ticketConfig.enabled = true; // @ts-ignore
                     ticketConfig.save();
-                    this.message.channel.send("La fonctionalité des tickets a été activée. \nFaite '"+config.command_prefix+this.commandName+" show ' pour voir le nom de la catégorie dans laquelle apparaitrons les tickets");
+                    resultContent = "La fonctionalité des tickets a été activée. \nFaite '"+config.command_prefix+this.commandName+" show ' pour voir le nom de la catégorie dans laquelle apparaitrons les tickets";
                 }
-                return true;
+                return this.response(true, resultContent);
             case "listen":
-                ticketConfig = await TicketConfig.findOne({serverId: this.message.guild.id, categoryId: { $ne: null }});
+                ticketConfig = await TicketConfig.findOne({serverId: this.guild.id, categoryId: { $ne: null }});
                 if (ticketConfig == null ||
-                    <CategoryChannel>this.message.guild.channels.cache.get(<string>ticketConfig.categoryId) == undefined) {
-                    this.message.channel.send("On dirait que vous n'avez pas encore configuré les tickets sur ce serveur, vous pouvez le faire en définissant la catégorie via : "+config.command_prefix+this.commandName+" set idDeLaCategorie");
-                    return false;
+                    <CategoryChannel>this.guild.channels.cache.get(<string>ticketConfig.categoryId) == undefined) {
+                    return this.response(false,
+                        "On dirait que vous n'avez pas encore configuré les tickets sur ce serveur, vous pouvez le faire en définissant la catégorie via : "+config.command_prefix+this.commandName+" set idDeLaCategorie"
+                    );
                 }
                 if (!(ticketConfig.messagesToListen instanceof Array)) ticketConfig.messagesToListen = [];
                 switch (subAction) {
                     case "add":
                         const emote = emoteListen instanceof GuildEmoji ? emoteListen.name : emoteListen;
                         if (emote == null) {
-                            this.message.channel.send("L'émoji spécifié semble invalide");
-                            return false;
+                            return this.response(false, "L'émoji spécifié semble invalide")
                         }
                         if (ticketConfig.messagesToListen.find(message =>
                             message.channelId == channelListen.id &&
                             message.messageId == messageListen.id &&
                             message.emoteName == emote)) {
 
-                            this.message.channel.send("Il y a déjà une écoute de réaction pour création de ticket sur ce message avec cette emote");
-                            return false;
+                            return this.response(false, "Il y a déjà une écoute de réaction pour création de ticket sur ce message avec cette emote");
                         }
                         ticketConfig.messagesToListen.push({channelId: channelListen.id, messageId: messageListen.id, emoteName: emote}); // @ts-ignore
                         ticketConfig.save();
                         messageListen.react(emoteListen);
                         ConfigTicket.listenMessageTicket(messageListen, emote, ticketConfig._id, ticketConfig.messagesToListen[ticketConfig.messagesToListen.length-1]._id);
-                        this.message.channel.send("Une écoute a été activée sur ce message pour la création de ticket");
-                        return true;
+
+                        return this.response(true, "Une écoute a été activée sur ce message pour la création de ticket");
                     case "remove":
                         emoteName = emoteListen instanceof GuildEmoji ? emoteListen.name : emoteListen;
 
@@ -246,7 +269,7 @@ export default class ConfigTicket extends Command {
                             if ((emoteName == null || listening.emoteName == emoteName) &&
                                 (messageListen == undefined || listening.messageId == messageListen.id) &&
                                 (channelListen == undefined || listening.channelId == channelListen.id)) {
-                                const exist = await ConfigTicket.listeningMessageExist(listening,this.message.guild);
+                                const exist = await ConfigTicket.listeningMessageExist(listening,this.guild);
                                 if (exist) {
                                     const reaction = exist.message.reactions.cache.find(reaction => reaction.emoji.name == listening.emoteName);
                                     if (reaction) reaction.remove();
@@ -257,13 +280,13 @@ export default class ConfigTicket extends Command {
                             }
                         }
                         if (nbRemoved == 0) {
-                            this.message.channel.send("Aucune écoute de réaction n'a été trouvée");
-                            return false;
+                            return this.response(false, "Aucune écoute de réaction n'a été trouvée");
                         }
                          // @ts-ignore
                         ticketConfig.save();
-                        this.message.channel.send(nbRemoved+" écoute"+(nbRemoved > 1 ? 's' : '')+" "+(nbRemoved > 1 ? "ont " : "a ")+"été supprimée"+(nbRemoved > 1 ? 's' : '')+" avec succès!");
-                        return true;
+                        return this.response(true,
+                            nbRemoved+" écoute"+(nbRemoved > 1 ? 's' : '')+" "+(nbRemoved > 1 ? "ont " : "a ")+"été supprimée"+(nbRemoved > 1 ? 's' : '')+" avec succès!"
+                        )
                     case "show":
                         emoteName = emoteListen instanceof GuildEmoji ? emoteListen.name : emoteListen;
 
@@ -273,7 +296,7 @@ export default class ConfigTicket extends Command {
                             if ((emoteName == undefined || message.emoteName == emoteName) &&
                                 (messageListen == undefined || message.messageId == messageListen.id) &&
                                 (channelListen == undefined || message.channelId == channelListen.id)) {
-                                const exist = await ConfigTicket.listeningMessageExist(ticketConfig.messagesToListen[i],this.message.guild);
+                                const exist = await ConfigTicket.listeningMessageExist(ticketConfig.messagesToListen[i],this.guild);
                                 fields.push(exist ? {
                                     name: "#"+exist.channel.name+" > ("+exist.message.content.substring(0,Math.min(20,exist.message.content.length))+"...) :"+ticketConfig.messagesToListen[i].emoteName+":",
                                     value: "Channel : #"+exist.channel.name+" ; Id du message : "+exist.message.id
@@ -288,8 +311,7 @@ export default class ConfigTicket extends Command {
                             }
                         }
                         if (fields.length == 0) {
-                            this.message.channel.send("Aucune écoute de réaction trouvée");
-                            return false;
+                            return this.response(false, "Aucune écoute de réaction trouvée");
                         } // @ts-ignore
                         ticketConfig.save();
                         const embeds: Array<MessageEmbed> = splitFieldsEmbed(25,fields,(Embed: MessageEmbed, partNb: number) => {
@@ -297,24 +319,22 @@ export default class ConfigTicket extends Command {
                                 Embed.setTitle("Les écoutes de réactions pour le ticketing");
                             }
                         });
-                        this.message.channel.send({embeds});
-                        return true;
-
+                        return this.response(true, {embeds});
                 }
-                return false;
+                break;
             case "blacklist":
                 switch(subAction) {
                     case "add":
-                        return this.addUserToBlackList(this.message.guild.id,user.id);
+                        return this.addUserToBlackList(this.guild.id,user.id);
 
                     case "remove":
-                        return this.removeUserFromBlackList(this.message.guild.id,user.id);
+                        return this.removeUserFromBlackList(this.guild.id,user.id);
 
                     case "show":
-                        return this.showUsersInBlackList(bot, this.message.guild.id);
+                        return this.showUsersInBlackList(bot, this.guild.id);
                 }
         }
-        return false;
+        return this.response(false, "Vous n'avez pas spécifié les bonnes actions");
     }
 
     async addUserToBlackList(serverId, userId) {
@@ -332,23 +352,20 @@ export default class ConfigTicket extends Command {
             TicketConfig.create(ticketConfig);
         } else {
             if (ticketConfig.blacklist.includes(userId)) {
-                this.message.channel.send("Il semblerait que cet utilisateur se trouve déjà dans la blacklist");
-                return true;
+                return this.response(true, "Il semblerait que cet utilisateur se trouve déjà dans la blacklist");
             }
 
             ticketConfig.blacklist.push(userId);// @ts-ignore
             ticketConfig.save();
         }
-        this.message.channel.send("L'utilisateur a été ajouté avec succès à la blacklist !");
-        return true;
+        return this.response(true, "L'utilisateur a été ajouté avec succès à la blacklist !");
     }
 
     async removeUserFromBlackList(serverId, userId) {
         let ticketConfig: ITicketConfig = await TicketConfig.findOne({serverId: serverId});
 
         if (ticketConfig == null || !ticketConfig.blacklist.includes(userId)) {
-            this.message.channel.send("Il semblerait que l'utilisateur ne se trouve pas dans la blacklist");
-            return true;
+            return this.response(true, "Il semblerait que l'utilisateur ne se trouve pas dans la blacklist");
         }
         let list = ticketConfig.blacklist ;
         for (let i=0;i<list.length;i++) {
@@ -359,8 +376,7 @@ export default class ConfigTicket extends Command {
         } // @ts-ignore
         ticketConfig.save();
 
-        this.message.channel.send("L'utilisateur a été retiré avec succès de la blacklist !");
-        return true;
+        return this.response(true, "L'utilisateur a été retiré avec succès de la blacklist !");
     }
 
     async showUsersInBlackList(bot, serverId) {
@@ -383,7 +399,7 @@ export default class ConfigTicket extends Command {
 
             for (const userId of list) {
                 try { // @ts-ignore
-                    const user = await this.message.guild.members.fetch(userId);
+                    const user = await this.guild.members.fetch(userId);
                     users.push({username: user.nickname ?? user.user.username, id: user.id});
                 } catch(e) {
                     users.push({username: "unknown", id: userId});
@@ -420,8 +436,7 @@ export default class ConfigTicket extends Command {
                 }
             }
         }
-        this.message.channel.send({embeds});
-        return true;
+        return this.response(true, {embeds});
     }
 
     static async listeningMessageExist(listening: {channelId: string, messageId: string}, guild: Guild) {

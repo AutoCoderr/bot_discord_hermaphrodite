@@ -1,41 +1,45 @@
 import Command from "../Classes/Command";
 import config from "../config";
-import {GuildChannel, GuildMember, Message, MessageEmbed} from "discord.js";
+import {
+    CommandInteractionOptionResolver,
+    Guild,
+    GuildChannel,
+    GuildMember,
+    MessageEmbed,
+    TextBasedChannels,
+    User
+} from "discord.js";
 import {getArgsModelHistory, getHistory} from "../Classes/OtherFunctions";
 
 export default class HistoryExec extends Command {
-
-    argsModel = getArgsModelHistory(this.message);
-
     static display = true;
     static description = "Pour executer des commandes de l'historique.";
     static commandName = "historyExec";
 
-    constructor(message: Message) {
-        super(message, HistoryExec.commandName);
+    static argsModel = getArgsModelHistory();
+
+    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: string) {
+        super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, HistoryExec.commandName, HistoryExec.argsModel);
     }
 
 
-    async action(args: {help: boolean, commands: typeof Command[], sort: string, limit: number, channels: GuildChannel[], users: GuildMember[]}, bot) {
+    async action(args: {commands: typeof Command[], sort: string, limit: number, channels: GuildChannel[], users: GuildMember[]}, bot) {
 
-        if (args.help) {
-            this.displayHelp();
-            return false;
-        }
+        const histories = await getHistory(this,args);
 
-        const histories = await getHistory(this.message,args);
+        const messages: string[] = [];
 
-        this.message.channel.send("Execute : ");
+        messages.push("Execute : ");
 
         if (histories.length > 0) {
             for (let history of histories) {
-                this.message.channel.send(config.command_prefix+history.command);
+                messages.push(config.command_prefix+history.command);
             }
         } else {
-            this.message.channel.send("Aucune commande trouvée")
+            messages.push("Aucune commande trouvée")
         }
 
-        return true;
+        return this.response(true, messages);
     }
 
     saveHistory() {} // overload saveHistory of Command class to save nothing in the history
