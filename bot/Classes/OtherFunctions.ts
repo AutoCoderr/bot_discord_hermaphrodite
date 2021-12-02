@@ -57,8 +57,9 @@ export function getArgsModelHistory() {
         limit: {
             fields: ['-l', '--limit'],
             type: "number",
-            required: false,
-            description: "Pour afficher les n premieres commandes de la listes"
+            required: true,
+            default: 15,
+            description: "Pour afficher les n dernières commandes de la listes"
         },
         channels: {
             fields: ['-ch', '--channel'],

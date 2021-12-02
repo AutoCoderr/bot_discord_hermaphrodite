@@ -267,8 +267,8 @@ export default class Command {
         if (commandName == null) {
             commandName = this.commandName;
         }
-
-        if (channel.type == "DM" || config.roots.includes(member.id) || (member instanceof GuildMember && member.permissions.has("ADMINISTRATOR"))) return true;
+      
+        if (channel.type == "DM" || config.roots.includes(member.id) || (guild != null && guild.ownerId == member.id)) return true;
 
         if (guild && member instanceof GuildMember) {
             const permission: IPermissions = await Permissions.findOne({
