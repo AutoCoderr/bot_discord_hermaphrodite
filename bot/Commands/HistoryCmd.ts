@@ -26,6 +26,7 @@ export default class HistoryCmd extends Command {
     }
 
     async action(args: {commands: typeof Command[], sort: string, limit: number, channels: GuildChannel[], users: GuildMember[]}, bot) {
+        const {commands, sort, limit, channels, users} = args;
 
         if (this.guild == null)
             return this.response(false,
@@ -75,7 +76,7 @@ export default class HistoryCmd extends Command {
                     value: "Aucun élément n'a été trouvé dans l'historique"
                 }));
         }
-      
+
         return this.response(true, embeds.map(embed => ({ embeds: [embed] })));
     }
 
