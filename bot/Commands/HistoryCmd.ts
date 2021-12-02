@@ -19,8 +19,6 @@ export default class HistoryCmd extends Command {
 
     static argsModel = getArgsModelHistory();
 
-    static slashCommand = false;
-
     constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: string) {
         super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, HistoryCmd.commandName, HistoryCmd.argsModel);
     }
