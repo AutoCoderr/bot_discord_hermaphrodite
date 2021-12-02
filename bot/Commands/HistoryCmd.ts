@@ -1,7 +1,15 @@
 import config from "../config";
 import Command from "../Classes/Command";
 import {getArgsModelHistory, getHistory, splitFieldsEmbed} from "../Classes/OtherFunctions";
-import {Guild, GuildChannel, GuildMember, Message, MessageEmbed, TextBasedChannels, User} from "discord.js";
+import {
+    CommandInteractionOptionResolver,
+    Guild,
+    GuildChannel,
+    GuildMember,
+    MessageEmbed,
+    TextBasedChannels,
+    User
+} from "discord.js";
 import {IHistory} from "../Models/History";
 
 export default class HistoryCmd extends Command {
@@ -11,8 +19,10 @@ export default class HistoryCmd extends Command {
 
     static argsModel = getArgsModelHistory();
 
-    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommand: null|string = null) {
-        super(channel, member, guild, writtenCommand, HistoryCmd.commandName, HistoryCmd.argsModel);
+    static slashCommand = false;
+
+    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: string) {
+        super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, HistoryCmd.commandName, HistoryCmd.argsModel);
     }
 
     async action(args: {commands: typeof Command[], sort: string, limit: number, channels: GuildChannel[], users: GuildMember[]}, bot) {

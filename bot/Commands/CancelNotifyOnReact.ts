@@ -4,6 +4,7 @@ import { forEachNotifyOnReact } from "../Classes/OtherFunctions";
 import { existingCommands } from "../Classes/CommandsDescription";
 import StoredNotifyOnReact from "../Models/StoredNotifyOnReact";
 import Discord, {
+    CommandInteractionOptionResolver,
     Guild,
     GuildChannel,
     GuildEmoji,
@@ -49,8 +50,8 @@ export default class CancelNotifyOnReact extends Command {
         }
     };
 
-    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommand: null|string = null) {
-        super(channel, member, guild, writtenCommand, CancelNotifyOnReact.commandName, CancelNotifyOnReact.argsModel);
+    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: string) {
+        super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, CancelNotifyOnReact.commandName, CancelNotifyOnReact.argsModel);
     }
 
     async action(args: {channel: GuildChannel, message: Message, emote: GuildEmoji|string},bot) {

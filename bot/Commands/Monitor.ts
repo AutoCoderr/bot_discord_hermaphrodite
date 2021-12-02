@@ -1,5 +1,6 @@
 import Command from "../Classes/Command";
 import {
+    CommandInteractionOptionResolver,
     Guild,
     GuildChannel,
     GuildMember,
@@ -233,8 +234,8 @@ export default class Monitor extends Command {
         }
     }
 
-    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommand: null|string = null) {
-        super(channel, member, guild, writtenCommand, Monitor.commandName, Monitor.argsModel);
+    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: string) {
+        super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, Monitor.commandName, Monitor.argsModel);
     }
 
     async action(args: {action: string, channel: TextChannel, messages: Array<Message>}, bot) {

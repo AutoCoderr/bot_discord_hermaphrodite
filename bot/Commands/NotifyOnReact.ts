@@ -1,7 +1,17 @@
 import config from "../config";
 import Command from "../Classes/Command";
 import StoredNotifyOnReact, { IStoredNotifyOnReact } from "../Models/StoredNotifyOnReact";
-import {Guild, GuildChannel, GuildEmoji, GuildMember, Message, MessageEmbed, TextBasedChannels, User} from "discord.js";
+import {
+    CommandInteractionOptionResolver,
+    Guild,
+    GuildChannel,
+    GuildEmoji,
+    GuildMember,
+    Message,
+    MessageEmbed,
+    TextBasedChannels,
+    User
+} from "discord.js";
 import {existingCommands} from "../Classes/CommandsDescription";
 
 export default class NotifyOnReact extends Command {
@@ -56,8 +66,8 @@ export default class NotifyOnReact extends Command {
         },
     };
 
-    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommand: null|string = null) {
-        super(channel, member, guild, writtenCommand, NotifyOnReact.commandName, NotifyOnReact.argsModel);
+    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: string) {
+        super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, NotifyOnReact.commandName, NotifyOnReact.argsModel);
         this.listenings = NotifyOnReact.listenings;
     }
 

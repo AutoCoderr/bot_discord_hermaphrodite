@@ -2,7 +2,7 @@ import Command from "../Classes/Command";
 import config from "../config";
 import TicketConfig, {ITicketConfig} from "../Models/TicketConfig";
 import Discord, {
-    CategoryChannel, ClientUser,
+    CategoryChannel, ClientUser, CommandInteractionOptionResolver,
     Guild,
     GuildChannel,
     GuildEmoji,
@@ -112,8 +112,8 @@ export default class ConfigTicket extends Command {
         },
     }
 
-    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommand: null|string = null) {
-        super(channel, member, guild, writtenCommand, ConfigTicket.commandName, ConfigTicket.argsModel);
+    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: string) {
+        super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, ConfigTicket.commandName, ConfigTicket.argsModel);
     }
 
     async action(args: {action: string, category: CategoryChannel, subAction: string, user: GuildMember, channelListen: TextChannel, messageListen: Message, emoteListen: GuildEmoji|string, moderatorRole: Role}, bot) {

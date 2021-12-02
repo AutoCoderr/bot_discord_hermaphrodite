@@ -1,28 +1,44 @@
 import config from "../config";
 import Command from "../Classes/Command";
 import WelcomeMessage, {IWelcomeMessage} from "../Models/WelcomeMessage";
-import {Guild, GuildMember, Message, MessageEmbed, TextBasedChannels, User} from "discord.js";
+import {
+    CommandInteractionOptionResolver,
+    Guild,
+    GuildMember,
+    Message,
+    MessageEmbed,
+    TextBasedChannels,
+    User
+} from "discord.js";
 
 export default class ConfigWelcome extends Command {
     static display = true;
-    static description = "Pour activer, désactiver, ou définir le message privé à envoyer automatiquement aux nouveaux arrivants."
+    static description = "Pour activer, désactiver, ou définir le message privé à envoyer aux nouveaux arrivants."
     static commandName = "configWelcome";
+
+    static slashCommand = true;
 
     static argsModel = {
 
         $argsByOrder: [
             {
+                isSubCommand: true,
                 field: "action",
                 type: "string",
                 required: true,
                 description: "L'action à effectuer: set, show, disable ou enable",
-                valid: (elem,_) => ["set","show","disable","enable"].includes(elem)
+                choices: {
+                    set: "Définir le message de bienvenue",
+                    show: "Afficher le message de bienvenue configuré",
+                    disable: "Désactiver le message de bienvenue",
+                    enable: "Activer le message de bienvenue"
+                }
             }
         ]
     }
 
-    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommand: null|string = null) {
-        super(channel, member, guild, writtenCommand, ConfigWelcome.commandName, ConfigWelcome.argsModel);
+    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: string) {
+        super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, ConfigWelcome.commandName, ConfigWelcome.argsModel);
     }
 
     async action(args: {action: string}, bot) {
@@ -41,7 +57,7 @@ export default class ConfigWelcome extends Command {
         switch(action) {
             case "set":
                 return this.response(true, "Veuillez rentrer le message, qui sera envoyé en MP aux nouveaux arrivants sur ce serveur :",
-                    _ => new Promise(resolve =>  {
+                    () => new Promise(resolve =>  {
                         const listener = async (response: Message) => {
                             if (response.author.id == this.member.id) { // @ts-ignore
                                 let welcomeMessage: IWelcomeMessage = await WelcomeMessage.findOne({serverId: this.guild.id});
@@ -59,6 +75,10 @@ export default class ConfigWelcome extends Command {
                                     welcomeMessage.save();
                                 }
                                 bot.off('messageCreate', listener);
+
+                                if (this.commandOrigin === 'slash')
+                                    response.delete();
+
                                 resolve(
                                     this.response(true,
                                     "Votre message a été enregistré et sera envoyé en MP aux nouveaux arrivants de ce serveur"+

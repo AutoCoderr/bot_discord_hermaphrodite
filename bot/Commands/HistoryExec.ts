@@ -1,6 +1,14 @@
 import Command from "../Classes/Command";
 import config from "../config";
-import {Guild, GuildChannel, GuildMember, Message, MessageEmbed, TextBasedChannels, User} from "discord.js";
+import {
+    CommandInteractionOptionResolver,
+    Guild,
+    GuildChannel,
+    GuildMember,
+    MessageEmbed,
+    TextBasedChannels,
+    User
+} from "discord.js";
 import {getArgsModelHistory, getHistory} from "../Classes/OtherFunctions";
 
 export default class HistoryExec extends Command {
@@ -10,8 +18,8 @@ export default class HistoryExec extends Command {
 
     static argsModel = getArgsModelHistory();
 
-    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommand: null|string = null) {
-        super(channel, member, guild, writtenCommand, HistoryExec.commandName, HistoryExec.argsModel);
+    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: string) {
+        super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, HistoryExec.commandName, HistoryExec.argsModel);
     }
 
 

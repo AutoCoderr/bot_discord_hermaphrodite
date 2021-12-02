@@ -1,6 +1,14 @@
 import config from "../config";
 import Command from "../Classes/Command";
-import {Guild, GuildMember, MessageEmbed, Role, TextBasedChannels, User} from "discord.js";
+import {
+    CommandInteractionOptionResolver,
+    Guild,
+    GuildMember,
+    MessageEmbed,
+    Role,
+    TextBasedChannels,
+    User
+} from "discord.js";
 import Permissions, {IPermissions} from "../Models/Permissions";
 import {
     addRoleToSlashCommandPermission,
@@ -77,8 +85,8 @@ export default class Perm extends Command {
         ]
     };
 
-    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommand: null|string = null) {
-        super(channel, member, guild, writtenCommand, Perm.commandName, Perm.argsModel);
+    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: string) {
+        super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, Perm.commandName, Perm.argsModel);
     }
 
     async action(args: {action: string, commands: typeof Command[], roles: Array<Role>}, bot) { //%perm set commandName @role

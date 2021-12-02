@@ -29,6 +29,8 @@ export default class Command {
     static customCommand: boolean = true;
     static slashCommand: boolean = false;
 
+    commandOrigin: string;
+
     commandName: null|string;
     guild: null|Guild;
     channel: TextBasedChannels;
@@ -38,12 +40,13 @@ export default class Command {
     writtenCommand: null|string = null; // If command called as a custom command, get the message typed by the user
     slashCommandOptions: null|CommandInteractionOptionResolver = null; // If command called as a slash command, get options
 
-    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandName: null|string, argsModel: any) {
+    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: string, commandName: null|string, argsModel: any) {
         this.guild = guild;
         this.channel = channel;
         this.member = member;
         this.commandName = commandName;
         this.argsModel = argsModel;
+        this.commandOrigin = commandOrigin;
         if (writtenCommandOrSlashCommandOptions instanceof CommandInteractionOptionResolver)
             this.slashCommandOptions = writtenCommandOrSlashCommandOptions;
         else

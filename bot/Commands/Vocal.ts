@@ -1,5 +1,6 @@
 import Command from "../Classes/Command";
 import {
+    CommandInteractionOptionResolver,
     Guild,
     GuildMember, Interaction,
     MessageActionRow,
@@ -106,8 +107,8 @@ export default class Vocal extends Command {
         }
     }
 
-    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommand: null|string = null) {
-        super(channel, member, guild, writtenCommand, Vocal.commandName, Vocal.argsModel);
+    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: string) {
+        super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, Vocal.commandName, Vocal.argsModel);
     }
 
     async action(args: { action: string, subs: boolean, users: GuildMember[], roles: Role[], time: number }) {

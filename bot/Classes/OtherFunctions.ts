@@ -17,7 +17,6 @@ export function addMissingZero(number, n = 2) {
 
 export function getArgsModelHistory() {
     return {
-
         commands: {
             fields: ['-c', '--command'],
             type: "commands",
@@ -51,7 +50,7 @@ export function getArgsModelHistory() {
             fields: ['-s', '--sort'],
             type: "string",
             required: false,
-            description: "'asc' ou 'desc/dsc' ('desc' par défaut) pour trier du debut à la fin ou de la fin au début dans l'ordre chronologique",
+            description: "'asc' ou 'desc/dsc' ('desc' par défaut) pour trier dans l'ordre chronologique dans les deux sens",
             valid: (value, _) => ['asc','desc','dsc'].includes(value.toLowerCase()),
             default: "desc"
         },

@@ -2,7 +2,7 @@ import client from "./client";
 import {
     ApplicationCommand, ApplicationCommandDataResolvable,
     Guild,
-    Interaction,
+    Interaction, MessageOptions, MessagePayload,
     Role
 } from "discord.js";
 import {ApplicationCommandOptionTypes} from "discord.js/typings/enums";
@@ -33,10 +33,18 @@ export async function initSlashCommands() {
 
     await Promise.all(guilds.map(async guild => {
         console.log('Create slash commands for ' + guild.name + ' server');
+
         const commands = guild.commands;
+
+        const existingSlashCommands = await commands.fetch().then(commands =>
+            commands.reduce((acc,command) => ({
+                ...acc,
+                [command.name]: command
+            }), {})
+        );
+
         return await Promise.all((<Array<typeof Command>>Object.values(existingCommands)).map(async command => {
             if (command.slashCommand) {
-                console.log("generate slash command "+command.commandName);
 
                 const createdSlashCommand = await commands?.create(<ApplicationCommandDataResolvable>generateSlashCommandFromModel(command));
 
@@ -45,6 +53,10 @@ export async function initSlashCommands() {
                 if (slashCommandsByGuildAndName[guild.id] === undefined)
                     slashCommandsByGuildAndName[guild.id] = {}
                 slashCommandsByGuildAndName[guild.id][<string>command.commandName] = createdSlashCommand;
+            } else {
+                const foundCommand = existingSlashCommands[(<string>command.commandName).toLowerCase()];
+                if (foundCommand)
+                    foundCommand.delete();
             }
         }))
     }));
@@ -229,6 +241,24 @@ function generateSlashOptionFromModel(attr: string, argModel: any, subCommands: 
     }
 }
 
+async function getAndDisplaySlashCommandsResponse(interaction: Interaction, response: false| { result: Array<string | MessagePayload | MessageOptions>, callback?: Function }, p = 0) {
+    if (!interaction.isCommand()) return;
+    if (response) {
+        for (let i=0;i<response.result.length;i++) {
+            const payload = response.result[i];
+            if (i == 0 && p == 0)
+                await interaction.editReply(payload);
+            else
+                await interaction.followUp(payload);
+        }
+        if (response.callback) {
+            await getAndDisplaySlashCommandsResponse(interaction, await response.callback(), p+1);
+        }
+    } else {
+        await interaction.editReply("Aucune réponse");
+    }
+}
+
 export async function listenSlashCommands(interaction: Interaction) {
     if (!interaction.isCommand()) return;
 
@@ -239,16 +269,11 @@ export async function listenSlashCommands(interaction: Interaction) {
             await interaction.deferReply({
                 ephemeral: true
             });
-            const command = new CommandClass(interaction.channel, interaction.member, interaction.guild, options);
+            const command = new CommandClass(interaction.channel, interaction.member, interaction.guild, options, 'slash');
 
             const response = await command.executeCommand(client, true);
 
-            if (response) {
-                for (const payload of response.result)
-                    await interaction.editReply(payload);
-            } else {
-                await interaction.editReply("Aucune réponse");
-            }
+            await getAndDisplaySlashCommandsResponse(interaction, response);
         }
     }
 }
