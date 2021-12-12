@@ -51,9 +51,15 @@ export default class Monitor extends Command {
         },
         onlineUserCount: {
             display: async (guild: Guild, Embed: MessageEmbed) => {
+                let onlineUserCount;
+                try {
+                    onlineUserCount = (await guild.members.fetch()).filter(member => member.presence != null && member.presence.status == "online").size.toString();
+                } catch (_) {
+                    onlineUserCount = "Fetching error";
+                }
                 Embed.addFields({
                     name: "Nombre d'utilisateurs en ligne",
-                    value: (await guild.members.fetch()).filter(member => member.presence != null && member.presence.status == "online").size.toString()
+                    value: onlineUserCount
                 });
             },
             listen: (callback: Function) => {
