@@ -2,14 +2,20 @@ import Command from "../Classes/Command";
 import { existingCommands } from "../Classes/CommandsDescription";
 import * as Discord from "discord.js";
 import config from "../config";
-import {Message} from "discord.js";
+import {
+    CommandInteractionOptionResolver,
+    Guild,
+    GuildMember,
+    TextBasedChannels,
+    User
+} from "discord.js";
 
 export default class Help extends Command {
 
     static commandName = "help";
 
-    constructor(message: Message) {
-        super(message, Help.commandName);
+    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: string) {
+        super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, Help.commandName, Help.argsModel);
     }
 
     async action(_,bot) {
@@ -21,7 +27,7 @@ export default class Help extends Command {
         let allowedCommands: Array<string> = [];
         for (let commandName in existingCommands) {
             const command = existingCommands[commandName];
-            if (command.display && await command.staticCheckPermissions(this.message, false)) {
+            if (command.display && command.customCommand && await command.staticCheckPermissions(this, false)) {
                 allowedCommands.push(commandName);
             }
         }
@@ -39,17 +45,16 @@ export default class Help extends Command {
                 });
             }
         }
-        this.message.channel.send({embeds: [Embed]});
-        return true;
+        return this.response(true, {embeds: [Embed]});
     }
 
     async saveHistory() {} // overload saveHistory of Command class to save nothing in the history
 
-    async checkPermissions(displayMsg) { // overload checkPermission of Command class to permit all users to execute the help command
+    async checkPermissions(displayMsg = true) { // overload checkPermission of Command class to permit all users to execute the help command
         return true;
     }
 
-    static async staticCheckPermissions(message: Message, displayMsg, commandName) { // overload the staticCheckPermission of Command class to permit all users to execute the help command
+    static async staticCheckPermissions(_: TextBasedChannels, __: User|GuildMember, ___: null|Guild = null, ____ = true, _____: string|null = null) { // overload the staticCheckPermission of Command class to permit all users to execute the help command
         return true
     }
 }

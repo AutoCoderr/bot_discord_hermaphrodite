@@ -1,13 +1,14 @@
 import Command from "../Classes/Command";
 import {
+    CommandInteractionOptionResolver,
     Guild,
     GuildChannel,
     GuildMember,
     Message,
     MessageEmbed,
     PartialGuildMember,
-    Role,
-    TextChannel
+    Role, TextBasedChannels,
+    TextChannel, User
 } from "discord.js";
 import config from "../config";
 import MonitoringMessage, {IMonitoringMessage} from "../Models/MonitoringMessage";
@@ -22,7 +23,9 @@ interface messageChannelAndGuild {
 
 export default class Monitor extends Command {
 
-    static listeneds = {};
+    static display = true;
+    static description = "Pour afficher en temps réel des infos relatives au serveur";
+    static commandName = "monitor";
 
     static datasCanBeDisplayed = {
         userCount: {
@@ -48,9 +51,15 @@ export default class Monitor extends Command {
         },
         onlineUserCount: {
             display: async (guild: Guild, Embed: MessageEmbed) => {
+                let onlineUserCount;
+                try {
+                    onlineUserCount = (await guild.members.fetch()).filter(member => member.presence != null && member.presence.status == "online").size.toString();
+                } catch (_) {
+                    onlineUserCount = "Fetching error";
+                }
                 Embed.addFields({
                     name: "Nombre d'utilisateurs en ligne",
-                    value: (await guild.members.fetch()).filter(member => member.presence != null && member.presence.status == "online").size.toString()
+                    value: onlineUserCount
                 });
             },
             listen: (callback: Function) => {
@@ -117,109 +126,135 @@ export default class Monitor extends Command {
     };
 
     static nbListeners = Object.keys(Monitor.datasCanBeDisplayed).filter(data => typeof(Monitor.datasCanBeDisplayed[data].listen) == "function").length;
+    static listeneds = {};
 
-    static display = true;
-    static description = "Pour afficher en temps réel des infos relatives au serveur";
-    static commandName = "monitor";
+    static slashCommand = true;
 
-    constructor(message: Message) {
-        super(message, Monitor.commandName);
-    }
-
-    argsModel = {
-        help: {
-            fields: ["-h","--help"],
-            type: "boolean",
-            description: "Pour afficher l'aide",
-            required: false
-        },
-        showUserCount: {
-            fields: ["-uc", "--user-count", "--show-user-count"],
-            type: "boolean",
-            description: "Pour afficher ou non le nombre d'utilisateurs",
-            default: true
-        },
-        showDescription: {
-            fields: ["-d", "--description", "--show-description"],
-            type: "boolean",
-            description: "Pour afficher ou non la description",
-            default: true
-        },
-        showIcon: {
-            fields: ["-i", "--icon", "--show-icon"],
-            type: "boolean",
-            description: "Pour afficher ou non l'icone",
-            default: true
-        },
-        showOnlineUserCount: {
-            fields: ["-ouc", "--online-user-count", "--show-online-user-count"],
-            type: "boolean",
-            description: "Pour afficher ou non le nombre d'utilisateurs connectées",
-            default: true
-        },
-        showMemberMax: {
-            fields: ["-mm", "--member-max", "--show-member-max"],
-            type: "boolean",
-            description: "Pour afficher ou non le nombre maximum de membres",
-            default: false
-        },
-        showRoleMembersCount: {
-            fields: ["-rmc", "--role-members-count", "--show-role-members-count"],
-            type: "roles",
-            description: "Pour afficher le nombre de membres d'un ou de plusieurs rôles spécifiés (exemple: "+config.command_prefix+"monitor -rmc @moderateurs)",
-            required: false
-        },
-        showEmojiCount: {
-            fields: ["-ec", "--emoji-count", "--show-emoji-count"],
-            type: "boolean",
-            description: "Pour afficher ou non le nombre d'emotes",
-            default: false
-        },
-        showChannelCount: {
-            fields: ["-cc", "--channel-count", "--show-channel-count"],
-            type: "boolean",
-            description: "Pour afficher ou non le nombre de channels",
-            default: false
-        },
+    static argsModel = {
 
         $argsByType: {
             action: {
+                isSubCommand: true,
                 type: "string",
                 description: "L'action à effectuer : Ajout de monitoring (add), Suppression de monitoring (remove), les afficher (show), rafraichir (refresh)",
-                required: (args) => args.help == undefined,
-                valid: (elem: string, _) => ["add","remove","show","refresh"].includes(elem)
+                required: true,
+                choices: {
+                    add: "Ajouter un monitoring",
+                    remove: "Supprimer un ou des monitoring",
+                    show: "Afficher les monitoring",
+                    refresh: "Rafraichir un ou des monitoring"
+                }
             },
             channel: {
+                referToSubCommands: ["add","remove","refresh"],
                 type: "channel",
                 description: "Le channel sur lequel monitorer le serveur",
-                default: this.message.channel,
-                required: (args) => args.help == undefined && args.action != "show",
-                valid: (elem: GuildChannel, _) => elem.type == "GUILD_TEXT"
+                default: (_, command: Command) => command.channel,
+                required: false,
+                valid: (elem: GuildChannel, _) => elem.type == "GUILD_TEXT",
+                errorMessage: (value, _) => {
+                    if (value != undefined) {
+                        return {
+                            name: "Channel mentionné invalide",
+                            value: "Vous ne pouvez mentionner que des channels de texte"
+                        };
+                    }
+                    return {
+                        name: "Channel non renseigné",
+                        value: "Vous n'avez pas renseigné de channel"
+                    }
+                }
             },
             messages: {
-                type: "messages",
+                referToSubCommands: ["refresh","remove"],
+                type: "message",
+                multi: true,
                 description: "L'id du message à supprimer ou rafraichir",
-                required: (args) => args.help == undefined && ["refresh","remove"].includes(args.action),
+                required: (args) => ["refresh","remove"].includes(args.action),
                 moreDatas: (args) => args.channel
             }
+        },
+
+        showUserCount: {
+            referToSubCommands: ["add"],
+            fields: ["-uc", "--user-count", "--show-user-count"],
+            type: "boolean",
+            description: "Pour afficher ou non le nombre d'utilisateurs",
+            default: true,
+            required: false
+        },
+        showDescription: {
+            referToSubCommands: ["add"],
+            fields: ["-d", "--description", "--show-description"],
+            type: "boolean",
+            description: "Pour afficher ou non la description",
+            default: true,
+            required: false
+        },
+        showIcon: {
+            referToSubCommands: ["add"],
+            fields: ["-i", "--icon", "--show-icon"],
+            type: "boolean",
+            description: "Pour afficher ou non l'icone",
+            default: true,
+            required: false
+        },
+        showOnlineUserCount: {
+            referToSubCommands: ["add"],
+            fields: ["-ouc", "--online-user-count", "--show-online-user-count"],
+            type: "boolean",
+            description: "Pour afficher ou non le nombre d'utilisateurs connectées",
+            default: true,
+            required: false
+        },
+        showMemberMax: {
+            referToSubCommands: ["add"],
+            fields: ["-mm", "--member-max", "--show-member-max"],
+            type: "boolean",
+            description: "Pour afficher ou non le nombre maximum de membres",
+            default: false,
+            required: false
+        },
+        showRoleMembersCount: {
+            referToSubCommands: ["add"],
+            fields: ["-rmc", "--role-members-count", "--show-role-members-count"],
+            type: "roles",
+            description: "Pour afficher le nombre de membres d'un/des rôles spécifiés (exemple: "+config.command_prefix+"monitor -rmc @moderateurs)",
+            required: false
+        },
+        showEmojiCount: {
+            referToSubCommands: ["add"],
+            fields: ["-ec", "--emoji-count", "--show-emoji-count"],
+            type: "boolean",
+            description: "Pour afficher ou non le nombre d'emotes",
+            default: false,
+            required: false
+        },
+        showChannelCount: {
+            referToSubCommands: ["add"],
+            fields: ["-cc", "--channel-count", "--show-channel-count"],
+            type: "boolean",
+            description: "Pour afficher ou non le nombre de channels",
+            default: false,
+            required: false
         }
     }
 
-    async action(args: {help: boolean, action: string, channel: TextChannel, messages: Array<Message>}, bot) {
-        const {help, action, channel, messages} = args;
+    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: string) {
+        super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, Monitor.commandName, Monitor.argsModel);
+    }
 
-        if (help) {
-            this.displayHelp();
-            return false;
-        }
+    async action(args: {action: string, channel: TextChannel, messages: Array<Message>}, bot) {
+        const {action, channel, messages} = args;
 
-        if (this.message.guild == null) {
-            this.sendErrors({
-                name: "Datas missing",
-                value: "Nor message guild nor message membre has been found"
-            });
-            return false;
-        }
+        if (this.guild == null)
+            return this.response(false,
+                this.sendErrors({
+                    name: "Datas missing",
+                    value: "Nor guild nor member has been found"
+                })
+            );
+
         let monitoringMessage: IMonitoringMessage;
         switch (action) {
             case "add":
@@ -255,42 +290,40 @@ export default class Monitor extends Command {
                     }
                 }
 
-                const createdMessage: Message = await channel.send({ embeds: [await Monitor.getMonitorMessage(this.message.guild, datasToDisplay)]});
+                const createdMessage: Message = await channel.send({ embeds: [await Monitor.getMonitorMessage(this.guild, datasToDisplay)]});
                 monitoringMessage = await MonitoringMessage.create({
-                    serverId: this.message.guild.id,
+                    serverId: this.guild.id,
                     datas: datasToDisplay,
                     channelId: channel.id,
                     messageId: createdMessage.id
                 });
                 Monitor.startMonitoringMessageEvent(monitoringMessage);
-                this.message.channel.send("Un message de monitoring a été créé sur le channel <#"+channel.id+">");
-                return true;
+                return this.response(true, "Un message de monitoring a été créé sur le channel <#"+channel.id+">");
             case "refresh":
                 for (const message of messages) {
                     monitoringMessage = await MonitoringMessage.findOne({
-                        serverId: this.message.guild.id,
+                        serverId: this.guild.id,
                         channelId: channel.id,
                         messageId: message.id
                     });
                     if (monitoringMessage == null) {
-                        this.message.channel.send("Il n'y a pas de monitoring sur le message "+message.id);
+                        return this.response(false, "Il n'y a pas de monitoring sur le message "+message.id);
                     }
-                    await message.edit({embeds: [await Monitor.getMonitorMessage(this.message.guild, monitoringMessage.datas)]});
+                    await message.edit({embeds: [await Monitor.getMonitorMessage(this.guild, monitoringMessage.datas)]});
                 }
 
-                this.message.channel.send("Monitoring mis à jour");
-                return true;
+                return this.response(true, "Monitoring mis à jour");
             case "show":
                 const channelsById = {};
                 const monitoringMessages: Array<IMonitoringMessage> = await MonitoringMessage.find({
-                    serverId: this.message.guild.id
+                    serverId: this.guild.id
                 });
                 if (monitoringMessages.length > 0) {
                     const Embeds = splitFieldsEmbed(25, await Promise.all(monitoringMessages.map(async monitoringMessage => {
                         if (channelsById[monitoringMessage.channelId] == undefined) { // @ts-ignore
-                            channelsById[monitoringMessage.channelId] = this.message.guild.channels.cache.get(monitoringMessage.channelId);
+                            channelsById[monitoringMessage.channelId] = this.guild.channels.cache.get(monitoringMessage.channelId);
                         }
-                        const exist = await Monitor.checkMonitoringMessageExist(monitoringMessage, this.message.guild, channelsById[monitoringMessage.channelId]);
+                        const exist = await Monitor.checkMonitoringMessageExist(monitoringMessage, this.guild, channelsById[monitoringMessage.channelId]);
                         return {
                             name: exist ? "Sur la channel #" + exist.channel.name : "Ce message et/ou ce salon n'existe plus",
                             value: exist ?
@@ -309,31 +342,27 @@ export default class Monitor extends Command {
                             Embed.setTitle("Les messages de monitoring")
                         }
                     });
-                    for (const Embed of Embeds) {
-                        this.message.channel.send({embeds: [Embed]});
-                    }
-                } else {
-                    this.message.channel.send("Il n'y a aucun monitoring sur ce serveur");
+                    return this.response(true, Embeds.map(Embed => ({embeds: [Embed]})));
                 }
-
-                return true;
+                return this.response(true, "Il n'y a aucun monitoring sur ce serveur");
             case "remove":
+                const responses: string[] = [];
                 for (const message of messages) {
                     const res = await MonitoringMessage.deleteOne({
-                        serverId: this.message.guild.id,
+                        serverId: this.guild.id,
                         channelId: channel.id,
                         messageId: message.id
                     });
                     if (res.deletedCount > 0) {
                         await message.delete();
-                        this.message.channel.send("Monitoring supprimé avec succès sur le message "+message.id);
+                        responses.push("Monitoring supprimé avec succès sur le message "+message.id);
                     } else {
-                        this.message.channel.send("Il n'y a pas de monitoring sur le message "+message.id);
+                        responses.push("Il n'y a pas de monitoring sur le message "+message.id);
                     }
                 }
-                return true;
+                return this.response(true, responses.join("\n"));
         }
-        return false;
+        return this.response(false, "Aucune action spécifiée");
     }
 
     static async checkMonitoringMessageExist(monitoringMessage: IMonitoringMessage, guild: null|undefined|Guild = null, channel: null|undefined|TextChannel = null) {
@@ -428,18 +457,49 @@ export default class Monitor extends Command {
         console.log("All monitorings listened");
     }
 
-    help(Embed: MessageEmbed) {
-        Embed.addFields({
-            name: "Exemples :",
-            value: config.command_prefix+this.commandName+" add (prend par défaut le channel de l'utilisateur)\n"+
-                   config.command_prefix+this.commandName+" add #unAutreChannelSurLequelMonitorer\n"+
-                   config.command_prefix+this.commandName+" add -ec -d false (avec le nombre d'emojis, sans la description)\n"+
-                   config.command_prefix+this.commandName+" remove #leChannelSurLequelNePlusMonitorer idDuMessage\n"+
-                   config.command_prefix+this.commandName+" remove idDuMessageDeMonitoring (sans channel spécifié, prend le channel courant)\n"+
-                   config.command_prefix+this.commandName+" refresh #leChannelSurLequelRefraichir idDuMessage\n"+
-                   config.command_prefix+this.commandName+" refresh idDuMessageDeMonitoring (sans channel spécifié, prend le channel courant)\n"+
-                   config.command_prefix+this.commandName+" show\n"+
-                   config.command_prefix+this.commandName+" -h\n"
-        });
+    help() {
+        return new MessageEmbed()
+            .setTitle("Exemples :")
+            .addFields([
+                {
+                    name: "add",
+                    value: "Ajouter un monitoring (par défaut sur la channel courant)"
+                },
+                {
+                    name: "add #unAutreChannelSurLequelMonitorer",
+                    value: "Ajouter un monitoring sur le channel spécifié"
+                },
+                {
+                    name: "add -ec -d false",
+                    value: "Ajouter un moniroting avec le nombre d'émojis, sans la description"
+                },
+                {
+                    name: "remove #leChannelSurLequelNePlusMonitorer idDuMessage",
+                    value: "Retirer le monitoring sur le message spécifié dans le channel spécifié"
+                },
+                {
+                    name: "remove idDuMessageDeMonitoring",
+                    value: "Retire le moniting sur le message spéficié, sur le channel courant par défaut"
+                },
+                {
+                    name: "refresh #leChannelSurLequelRefraichir idDuMessage",
+                    value: "Rafraichir le monitoring sur la messagé spécifié dans le channel spécifié"
+                },
+                {
+                    name: "refresh idDuMessageDeMonitoring",
+                    value: "rafraichir le moniting sur le message spéficié, sur le channel courant par défaut"
+                },
+                {
+                    name: "show",
+                    value: "Afficher les monitoring en cours sur ce serveur"
+                },
+                {
+                    name: "-h",
+                    value: "Afficher l'aide"
+                }
+            ].map(field => ({
+                name: config.command_prefix+this.commandName+" "+field.name,
+                value: field.value
+            })));
     }
 }

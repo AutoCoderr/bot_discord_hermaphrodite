@@ -1,7 +1,11 @@
 import { existingCommands } from "./CommandsDescription";
-import History, {IHistory} from "../Models/History";
-import {GuildChannel, GuildMember, Message, MessageEmbed} from "discord.js";
+import History from "../Models/History";
+import {EmbedFieldData, Guild, GuildChannel, GuildMember, Message, MessageEmbed} from "discord.js";
 import Command from "./Command";
+import CancelNotifyOnReact from "../Commands/CancelNotifyOnReact";
+import HistoryExec from "../Commands/HistoryExec";
+import HistoryCmd from "../Commands/HistoryCmd";
+import ListNotifyOnReact from "../Commands/ListNotifyOnReact";
 
 export function addMissingZero(number, n = 2) {
     number = number.toString();
@@ -11,29 +15,18 @@ export function addMissingZero(number, n = 2) {
     return number;
 }
 
-export function getArgsModelHistory(message: Message) {
+export function getArgsModelHistory() {
     return {
-        help: { fields: ['-h', '--help'], type: "boolean", required: false, description: "Pour afficher l'aide" },
-
         commands: {
             fields: ['-c', '--command'],
-            type: "string",
+            type: "commands",
             required: false,
             description: "La ou les commandes dont on souhaite voir l'historique",
-            valid: async (commandList, _) => { // Vérifie si l'utilisateur à le droit d'accéder à cette commande
+            valid: async (commandList: typeof Command[], _) => { // Vérifie si une commande n'a pas été tapée plusieurs fois
                 const alreadySpecifiedCommands = {};
-                const commands: typeof Command[] = Object.values(existingCommands);
-                for (let specifiedCommandName of commandList.split(",")) {
-                    specifiedCommandName = specifiedCommandName.trim();
-                    if (alreadySpecifiedCommands[specifiedCommandName] === undefined) {
-                        let commandExists = false
-                        for (const command of commands) {
-                            if (command.commandName == specifiedCommandName && command.display && await command.staticCheckPermissions(message, false)) {
-                                commandExists = true;
-                                break;
-                            }
-                        }
-                        if (!commandExists) return false;
+                for (const command of commandList) {
+                    if (alreadySpecifiedCommands[<string>command.commandName] === undefined) {
+                        alreadySpecifiedCommands[<string>command.commandName] = true;
                     } else {
                         return false;
                     }
@@ -43,8 +36,8 @@ export function getArgsModelHistory(message: Message) {
             errorMessage: (value, _) => {
                 if (value != undefined) {
                     return {
-                        name: "La commande n'existe pas",
-                        value: "La commande '" + value + "' n'existe pas, ou vous est inaccessible"
+                        name: "Liste de commandes invalide",
+                        value: value+" : Une de ces commandes n'existe pas, vous est inaccesible, ou a été spécifiée plusieurs fois"
                     };
                 }
                 return {
@@ -56,15 +49,15 @@ export function getArgsModelHistory(message: Message) {
         sort: {
             fields: ['-s', '--sort'],
             type: "string",
-            required: true,
-            description: "'asc' ou 'desc/dsc' ('desc' par défaut) pour trier du debut à la fin ou de la fin au début dans l'ordre chronologique",
-            valid: (value, _) => ['asc','desc','dsc'].includes(value),
+            required: false,
+            description: "'asc' ou 'desc/dsc' ('desc' par défaut) pour trier dans l'ordre chronologique dans les deux sens",
+            valid: (value, _) => ['asc','desc','dsc'].includes(value.toLowerCase()),
             default: "desc"
         },
         limit: {
             fields: ['-l', '--limit'],
             type: "number",
-            required: true,
+            required: false,
             default: 15,
             description: "Pour afficher les n dernières commandes de la listes"
         },
@@ -85,10 +78,10 @@ export function getArgsModelHistory(message: Message) {
 }
 
 
-export async function getHistory(message,args: {commands: string, sort: string, limit: number, channels: GuildChannel[], users: GuildMember[]}) {
+export async function getHistory(currentCommand: HistoryCmd|HistoryExec,args: {commands: typeof Command[], sort: string, limit: number, channels: GuildChannel[], users: GuildMember[]}) {
     let { commands, sort, limit, channels, users } = args;
 
-    let where:any = {serverId: message.guild.id};
+    let where:any = {serverId: (<Guild>currentCommand.guild).id};
     if (users != undefined) {
         where.userId = {$in: users.map(user => user.id)};
     }
@@ -97,14 +90,13 @@ export async function getHistory(message,args: {commands: string, sort: string, 
     }
     if (commands != undefined) {
         where.commandName = {$in: []};
-        for (let commandName of commands.split(",")) {
-            commandName = commandName.trim();
-            where.commandName.$in.push(commandName);
+        for (const command of commands) {
+            where.commandName.$in.push(command.commandName);
         }
     } else {
         where.commandName = { $nin: [] };
         for (let aCommand in existingCommands) {
-            if (!await existingCommands[aCommand].staticCheckPermissions(message,false)) {
+            if (!await existingCommands[aCommand].staticCheckPermissions(currentCommand.channel, currentCommand.member, currentCommand.guild, false)) {
                 where.commandName.$nin.push(aCommand);
             }
         }
@@ -115,8 +107,12 @@ export async function getHistory(message,args: {commands: string, sort: string, 
     return await History.find(where).limit(limit).sort({dateTime: sort});
 }
 
-export async function forEachNotifyOnReact(callback, channel: GuildChannel, message: Message, messageCommand) {
-    const serverId = messageCommand.guild.id;
+export async function forEachNotifyOnReact(callback, channel: GuildChannel, message: Message, command: CancelNotifyOnReact|ListNotifyOnReact) {
+    if (command.guild == null) {
+        callback(false);
+        return;
+    }
+    const serverId = command.guild.id;
     // @ts-ignore
     let listenings = existingCommands.NotifyOnReact.listenings[serverId];
 
@@ -129,7 +125,8 @@ export async function forEachNotifyOnReact(callback, channel: GuildChannel, mess
                 if (typeof(listenings[channel.id][message.id]) != "undefined") { // Si un channel et un message ont été spécifiés, regarde dans le message
                     for (let emote in listenings[channel.id][message.id]) {
                         if (listenings[channel.id][message.id][emote]) {
-                            callback(true, channel, message.id, message.content, emote);
+                            const contentMessage = message.content.substring(0,Math.min(20,message.content.length)) + "...";
+                            callback(true, channel, message.id, contentMessage, emote);
                             nbListeneds += 1;
                         }
                     }
@@ -166,10 +163,10 @@ export async function forEachNotifyOnReact(callback, channel: GuildChannel, mess
     } else { // Si rien n'a été spécifié en argument, regarde sur tout les messaqes de tout les channels
         let nbListeneds = 0;
         for (let channelId in listenings) {
-            let channel = messageCommand.guild.channels.cache.get(channelId);
+            let channel = command.guild.channels.cache.get(channelId);
             for (let messageId in listenings[channelId]) {
                 let messageListened;
-                try {
+                try { //@ts-ignore
                     messageListened = await channel.messages.fetch(messageId);
                 } catch (e) {
                 }
@@ -191,7 +188,7 @@ export async function forEachNotifyOnReact(callback, channel: GuildChannel, mess
 }
 
 export function splitFieldsEmbed(nbByPart: number,
-                                     fields: Array<{name: string, value: string}>,
+                                     fields: EmbedFieldData[],
                                      atEachPart: Function): Array<MessageEmbed> {
     let Embed: MessageEmbed;
     let Embeds: Array<MessageEmbed> = [];
@@ -210,8 +207,48 @@ export function splitFieldsEmbed(nbByPart: number,
     return Embeds;
 }
 
+export function splitOneFieldLinesEmbed(title: string, nbByPart: number, lines: string[]) {
+    let embeds: MessageEmbed[] = [];
+    for (let i=0;i<Math.floor(lines.length/nbByPart)+(lines.length%nbByPart != 0 ? 1 : 0);i++) {
+        embeds.push(new MessageEmbed()
+            .setColor('#0099ff')
+            .setTimestamp()
+            .addFields({
+                name: title,
+                value: lines.slice(i*nbByPart,Math.min((i+1)*nbByPart,lines.length)).join("\n")
+            }));
+    }
+    return embeds;
+}
+
 export function isNumber(num) {
     return (typeof(num) == 'number' && !isNaN(num)) || (
       typeof(num) == 'string' && parseInt(num).toString() == num && num != "NaN"
     );
+}
+
+export const durationUnits = {
+    second: ['s','seconde','secondes','second','seconds','sec'],
+    minute: ['m','minute','minutes','min'],
+    hour: ['h','hour','hours','heure','heures']
+}
+
+export const durationUnitsMult = {
+    second: 1000,
+    minute: 60*1000,
+    hour: 60*60*1000
+}
+
+export function decomposeMsTime(ms: number): {h: number, m: number, s: number} {
+    return {
+        h: Math.floor(ms/1000/60/60),
+        m: Math.floor(ms/1000/60)%60,
+        s: Math.floor(ms/1000)%60
+    }
+}
+
+export function showTime(time: {h: number, m: number, s: number}): string {
+    return (time.h > 0 ? ' '+time.h+' heure'+(time.h > 1 ? 's' : '') : '')+
+        (time.m > 0 ? ' '+time.m+' minute'+(time.m > 1 ? 's' : '') : '')+
+        (time.s > 0 ? ' '+time.s+' seconde'+(time.s > 1 ? 's' : '') : '')
 }

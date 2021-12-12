@@ -4,7 +4,7 @@
   "description": "Ceci est un bot cool",
   "main": "bot.js",
   "scripts": {
-    "start": "tsc && node bot.js",
+    "start": "tsc && node --trace-deprecation --trace-warnings bot.js",
     "watch": "tsc -w",
     "build": "tsc"
   },

@@ -1,104 +1,187 @@
-import {CategoryChannel, GuildChannel, GuildEmoji, GuildMember, Message, Role, ThreadChannel} from "discord.js";
+import {
+    CategoryChannel, Guild,
+    GuildChannel,
+    GuildEmoji,
+    GuildMember,
+    Message,
+    Role, TextBasedChannels,
+    ThreadChannel, User,
+    VoiceChannel
+} from "discord.js";
 import client from "../client";
+import {existingCommands} from "./CommandsDescription";
+import Command from "./Command";
+import {isNumber,durationUnits,durationUnitsMult} from "./OtherFunctions";
 
 export const extractTypes = {
-    channel: (field, message: Message): GuildChannel|ThreadChannel|false => {
-        if (message.guild == null) return false;
+    channel: (field, command: Command): GuildChannel|ThreadChannel|VoiceChannel|false => {
+        if (command.guild == null) return false;
         let channelId = field.split("<#")[1];
         channelId = channelId.substring(0,channelId.length-1);
-        const channel = message.guild.channels.cache.get(channelId);
+        const channel = command.guild.channels.cache.get(channelId);
         return channel != undefined ? channel : false;
     },
-    channels: (field, message: Message): Array<GuildChannel|ThreadChannel>|false => {
-        const channelsMentions = field.split(",");
+    channels: (field, command: Command): Array<GuildChannel|ThreadChannel|VoiceChannel>|false => {
+        const channelsSplitted = field.split("<#");
         const channels: Array<GuildChannel|ThreadChannel> = [];
-        for (const channelMention of channelsMentions) {
-            const AChannel = extractTypes.channel(channelMention.trim(), message);
+        for (let i=1;i<channelsSplitted.length;i++) {
+            const channelMention = "<#"+channelsSplitted[i].trim();
+            const AChannel = extractTypes.channel(channelMention, command);
             if (!AChannel) return false;
             channels.push(AChannel);
         }
         return channels;
     },
-    category: (field, message: Message): CategoryChannel|boolean => {
-        if (message.guild == null) return false;
-        const channel = message.guild.channels.cache.get(field);
+    category: (field, command: Command): CategoryChannel|boolean => {
+        if (command.guild == null) return false;
+        const channel = command.guild.channels.cache.get(field);
         return (channel instanceof CategoryChannel && channel.type == "GUILD_CATEGORY") ? channel : false;
     },
-    message: async (field, _: Message, channel: GuildChannel|boolean): Promise<Message|false> => {
-        if (channel) {
+    message: async (field, _: Command, mentionedChannel: GuildChannel|boolean): Promise<Message|false> => {
+        if (mentionedChannel) {
             try { // @ts-ignore
-                return await channel.messages.fetch(field)
+                return await mentionedChannel.messages.fetch(field.toString())
             } catch (e) {
                 return false;
             }
         }
         return false;
     },
-    messages: async (field, message: Message, channel: GuildChannel|boolean):  Promise<Array<Message>|false> => {
-        const messagesIds = field.split(",");
+    messages: async (field, command: Command, mentionedChannel: GuildChannel|boolean):  Promise<Array<Message>|false> => {
         const messages: Array<Message> = [];
-        for (const messageId of messagesIds) {
-            const AMessage = await extractTypes.message(messageId.trim(), message, channel);
-            if (!AMessage) return false;
-            messages.push(AMessage);
+        let messageId = "";
+        for (let i=0;i<field.length;i++) {
+            if (field[i] !== " " && field[i] != ",") {
+                messageId += field[i];
+            }
+            if (messageId.length == 18) {
+                const AMessage = await extractTypes.message(messageId, command, mentionedChannel);
+                if (!AMessage) return false;
+                messages.push(AMessage);
+                messageId = "";
+            }
         }
         return messages;
     },
-    listenerReactMessage: async (field, message: Message): Promise<{channel: GuildChannel, message: Message}|false> => {
+    listenerReactMessage: async (field, command: Command): Promise<{channel: GuildChannel, message: Message}|false> => {
         const channelMention = field.split("/")[0];
-        const channel: GuildChannel|ThreadChannel|boolean = extractTypes.channel(channelMention, message);
+        const channel: GuildChannel|ThreadChannel|boolean = extractTypes.channel(channelMention, command);
         let messageToGet: Message|null = null
         if (channel instanceof GuildChannel) {
             const messageId = field.split("/")[1].replaceAll(" ","");
             // @ts-ignore
-            messageToGet = await extractTypes.message(messageId,message,channel);
+            messageToGet = await extractTypes.message(messageId,command,channel);
         } else {
             return false;
         }
         return messageToGet ? {message: messageToGet,channel} : false;
     },
-    emote: (field, _: Message): GuildEmoji|false => {
+    emote: (field, _: Command): GuildEmoji|false => {
         if (new RegExp("^[^\u0000-\u007F]+$").test(field)) return field;
         const emoteId = field.split(":")[2].split(">")[0];
         const emote = client.emojis.cache.get(emoteId);
         return emote ? emote : false;
     },
-    user: async (field, message: Message): Promise<GuildMember|false> => {
-        if (message.guild == null) return false;
+    user: async (field, command: Command): Promise<GuildMember|false> => {
+        if (command.guild == null) return false;
         let userId = field.split("<@")[1].split(">")[0];
         if (userId[0] == "!") userId = userId.substring(1);
         try {
-            return await message.guild.members.fetch(userId);
+            return await command.guild.members.fetch(userId);
         } catch(e) {
             return false;
         }
     },
-    users: async (field, message: Message): Promise<Array<GuildMember>|false> => {
-        const userMentions = field.split(",");
+    users: async (field, command: Command): Promise<Array<GuildMember>|false> => {
+        const usersSplitted = field.split("<@");
         const users: Array<GuildMember> = [];
-        for (const userMention of userMentions) {
-            const AUser = await extractTypes.user(userMention.trim(), message);
+        for (let i=1;i<usersSplitted.length;i++) {
+            const userMention = "<@"+usersSplitted[i].replace(",","").trim();
+            const AUser = await extractTypes.user(userMention, command);
             if (!AUser) return false;
             users.push(AUser);
         }
         return users;
     },
-    role: (field, message: Message): Role|false => {
-        if (message.guild == null) return false;
+    role: (field, command: Command): Role|false => {
+        if (command.guild == null) return false;
         const roleId = field.split("<@&")[1].split(">")[0];
-        const role = message.guild.roles.cache.get(roleId);
+        const role = command.guild.roles.cache.get(roleId);
         return role ?? false;
     },
-    roles: (field, message: Message): Array<Role>|false => {
-        if (field.length-field.replace(",","") == 0) return [];
+    roles: (field, command: Command): Array<Role>|false => {
+        const rolesSplitted = field.split("<@");
 
         const roles: Array<Role> = [];
-        const rolesMentions = field.split(",");
-        for (const roleMention of rolesMentions) {
-            const role = extractTypes.role(roleMention.trim(), message);
+        for (let i=1;i<rolesSplitted.length;i++) {
+            const roleMention = "<@"+rolesSplitted[i].replace(",","").trim();
+            const role = extractTypes.role(roleMention, command);
             if (!(role instanceof Role)) return false;
             roles.push(role);
         }
         return roles;
+    },
+    command: async (field, currentCommand: Command): Promise<typeof Command|false>=> {
+        const commandList: typeof Command[] = Object.values(existingCommands);
+        for (const eachCommand of commandList) {
+            if (eachCommand.commandName === field && eachCommand.display && await eachCommand.staticCheckPermissions(currentCommand.channel,currentCommand.member, currentCommand.guild, false, eachCommand.commandName)) {
+                return eachCommand;
+            }
+        }
+        return false;
+    },
+    commands: async (field, currentCommand: Command): Promise<typeof Command[]|false> => {
+        let commands: typeof Command[] = [];
+        let commandName = "";
+        for (let i=0;i<field.length;i++) {
+            if (field[i] !== " " && field[i] !== ",") {
+                commandName += field[i];
+            } else {
+                const foundCommand = await extractTypes.command(commandName,currentCommand);
+                if (!foundCommand) return false;
+                commands.push(foundCommand);
+                commandName = "";
+            }
+        }
+        if (commandName != "") {
+            const foundCommand = await extractTypes.command(commandName,currentCommand);
+            if (!foundCommand) return false;
+            commands.push(foundCommand);
+        }
+        return commands;
+    },
+    duration: (field,_: Command) => {
+        if (field === 0 || (typeof(field) == "string" && parseInt(field) === 0)) return 0;
+        const unitByName = Object.entries(durationUnits).reduce((acc,[key,values]) => ({
+                ...acc,
+                ...values.reduce((acc, value) => ({
+                    ...acc,
+                    [value]: key
+                }), {})
+            }), {});
+
+        let ms = 0;
+        let i=0;
+        while (i<field.length) {
+            while (field[i] === " ") {
+                i++
+            }
+            let numStr = ''
+            while (isNumber(field[i])) {
+                numStr += field[i];
+                i++;
+            }
+            while (field[i] === " ") {
+                i++
+            }
+            let unitName = ''
+            while (i<field.length && field[i] !== " " && !isNumber(field[i])) {
+                unitName += field[i];
+                i++;
+            }
+            ms += parseInt(numStr)*durationUnitsMult[unitByName[unitName]]
+        }
+
+        return ms;
     }
 };
