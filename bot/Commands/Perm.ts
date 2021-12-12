@@ -147,45 +147,44 @@ export default class Perm extends Command {
 
         const responses: string[] = [];
         for (const command of commands) {
-            const permission = await Permissions.findOne({serverId: serverId, command: command.commandName});
+            let permission = await Permissions.findOne({serverId: serverId, command: command.commandName});
 
             if (permission == null) {
-                const permission: IPermissions = {
+                permission = await Permissions.create({
                     command: <string>command.commandName,
-                    roles: rolesId,
+                    roles: [],
                     serverId: serverId
-                }
-                Permissions.create(permission);
-            } else {
-                if (action == "add") {
-                    for (let roleId of rolesId) {
-                        if (permission.roles.includes(roleId)) {
-                            return this.response(false,
-                                this.sendErrors({
-                                    name: "Role already added",
-                                    value: "That role is already attributed for that command"
-                                })
-                            );
-                        }
-                    }
-                    permission.roles = [...permission.roles, ...rolesId];
-                    await addRoleToSlashCommandPermission(this.guild, <string>command.commandName, rolesId);
-                    responses.push("Permission added successfully for the '"+command.commandName+"' command!");
-                } else if (action == "set") {
-                    permission.roles = rolesId;
-                    await setRoleToSlashCommandPermission(this.guild, <string>command.commandName, rolesId);
-                    responses.push("Permission setted successfully for the '"+command.commandName+"' command!");
-                } else if (action == "clear") {
-                    permission.roles = [];
-                    await setRoleToSlashCommandPermission(this.guild, <string>command.commandName, []);
-                    responses.push("Permission cleared successfully for the '"+command.commandName+"' command!");
-                } else if (action == "remove") {
-                    permission.roles = permission.roles.filter(roleId => !roles.some(role => role.id == roleId))
-                    await removeRoleFromSlashCommandPermission(this.guild, <string>command.commandName, roles);
-                    responses.push("Permission removed successfully for the '"+command.commandName+"' command!");
-                }
-                await permission.save();
+                });
             }
+
+            if (action == "add") {
+                for (let roleId of rolesId) {
+                    if (permission.roles.includes(roleId)) {
+                        return this.response(false,
+                            this.sendErrors({
+                                name: "Role already added",
+                                value: "That role is already attributed for that command"
+                            })
+                        );
+                    }
+                }
+                permission.roles = [...permission.roles, ...rolesId];
+                await addRoleToSlashCommandPermission(this.guild, <string>command.commandName, rolesId);
+                responses.push("Permission added successfully for the '"+command.commandName+"' command!");
+            } else if (action == "set") {
+                permission.roles = rolesId;
+                await setRoleToSlashCommandPermission(this.guild, <string>command.commandName, rolesId);
+                responses.push("Permission setted successfully for the '"+command.commandName+"' command!");
+            } else if (action == "clear") {
+                permission.roles = [];
+                await setRoleToSlashCommandPermission(this.guild, <string>command.commandName, []);
+                responses.push("Permission cleared successfully for the '"+command.commandName+"' command!");
+            } else if (action == "remove") {
+                permission.roles = permission.roles.filter(roleId => !roles.some(role => role.id == roleId))
+                await removeRoleFromSlashCommandPermission(this.guild, <string>command.commandName, roles);
+                responses.push("Permission removed successfully for the '"+command.commandName+"' command!");
+            }
+            await permission.save();
         }
         return this.response(true, responses.join('\n'));
     }

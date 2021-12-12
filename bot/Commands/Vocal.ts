@@ -752,7 +752,7 @@ export default class Vocal extends Command {
                     continue;
                 }
                 try {
-                    await listener.send("'" + (newState.member.nickname ?? newState.member.user.username) + "' s'est connecté sur le channel vocal '#" + newState.channel.name + "' sur le serveur '" + newState.guild.name + "'");
+                    await listener.send("'" + (newState.member.nickname ?? newState.member.user.username) + "' s'est connecté sur le channel vocal <#" + newState.channel.id + "> sur le serveur '" + newState.guild.name + "'");
                 } catch (_) {
                     continue;
                 }
