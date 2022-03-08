@@ -8,6 +8,7 @@ export interface IVocalInvite {
     requesterId: string;
     requestedId: string;
     accept: boolean;
+    timestamp?: Date;
     serverId: string;
 }
 
@@ -16,6 +17,7 @@ const VocalInviteSchema: Schema = new Schema({
     requesterId: { type: String, required: true },
     requestedId: { type: String, required: true },
     accept: { type: Boolean, required: true },
+    timestamp: { type: Date, required: true },
     serverId: { type: String, required: true }
 });
 

@@ -190,6 +190,14 @@ export default class Vocal extends Command {
                     continue;
                 }
 
+                const currentDate = new Date();
+                await VocalInvite.deleteMany({
+                    serverId: this.guild.id,
+                    requesterId: this.member.id,
+                    requestedId: user.id,
+                    timestamp: { $lte: new Date(currentDate.getTime()-Vocal.buttonsTimeout) }
+                });
+
                 const invite = await VocalInvite.findOne({
                     serverId: this.guild.id,
                     requesterId: this.member.id,
@@ -711,6 +719,7 @@ export default class Vocal extends Command {
             buttonId: acceptButtonId,
             requesterId: requester.id,
             requestedId: requested.id,
+            timestamp: new Date(),
             accept: true,
             serverId: guild.id
         });
@@ -718,6 +727,7 @@ export default class Vocal extends Command {
             buttonId: denyButtonId,
             requesterId: requester.id,
             requestedId: requested.id,
+            timestamp: new Date(),
             accept: false,
             serverId: guild.id
         });
@@ -875,6 +885,12 @@ export default class Vocal extends Command {
     }
 
     static async listenInviteButtons(interaction: ButtonInteraction): Promise<boolean> {
+
+        const currentDate = new Date();
+        await VocalInvite.deleteMany({
+            timestamp: { $lte: new Date(currentDate.getTime()-Vocal.buttonsTimeout) }
+        });
+
         const invite: IVocalInvite = await VocalInvite.findOne({
             buttonId: interaction.customId
         })
