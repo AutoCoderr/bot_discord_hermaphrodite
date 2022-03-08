@@ -109,7 +109,7 @@ export default class Vocal extends Command {
         }
     }
 
-    static buttonsTimeout = 24*60*60*1000; // 24h pour répondre à une invitation
+    static buttonsTimeout = 48*60*60*1000; // 48h pour répondre à une invitation
 
     constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: string) {
         super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, Vocal.commandName, Vocal.argsModel);
