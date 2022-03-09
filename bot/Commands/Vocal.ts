@@ -7,7 +7,7 @@ import {
     MessageActionRow,
     MessageButton,
     MessageEmbed,
-    Role, TextBasedChannels, User, VoiceState
+    Role, StageChannel, TextBasedChannels, User, VoiceChannel, VoiceState
 } from "discord.js";
 import config from "../config";
 import VocalSubscribe, {IVocalSubscribe} from "../Models/VocalSubscribe";
@@ -52,7 +52,7 @@ export default class Vocal extends Command {
                 description: "Obtenir plus de détails concernant les écoutes : subs"
             },
             roles: {
-                referToSubCommands: ['block','unblock'],
+                referToSubCommands: ['block', 'unblock'],
                 required: false,
                 displayValidError: true,
                 displayExtractError: true,
@@ -67,7 +67,7 @@ export default class Vocal extends Command {
                 })
             },
             users: {
-                referToSubCommands: ['block','unblock','add','remove'],
+                referToSubCommands: ['block', 'unblock', 'add', 'remove'],
                 required: (args) =>
                     (['add', 'remove'].includes(args.action) || (['block', 'unblock'].includes(args.action) && args.roles instanceof Array && args.roles.length == 0)),
                 displayValidErrorEvenIfFound: true,
@@ -75,7 +75,7 @@ export default class Vocal extends Command {
                 type: "user",
                 multi: true,
                 description: "Le ou les utilisateurs à ignorer ou écouter quand ils se connectent sur un vocal",
-                valid: (users: GuildMember|GuildMember[], args, command: Command) => {
+                valid: (users: GuildMember | GuildMember[], args, command: Command) => {
                     if (users instanceof GuildMember && (users.id === command.member.id || args.users.some(eachUser => eachUser.id === users.id)))
                         return false;
                     if (users instanceof Array) {
@@ -100,7 +100,7 @@ export default class Vocal extends Command {
                     }
             },
             time: {
-                referToSubCommands: ['limit','mute'],
+                referToSubCommands: ['limit', 'mute'],
                 required: (args) => ["limit", "mute"].includes(args.action),
                 type: "duration",
                 description: "Le temps durant lequel on souhaite ne pas recevoir de notif (ex: 30s, 5m, 3h, 2j)",
@@ -109,9 +109,11 @@ export default class Vocal extends Command {
         }
     }
 
-    static buttonsTimeout = 48*60*60*1000; // 48h pour répondre à une invitation
+    static buttonsTimeout = 48 * 60 * 60 * 1000; // 48h pour répondre à une invitation
 
-    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: string) {
+    static usersWhoAreOnVocal: { [id: string]: VoiceChannel|StageChannel } = {};
+
+    constructor(channel: TextBasedChannels, member: User | GuildMember, guild: null | Guild = null, writtenCommandOrSlashCommandOptions: null | string | CommandInteractionOptionResolver = null, commandOrigin: string) {
         super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, Vocal.commandName, Vocal.argsModel);
     }
 
@@ -195,7 +197,7 @@ export default class Vocal extends Command {
                     serverId: this.guild.id,
                     requesterId: this.member.id,
                     requestedId: user.id,
-                    timestamp: { $lte: new Date(currentDate.getTime()-Vocal.buttonsTimeout) }
+                    timestamp: {$lte: new Date(currentDate.getTime() - Vocal.buttonsTimeout)}
                 });
 
                 const invite = await VocalInvite.findOne({
@@ -222,7 +224,7 @@ export default class Vocal extends Command {
                     continue;
                 }
 
-                if (await Vocal.sendVocalInvite(this.member,user,this.guild))
+                if (await Vocal.sendVocalInvite(this.member, user, this.guild))
                     inviteds.push(user);
                 else
                     usersCantBeDM.push(user);
@@ -235,8 +237,8 @@ export default class Vocal extends Command {
                 });
             if (hasNotVocal.length > 0)
                 embed.addFields({
-                   name: "Ces utilisateurs n'ont pas accès à la fonction vocal :",
-                   value: hasNotVocal.map(user => "<@" + user.id + ">").join("\n")
+                    name: "Ces utilisateurs n'ont pas accès à la fonction vocal :",
+                    value: hasNotVocal.map(user => "<@" + user.id + ">").join("\n")
                 });
             if (alreadySubscribeds.length > 0)
                 embed.addFields({
@@ -545,7 +547,7 @@ export default class Vocal extends Command {
 
             if (subs) {
 
-                const subscribings: Array<IVocalSubscribe|typeof VocalSubscribe> = await VocalSubscribe.find({
+                const subscribings: Array<IVocalSubscribe | typeof VocalSubscribe> = await VocalSubscribe.find({
                     serverId: this.guild.id,
                     listenerId: this.member.id
                 })
@@ -559,7 +561,7 @@ export default class Vocal extends Command {
                             subscribe.remove();
                         }
                         return {
-                            name: member ? (member.nickname ?? member.user.username) : 'Not found user ('+subscribe.listenedId+')',
+                            name: member ? (member.nickname ?? member.user.username) : 'Not found user (' + subscribe.listenedId + ')',
                             value: member ?
                                 "Vous écoutez <@" + subscribe.listenedId + ">" + (!subscribe.enabled ? " (écoute désactivée)" : "") :
                                 "N'est plus présent sur le serveur, écoute supprimée"
@@ -576,7 +578,7 @@ export default class Vocal extends Command {
                     })
                 }
 
-                const subscribeds: Array<IVocalSubscribe|typeof VocalSubscribe> = await VocalSubscribe.find({
+                const subscribeds: Array<IVocalSubscribe | typeof VocalSubscribe> = await VocalSubscribe.find({
                     serverId: this.guild.id,
                     listenedId: this.member.id
                 })
@@ -596,15 +598,15 @@ export default class Vocal extends Command {
                                 userId: subscribe.listenerId
                             })
                             muted = userConfig != null &&
-                                typeof(userConfig.mutedFor) == "number" &&
+                                typeof (userConfig.mutedFor) == "number" &&
                                 userConfig.lastMute instanceof Date &&
-                                Date.now()-userConfig.lastMute.getTime() < userConfig.mutedFor;
+                                Date.now() - userConfig.lastMute.getTime() < userConfig.mutedFor;
                         }
                         return {
-                            name: member ? (member.nickname ?? member.user.username) : 'Not found user ('+subscribe.listenerId+')',
+                            name: member ? (member.nickname ?? member.user.username) : 'Not found user (' + subscribe.listenerId + ')',
                             value: member ? "<@" + subscribe.listenerId + "> vous écoute" +
                                 (!subscribe.enabled ? " (écoute désactivée)" :
-                                    muted ? " (il/elle est mute)" : ""
+                                        muted ? " (il/elle est mute)" : ""
                                 ) : "N'est plus présent sur le serveur, écoute supprimée"
                         }
                     })), (embed: MessageEmbed, nbPart) => {
@@ -643,7 +645,6 @@ export default class Vocal extends Command {
                 fieldLines.push("L'écoute est " + (ownUserConfig.listening ? "activée" : "désactivée"));
 
 
-
                 const nbSubscribings: number = await VocalSubscribe.count({
                     serverId: this.guild.id,
                     listenerId: this.member.id
@@ -668,7 +669,7 @@ export default class Vocal extends Command {
 
                 embed.addFields({
                     name: "Status :",
-                    value: '\n'+fieldLines.join("\n\n")
+                    value: '\n' + fieldLines.join("\n\n")
                 })
 
                 if (ownUserConfig.blocked.users.length > 0) {
@@ -691,13 +692,13 @@ export default class Vocal extends Command {
         return this.response(false, "Vous n'avez rentré aucune option");
     }
 
-    static async sendVocalInvite(requester: GuildMember|User, requested: GuildMember, guild: Guild): Promise<boolean> {
+    static async sendVocalInvite(requester: GuildMember | User, requested: GuildMember, guild: Guild): Promise<boolean> {
         const acceptButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "a";
         const denyButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "d";
 
         try {
             await requested.send({
-                content: (requester instanceof GuildMember ? (requester.nickname??requester.user.username) : requester.username) + " souhaite pouvoir écouter vos connexions vocales sur le serveur '" + guild.name + "'",
+                content: (requester instanceof GuildMember ? (requester.nickname ?? requester.user.username) : requester.username) + " souhaite pouvoir écouter vos connexions vocales sur le serveur '" + guild.name + "'",
                 components: [
                     new MessageActionRow().addComponents(
                         new MessageButton()
@@ -735,103 +736,97 @@ export default class Vocal extends Command {
     }
 
     static async listenVoiceChannelsConnects(oldState: VoiceState, newState: VoiceState) {
-        if (oldState.channelId !== newState.channelId && newState.channelId !== null && newState.channel !== null && newState.member !== null) {
 
-            const vocalConfig: IVocalConfig = await VocalConfig.findOne({serverId: newState.guild.id, enabled: true});
-            if (vocalConfig === null) return;
+        if (oldState.channelId === newState.channelId || newState.member === null)
+            return;
 
-            if (vocalConfig.channelBlacklist.includes(newState.channelId)) return;
+        if (newState.channelId === null || newState.channel === null) {
+            delete Vocal.usersWhoAreOnVocal[newState.member.id];
+            return;
+        }
+        Vocal.usersWhoAreOnVocal[newState.member.id] = newState.channel;
 
-            const vocalSubscribes: IVocalSubscribe[] = await VocalSubscribe.find({
+        const vocalConfig: IVocalConfig = await VocalConfig.findOne({serverId: newState.guild.id, enabled: true});
+        if (vocalConfig === null) return;
+
+        if (vocalConfig.channelBlacklist.includes(newState.channelId)) return;
+
+        const vocalSubscribes: IVocalSubscribe[] = await VocalSubscribe.find({
+            serverId: newState.guild.id,
+            listenedId: newState.member.id,
+            enabled: true
+        });
+
+        const allowedUsers: { [id: string]: boolean } = {};
+
+        for (const vocalSubscribe of vocalSubscribes) {
+
+            if (Vocal.usersWhoAreOnVocal[vocalSubscribe.listenerId] && Vocal.usersWhoAreOnVocal[vocalSubscribe.listenerId].id === newState.channelId)
+                continue;
+
+            let listenerConfig: IVocalUserConfig | typeof VocalUserConfig = await VocalUserConfig.findOne({
                 serverId: newState.guild.id,
-                listenedId: newState.member.id,
-                enabled: true
+                userId: vocalSubscribe.listenerId
             });
 
-            const allowedUsers: {[id: string]: boolean} = {};
-
-            for (const vocalSubscribe of vocalSubscribes) {
-                let listenerConfig: IVocalUserConfig | typeof VocalUserConfig = await VocalUserConfig.findOne({
+            if (listenerConfig === null) {
+                listenerConfig = await VocalUserConfig.create({
                     serverId: newState.guild.id,
-                    userId: vocalSubscribe.listenerId
+                    userId: vocalSubscribe.listenerId,
+                    blocked: {users: [], roles: []},
+                    listening: true,
+                    limit: 0
                 });
-
-                if (listenerConfig === null) {
-                    listenerConfig = await VocalUserConfig.create({
-                        serverId: newState.guild.id,
-                        userId: vocalSubscribe.listenerId,
-                        blocked: {users: [], roles: []},
-                        listening: true,
-                        limit: 0
-                    });
-                }
-
-                if (
-                    listenerConfig.lastMute instanceof Date &&
-                    typeof (listenerConfig.mutedFor) == "number" &&
-                    Date.now() - listenerConfig.lastMute.getTime() < listenerConfig.mutedFor
-                ) continue;
-
-                let listener: null | GuildMember = null;
-                try {
-                    listener = await newState.guild.members.fetch(vocalSubscribe.listenerId);
-                } catch (_) {
-                }
-
-                if (listener === null) {
-                    VocalSubscribe.deleteMany({
-                        serverId: newState.guild.id,
-                        listenerId: vocalSubscribe.listenerId
-                    });
-                    listenerConfig.remove()
-                    continue;
-                }
-
-                let listened: null | GuildMember = null;
-                try {
-                    listened = await newState.guild.members.fetch(vocalSubscribe.listenedId);
-                } catch (_) {
-                }
-
-                if (listened === null) {
-                    VocalSubscribe.deleteMany({
-                        serverId: newState.guild.id,
-                        listenedId: vocalSubscribe.listenedId
-                    });
-                    VocalUserConfig.deleteOne({
-                        serverId: newState.guild.id,
-                        userId: vocalSubscribe.listenedId
-                    })
-                    continue;
-                }
-
-                if (allowedUsers[listener.id] === undefined)
-                    allowedUsers[listener.id] = (await Vocal.staticCheckPermissions(null, listener, newState.guild, false)) === true;
-                if (!allowedUsers[listener.id])
-                    continue;
-
-                if (allowedUsers[listened.id] === undefined)
-                    allowedUsers[listened.id] = (await Vocal.staticCheckPermissions(null, listened, newState.guild, false)) === true;
-                if (!allowedUsers[listened.id])
-                    continue;
-
-                try {
-                    await listener.send("'" + (newState.member.nickname ?? newState.member.user.username) + "' s'est connecté sur le channel vocal <#" + newState.channel.id + "> sur le serveur '" + newState.guild.name + "'");
-                } catch (_) {
-                    continue;
-                }
-
-                if (listenerConfig.limit > 0) {
-                    listenerConfig.lastMute = new Date(Math.floor(Date.now() / 1000) * 1000);
-                    listenerConfig.mutedFor = listenerConfig.limit;
-                    listenerConfig.save();
-                }
             }
 
+            if (
+                listenerConfig.lastMute instanceof Date &&
+                typeof (listenerConfig.mutedFor) == "number" &&
+                Date.now() - listenerConfig.lastMute.getTime() < listenerConfig.mutedFor
+            ) continue;
+
+            let listener: null | GuildMember = null;
+            try {
+                listener = await newState.guild.members.fetch(vocalSubscribe.listenerId);
+            } catch (_) {
+            }
+
+            if (listener === null) {
+                VocalSubscribe.deleteMany({
+                    serverId: newState.guild.id,
+                    listenerId: vocalSubscribe.listenerId
+                });
+                listenerConfig.remove()
+                continue;
+            }
+
+            const listened: GuildMember = await newState.guild.members.fetch(vocalSubscribe.listenedId);
+
+            if (allowedUsers[listener.id] === undefined)
+                allowedUsers[listener.id] = (await Vocal.staticCheckPermissions(null, listener, newState.guild, false)) === true;
+            if (!allowedUsers[listener.id])
+                continue;
+
+            if (allowedUsers[listened.id] === undefined)
+                allowedUsers[listened.id] = (await Vocal.staticCheckPermissions(null, listened, newState.guild, false)) === true;
+            if (!allowedUsers[listened.id])
+                continue;
+
+            try {
+                await listener.send("'" + (newState.member.nickname ?? newState.member.user.username) + "' s'est connecté sur le channel vocal <#" + newState.channel.id + "> sur le serveur '" + newState.guild.name + "'");
+            } catch (_) {
+                continue;
+            }
+
+            if (listenerConfig.limit > 0) {
+                listenerConfig.lastMute = new Date(Math.floor(Date.now() / 1000) * 1000);
+                listenerConfig.mutedFor = listenerConfig.limit;
+                listenerConfig.save();
+            }
         }
     }
 
-    static async getDatasButton(button: IVocalAskInviteBack|IVocalInvite, interaction: ButtonInteraction): Promise<false|{server: Guild, requester: GuildMember, requested: GuildMember}> {
+    static async getDatasButton(button: IVocalAskInviteBack | IVocalInvite, interaction: ButtonInteraction): Promise<false | { server: Guild, requester: GuildMember, requested: GuildMember }> {
         let server;
         if ((server = client.guilds.cache.get(button.serverId)) === undefined) {
             await interaction.editReply({content: "Le serveur associé à cette invitation semble inaccessible au bot"});
@@ -854,15 +849,15 @@ export default class Vocal extends Command {
             }
         }
 
-        return (requester && requested) ? {server,requested,requester} : false;
+        return (requester && requested) ? {server, requested, requester} : false;
     }
 
     static async listenAskInviteBackButtons(interaction: ButtonInteraction): Promise<boolean> {
         const currentDate = new Date();
         await VocalAskInviteBack.deleteMany({
-            timestamp: { $lte: new Date(currentDate.getTime()-Vocal.buttonsTimeout) }
+            timestamp: {$lte: new Date(currentDate.getTime() - Vocal.buttonsTimeout)}
         });
-        const inviteBackButton: IVocalAskInviteBack|typeof VocalAskInviteBack = await VocalAskInviteBack.findOne({
+        const inviteBackButton: IVocalAskInviteBack | typeof VocalAskInviteBack = await VocalAskInviteBack.findOne({
             buttonId: interaction.customId
         });
 
@@ -875,7 +870,7 @@ export default class Vocal extends Command {
 
         const {server, requested, requester} = datas;
 
-        await Vocal.sendVocalInvite(requester,requested,server);
+        await Vocal.sendVocalInvite(requester, requested, server);
 
         await inviteBackButton.remove();
 
@@ -888,7 +883,7 @@ export default class Vocal extends Command {
 
         const currentDate = new Date();
         await VocalInvite.deleteMany({
-            timestamp: { $lte: new Date(currentDate.getTime()-Vocal.buttonsTimeout) }
+            timestamp: {$lte: new Date(currentDate.getTime() - Vocal.buttonsTimeout)}
         });
 
         const invite: IVocalInvite = await VocalInvite.findOne({
@@ -904,11 +899,11 @@ export default class Vocal extends Command {
         const {server, requested, requester} = datas;
 
         if (!(await Vocal.staticCheckPermissions(null, requested, server, false))) {
-            await interaction.editReply({content: "Vous n'avez plus accès à la fonction vocal sur le serveur '"+server.name+"'"});
+            await interaction.editReply({content: "Vous n'avez plus accès à la fonction vocal sur le serveur '" + server.name + "'"});
             return true;
         }
         if (!(await Vocal.staticCheckPermissions(null, requester, server, false))) {
-            await interaction.editReply({content: "'"+(requester.nickname??requester.user.username)+"' n'a plus accès à la fonction vocal sur le serveur '"+server.name+"'"});
+            await interaction.editReply({content: "'" + (requester.nickname ?? requester.user.username) + "' n'a plus accès à la fonction vocal sur le serveur '" + server.name + "'"});
             return true;
         }
 
@@ -1017,11 +1012,11 @@ export default class Vocal extends Command {
                 },
                 {
                     name: "limit 30sec",
-                    value: "Attendre 30 secondes entre chaque notif (limit 0 pour remettre ce temps à 0) \nexemples pour time: 30s, 1h, 5m (unitées possibles : "+
-                        Object.values(durationUnits).reduce((acc,units) => [
+                    value: "Attendre 30 secondes entre chaque notif (limit 0 pour remettre ce temps à 0) \nexemples pour time: 30s, 1h, 5m (unitées possibles : " +
+                        Object.values(durationUnits).reduce((acc, units) => [
                             ...acc,
                             ...units
-                        ], []).join(", ")+")"
+                        ], []).join(", ") + ")"
                 },
                 {
                     name: "mute",
@@ -1044,7 +1039,7 @@ export default class Vocal extends Command {
                     value: "Pour afficher l'aide"
                 }
             ].map(field => ({
-                name: config.command_prefix+this.commandName+" "+field.name,
+                name: config.command_prefix + this.commandName + " " + field.name,
                 value: field.value
             })));
     }
