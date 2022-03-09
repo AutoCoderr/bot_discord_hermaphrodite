@@ -239,16 +239,62 @@ export const durationUnitsMult = {
     hour: 60*60*1000
 }
 
-export function decomposeMsTime(ms: number): {h: number, m: number, s: number} {
+export function extractTime(date: Date) {
     return {
-        h: Math.floor(ms/1000/60/60),
-        m: Math.floor(ms/1000/60)%60,
-        s: Math.floor(ms/1000)%60
+        h: date.getHours(),
+        m: date.getMinutes(),
+        s: date.getSeconds()
     }
 }
 
-export function showTime(time: {h: number, m: number, s: number}): string {
-    return (time.h > 0 ? ' '+time.h+' heure'+(time.h > 1 ? 's' : '') : '')+
-        (time.m > 0 ? ' '+time.m+' minute'+(time.m > 1 ? 's' : '') : '')+
-        (time.s > 0 ? ' '+time.s+' seconde'+(time.s > 1 ? 's' : '') : '')
+export function extractUTCTime(date: Date) {
+    return {
+        h: date.getUTCHours(),
+        m: date.getUTCMinutes(),
+        s: date.getUTCSeconds()
+    }
+}
+
+export function extractDate(date: Date) {
+    return {
+        year: date.getFullYear(),
+        month: date.getMonth()+1,
+        day: date.getDate()
+    }
+}
+
+export function extractUTCDate(date: Date) {
+    return {
+        year: date.getUTCFullYear(),
+        month: date.getUTCMonth()+1,
+        day: date.getUTCDate()
+    }
+}
+
+export function showTime(time: {h: number, m: number, s: number}, format: string): string {
+    const {h,m,s} = time;
+    switch (format) {
+        case 'fr_long':
+            return (h > 0 ? ' '+h+' heure'+(h > 1 ? 's' : '') : '')+
+                (m > 0 ? ' '+m+' minute'+(m > 1 ? 's' : '') : '')+
+                (s > 0 ? ' '+s+' seconde'+(s > 1 ? 's' : '') : '');
+        case 'fr':
+            return h+'h'+m+'m'+s+'s';
+        case 'classic':
+            return [h,m,s].join(':');
+        default:
+            return "invalid format";
+    }
+}
+
+export function showDate(date: {year: number, month: number, day: number}, format: string): string {
+    const {year,month,day} = date;
+    switch (format) {
+        case 'en':
+            return year+"-"+addMissingZero(month)+"-"+addMissingZero(day);
+        case 'fr':
+            return addMissingZero(day)+"/"+addMissingZero(month)+"/"+year;
+        default:
+            return "invalid format";
+    }
 }

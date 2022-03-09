@@ -15,7 +15,15 @@ import VocalConfig, {IVocalConfig} from "../Models/VocalConfig";
 import VocalUserConfig, {IVocalUserConfig} from "../Models/VocalUserConfig";
 import VocalInvite, {IVocalInvite} from "../Models/VocalInvite";
 import client from "../client";
-import {decomposeMsTime, durationUnits, showTime, splitFieldsEmbed} from "../Classes/OtherFunctions";
+import {
+    extractUTCTime,
+    extractTime,
+    extractDate,
+    durationUnits,
+    showTime,
+    splitFieldsEmbed,
+    showDate
+} from "../Classes/OtherFunctions";
 import VocalAskInviteBack, {IVocalAskInviteBack} from "../Models/VocalAskInviteBack";
 
 export default class Vocal extends Command {
@@ -511,7 +519,7 @@ export default class Vocal extends Command {
 
             ownUserConfig.save();
 
-            return this.response(true, "Vous ne recevrez plus de notification pendant" + showTime(decomposeMsTime(time)));
+            return this.response(true, "Vous ne recevrez plus de notification pendant" + showTime(extractUTCTime(new Date(time)), 'fr_long'));
         }
 
         if (action == 'unmute') {
@@ -538,7 +546,7 @@ export default class Vocal extends Command {
             return this.response(true,
                 (time == 0) ?
                     "Il n'y aura maintenant aucun répit entre les notifications" :
-                    "Il y aura maintenant un répit de" + showTime(decomposeMsTime(time)) + " entre chaque notification"
+                    "Il y aura maintenant un répit de" + showTime(extractUTCTime(new Date(time)), 'fr_long') + " entre chaque notification"
             );
         }
 
@@ -563,8 +571,9 @@ export default class Vocal extends Command {
                         return {
                             name: member ? (member.nickname ?? member.user.username) : 'Not found user (' + subscribe.listenedId + ')',
                             value: member ?
-                                "Vous écoutez <@" + subscribe.listenedId + ">" + (!subscribe.enabled ? " (écoute désactivée)" : "") :
-                                "N'est plus présent sur le serveur, écoute supprimée"
+                                "Vous écoutez <@" + subscribe.listenedId + ">" + (!subscribe.enabled ? " (écoute désactivée)" : "") +
+                                (subscribe.timestamp ? " depuis le "+showDate(extractDate(subscribe.timestamp), 'fr')+" à "+showTime(extractTime(subscribe.timestamp), 'fr') : '') :
+                                    "N'est plus présent sur le serveur, écoute supprimée"
                         }
                     })), (embed: MessageEmbed, nbPart) => {
                         if (nbPart == 1)
@@ -632,14 +641,14 @@ export default class Vocal extends Command {
                 let sinceTimeMuted;
                 let remaningTimeMuted;
                 if (muted) {
-                    sinceTimeMuted = decomposeMsTime(now - ownUserConfig.lastMute.getTime());
-                    remaningTimeMuted = decomposeMsTime(ownUserConfig.mutedFor - now + ownUserConfig.lastMute.getTime());
+                    sinceTimeMuted = extractUTCTime(new Date(now - ownUserConfig.lastMute.getTime()));
+                    remaningTimeMuted = extractUTCTime(new Date(ownUserConfig.mutedFor - now + ownUserConfig.lastMute.getTime()));
                 }
 
-                fieldLines.push(muted ? "Vous êtes mute depuis" + showTime(sinceTimeMuted) +
-                    ".\nIl reste" + showTime(remaningTimeMuted) + "." : "Vous n'êtes pas mute");
+                fieldLines.push(muted ? "Vous êtes mute depuis" + showTime(sinceTimeMuted, 'fr_long') +
+                    ".\nIl reste" + showTime(remaningTimeMuted, 'fr_long') + "." : "Vous n'êtes pas mute");
 
-                fieldLines.push((ownUserConfig.limit > 0 ? "Vous avez" + showTime(decomposeMsTime(ownUserConfig.limit)) : "Vous n'avez pas") +
+                fieldLines.push((ownUserConfig.limit > 0 ? "Vous avez" + showTime(extractUTCTime(new Date(ownUserConfig.limit)), 'fr_long') : "Vous n'avez pas") +
                     " de répit entre chaque notification");
 
                 fieldLines.push("L'écoute est " + (ownUserConfig.listening ? "activée" : "désactivée"));
@@ -916,6 +925,7 @@ export default class Vocal extends Command {
                 serverId: invite.serverId,
                 listenerId: invite.requesterId,
                 listenedId: invite.requestedId,
+                timestamp: new Date,
                 enabled: listenerConfig.listening
             });
             try {
