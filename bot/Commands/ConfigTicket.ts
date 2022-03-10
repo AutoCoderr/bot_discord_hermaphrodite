@@ -460,20 +460,29 @@ export default class ConfigTicket extends Command {
         let userWhoReact: User;
         const filter = (reaction, user) => {
             userWhoReact = user;
-            return reaction.emoji.name == emoteName;
+            return reaction.emoji.name == emoteName && user;
         };
         message.awaitReactions({ max: 1 , filter})
-            .then(async _ => {
+            .then(async (collected) => {
                 if (!userWhoReact) return;
+                if (userWhoReact.id == (<ClientUser>client.user).id) {
+                    ConfigTicket.listenMessageTicket(message, emoteName, _idConfigTicket, _idMessageToListen);
+                    return;
+                }
+
                 const ticketConfig: ITicketConfig = await TicketConfig.findOne({
                     _id: _idConfigTicket,
                     'messagesToListen._id': _idMessageToListen
                 });
                 if (ticketConfig == null) return;
+
+                const reaction = collected.first();
+                if (reaction)
+                    reaction.users.remove(userWhoReact);
+
                 let category: CategoryChannel;
 
-                if (userWhoReact.id != (<ClientUser>client.user).id &&
-                    ticketConfig.enabled &&
+                if (ticketConfig.enabled &&
                     ticketConfig.categoryId != null &&
                     (category = <CategoryChannel>guild.channels.cache.get(ticketConfig.categoryId)) != undefined) {
 
@@ -487,12 +496,9 @@ export default class ConfigTicket extends Command {
 
                             const moderatorRole: Role | undefined = ticketConfig.moderatorId ? guild.roles.cache.get(ticketConfig.moderatorId) : undefined;
 
-                            let member: null|GuildMember = null
-                            try {
-                                member = await guild.members.fetch(userWhoReact.id);
-                            } catch (e) {
-                            }
-                            const username = member && member.nickname ? member.nickname : userWhoReact.username;
+                            const member: GuildMember = await guild.members.fetch(userWhoReact.id);
+
+                            const username = member.nickname ? member.nickname : userWhoReact.username;
                             channel = await guild.channels.create('Ticket de ' + username + " " + userWhoReact.id, {
                                 type: "GUILD_TEXT"
                             });
