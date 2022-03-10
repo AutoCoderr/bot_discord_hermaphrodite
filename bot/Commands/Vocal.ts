@@ -10,10 +10,11 @@ import {
     Role, StageChannel, TextBasedChannels, User, VoiceChannel, VoiceState
 } from "discord.js";
 import config from "../config";
-import VocalSubscribe, {IVocalSubscribe} from "../Models/VocalSubscribe";
-import VocalConfig, {IVocalConfig} from "../Models/VocalConfig";
-import VocalUserConfig, {IVocalUserConfig} from "../Models/VocalUserConfig";
-import VocalInvite, {IVocalInvite} from "../Models/VocalInvite";
+import VocalSubscribe, {IVocalSubscribe} from "../Models/Vocal/VocalSubscribe";
+import VocalConfig, {IVocalConfig} from "../Models/Vocal/VocalConfig";
+import VocalUserConfig, {IVocalUserConfig} from "../Models/Vocal/VocalUserConfig";
+import VocalInvite, {IVocalInvite} from "../Models/Vocal/VocalInvite";
+import VocalAskInviteBack, {IVocalAskInviteBack} from "../Models/Vocal/VocalAskInviteBack";
 import client from "../client";
 import {splitFieldsEmbed} from "../Classes/OtherFunctions";
 import {
@@ -24,7 +25,6 @@ import {
     showTime,
     showDate
 } from "../Classes/DateTimeManager";
-import VocalAskInviteBack, {IVocalAskInviteBack} from "../Models/VocalAskInviteBack";
 
 export default class Vocal extends Command {
     static display = true;
