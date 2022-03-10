@@ -263,12 +263,12 @@ export default class Command {
         return Command.staticCheckPermissions(this.channel, this.member, this.guild, displayMsg, this.commandName);
     }
 
-    static async staticCheckPermissions(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, displayMsg = true, commandName: string|null = null): Promise<boolean|Array<string | MessagePayload | MessageOptions>> {
+    static async staticCheckPermissions(channel: null|TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, displayMsg = true, commandName: string|null = null): Promise<boolean|Array<string | MessagePayload | MessageOptions>> {
         if (commandName == null) {
             commandName = this.commandName;
         }
-      
-        if (channel.type == "DM" || config.roots.includes(member.id) || (guild != null && guild.ownerId == member.id)) return true;
+
+        if ((channel && channel.type == "DM") || config.roots.includes(member.id) || (guild != null && guild.ownerId == member.id)) return true;
 
         if (guild && member instanceof GuildMember) {
             const permission: IPermissions = await Permissions.findOne({

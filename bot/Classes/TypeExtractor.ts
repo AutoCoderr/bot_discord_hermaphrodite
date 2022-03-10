@@ -11,7 +11,8 @@ import {
 import client from "../client";
 import {existingCommands} from "./CommandsDescription";
 import Command from "./Command";
-import {isNumber,durationUnits,durationUnitsMult} from "./OtherFunctions";
+import {isNumber} from "./OtherFunctions";
+import {durationUnits,durationUnitsMult} from "./DateTimeManager";
 
 export const extractTypes = {
     channel: (field, command: Command): GuildChannel|ThreadChannel|VoiceChannel|false => {

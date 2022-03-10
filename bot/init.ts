@@ -16,9 +16,17 @@ export default function init(bot) {
 
             initSlashCommands()
 
-            client.on('interactionCreate', (interaction: Interaction) => {
-                //@ts-ignore
-                existingCommands.Vocal.listenInviteButtons(interaction);
+            client.on('interactionCreate', async (interaction: Interaction) => {
+
+                if (interaction.isButton()) {
+                    await interaction.deferReply();
+                    if (//@ts-ignore
+                        !(await existingCommands.Vocal.listenInviteButtons(interaction)) &&//@ts-ignore
+                        !(await existingCommands.Vocal.listenAskInviteBackButtons(interaction))
+                    ) {
+                        await interaction.editReply({content: "Bouton invalide"});
+                    }
+                }
 
                 listenSlashCommands(interaction);
             });
