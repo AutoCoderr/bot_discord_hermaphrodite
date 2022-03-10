@@ -15,15 +15,15 @@ import VocalConfig, {IVocalConfig} from "../Models/VocalConfig";
 import VocalUserConfig, {IVocalUserConfig} from "../Models/VocalUserConfig";
 import VocalInvite, {IVocalInvite} from "../Models/VocalInvite";
 import client from "../client";
+import {splitFieldsEmbed} from "../Classes/OtherFunctions";
 import {
     extractUTCTime,
     extractTime,
     extractDate,
     durationUnits,
     showTime,
-    splitFieldsEmbed,
     showDate
-} from "../Classes/OtherFunctions";
+} from "../Classes/DateTimeManager";
 import VocalAskInviteBack, {IVocalAskInviteBack} from "../Models/VocalAskInviteBack";
 
 export default class Vocal extends Command {
@@ -519,7 +519,7 @@ export default class Vocal extends Command {
 
             ownUserConfig.save();
 
-            return this.response(true, "Vous ne recevrez plus de notification pendant" + showTime(extractUTCTime(new Date(time)), 'fr_long'));
+            return this.response(true, "Vous ne recevrez plus de notification pendant" + showTime(extractUTCTime(time), 'fr_long'));
         }
 
         if (action == 'unmute') {
@@ -546,7 +546,7 @@ export default class Vocal extends Command {
             return this.response(true,
                 (time == 0) ?
                     "Il n'y aura maintenant aucun répit entre les notifications" :
-                    "Il y aura maintenant un répit de" + showTime(extractUTCTime(new Date(time)), 'fr_long') + " entre chaque notification"
+                    "Il y aura maintenant un répit de" + showTime(extractUTCTime(time), 'fr_long') + " entre chaque notification"
             );
         }
 
@@ -641,14 +641,14 @@ export default class Vocal extends Command {
                 let sinceTimeMuted;
                 let remaningTimeMuted;
                 if (muted) {
-                    sinceTimeMuted = extractUTCTime(new Date(now - ownUserConfig.lastMute.getTime()));
-                    remaningTimeMuted = extractUTCTime(new Date(ownUserConfig.mutedFor - now + ownUserConfig.lastMute.getTime()));
+                    sinceTimeMuted = extractUTCTime(now - ownUserConfig.lastMute.getTime());
+                    remaningTimeMuted = extractUTCTime(ownUserConfig.mutedFor - now + ownUserConfig.lastMute.getTime());
                 }
 
                 fieldLines.push(muted ? "Vous êtes mute depuis" + showTime(sinceTimeMuted, 'fr_long') +
                     ".\nIl reste" + showTime(remaningTimeMuted, 'fr_long') + "." : "Vous n'êtes pas mute");
 
-                fieldLines.push((ownUserConfig.limit > 0 ? "Vous avez" + showTime(extractUTCTime(new Date(ownUserConfig.limit)), 'fr_long') : "Vous n'avez pas") +
+                fieldLines.push((ownUserConfig.limit > 0 ? "Vous avez" + showTime(extractUTCTime(ownUserConfig.limit), 'fr_long') : "Vous n'avez pas") +
                     " de répit entre chaque notification");
 
                 fieldLines.push("L'écoute est " + (ownUserConfig.listening ? "activée" : "désactivée"));
