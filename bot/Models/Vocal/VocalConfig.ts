@@ -1,5 +1,5 @@
 import { Schema } from 'mongoose';
-import { connect } from "../Mongo";
+import { connect } from "../../Mongo";
 
 
 const db = connect();

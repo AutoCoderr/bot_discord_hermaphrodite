@@ -1,4 +1,4 @@
-import {durationUnits} from "./OtherFunctions";
+import {durationUnits} from "./DateTimeManager";
 
 export const checkTypes = {
     number: field => typeof(field) == "number",

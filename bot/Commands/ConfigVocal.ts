@@ -8,10 +8,10 @@ import {
     ThreadChannel, User,
     VoiceChannel
 } from "discord.js";
-import VocalConfig from "../Models/VocalConfig";
+import VocalConfig from "../Models/Vocal/VocalConfig";
 import {splitFieldsEmbed} from "../Classes/OtherFunctions";
 import config from "../config";
-import VocalSubscribe, {IVocalSubscribe} from "../Models/VocalSubscribe";
+import VocalSubscribe, {IVocalSubscribe} from "../Models/Vocal/VocalSubscribe";
 
 export default class ConfigVocal extends Command {
     static display = true;
