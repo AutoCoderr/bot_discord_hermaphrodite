@@ -1,6 +1,6 @@
 import config from "../config";
 import Command from "../Classes/Command";
-import { forEachNotifyOnReact } from "../Classes/OtherFunctions";
+import {forEachNotifyOnReact, getEmoteDisplay} from "../Classes/OtherFunctions";
 import { existingCommands } from "../Classes/CommandsDescription";
 import StoredNotifyOnReact from "../Models/StoredNotifyOnReact";
 import Discord, {
@@ -76,7 +76,7 @@ export default class CancelNotifyOnReact extends Command {
             );
         }
 
-        let emoteName = emote ? (emote instanceof GuildEmoji ? emote.name : emote) : undefined;
+        let emoteId = emote ? (emote instanceof GuildEmoji ? emote.id : emote) : undefined;
 
         let Embed = new Discord.MessageEmbed()
             .setColor('#0099ff')
@@ -85,13 +85,14 @@ export default class CancelNotifyOnReact extends Command {
             .setTimestamp();
         // @ts-ignore
         let listenings = existingCommands.NotifyOnReact.listenings[this.guild.id];
-        if (emoteName == undefined) {
-            await forEachNotifyOnReact((found, channel, messageId, contentMessage, emoteName) => {
+        if (emoteId == undefined) {
+            await forEachNotifyOnReact((found, channel, messageId, contentMessage, emoteDisplay) => {
                 if (found) { // @ts-ignore
-                    CancelNotifyOnReact.deleteNotifyOnReactInBdd(this.guild.id,channel.id,messageId,emoteName);
-                    listenings[channel.id][messageId][emoteName] = false;
+                    CancelNotifyOnReact.deleteNotifyOnReactInBdd(this.guild.id,channel.id,messageId,emoteId);
+                    listenings[channel.id][messageId][emoteId] = false;
+
                     Embed.addFields({
-                        name: "Supprimée : sur '#" + channel.name + "' (" + contentMessage + ") :" + emoteName + ":",
+                        name: "Supprimée : sur '#" + channel.name + "' (" + contentMessage + ") " + emoteDisplay,
                         value: "Cette écoute de réaction a été supprimée"
                     });
                 } else {
@@ -101,11 +102,11 @@ export default class CancelNotifyOnReact extends Command {
                     });
                 }
             }, channel, message, this);
-        } else if (listenings && listenings[channel.id] && listenings[channel.id][message.id] && listenings[channel.id][message.id][emoteName]) { // @ts-ignore
-            CancelNotifyOnReact.deleteNotifyOnReactInBdd(message.guild.id,channel.id,message.id,emoteName);
-            listenings[channel.id][message.id][emoteName] = false;
+        } else if (listenings && listenings[channel.id] && listenings[channel.id][message.id] && listenings[channel.id][message.id][emoteId]) { // @ts-ignore
+            CancelNotifyOnReact.deleteNotifyOnReactInBdd(message.guild.id,channel.id,message.id,emoteId);
+            listenings[channel.id][message.id][emoteId] = false;
             Embed.addFields({
-                name: "sur '#" + channel.name + "' (" + message.content + ") :" + emoteName + ":",
+                name: "sur '#" + channel.name + "' (" + message.content + ") "+getEmoteDisplay(this.guild, emoteId),
                 value: "Cette écoute de réaction a été supprimée"
             });
         } else {
@@ -117,12 +118,12 @@ export default class CancelNotifyOnReact extends Command {
         return this.response(true, {embeds: [Embed]});
     }
 
-    static async deleteNotifyOnReactInBdd(serverId,channelId,messageId,emoteName) {
+    static async deleteNotifyOnReactInBdd(serverId,channelId,messageId,emoteNameOrId) {
         await StoredNotifyOnReact.deleteOne({
             serverId: serverId,
             channelToListenId: channelId,
             messageToListenId: messageId,
-            emoteName: emoteName
+            $or: [{emoteName: emoteNameOrId}, {emoteId: emoteNameOrId}]
         });
     }
 

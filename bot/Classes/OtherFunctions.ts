@@ -1,11 +1,12 @@
 import { existingCommands } from "./CommandsDescription";
 import History from "../Models/History";
-import {EmbedFieldData, Guild, GuildChannel, GuildMember, Message, MessageEmbed} from "discord.js";
+import {EmbedFieldData, Emoji, Guild, GuildChannel, GuildMember, Message, MessageEmbed} from "discord.js";
 import Command from "./Command";
 import CancelNotifyOnReact from "../Commands/CancelNotifyOnReact";
 import HistoryExec from "../Commands/HistoryExec";
 import HistoryCmd from "../Commands/HistoryCmd";
 import ListNotifyOnReact from "../Commands/ListNotifyOnReact";
+import {checkTypes} from "./TypeChecker";
 
 export function addMissingZero(number, n = 2) {
     number = number.toString();
@@ -107,6 +108,11 @@ export async function getHistory(currentCommand: HistoryCmd|HistoryExec,args: {c
     return await History.find(where).limit(limit).sort({dateTime: sort});
 }
 
+export function getEmoteDisplay(guild: Guild, emoteId: string) {
+    const emote = checkTypes.unicode(emoteId) ? emoteId : (guild.emojis.cache.get(emoteId)??emoteId);
+    return emote instanceof Emoji ? ':'+emote.name+':' : emoteId;
+}
+
 export async function forEachNotifyOnReact(callback, channel: GuildChannel, message: Message, command: CancelNotifyOnReact|ListNotifyOnReact) {
     if (command.guild == null) {
         callback(false);
@@ -123,10 +129,10 @@ export async function forEachNotifyOnReact(callback, channel: GuildChannel, mess
             if (message != undefined) {
                 let nbListeneds = 0;
                 if (typeof(listenings[channel.id][message.id]) != "undefined") { // Si un channel et un message ont été spécifiés, regarde dans le message
-                    for (let emote in listenings[channel.id][message.id]) {
-                        if (listenings[channel.id][message.id][emote]) {
+                    for (let emoteNameOrId in listenings[channel.id][message.id]) {
+                        if (listenings[channel.id][message.id][emoteNameOrId]) {
                             const contentMessage = message.content.substring(0,Math.min(20,message.content.length)) + "...";
-                            callback(true, channel, message.id, contentMessage, emote);
+                            callback(true, channel, message.id, contentMessage, getEmoteDisplay(command.guild, emoteNameOrId));
                             nbListeneds += 1;
                         }
                     }
@@ -145,10 +151,10 @@ export async function forEachNotifyOnReact(callback, channel: GuildChannel, mess
                     const contentMessage = messageListened != undefined ?
                         messageListened.content.substring(0, Math.min(20,messageListened.content.length)) + "..."
                         : messageId;
-                    for (let emote in listenings[channel.id][messageId]) {
-                        if (listenings[channel.id][messageId][emote]) {
+                    for (let emoteNameOrId in listenings[channel.id][messageId]) {
+                        if (listenings[channel.id][messageId][emoteNameOrId]) {
                             nbListeneds += 1;
-                            callback(true, channel, messageId, contentMessage, emote);
+                            callback(true, channel, messageId, contentMessage, getEmoteDisplay(command.guild, emoteNameOrId));
                         }
                     }
                 }
@@ -173,10 +179,10 @@ export async function forEachNotifyOnReact(callback, channel: GuildChannel, mess
                 const contentMessage = messageListened != undefined ?
                     messageListened.content.substring(0, Math.min(20,messageListened.content.length)) + "..."
                     : messageId;
-                for (let emote in listenings[channelId][messageId]) {
-                    if (listenings[channelId][messageId][emote]) {
+                for (let emoteNameOrId in listenings[channelId][messageId]) {
+                    if (listenings[channelId][messageId][emoteNameOrId]) {
                         nbListeneds += 1;
-                        callback(true, channel, messageId, contentMessage, emote);
+                        callback(true, channel, messageId, contentMessage, getEmoteDisplay(command.guild, emoteNameOrId));
                     }
                 }
             }
