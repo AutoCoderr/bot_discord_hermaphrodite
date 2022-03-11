@@ -108,12 +108,7 @@ export async function getHistory(currentCommand: HistoryCmd|HistoryExec,args: {c
     return await History.find(where).limit(limit).sort({dateTime: sort});
 }
 
-export function getEmoteDisplay(guild: Guild, emoteId: string) {
-    const emote = checkTypes.unicode(emoteId) ? emoteId : (guild.emojis.cache.get(emoteId)??emoteId);
-    return emote instanceof Emoji ? ':'+emote.name+':' : emoteId;
-}
-
-export async function forEachNotifyOnReact(callback, channel: GuildChannel, message: Message, command: CancelNotifyOnReact|ListNotifyOnReact) {
+export async function forEachNotifyOnReact(callback, channel: undefined|GuildChannel, message: undefined|Message, command: CancelNotifyOnReact|ListNotifyOnReact) {
     if (command.guild == null) {
         callback(false);
         return;
@@ -129,10 +124,10 @@ export async function forEachNotifyOnReact(callback, channel: GuildChannel, mess
             if (message != undefined) {
                 let nbListeneds = 0;
                 if (typeof(listenings[channel.id][message.id]) != "undefined") { // Si un channel et un message ont été spécifiés, regarde dans le message
-                    for (let emoteNameOrId in listenings[channel.id][message.id]) {
-                        if (listenings[channel.id][message.id][emoteNameOrId]) {
+                    for (let emoteKey in listenings[channel.id][message.id]) {
+                        if (listenings[channel.id][message.id][emoteKey]) {
                             const contentMessage = message.content.substring(0,Math.min(20,message.content.length)) + "...";
-                            callback(true, channel, message.id, contentMessage, getEmoteDisplay(command.guild, emoteNameOrId));
+                            callback(true, channel, message.id, contentMessage, emoteKey);
                             nbListeneds += 1;
                         }
                     }
@@ -151,10 +146,10 @@ export async function forEachNotifyOnReact(callback, channel: GuildChannel, mess
                     const contentMessage = messageListened != undefined ?
                         messageListened.content.substring(0, Math.min(20,messageListened.content.length)) + "..."
                         : messageId;
-                    for (let emoteNameOrId in listenings[channel.id][messageId]) {
-                        if (listenings[channel.id][messageId][emoteNameOrId]) {
+                    for (let emoteKey in listenings[channel.id][messageId]) {
+                        if (listenings[channel.id][messageId][emoteKey]) {
                             nbListeneds += 1;
-                            callback(true, channel, messageId, contentMessage, getEmoteDisplay(command.guild, emoteNameOrId));
+                            callback(true, channel, messageId, contentMessage, emoteKey);
                         }
                     }
                 }
@@ -179,10 +174,10 @@ export async function forEachNotifyOnReact(callback, channel: GuildChannel, mess
                 const contentMessage = messageListened != undefined ?
                     messageListened.content.substring(0, Math.min(20,messageListened.content.length)) + "..."
                     : messageId;
-                for (let emoteNameOrId in listenings[channelId][messageId]) {
-                    if (listenings[channelId][messageId][emoteNameOrId]) {
+                for (let emoteKey in listenings[channelId][messageId]) {
+                    if (listenings[channelId][messageId][emoteKey]) {
                         nbListeneds += 1;
-                        callback(true, channel, messageId, contentMessage, getEmoteDisplay(command.guild, emoteNameOrId));
+                        callback(true, channel, messageId, contentMessage, emoteKey);
                     }
                 }
             }
