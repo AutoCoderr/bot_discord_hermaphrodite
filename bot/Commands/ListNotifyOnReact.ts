@@ -2,14 +2,14 @@ import config from "../config";
 import {forEachNotifyOnReact} from "../Classes/OtherFunctions";
 import Command from "../Classes/Command";
 import Discord, {
-    CommandInteractionOptionResolver,
+    CommandInteractionOptionResolver, Emoji,
     Guild,
     GuildChannel,
     GuildEmoji,
     GuildMember,
     Message,
     MessageEmbed,
-    TextBasedChannels,
+    TextBasedChannels, TextChannel,
     User
 } from "discord.js";
 import {existingCommands} from "../Classes/CommandsDescription";
@@ -78,8 +78,17 @@ export default class ListNotifyOnReact extends Command {
         let listenings = existingCommands.NotifyOnReact.listenings[this.guild.id];
 
         if (emoteKey == undefined || all) {
-            await forEachNotifyOnReact((found, channel, messageId, contentMessage, emoteKey) => {
-                const emote = checkTypes.id(emoteKey) ? (<Guild>this.guild).emojis.cache.get(emoteKey)??null : null;
+            await forEachNotifyOnReact(async (found, channel: TextChannel, messageId, contentMessage, emoteKey) => {
+                let emote: Emoji|null = checkTypes.id(emoteKey) ? (<Guild>this.guild).emojis.cache.get(emoteKey)??null : null;
+                if (checkTypes.id(emoteKey) && emote === null) {
+                    try {
+                        message = message ?? (await channel.messages.fetch(messageId));
+                    } catch(_) {}
+                    if (message) {
+                        const reaction = message.reactions.cache.find(reaction => reaction.emoji.id === emoteKey);
+                        emote = reaction ? reaction.emoji : null
+                    }
+                }
                 if (found) {
                     Embed.addFields({
                         name: "Sur '#" + channel.name + "' (" + contentMessage + ") "+(emote ? ':'+emote.name+':' : emoteKey),

@@ -2,6 +2,7 @@ import config from "../config";
 import Command from "../Classes/Command";
 import StoredNotifyOnReact, { IStoredNotifyOnReact } from "../Models/StoredNotifyOnReact";
 import {
+    ClientUser,
     CommandInteractionOptionResolver, Emoji,
     Guild,
     GuildChannel,
@@ -14,6 +15,7 @@ import {
 } from "discord.js";
 import {existingCommands} from "../Classes/CommandsDescription";
 import {checkTypes} from "../Classes/TypeChecker";
+import client from "../client";
 
 export default class NotifyOnReact extends Command {
     static listenings = {}; /* example : {
@@ -125,6 +127,8 @@ export default class NotifyOnReact extends Command {
         }
         this.listenings[this.guild.id][channelToListen.id][messageToListen.id][typeof(emoteToReact) === "string" ? emoteToReact : emoteToReact.id] = true; // Set the key of that reaction listener in the listenings Object
 
+        messageToListen.react(emoteToReact);
+
         NotifyOnReact.saveNotifyOnReact(messageToListen, channelToWrite, messageToWrite, emoteKey, channelToListen);
         NotifyOnReact.reactingAndNotifyOnMessage(messageToListen, channelToWrite, messageToWrite, emoteKey, channelToListen);
 
@@ -137,12 +141,15 @@ export default class NotifyOnReact extends Command {
         let userWhoReact;
         const filter = (reaction, user) => {
             userWhoReact = user;
-            console.log(reaction.emoji);
             return reaction.emoji.id == emoteKey;
         };
         messageToListen.awaitReactions({ max: 1 , filter})
             .then(_ => {
                 if (!userWhoReact) return;
+                if (userWhoReact.id === (<ClientUser>client.user).id) {
+                    this.reactingAndNotifyOnMessage(messageToListen, channelToWrite, messageToWrite, emoteKey, channelToListen);
+                    return;
+                }
                 if (!this.listenings[serverId][channelToListen.id][messageToListen.id][emoteKey])  { // Detect if the listening on the message has been disabled
                     delete this.listenings[serverId][channelToListen.id][messageToListen.id][emoteKey]; // And delete the useless keys in the listenings object
 
@@ -190,7 +197,8 @@ export default class NotifyOnReact extends Command {
 
     static async applyNotifyOnReactAtStarting(bot) { // Detect notifyOnReacts storeds in the database and apply them
         console.log("Detect stored notifyOnReacts in the database and apply them")
-        const channels = {};
+        const channelsListened = {};
+        const channelsWhereEmoteNotFound = {};
         const storedNotifyOnReacts: Array<IStoredNotifyOnReact> = await StoredNotifyOnReact.find({});
         for (const {serverId, emoteId, emoteName, channelToListenId, messageToListenId, channelToWriteId, messageToWrite} of storedNotifyOnReacts) {
 
@@ -220,11 +228,25 @@ export default class NotifyOnReact extends Command {
                 deleteNotif();
                 continue;
             }
+            let reaction;
             let emote;
+
+            // Si l'émote n'est pas une émote native en unicode, on essaye de la récupérer à partir du nom ou de l'id, sur le serveur, et sur le message à écouter en lui même.
             if (!checkTypes.unicode(emoteNameOrId) && (
-                (emoteId && (emote = server.emojis.cache.get(emoteId)) === undefined) ||
-                (emoteName && (emote = server.emojis.cache.find((emote) => emote.name === emoteName))) === undefined)) {
+                (emoteId &&
+                    (emote = server.emojis.cache.get(emoteId)) === undefined &&
+                    (emote = (reaction = messageToListen.reactions.cache.find(reaction => reaction.emoji.id === emoteId)) ? reaction.emoji : undefined  ) === undefined
+                ) ||
+                (emoteName &&
+                    (emote = server.emojis.cache.find((emote) => emote.name === emoteName)) === undefined &&
+                    (emote = (reaction = messageToListen.reactions.cache.find(reaction => reaction.emoji.name === emoteName)) ? reaction.emoji : undefined  ) === undefined
+                )
+                )) {
                 deleteNotif();
+                if (!channelsWhereEmoteNotFound[channelToWrite.id]) {
+                    channelsWhereEmoteNotFound[channelToWrite.id] = true; // @ts-ignore
+                    channelToWrite.send("Une ou plusieurs emotes n'ont pas été trouvée. Une ou plusieurs écoutes de réaction ont été supprimées");
+                }
                 continue;
             }
 
@@ -243,8 +265,8 @@ export default class NotifyOnReact extends Command {
 
             NotifyOnReact.reactingAndNotifyOnMessage(messageToListen, channelToWrite, messageToWrite, emoteKey, channelToListen);
 
-            if (!channels[channelToWrite.id]) {
-                channels[channelToWrite.id] = true; // @ts-ignore
+            if (!channelsListened[channelToWrite.id]) {
+                channelsListened[channelToWrite.id] = true; // @ts-ignore
                 channelToWrite.send("Le serveur du bot a redémarré. Une écoute de réaction sera notifiée sur ce channel");
             }
         }
