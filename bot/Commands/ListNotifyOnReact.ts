@@ -78,16 +78,11 @@ export default class ListNotifyOnReact extends Command {
         let listenings = existingCommands.NotifyOnReact.listenings[this.guild.id];
 
         if (emoteKey == undefined || all) {
-            await forEachNotifyOnReact(async (found, channel: TextChannel, messageId, contentMessage, emoteKey) => {
+            await forEachNotifyOnReact(async (found, channel: TextChannel, message: Message, contentMessage, emoteKey) => {
                 let emote: Emoji|null = checkTypes.id(emoteKey) ? (<Guild>this.guild).emojis.cache.get(emoteKey)??null : null;
                 if (checkTypes.id(emoteKey) && emote === null) {
-                    try {
-                        message = message ?? (await channel.messages.fetch(messageId));
-                    } catch(_) {}
-                    if (message) {
-                        const reaction = message.reactions.cache.find(reaction => reaction.emoji.id === emoteKey);
-                        emote = reaction ? reaction.emoji : null
-                    }
+                    const reaction = message.reactions.cache.find(reaction => reaction.emoji.id === emoteKey);
+                    emote = reaction ? reaction.emoji : null
                 }
                 if (found) {
                     Embed.addFields({
@@ -100,12 +95,12 @@ export default class ListNotifyOnReact extends Command {
                         value: "Aucune réaction n'a été trouvée"
                     });
                 }
-            }, all ? undefined : channel, all ? undefined : message, this);
+            }, all ? undefined : channel, all ? undefined : message, Embed, this);
         } else if (listenings && listenings[channel.id] && listenings[channel.id][message.id] && listenings[channel.id][message.id][emoteKey]) {
             const contentMessage = message.content.substring(0,Math.min(20,message.content.length)) + "...";
             Embed.addFields({
                 name: "sur '#" + channel.name + "' (" + contentMessage + ") "+(emote instanceof GuildEmoji ? ':'+emote.name+':' : emote),
-                value: "Cette écoute de réaction a été supprimée"
+                value: "Il y a une écoute de réaction sur ce message"
             });
         } else {
             Embed.addFields({

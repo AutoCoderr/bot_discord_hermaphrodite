@@ -90,24 +90,15 @@ export default class CancelNotifyOnReact extends Command {
         let listenings = existingCommands.NotifyOnReact.listenings[this.guild.id];
         if (emoteKey === undefined || all) {
             CancelNotifyOnReact.deleteNotifyOnReactInBdd(this.guild.id, (channel && !all) ? channel.id : null, (message && !all) ? message.id : null)
-            await forEachNotifyOnReact(async (found, channel, messageId, contentMessage, emoteKey) => {
+            await forEachNotifyOnReact(async (found, channel, message: Message, contentMessage, emoteKey) => {
                 if (found) { // @ts-ignore
                     listenings[channel.id][messageId][emoteKey] = false;
 
                     let emote: Emoji|null = checkTypes.id(emoteKey) ? (<Guild>this.guild).emojis.cache.get(emoteKey)??null : null
-                    try {
-                        message = message ?? (await channel.messages.fetch(messageId));
-                    } catch(_) {}
                     let reaction: null|MessageReaction = null;
-                    if (message) {
-                        reaction = message.reactions.cache.find(reaction => reaction.emoji.id === emoteKey)??null;
-                    }
-                    if (reaction) {
-                        console.log("reaction found");
+                    reaction = message.reactions.cache.find(reaction => reaction.emoji.id === emoteKey)??null;
+                    if (reaction)
                         reaction.users.remove(<ClientUser>client.user);
-                    } else {
-                        console.log("no reaction found");
-                    }
 
                     if (checkTypes.id(emoteKey) && emote === null && reaction) {
                         emote = reaction.emoji;
@@ -123,7 +114,7 @@ export default class CancelNotifyOnReact extends Command {
                         value: "Aucune réaction n'a été trouvée et supprimée"
                     });
                 }
-            }, all ? undefined : channel, all ? undefined : message, this);
+            }, all ? undefined : channel, all ? undefined : message, Embed, this);
         } else if (listenings && listenings[channel.id] && listenings[channel.id][message.id] && listenings[channel.id][message.id][emoteKey]) {
             CancelNotifyOnReact.deleteNotifyOnReactInBdd(this.guild.id,channel.id,message.id,emoteKey);
             listenings[channel.id][message.id][emoteKey] = false;
