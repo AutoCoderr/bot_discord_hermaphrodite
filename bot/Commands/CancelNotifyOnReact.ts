@@ -95,8 +95,7 @@ export default class CancelNotifyOnReact extends Command {
                     listenings[channel.id][messageId][emoteKey] = false;
 
                     let emote: Emoji|null = checkTypes.id(emoteKey) ? (<Guild>this.guild).emojis.cache.get(emoteKey)??null : null
-                    let reaction: null|MessageReaction = null;
-                    reaction = message.reactions.cache.find(reaction => reaction.emoji.id === emoteKey)??null;
+                    const reaction: null|MessageReaction = message.reactions.cache.find(reaction => reaction.emoji.id === emoteKey)??null;
                     if (reaction)
                         reaction.users.remove(<ClientUser>client.user);
 

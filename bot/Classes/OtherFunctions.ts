@@ -179,8 +179,8 @@ export async function forEachNotifyOnReact(callback, channel: undefined|GuildCha
     } else { // Si rien n'a été spécifié en argument, regarde sur tout les messaqes de tout les channels
         let nbListeneds = 0;
         for (let channelId in listenings) {
-            let channel: GuildChannel|ThreadChannel|null = command.guild.channels.cache.get(channelId)??null;
-            if (channel === undefined) {
+            const channel: GuildChannel|ThreadChannel|null = command.guild.channels.cache.get(channelId)??null;
+            if (channel === null) {
                 embed.setFields({
                     name: "Channel introuvable, écoutes supprimées",
                     value: "Le channel "+channelId+" est introuvable, écoutes supprimées"
