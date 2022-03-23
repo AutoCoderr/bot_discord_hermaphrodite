@@ -9,7 +9,7 @@ export interface ITicketConfig {
     categoryId: string|null;
     moderatorId?: string|null;
     blacklist: Array<string>;
-    messagesToListen?: Array<{_id?: string, channelId: string, messageId: string, emoteName: string}>;
+    messagesToListen?: Array<{_id?: string, channelId: string, messageId: string, emoteName?: string, emoteId?: string}>;
     ticketChannels?: Array<{_id?: string, channelId: string, userId: string}>;
     serverId: string;
 }
