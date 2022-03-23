@@ -141,7 +141,7 @@ export default class NotifyOnReact extends Command {
         let userWhoReact;
         const filter = (reaction, user) => {
             userWhoReact = user;
-            return reaction.emoji.id == emoteKey;
+            return (reaction.emoji.id??reaction.emoji.name) === emoteKey;
         };
         messageToListen.awaitReactions({ max: 1 , filter})
             .then(_ => {
@@ -202,7 +202,7 @@ export default class NotifyOnReact extends Command {
         const storedNotifyOnReacts: Array<IStoredNotifyOnReact> = await StoredNotifyOnReact.find({});
         for (const {serverId, emoteId, emoteName, channelToListenId, messageToListenId, channelToWriteId, messageToWrite} of storedNotifyOnReacts) {
 
-            const emoteNameOrId = emoteName??emoteId; //@ts-ignore
+            const emoteNameOrId: string = <string>(emoteName??emoteId); //@ts-ignore
             const deleteNotif = () => existingCommands.CancelNotifyOnReact.deleteNotifyOnReactInBdd(serverId,channelToListenId,messageToListenId,emoteNameOrId);
 
             const server: Guild|undefined = bot.guilds.cache.get(serverId);
@@ -250,7 +250,7 @@ export default class NotifyOnReact extends Command {
                 continue;
             }
 
-            const emoteKey = emote instanceof Emoji ? emote.id : emote;
+            const emoteKey: string = emote instanceof Emoji ? (<string>emote.id) : emoteNameOrId;
 
             if (typeof (this.listenings[serverId]) == "undefined") {
                 this.listenings[serverId] = {};
