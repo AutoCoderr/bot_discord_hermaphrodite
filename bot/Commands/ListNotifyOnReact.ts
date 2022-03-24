@@ -2,17 +2,18 @@ import config from "../config";
 import {forEachNotifyOnReact} from "../Classes/OtherFunctions";
 import Command from "../Classes/Command";
 import Discord, {
-    CommandInteractionOptionResolver,
+    CommandInteractionOptionResolver, Emoji,
     Guild,
     GuildChannel,
     GuildEmoji,
     GuildMember,
     Message,
     MessageEmbed,
-    TextBasedChannels,
+    TextBasedChannels, TextChannel,
     User
 } from "discord.js";
 import {existingCommands} from "../Classes/CommandsDescription";
+import {checkTypes} from "../Classes/TypeChecker";
 
 export default class ListNotifyOnReact extends Command {
     static display = true;
@@ -53,8 +54,8 @@ export default class ListNotifyOnReact extends Command {
         super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, ListNotifyOnReact.commandName, ListNotifyOnReact.argsModel);
     }
 
-    async action(args: {channel: GuildChannel, message: Message, emote: GuildEmoji|string}, bot) {
-        let {channel,message,emote} = args;
+    async action(args: {channel: GuildChannel, message: Message, emote: GuildEmoji|string, all: boolean}, bot) {
+        let {channel,message,emote, all} = args;
 
         if (this.guild == null) return this.response(false,
             this.sendErrors({
@@ -63,7 +64,7 @@ export default class ListNotifyOnReact extends Command {
             })
         );
 
-        let emoteName = emote ? (emote instanceof GuildEmoji ? emote.name : emote) : undefined;
+        let emoteKey = emote ? (emote instanceof GuildEmoji ? emote.id : emote) : undefined;
 
         // Affiche dans un Embed, l'ensemble des écoutes de réactions qu'il y a
 
@@ -76,11 +77,16 @@ export default class ListNotifyOnReact extends Command {
         // @ts-ignore
         let listenings = existingCommands.NotifyOnReact.listenings[this.guild.id];
 
-        if (emoteName == undefined) {
-            await forEachNotifyOnReact((found, channel, messageId, contentMessage, emoteName) => {
+        if (emoteKey == undefined || all) {
+            await forEachNotifyOnReact(async (found, channel: TextChannel, message: Message, contentMessage, emoteKey) => {
+                let emote: Emoji|null = checkTypes.id(emoteKey) ? (<Guild>this.guild).emojis.cache.get(emoteKey)??null : null;
+                if (checkTypes.id(emoteKey) && emote === null) {
+                    const reaction = message.reactions.cache.find(reaction => reaction.emoji.id === emoteKey);
+                    emote = reaction ? reaction.emoji : null
+                }
                 if (found) {
                     Embed.addFields({
-                        name: "Sur '#" + channel.name + "' (" + contentMessage + ") :" + emoteName + ":",
+                        name: "Sur '#" + channel.name + "' (" + contentMessage + ") "+(emote ? ':'+emote.name+':' : emoteKey),
                         value: "Il y a une écoute de réaction sur ce message"
                     });
                 } else {
@@ -89,12 +95,12 @@ export default class ListNotifyOnReact extends Command {
                         value: "Aucune réaction n'a été trouvée"
                     });
                 }
-            }, channel, message, this);
-        } else if (listenings && listenings[channel.id] && listenings[channel.id][message.id] && listenings[channel.id][message.id][emoteName]) {
+            }, all ? undefined : channel, all ? undefined : message, Embed, this);
+        } else if (listenings && listenings[channel.id] && listenings[channel.id][message.id] && listenings[channel.id][message.id][emoteKey]) {
             const contentMessage = message.content.substring(0,Math.min(20,message.content.length)) + "...";
             Embed.addFields({
-                name: "sur '#" + channel.name + "' (" + contentMessage + ") :" + emoteName + ":",
-                value: "Cette écoute de réaction a été supprimée"
+                name: "sur '#" + channel.name + "' (" + contentMessage + ") "+(emote instanceof GuildEmoji ? ':'+emote.name+':' : emote),
+                value: "Il y a une écoute de réaction sur ce message"
             });
         } else {
             Embed.addFields({

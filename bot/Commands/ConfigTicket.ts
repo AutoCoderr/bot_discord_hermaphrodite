@@ -2,7 +2,7 @@ import Command from "../Classes/Command";
 import config from "../config";
 import TicketConfig, {ITicketConfig} from "../Models/TicketConfig";
 import Discord, {
-    CategoryChannel, ClientUser, CommandInteractionOptionResolver,
+    CategoryChannel, ClientUser, CommandInteractionOptionResolver, Emoji,
     Guild,
     GuildChannel,
     GuildEmoji,
@@ -13,6 +13,7 @@ import Discord, {
 } from "discord.js";
 import {splitFieldsEmbed} from "../Classes/OtherFunctions";
 import client from "../client";
+import {checkTypes} from "../Classes/TypeChecker";
 
 
 const toDenyToEveryone: Array<PermissionString> = ['SEND_MESSAGES','VIEW_CHANNEL','SEND_TTS_MESSAGES', 'MANAGE_CHANNELS', 'MANAGE_MESSAGES'];
@@ -91,7 +92,7 @@ export default class ConfigTicket extends Command {
             },
             channelListen: {
                 referToSubCommands: ["listen.add","listen.remove"],
-                required: args => args.action == "listen" && (args.subAction == "add" || (args.subAction == "remove" && !args.allListen)),
+                required: (args, _, modelizeSlashCommand = false) => args.action == "listen" && (args.subAction == "add" || (args.subAction == "remove" && !args.allListen && !modelizeSlashCommand)),
                 type: "channel",
                 description: "Le channel sur lequel ajouter, retirer, ou afficher les écoutes de réaction",
                 valid: (elem: GuildChannel,_) => elem.type == "GUILD_TEXT"
@@ -129,6 +130,7 @@ export default class ConfigTicket extends Command {
         }
 
         let ticketConfig: ITicketConfig;
+        let emoteId: string|null;
         let emoteName: string|null;
         let resultContent: string;
 
@@ -243,35 +245,37 @@ export default class ConfigTicket extends Command {
                 if (!(ticketConfig.messagesToListen instanceof Array)) ticketConfig.messagesToListen = [];
                 switch (subAction) {
                     case "add":
-                        const emote = emoteListen instanceof GuildEmoji ? emoteListen.name : emoteListen;
-                        if (emote == null) {
+                        emoteId = emoteListen instanceof GuildEmoji ? emoteListen.id : emoteListen;
+                        emoteName = emoteListen instanceof GuildEmoji ? emoteListen.name : emoteListen;
+                        if (!emoteId) {
                             return this.response(false, "L'émoji spécifié semble invalide")
                         }
-                        if (ticketConfig.messagesToListen.find(message =>
+                        if (ticketConfig.messagesToListen.some(message =>
                             message.channelId == channelListen.id &&
                             message.messageId == messageListen.id &&
-                            message.emoteName == emote)) {
+                            (message.emoteName == emoteName || message.emoteId == emoteId))) {
 
                             return this.response(false, "Il y a déjà une écoute de réaction pour création de ticket sur ce message avec cette emote");
                         }
-                        ticketConfig.messagesToListen.push({channelId: channelListen.id, messageId: messageListen.id, emoteName: emote}); // @ts-ignore
+                        ticketConfig.messagesToListen.push({channelId: channelListen.id, messageId: messageListen.id, emoteId}); // @ts-ignore
                         ticketConfig.save();
                         messageListen.react(emoteListen);
-                        ConfigTicket.listenMessageTicket(messageListen, emote, ticketConfig._id, ticketConfig.messagesToListen[ticketConfig.messagesToListen.length-1]._id);
+                        ConfigTicket.listenMessageTicket(messageListen, emoteId, ticketConfig._id, ticketConfig.messagesToListen[ticketConfig.messagesToListen.length-1]._id);
 
                         return this.response(true, "Une écoute a été activée sur ce message pour la création de ticket");
                     case "remove":
+                        emoteId = emoteListen instanceof GuildEmoji ? emoteListen.id : emoteListen;
                         emoteName = emoteListen instanceof GuildEmoji ? emoteListen.name : emoteListen;
 
                         let nbRemoved = 0;
                         for (let i=0;i<ticketConfig.messagesToListen.length;i++) {
                             const listening = ticketConfig.messagesToListen[i];
-                            if ((emoteName == null || listening.emoteName == emoteName) &&
-                                (messageListen == undefined || listening.messageId == messageListen.id) &&
-                                (channelListen == undefined || listening.channelId == channelListen.id)) {
+                            if ((!emoteId || listening.emoteName === emoteName || listening.emoteId === emoteId) &&
+                                (!messageListen || listening.messageId === messageListen.id) &&
+                                (!channelListen || listening.channelId === channelListen.id)) {
                                 const exist = await ConfigTicket.listeningMessageExist(listening,this.guild);
                                 if (exist) {
-                                    const reaction = exist.message.reactions.cache.find(reaction => reaction.emoji.name == listening.emoteName);
+                                    const reaction = exist.message.reactions.cache.find(reaction => (reaction.emoji.id??reaction.emoji.name) === listening.emoteId || reaction.emoji.name === listening.emoteName);
                                     if (reaction) reaction.remove();
                                 }
                                 ticketConfig.messagesToListen.splice(i,1);
@@ -289,16 +293,17 @@ export default class ConfigTicket extends Command {
                         )
                     case "show":
                         emoteName = emoteListen instanceof GuildEmoji ? emoteListen.name : emoteListen;
+                        emoteId = emoteListen instanceof GuildEmoji ? emoteListen.id : emoteListen;
 
                         const fields: Array<{name: string, value: string}> = [];
                         for (let i=0;i<ticketConfig.messagesToListen.length;i++) {
                             const message = ticketConfig.messagesToListen[i];
-                            if ((emoteName == undefined || message.emoteName == emoteName) &&
-                                (messageListen == undefined || message.messageId == messageListen.id) &&
-                                (channelListen == undefined || message.channelId == channelListen.id)) {
-                                const exist = await ConfigTicket.listeningMessageExist(ticketConfig.messagesToListen[i],this.guild);
+                            if ((!emoteId || message.emoteName === emoteName || message.emoteId === emoteId) &&
+                                (!messageListen || message.messageId === messageListen.id) &&
+                                (!channelListen || message.channelId === channelListen.id)) {
+                                const exist = await ConfigTicket.listeningMessageExist(message,this.guild);
                                 fields.push(exist ? {
-                                    name: "#"+exist.channel.name+" > ("+exist.message.content.substring(0,Math.min(20,exist.message.content.length))+"...) :"+ticketConfig.messagesToListen[i].emoteName+":",
+                                    name: "#"+exist.channel.name+" > ("+exist.message.content.substring(0,Math.min(20,exist.message.content.length))+"...) "+(exist.emote instanceof Emoji ? ":"+exist.emote.name+":" : exist.emote),
                                     value: "Channel : #"+exist.channel.name+" ; Id du message : "+exist.message.id
                                 } : {
                                     name: "Message/channel introuvable",
@@ -439,7 +444,7 @@ export default class ConfigTicket extends Command {
         return this.response(true, {embeds});
     }
 
-    static async listeningMessageExist(listening: {channelId: string, messageId: string}, guild: Guild) {
+    static async listeningMessageExist(listening: {channelId: string, messageId: string, emoteName?: string, emoteId?: string}, guild: Guild) {
         const channel: undefined | TextChannel = <TextChannel>guild.channels.cache.get(listening.channelId);
         if (!channel)
             return false;
@@ -451,29 +456,58 @@ export default class ConfigTicket extends Command {
         }
         if (!message) return false;
 
+        const {emoteName, emoteId} = listening;
 
-        return {channel, message};
+        const emoteNameOrId = emoteName??emoteId;
+
+        let emote;
+        let reaction;
+
+        if (!checkTypes.unicode(emoteNameOrId) && (
+            (emoteId &&
+                (emote = guild.emojis.cache.get(emoteId)) === undefined &&
+                (emote = (reaction = message.reactions.cache.find(reaction => reaction.emoji.id === emoteId)) ? reaction.emoji : undefined  ) === undefined
+            ) ||
+            (emoteName &&
+                (emote = guild.emojis.cache.find((emote) => emote.name === emoteName)) === undefined &&
+                (emote = (reaction = message.reactions.cache.find(reaction => reaction.emoji.name === emoteName)) ? reaction.emoji : undefined  ) === undefined
+            )
+        )) {
+            return false;
+        }
+
+
+        return {channel, message, emote: emote??emoteNameOrId};
     }
 
-    static listenMessageTicket(message: Message, emoteName, _idConfigTicket, _idMessageToListen) {
+    static listenMessageTicket(message: Message, emoteKey, _idConfigTicket, _idMessageToListen) {
         const guild: Guild = <Guild>message.guild;
         let userWhoReact: User;
         const filter = (reaction, user) => {
             userWhoReact = user;
-            return reaction.emoji.name == emoteName;
+            return (reaction.emoji.id??reaction.emoji.name) === emoteKey;
         };
         message.awaitReactions({ max: 1 , filter})
-            .then(async _ => {
+            .then(async (collected) => {
                 if (!userWhoReact) return;
+                if (userWhoReact.id == (<ClientUser>client.user).id) {
+                    ConfigTicket.listenMessageTicket(message, emoteKey, _idConfigTicket, _idMessageToListen);
+                    return;
+                }
+
                 const ticketConfig: ITicketConfig = await TicketConfig.findOne({
                     _id: _idConfigTicket,
                     'messagesToListen._id': _idMessageToListen
                 });
                 if (ticketConfig == null) return;
+
+                const reaction = collected.first();
+                if (reaction)
+                    reaction.users.remove(userWhoReact);
+
                 let category: CategoryChannel;
 
-                if (userWhoReact.id != (<ClientUser>client.user).id &&
-                    ticketConfig.enabled &&
+                if (ticketConfig.enabled &&
                     ticketConfig.categoryId != null &&
                     (category = <CategoryChannel>guild.channels.cache.get(ticketConfig.categoryId)) != undefined) {
 
@@ -487,12 +521,9 @@ export default class ConfigTicket extends Command {
 
                             const moderatorRole: Role | undefined = ticketConfig.moderatorId ? guild.roles.cache.get(ticketConfig.moderatorId) : undefined;
 
-                            let member: null|GuildMember = null
-                            try {
-                                member = await guild.members.fetch(userWhoReact.id);
-                            } catch (e) {
-                            }
-                            const username = member && member.nickname ? member.nickname : userWhoReact.username;
+                            const member: GuildMember = await guild.members.fetch(userWhoReact.id);
+
+                            const username = member.nickname ? member.nickname : userWhoReact.username;
                             channel = await guild.channels.create('Ticket de ' + username + " " + userWhoReact.id, {
                                 type: "GUILD_TEXT"
                             });
@@ -528,7 +559,7 @@ export default class ConfigTicket extends Command {
                             userWhoReact.send("Vous ne pouvez créer de ticket sur le serveur "+guild.name+" car vous êtes dans la blacklist").catch(() => {});
                     }
                 }
-                ConfigTicket.listenMessageTicket(message, emoteName, _idConfigTicket, _idMessageToListen);
+                ConfigTicket.listenMessageTicket(message, emoteKey, _idConfigTicket, _idMessageToListen);
             })
             .catch(e => {
                 console.log("Catch event in listenMessageTicket() function ");
@@ -557,7 +588,7 @@ export default class ConfigTicket extends Command {
                 const listening = ticketConfig.messagesToListen[i];
                 const exist = await ConfigTicket.listeningMessageExist(listening,guild);
                 if (exist) {
-                    ConfigTicket.listenMessageTicket(exist.message,listening.emoteName,ticketConfig._id,listening._id);
+                    ConfigTicket.listenMessageTicket(exist.message,exist.emote instanceof Emoji ? exist.emote.id : exist.emote, ticketConfig._id,listening._id);
                 } else {
                     ticketConfig.messagesToListen.splice(i,1);
                     i -= 1;

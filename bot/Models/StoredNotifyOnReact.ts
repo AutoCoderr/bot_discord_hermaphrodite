@@ -4,7 +4,8 @@ import { connect } from "../Mongo";
 const db = connect();
 
 export interface IStoredNotifyOnReact {
-    emoteName: string;
+    emoteName?: string;
+    emoteId?: string;
     channelToListenId: string;
     messageToListenId: string;
     messageToWrite: string;
@@ -13,7 +14,8 @@ export interface IStoredNotifyOnReact {
 }
 
 const StoredNotifyOnReactSchema: Schema = new Schema({
-    emoteName: { type: String, required: true },
+    emoteName: { type: String, required: false },
+    emoteId: { type: String, required: false },
     channelToListenId: { type: String, required: true },
     messageToListenId: { type: String, required: true},
     messageToWrite: { type: String, required: true},
