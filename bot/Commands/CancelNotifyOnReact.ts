@@ -1,19 +1,22 @@
 import config from "../config";
 import Command from "../Classes/Command";
-import { forEachNotifyOnReact } from "../Classes/OtherFunctions";
+import {forEachNotifyOnReact} from "../Classes/OtherFunctions";
 import { existingCommands } from "../Classes/CommandsDescription";
 import StoredNotifyOnReact from "../Models/StoredNotifyOnReact";
 import Discord, {
-    CommandInteractionOptionResolver,
+    ClientUser,
+    CommandInteractionOptionResolver, Emoji,
     Guild,
     GuildChannel,
     GuildEmoji,
     GuildMember,
     Message,
-    MessageEmbed,
+    MessageEmbed, MessageReaction,
     TextBasedChannels,
     User
 } from "discord.js";
+import {checkTypes} from "../Classes/TypeChecker";
+import client from "../client";
 
 export default class CancelNotifyOnReact extends Command {
     static description = "Pour désactiver l'écoute d'une réaction sur un ou plusieurs messages.";
@@ -54,8 +57,8 @@ export default class CancelNotifyOnReact extends Command {
         super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, CancelNotifyOnReact.commandName, CancelNotifyOnReact.argsModel);
     }
 
-    async action(args: {channel: GuildChannel, message: Message, emote: GuildEmoji|string},bot) {
-        let {channel,message,emote} = args;
+    async action(args: {channel: GuildChannel, message: Message, emote: GuildEmoji|string, all: boolean},bot) {
+        let {channel,message,emote, all} = args;
 
         if (this.guild == null || this.member == null) {
             return this.response(
@@ -76,7 +79,7 @@ export default class CancelNotifyOnReact extends Command {
             );
         }
 
-        let emoteName = emote ? (emote instanceof GuildEmoji ? emote.name : emote) : undefined;
+        let emoteKey = emote ? (emote instanceof GuildEmoji ? emote.id : emote) : undefined;
 
         let Embed = new Discord.MessageEmbed()
             .setColor('#0099ff')
@@ -85,13 +88,24 @@ export default class CancelNotifyOnReact extends Command {
             .setTimestamp();
         // @ts-ignore
         let listenings = existingCommands.NotifyOnReact.listenings[this.guild.id];
-        if (emoteName == undefined) {
-            await forEachNotifyOnReact((found, channel, messageId, contentMessage, emoteName) => {
+
+        if (emoteKey === undefined || all) {
+            CancelNotifyOnReact.deleteNotifyOnReactInBdd(this.guild.id, (channel && !all) ? channel.id : null, (message && !all) ? message.id : null)
+            await forEachNotifyOnReact(async (found, channel, message: Message, contentMessage, emoteKey) => {
                 if (found) { // @ts-ignore
-                    CancelNotifyOnReact.deleteNotifyOnReactInBdd(this.guild.id,channel.id,messageId,emoteName);
-                    listenings[channel.id][messageId][emoteName] = false;
+                    listenings[channel.id][message.id][emoteKey] = false;
+
+                    let emote: Emoji|null = checkTypes.id(emoteKey) ? (<Guild>this.guild).emojis.cache.get(emoteKey)??null : null
+                    const reaction: null|MessageReaction = message.reactions.cache.find(reaction => (reaction.emoji.id??reaction.emoji.name) === emoteKey)??null;
+                    if (reaction)
+                        reaction.users.remove(<ClientUser>client.user);
+
+                    if (checkTypes.id(emoteKey) && emote === null && reaction) {
+                        emote = reaction.emoji;
+                    }
+
                     Embed.addFields({
-                        name: "Supprimée : sur '#" + channel.name + "' (" + contentMessage + ") :" + emoteName + ":",
+                        name: "Supprimée : sur '#" + channel.name + "' (" + contentMessage + ") " + (emote ? ':'+emote.name+':' : emoteKey),
                         value: "Cette écoute de réaction a été supprimée"
                     });
                 } else {
@@ -100,12 +114,19 @@ export default class CancelNotifyOnReact extends Command {
                         value: "Aucune réaction n'a été trouvée et supprimée"
                     });
                 }
-            }, channel, message, this);
-        } else if (listenings && listenings[channel.id] && listenings[channel.id][message.id] && listenings[channel.id][message.id][emoteName]) { // @ts-ignore
-            CancelNotifyOnReact.deleteNotifyOnReactInBdd(message.guild.id,channel.id,message.id,emoteName);
-            listenings[channel.id][message.id][emoteName] = false;
+            }, all ? undefined : channel, all ? undefined : message, Embed, this);
+        } else if (listenings && listenings[channel.id] && listenings[channel.id][message.id] && listenings[channel.id][message.id][emoteKey]) {
+            CancelNotifyOnReact.deleteNotifyOnReactInBdd(this.guild.id,channel.id,message.id,emoteKey);
+            listenings[channel.id][message.id][emoteKey] = false;
+            if (emote instanceof Emoji) {
+                CancelNotifyOnReact.deleteNotifyOnReactInBdd(this.guild.id,channel.id,message.id,emote.name);
+            }
+            const reaction = message.reactions.cache.find(reaction => reaction.emoji.id === (<Emoji>emote).id);
+            if (reaction) {
+                reaction.users.remove(<ClientUser>client.user);
+            }
             Embed.addFields({
-                name: "sur '#" + channel.name + "' (" + message.content + ") :" + emoteName + ":",
+                name: "sur '#" + channel.name + "' (" + message.content + ") "+(emote instanceof Emoji ? ':'+emote.name+':' : emoteKey),
                 value: "Cette écoute de réaction a été supprimée"
             });
         } else {
@@ -117,12 +138,12 @@ export default class CancelNotifyOnReact extends Command {
         return this.response(true, {embeds: [Embed]});
     }
 
-    static async deleteNotifyOnReactInBdd(serverId,channelId,messageId,emoteName) {
-        await StoredNotifyOnReact.deleteOne({
+    static async deleteNotifyOnReactInBdd(serverId, channelId: string|null = null, messageId: string|null = null, emoteKey: string|null = null) {
+        await StoredNotifyOnReact.deleteMany({
             serverId: serverId,
-            channelToListenId: channelId,
-            messageToListenId: messageId,
-            emoteName: emoteName
+            ...( channelId ? {channelToListenId: channelId} : {}),
+            ...(messageId ? {messageToListenId: messageId} : {}),
+            ...(emoteKey ? {$or: [{emoteName: emoteKey}, {emoteId: emoteKey}]} : {})
         });
     }
 

@@ -1,6 +1,15 @@
 import { existingCommands } from "./CommandsDescription";
 import History from "../Models/History";
-import {EmbedFieldData, Guild, GuildChannel, GuildMember, Message, MessageEmbed} from "discord.js";
+import {
+    EmbedFieldData,
+    Guild,
+    GuildChannel,
+    GuildMember,
+    Message,
+    MessageEmbed,
+    TextChannel,
+    ThreadChannel
+} from "discord.js";
 import Command from "./Command";
 import CancelNotifyOnReact from "../Commands/CancelNotifyOnReact";
 import HistoryExec from "../Commands/HistoryExec";
@@ -107,7 +116,7 @@ export async function getHistory(currentCommand: HistoryCmd|HistoryExec,args: {c
     return await History.find(where).limit(limit).sort({dateTime: sort});
 }
 
-export async function forEachNotifyOnReact(callback, channel: GuildChannel, message: Message, command: CancelNotifyOnReact|ListNotifyOnReact) {
+export async function forEachNotifyOnReact(callback, channel: undefined|GuildChannel, message: undefined|Message, embed: MessageEmbed, command: CancelNotifyOnReact|ListNotifyOnReact) {
     if (command.guild == null) {
         callback(false);
         return;
@@ -123,10 +132,10 @@ export async function forEachNotifyOnReact(callback, channel: GuildChannel, mess
             if (message != undefined) {
                 let nbListeneds = 0;
                 if (typeof(listenings[channel.id][message.id]) != "undefined") { // Si un channel et un message ont été spécifiés, regarde dans le message
-                    for (let emote in listenings[channel.id][message.id]) {
-                        if (listenings[channel.id][message.id][emote]) {
+                    for (let emoteKey in listenings[channel.id][message.id]) {
+                        if (listenings[channel.id][message.id][emoteKey]) {
                             const contentMessage = message.content.substring(0,Math.min(20,message.content.length)) + "...";
-                            callback(true, channel, message.id, contentMessage, emote);
+                            callback(true, channel, message, contentMessage, emoteKey);
                             nbListeneds += 1;
                         }
                     }
@@ -134,21 +143,28 @@ export async function forEachNotifyOnReact(callback, channel: GuildChannel, mess
                 if (nbListeneds == 0) {
                     callback(false);
                 }
-            } else { // Si un channel a été spécififié, mais pas de message, regarde tout les messages de ce channel
+            } else { // Si un channel a été spécifié, mais pas de message, regarde tout les messages de ce channel
                 let nbListeneds = 0;
                 for (let messageId in listenings[channel.id]) {
-                    let messageListened;
-                    try { // @ts-ignore
-                        messageListened = await channel.messages.fetch(messageId);
+                    let messageListened: Message|null = null;
+                    try {
+                        messageListened = await (<TextChannel>channel).messages.fetch(messageId);
                     } catch(e) {
+                        embed.setFields({
+                            name: "Message introuvable, écoutes supprimées",
+                            value: "Le message "+messageId+" est introuvable, écoutes supprimées"
+                        });
+                        // @ts-ignore
+                        existingCommands.CancelNotifyOnReact.deleteNotifyOnReactInBdd(serverId, channel.id, messageId);
+
+                        delete listenings[channel.id][messageId];
+                        continue;
                     }
-                    const contentMessage = messageListened != undefined ?
-                        messageListened.content.substring(0, Math.min(20,messageListened.content.length)) + "..."
-                        : messageId;
-                    for (let emote in listenings[channel.id][messageId]) {
-                        if (listenings[channel.id][messageId][emote]) {
+                    const contentMessage = messageListened.content.substring(0, Math.min(20,messageListened.content.length)) + "...";
+                    for (let emoteKey in listenings[channel.id][messageId]) {
+                        if (listenings[channel.id][messageId][emoteKey]) {
                             nbListeneds += 1;
-                            callback(true, channel, messageId, contentMessage, emote);
+                            callback(true, channel, messageListened, contentMessage, emoteKey);
                         }
                     }
                 }
@@ -163,20 +179,38 @@ export async function forEachNotifyOnReact(callback, channel: GuildChannel, mess
     } else { // Si rien n'a été spécifié en argument, regarde sur tout les messaqes de tout les channels
         let nbListeneds = 0;
         for (let channelId in listenings) {
-            let channel = command.guild.channels.cache.get(channelId);
+            const channel: GuildChannel|ThreadChannel|null = command.guild.channels.cache.get(channelId)??null;
+            if (channel === null) {
+                embed.setFields({
+                    name: "Channel introuvable, écoutes supprimées",
+                    value: "Le channel "+channelId+" est introuvable, écoutes supprimées"
+                });
+                // @ts-ignore
+                existingCommands.CancelNotifyOnReact.deleteNotifyOnReactInBdd(serverId, channelId);
+
+                delete listenings[channelId];
+                continue;
+            }
             for (let messageId in listenings[channelId]) {
-                let messageListened;
-                try { //@ts-ignore
-                    messageListened = await channel.messages.fetch(messageId);
+                let messageListened: Message|null = null;
+                try {
+                    messageListened = await (<TextChannel>channel).messages.fetch(messageId)??null;
                 } catch (e) {
+                    embed.setFields({
+                        name: "Message introuvable, écoutes supprimées",
+                        value: "Le message "+messageId+" est introuvable, écoutes supprimées"
+                    });
+                    // @ts-ignore
+                    existingCommands.CancelNotifyOnReact.deleteNotifyOnReactInBdd(serverId, channel.id, messageId);
+
+                    delete listenings[channelId][messageId];
+                    continue;
                 }
-                const contentMessage = messageListened != undefined ?
-                    messageListened.content.substring(0, Math.min(20,messageListened.content.length)) + "..."
-                    : messageId;
-                for (let emote in listenings[channelId][messageId]) {
-                    if (listenings[channelId][messageId][emote]) {
+                const contentMessage = messageListened.content.substring(0, Math.min(20,messageListened.content.length)) + "...";
+                for (let emoteKey in listenings[channelId][messageId]) {
+                    if (listenings[channelId][messageId][emoteKey]) {
                         nbListeneds += 1;
-                        callback(true, channel, messageId, contentMessage, emote);
+                        callback(true, channel, messageListened, contentMessage, emoteKey);
                     }
                 }
             }
