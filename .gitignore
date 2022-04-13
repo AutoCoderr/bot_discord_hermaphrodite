@@ -6,5 +6,6 @@
 !/bot/config.example.js
 /bot/Models/*.js
 /bot/Models/Vocal/*.js
+/bot/Models/Text/*.js
 /bot/Commands/*.js
 /bot/Classes/*.js
