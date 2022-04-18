@@ -26,6 +26,8 @@ export default class Command {
     static description: null|string = null;
     static argsModel: any = {};
 
+    static abstract: boolean = false;
+
     static customCommand: boolean = true;
     static slashCommand: boolean = false;
 

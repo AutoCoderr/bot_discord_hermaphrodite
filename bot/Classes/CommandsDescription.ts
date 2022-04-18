@@ -10,7 +10,8 @@ export function getExistingCommands(): Promise<void> {
             .then(files => files.map(file => require(path+file).default))
             .then(commands => {
                 for (const commandClass of commands) {
-                    existingCommands[commandClass.name] = commandClass;
+                    if (!commandClass.abstract)
+                        existingCommands[commandClass.name] = commandClass;
                 }
                 resolve();
             });
