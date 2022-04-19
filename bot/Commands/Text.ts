@@ -1,11 +1,14 @@
 import Command from "../Classes/Command";
 import {CommandInteractionOptionResolver, Guild, GuildChannel, GuildMember, TextBasedChannels, User} from "discord.js";
+import TextConfig, {ITextConfig} from "../Models/Text/TextConfig";
+import TextUserConfig, {ITextUserConfig} from "../Models/Text/TextUserConfig";
+import TextSubscribe, {ITextSubscribe} from "../Models/Text/TextSubscribe";
 
 interface argsType {
     action: 'add'|'remove'|'block'|'unblock'|'mute'|'unmute'|'limit'|'status',
-    users?: GuildMember[],
-    channels?: TextBasedChannels[],
-    keyWords?: string[],
+    users: GuildMember[],
+    channels: TextBasedChannels[],
+    keyWords: string[],
     time?: number
 }
 
@@ -127,7 +130,49 @@ export default class Text extends Command {
     async action(args: argsType) {
         const { action, users, channels, keyWords, time } = args;
 
-        console.log({ action, users, channels, keyWords, time });
+        if (this.guild === null) {
+            return this.response(false,
+                this.sendErrors({
+                    name: "Missing guild",
+                    value: "We couldn't find the guild"
+                })
+            );
+        }
+
+        const textConfig: ITextConfig = await TextConfig.findOne({serverId: this.guild.id, enabled: true});
+
+        if (textConfig === null) {
+            return this.response(false,
+                this.sendErrors({
+                    name: "Vocal désactivé",
+                    value: "Vous ne pouvez pas executer cette commande car l'option d'abonnement vocal n'est pas activée sur ce serveur"
+                })
+            );
+        }
+
+        if (['add', 'remove'].includes(action) &&
+            (textConfig.listenerBlacklist.users.includes(this.member.id) ||
+                textConfig.listenerBlacklist.roles.some(roleId => this.member instanceof GuildMember && this.member.roles.cache.some(role => role.id === roleId)))) {
+            return this.response(false,
+                this.sendErrors({
+                    name: "Accès interdit",
+                    value: "Vous n'avez visiblement pas le droit d'utiliser l'option d'abonnement textuel sur ce serveur"
+                })
+            );
+        }
+
+        if (action === "add") {
+            const usersBlockingMe: GuildMember[] = []
+            for (const user of users) {
+                const userConfig: ITextUserConfig = await TextUserConfig.findOne({serverId: this.guild.id, userId: user.id});
+                if (userConfig.blocking.some(({userId, channelId}) => userId === this.member.id && channelId === undefined)) {
+                    usersBlockingMe.push(user);
+                    continue;
+                }
+
+                const subscribeOnAllChannels: ITextSubscribe = TextSubscribe.findOne({serverId: this.guild.id, listenerId: this.member.id, channelId: })
+            }
+        }
 
         return this.response(false, "COUCOU");
     }
