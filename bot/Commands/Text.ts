@@ -1,5 +1,13 @@
 import Command from "../Classes/Command";
-import {CommandInteractionOptionResolver, Guild, GuildChannel, GuildMember, TextBasedChannels, User} from "discord.js";
+import {
+    CommandInteractionOptionResolver,
+    Guild,
+    GuildChannel,
+    GuildMember,
+    MessageEmbed,
+    TextBasedChannels,
+    User
+} from "discord.js";
 import TextConfig, {ITextConfig} from "../Models/Text/TextConfig";
 import TextUserConfig, {ITextUserConfig} from "../Models/Text/TextUserConfig";
 import TextSubscribe, {ITextSubscribe} from "../Models/Text/TextSubscribe";
@@ -150,8 +158,7 @@ export default class Text extends Command {
             );
         }
 
-        if (['add', 'remove'].includes(action) &&
-            (textConfig.listenerBlacklist.users.includes(this.member.id) ||
+        if ((textConfig.listenerBlacklist.users.includes(this.member.id) ||
                 textConfig.listenerBlacklist.roles.some(roleId => this.member instanceof GuildMember && this.member.roles.cache.some(role => role.id === roleId)))) {
             return this.response(false,
                 this.sendErrors({
@@ -161,19 +168,83 @@ export default class Text extends Command {
             );
         }
 
+        const embed = new MessageEmbed()
+            .setAuthor("Herma bot");
+
         if (action === "add") {
-            const usersBlockingMe: GuildMember[] = []
+            const blockedChannelsByUserId: {[key: string]: string[]} = {};
+            const usersBlockingMe: GuildMember[] = [];
+            const hasNotText: GuildMember[] = [];
             for (const user of users) {
+                if (!(await Text.staticCheckPermissions(null, user, this.guild, false)) ||
+                    textConfig.listenerBlacklist.users.includes(user.id) ||
+                    user.roles.cache.some(role => textConfig.listenerBlacklist.roles.includes(role.id))) {
+
+                    hasNotText.push(user);
+                    continue;
+                }
+
                 const userConfig: ITextUserConfig = await TextUserConfig.findOne({serverId: this.guild.id, userId: user.id});
+
                 if (userConfig.blocking.some(({userId, channelId}) => userId === this.member.id && channelId === undefined)) {
                     usersBlockingMe.push(user);
                     continue;
                 }
 
-                const subscribeOnAllChannels: ITextSubscribe = TextSubscribe.findOne({serverId: this.guild.id, listenerId: this.member.id, channelId: })
+                if (channels.length === 0) {
+                    blockedChannelsByUserId[user.id] = userConfig.blocking
+                        .filter(({userId, channelId}) => (userId === this.member.id || userId === undefined) && channelId !== undefined)
+                        .map(({channelId}) => <string>channelId);
+
+                    const allChannelSubscribe: typeof TextSubscribe = await TextSubscribe.findOne({serverId: this.guild.id, listenerId: this.member.id, listenedId: user.id, channelId: {$exists: false}});
+                    if (allChannelSubscribe) {
+                        if (keyWords.length === 0)
+                            allChannelSubscribe.keywords = undefined;
+                        else
+                            allChannelSubscribe.keywords = [...(allChannelSubscribe.keywords??[]), ...keyWords];
+                        const specifiedChannelSubscribes: typeof TextSubscribe = await TextSubscribe.find({serverId: this.guild.id, listenerId: this.member.id, listenedId: user.id, channelId: {$exists: true}});
+                        for (const subscribe of specifiedChannelSubscribes) {
+                            if (Text.compareKeyWords(subscribe.keywords ,allChannelSubscribe.keywords))
+                                subscribe.remove();
+                        }
+
+                        allChannelSubscribe.save();
+                    }
+                }
             }
+
+            if (usersBlockingMe.length > 0)
+                embed.addFields({
+                    name: "Ces utilisateurs vous bloque : ",
+                    value: usersBlockingMe.map(userId => "<@" + userId + ">").join("\n")
+                });
+            if (hasNotText.length > 0)
+                embed.addFields({
+                    name: "Ces utilisateurs n'ont pas la fonctionnalité de notification textuelle : ",
+                    value: hasNotText.map(userId => "<@" + userId + ">").join("\n")
+                });
+            for (const [userId,blockedChannels] of Object.entries(blockedChannelsByUserId)) {
+                embed.addFields({
+                    name: "<@"+userId+"> vous a bloqué pour les channels suivants",
+                    value: blockedChannels.map(channelId => "<#"+channelId+">").join("\n")
+                });
+            }
+
+            return this.response(true, {embeds: [embed]});
         }
 
         return this.response(false, "COUCOU");
+    }
+
+    static compareKeyWords(A: string[]|undefined,B: string[]|undefined) {
+        if ((A === undefined) !== (B === undefined))
+            return false;
+        if (A === undefined || B === undefined)
+            return true;
+
+        if (A.length !== B.length)
+            return false;
+
+        return !A.some(w => !B.includes(w));
     }
 }

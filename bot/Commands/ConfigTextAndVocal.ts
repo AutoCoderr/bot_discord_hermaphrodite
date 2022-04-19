@@ -189,18 +189,28 @@ export default abstract class ConfigTextAndVocal extends Command {
                             continue;
                         }
 
-                        if (users !== undefined && users.some(user => user.id === subscribe.listenerId)) {
+                        if (users !== undefined && users.some(user => user.id === subscribe.listenerId || user.id === subscribe.listenedId)) {
                             subscribe.remove();
                             continue;
                         }
 
-                        let member: null | GuildMember = null;
+                        let listener: null | GuildMember = null;
                         try {
-                            member = await this.guild.members.fetch(subscribe.listenerId);
+                            listener = await this.guild.members.fetch(subscribe.listenerId);
                         } catch (e) {
                             notFoundUserId.push(subscribe.listenerId);
                         }
-                        if (member === null || (roles !== undefined && member.roles.cache.some(roleA => roles.some(roleB => roleA.id === roleB.id)))) {
+                        let listened: null | GuildMember = null;
+                        try {
+                            listened = await this.guild.members.fetch(subscribe.listenedId);
+                        } catch (e) {
+                            notFoundUserId.push(subscribe.listenedId);
+                        }
+                        if (listener === null || listened === null ||
+                            (roles !== undefined && (
+                                listener.roles.cache.some(roleA => roles.some(roleB => roleA.id === roleB.id)) ||
+                                listened.roles.cache.some(roleA => roles.some(roleB => roleA.id === roleB.id))
+                            ))) {
                             subscribe.remove();
                         }
                     }

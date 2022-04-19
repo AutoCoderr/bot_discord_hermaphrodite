@@ -146,8 +146,7 @@ export default class Vocal extends Command {
                 })
             );
         }
-        if (['add', 'remove'].includes(action) &&
-            (vocalConfig.listenerBlacklist.users.includes(this.member.id) ||
+        if ((vocalConfig.listenerBlacklist.users.includes(this.member.id) ||
                 vocalConfig.listenerBlacklist.roles.some(roleId => this.member instanceof GuildMember && this.member.roles.cache.some(role => role.id === roleId)))) {
             return this.response(false,
                 this.sendErrors({
@@ -195,7 +194,10 @@ export default class Vocal extends Command {
                     continue;
                 }
 
-                if (!(await Vocal.staticCheckPermissions(null, user, this.guild, false))) {
+                if (!(await Vocal.staticCheckPermissions(null, user, this.guild, false)) ||
+                    vocalConfig.listenerBlacklist.users.includes(user.id) ||
+                    user.roles.cache.some(role => vocalConfig.listenerBlacklist.roles.includes(role.id))) {
+
                     hasNotVocal.push(user);
                     continue;
                 }
