@@ -6,14 +6,14 @@ const db = connect();
 export interface ITextUserConfig {
     userId: string;
     serverId: string;
-    blocking: Array<{userId: string, channelId?: string}>;
+    blocking: Array<{userId?: string, channelId?: string}>;
     limit: number;
     mutedFor?: number;
     lastMute?: Date;
 }
 
 const BlockingSchema: Schema = new Schema({
-    userId: { type: String, required: true },
+    userId: { type: String, required: false },
     channelId: { type: String, required: false }
 });
 

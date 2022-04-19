@@ -184,5 +184,28 @@ export const extractTypes = {
         }
 
         return ms;
+    },
+    strings: (field) => {
+        let quote = null;
+        const strings: string[] = [];
+        let string = "";
+        for (let i=0;i<field.length;i++) {
+            if (!quote && ["'",'"'].includes(field[i])) {
+                quote = field[i];
+                continue;
+            }
+            if ((quote && quote === field[i]) || (!quote && field[i] === " ")) {
+                strings.push(string);
+                quote = null;
+                string = "";
+                continue;
+            }
+
+            string += field[i];
+        }
+        if (string !== "")
+            strings.push(string);
+
+        return strings;
     }
 };
