@@ -6,9 +6,9 @@ import {
     GuildChannel,
     GuildMember,
     Message,
-    MessageEmbed, Role,
+    MessageEmbed,
     TextChannel,
-    ThreadChannel, VoiceChannel
+    ThreadChannel
 } from "discord.js";
 import Command from "./Command";
 import CancelNotifyOnReact from "../Commands/CancelNotifyOnReact";

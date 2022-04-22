@@ -1,6 +1,5 @@
 import Command from "../Classes/Command";
 import {
-    ButtonInteraction,
     CommandInteractionOptionResolver,
     Guild,
     GuildMember,
@@ -13,9 +12,7 @@ import config from "../config";
 import VocalSubscribe, {IVocalSubscribe} from "../Models/Vocal/VocalSubscribe";
 import VocalConfig, {IVocalConfig} from "../Models/Vocal/VocalConfig";
 import VocalUserConfig, {IVocalUserConfig} from "../Models/Vocal/VocalUserConfig";
-import VocalInvite, {IVocalInvite} from "../Models/Vocal/VocalInvite";
-import VocalAskInviteBack, {IVocalAskInviteBack} from "../Models/Vocal/VocalAskInviteBack";
-import client from "../client";
+import VocalInvite from "../Models/Vocal/VocalInvite";
 import {splitFieldsEmbed} from "../Classes/OtherFunctions";
 import {
     extractUTCTime,
@@ -234,7 +231,7 @@ export default class Vocal extends Command {
                     continue;
                 }
 
-                if (await Vocal.sendVocalInvite(this.member, user, this.guild))
+                if (await Vocal.sendInvite(this.member, user, this.guild))
                     inviteds.push(user);
                 else
                     usersCantBeDM.push(user);
@@ -703,7 +700,9 @@ export default class Vocal extends Command {
         return this.response(false, "Vous n'avez rentré aucune option");
     }
 
-    static async sendVocalInvite(requester: GuildMember | User, requested: GuildMember, guild: Guild): Promise<boolean> {
+    static async sendInvite(requester: GuildMember | User, requested: GuildMember, guild: Guild): Promise<boolean> {
+        const inviteId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "i";
+
         const acceptButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "a";
         const denyButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "d";
 
@@ -728,6 +727,7 @@ export default class Vocal extends Command {
         }
 
         VocalInvite.create({
+            inviteId,
             buttonId: acceptButtonId,
             requesterId: requester.id,
             requestedId: requested.id,
@@ -736,6 +736,7 @@ export default class Vocal extends Command {
             serverId: guild.id
         });
         VocalInvite.create({
+            inviteId,
             buttonId: denyButtonId,
             requesterId: requester.id,
             requestedId: requested.id,
@@ -835,155 +836,6 @@ export default class Vocal extends Command {
                 listenerConfig.save();
             }
         }
-    }
-
-    static async getDatasButton(button: IVocalAskInviteBack | IVocalInvite, interaction: ButtonInteraction): Promise<false | { server: Guild, requester: GuildMember, requested: GuildMember }> {
-        let server;
-        if ((server = client.guilds.cache.get(button.serverId)) === undefined) {
-            await interaction.editReply({content: "Le serveur associé à cette invitation semble inaccessible au bot"});
-            return false;
-        }
-        let requested: null | GuildMember = null;
-        try {
-            requested = await server.members.fetch(button.requestedId);
-        } catch (_) {
-            await interaction.editReply("Vous ne vous trouvez visiblement plus sur le serveur " + server.name);
-            return false;
-        }
-        let requester: null | GuildMember = null;
-        if (requested !== null) {
-            try {
-                requester = await server.members.fetch(button.requesterId);
-            } catch (_) {
-                await interaction.editReply("L'envoyeur de cette invitation est introuvable sur le serveur " + server.name);
-                return false;
-            }
-        }
-
-        return (requester && requested) ? {server, requested, requester} : false;
-    }
-
-    static async listenAskInviteBackButtons(interaction: ButtonInteraction): Promise<boolean> {
-        const currentDate = new Date();
-        await VocalAskInviteBack.deleteMany({
-            timestamp: {$lte: new Date(currentDate.getTime() - Vocal.buttonsTimeout)}
-        });
-        const inviteBackButton: IVocalAskInviteBack | typeof VocalAskInviteBack = await VocalAskInviteBack.findOne({
-            buttonId: interaction.customId
-        });
-
-        if (inviteBackButton === null)
-            return false;
-
-        const datas = await Vocal.getDatasButton(inviteBackButton, interaction);
-        if (!datas)
-            return false;
-
-        const {server, requested, requester} = datas;
-
-        await Vocal.sendVocalInvite(requester, requested, server);
-
-        await inviteBackButton.remove();
-
-        await interaction.editReply({content: "Invitation envoyée en retour"});
-
-        return true;
-    }
-
-    static async listenInviteButtons(interaction: ButtonInteraction): Promise<boolean> {
-
-        const currentDate = new Date();
-        await VocalInvite.deleteMany({
-            timestamp: {$lte: new Date(currentDate.getTime() - Vocal.buttonsTimeout)}
-        });
-
-        const invite: IVocalInvite = await VocalInvite.findOne({
-            buttonId: interaction.customId
-        })
-
-        if (invite === null)
-            return false;
-
-        const datas = await Vocal.getDatasButton(invite, interaction);
-        if (!datas)
-            return false;
-        const {server, requested, requester} = datas;
-
-        if (!(await Vocal.staticCheckPermissions(null, requested, server, false))) {
-            await interaction.editReply({content: "Vous n'avez plus accès à la fonction vocal sur le serveur '" + server.name + "'"});
-            return true;
-        }
-        if (!(await Vocal.staticCheckPermissions(null, requester, server, false))) {
-            await interaction.editReply({content: "'" + (requester.nickname ?? requester.user.username) + "' n'a plus accès à la fonction vocal sur le serveur '" + server.name + "'"});
-            return true;
-        }
-
-        if (invite.accept) {
-            const listenerConfig: IVocalUserConfig = await VocalUserConfig.findOne({
-                serverId: server.id,
-                listenerId: invite.requesterId
-            });
-            await VocalSubscribe.create({
-                serverId: invite.serverId,
-                listenerId: invite.requesterId,
-                listenedId: invite.requestedId,
-                timestamp: new Date,
-                enabled: listenerConfig.listening
-            });
-            try {
-                await requester.send((requested.nickname ?? requested.user.username) + " a accepté(e) votre invitation sur '" + server.name + "'" + (!listenerConfig.listening ? " (Attention votre écoute n'est pas activée sur ce serveur)" : ""));
-            } catch (_) {
-            }
-
-            const backSubscribe = await VocalSubscribe.findOne({
-                serverId: server.id,
-                listenerId: requested.id,
-                listenedId: requester.id
-            });
-
-            if (backSubscribe === null) {
-                const askBackButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "a";
-
-                await interaction.editReply({
-                    content: "Invitation acceptée",
-                    components: [
-                        new MessageActionRow().addComponents(
-                            new MessageButton()
-                                .setCustomId(askBackButtonId)
-                                .setLabel("Inviter en retour")
-                                .setStyle("PRIMARY")
-                        )
-                    ]
-                });
-
-                await VocalAskInviteBack.create({
-                    buttonId: askBackButtonId,
-                    requesterId: requested.id,
-                    requestedId: requester.id,
-                    timestamp: new Date(),
-                    serverId: server.id
-                });
-            } else {
-                await interaction.editReply({
-                    content: "Invitation acceptée"
-                });
-            }
-
-        } else {
-            try {
-                await requester.send((requested.nickname ?? requested.user.username) + " a refusé(e) votre invitation sur '" + server.name + "'");
-            } catch (_) {
-            }
-            await interaction.editReply({content: "Invitation refusée"});
-        }
-
-        await VocalInvite.deleteMany({
-            serverId: invite.serverId,
-            requesterId: invite.requesterId,
-            requestedId: invite.requestedId
-        });
-
-        return true;
     }
 
     help() {

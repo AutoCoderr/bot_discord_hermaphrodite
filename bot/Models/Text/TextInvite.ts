@@ -4,6 +4,7 @@ import { connect } from "../../Mongo";
 const db = connect();
 
 export interface ITextInvite {
+    inviteId: string;
     buttonId: string;
     requesterId: string;
     requestedId: string;
@@ -15,11 +16,12 @@ export interface ITextInvite {
 }
 
 const TextInviteSchema: Schema = new Schema({
+    inviteId: { type: String, required: true },
     buttonId: { type: String, required: true },
     requesterId: { type: String, required: true },
     requestedId: { type: String, required: true },
-    channelsId: { type: Array, required: false },
-    keywords: { type: Array, required: false },
+    channelsId: { type: Array, required: false, default: () => undefined },
+    keywords: { type: Array, required: false, default: () => undefined },
     accept: { type: Boolean, required: true },
     timestamp: { type: Date, required: true },
     serverId: { type: String, required: true }

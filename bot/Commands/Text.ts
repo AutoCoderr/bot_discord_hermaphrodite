@@ -12,6 +12,7 @@ import TextConfig, {ITextConfig} from "../Models/Text/TextConfig";
 import TextUserConfig, {ITextUserConfig} from "../Models/Text/TextUserConfig";
 import TextSubscribe from "../Models/Text/TextSubscribe";
 import TextInvite from "../Models/Text/TextInvite";
+import {compareKeyWords} from "../Classes/TextAndVocalFunctions";
 
 interface argsType {
     action: 'add'|'remove'|'block'|'unblock'|'mute'|'unmute'|'limit'|'status',
@@ -132,6 +133,8 @@ export default class Text extends Command {
         }
     };
 
+    static buttonsTimeout = 48 * 60 * 60 * 1000; // 48h pour répondre à une invitation
+
     constructor(channel: TextBasedChannels, member: User | GuildMember, guild: null | Guild = null, writtenCommandOrSlashCommandOptions: null | string | CommandInteractionOptionResolver = null, commandOrigin: string) {
         super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, Text.commandName, Text.argsModel);
     }
@@ -179,7 +182,9 @@ export default class Text extends Command {
             const hasNotText: GuildMember[] = [];
 
             const invites: Array<{requested: GuildMember, channels?: TextBasedChannels[]}> = [];
-            const alreadyInvited: Array<{requested: GuildMember, channels?: TextBasedChannels[]}> = [];
+            const alreadyInvited: Array<{requested: GuildMember, channelsId?: string[], keywords: string[]}> = [];
+
+            const updatedSubscribes: Array<{listenedId: string, channelId?: string}> = [];
 
             for (const user of users) {
                 if (!(await Text.staticCheckPermissions(null, user, this.guild, false)) ||
@@ -205,7 +210,7 @@ export default class Text extends Command {
                     'channelsId.0': { $exists: false }
                 })
 
-                const allChannelSubscribe: typeof TextSubscribe = await TextSubscribe.findOne({serverId: this.guild.id, listenerId: this.member.id, listenedId: user.id, "channelId.0": {$exists: false}});
+                const allChannelSubscribe: typeof TextSubscribe = await TextSubscribe.findOne({serverId: this.guild.id, listenerId: this.member.id, listenedId: user.id, channelId: {$exists: false}});
 
                 if (channels.length === 0) {
                     if (requestedConfig)
@@ -218,28 +223,37 @@ export default class Text extends Command {
                     }
 
                     if (allChannelSubscribe) {
-                        if (keyWords.length === 0)
+                        if (keyWords.length === 0) {
                             allChannelSubscribe.keywords = undefined;
-                        else
+                            await TextSubscribe.deleteMany({
+                                serverId: this.guild.id,
+                                listenerId: this.member.id,
+                                listenedId: user.id,
+                                channelId: {$exists: true}
+                            });
+                        } else {
                             allChannelSubscribe.keywords = [...(allChannelSubscribe.keywords ?? []), ...keyWords];
-                        const specifiedChannelSubscribes: typeof TextSubscribe = await TextSubscribe.find({
-                            serverId: this.guild.id,
-                            listenerId: this.member.id,
-                            listenedId: user.id,
-                            "channelId.0": {$exists: true}
-                        });
-                        for (const subscribe of specifiedChannelSubscribes) {
-                            if (Text.compareKeyWords(subscribe.keywords, allChannelSubscribe.keywords))
-                                subscribe.remove();
+                            const specifiedChannelsSubscribes: typeof TextSubscribe[] = await TextSubscribe.find({
+                                serverId: this.guild.id,
+                                listenerId: this.member.id,
+                                listenedId: user.id,
+                                channelId: {$exists: true}
+                            });
+                            for (const subscribe of specifiedChannelsSubscribes) {
+                                subscribe.keywords = [...(subscribe.keywords??[]), ...keyWords];
+                                subscribe.save();
+                            }
                         }
 
                         allChannelSubscribe.save();
+                        updatedSubscribes.push(allChannelSubscribe);
                         continue;
                     }
 
                     if (existingInviteForAllChannels) {
                         alreadyInvited.push({
-                            requested: user
+                            requested: user,
+                            keywords: existingInviteForAllChannels.keywords
                         });
                         continue;
                     }
@@ -248,7 +262,7 @@ export default class Text extends Command {
                         requested: user
                     });
 
-                    Text.sendTextInvite(this.member, user, undefined, keyWords.length > 0 ? keyWords : undefined, this.guild);
+                    Text.sendInvite(this.member, user, this.guild, undefined, keyWords.length > 0 ? keyWords : undefined);
 
                     continue;
                 }
@@ -284,7 +298,11 @@ export default class Text extends Command {
                         } else {
                             existingSubscribe.keywords = [...(existingSubscribe.keywords??[]), ...keyWords]
                         }
-                        if (allChannelSubscribe && Text.compareKeyWords(existingSubscribe.keywords, allChannelSubscribe.keywords)) {
+                        updatedSubscribes.push({
+                            listenedId: existingSubscribe.listenedId,
+                            channelId: existingSubscribe.channelId
+                        });
+                        if (allChannelSubscribe && compareKeyWords(existingSubscribe.keywords, allChannelSubscribe.keywords)) {
                             existingSubscribe.remove();
                         } else {
                             existingSubscribe.save();
@@ -292,7 +310,7 @@ export default class Text extends Command {
                         continue;
                     }
                     if (allChannelSubscribe) {
-                        if (!Text.compareKeyWords(allChannelSubscribe.keywords, keyWords.length > 0 ? keyWords : undefined )) {
+                        if (!compareKeyWords(allChannelSubscribe.keywords, keyWords.length > 0 ? keyWords : undefined )) {
                             existingSubscribe = await TextSubscribe.create({
                                 serverId: this.guild.id,
                                 listenerId: this.member.id,
@@ -301,14 +319,30 @@ export default class Text extends Command {
                                 keywords: keyWords.length > 0 ? keyWords : undefined
                             });
                         }
+                        updatedSubscribes.push({
+                            listenedId: user.id,
+                            channelId: channel.id
+                        });
                         continue;
                     }
                     channelsToInvite.push(channel);
                 }
                 if (channelsToInvite.length > 0) {
-                    if (existingInviteForAllChannels) {
+                    let specifiedChannelExistingInvite;
+                    if (existingInviteForAllChannels || (
+                        specifiedChannelExistingInvite = await TextInvite.findOne({
+                            serverId: this.guild.id,
+                            requesterId: this.member.id,
+                            requestedId: user.id,
+                            accept: true,
+                            channelsId: {$all: channelsToInvite.map(channel => channel.id)}
+                        })
+                    )) {
+
                         alreadyInvited.push({
-                            requested: user
+                            requested: user,
+                            keywords: specifiedChannelExistingInvite ? specifiedChannelExistingInvite.keywords : existingInviteForAllChannels.keywords,
+                            channelsId: specifiedChannelExistingInvite ? specifiedChannelExistingInvite.channelsId : undefined
                         });
                         continue;
                     }
@@ -317,7 +351,7 @@ export default class Text extends Command {
                         requested: user,
                         channels: channelsToInvite
                     })
-                    Text.sendTextInvite(this.member, user, channelsToInvite.map(channel => channel.id), keyWords.length > 0 ? keyWords : undefined, this.guild);
+                    Text.sendInvite(this.member, user, this.guild, channelsToInvite.map(channel => channel.id), keyWords.length > 0 ? keyWords : undefined);
                 }
             }
 
@@ -329,12 +363,20 @@ export default class Text extends Command {
                             (keyWords.length > 0 ? " sur les mot clés "+keyWords.map(w => '"'+w+'"').join(", ") : "")
                     });
                 }
+            if (updatedSubscribes.length > 0) {
+                embed.addFields({
+                    name: keyWords.length === 0 ?
+                        "Les mots clé ont été supprimés sur les écoutes suivantes :" :
+                        "Les mots clés "+keyWords.map(w => "'"+w+"'").join(", ")+" ont été ajouté aux écoutes suivantes :",
+                    value: updatedSubscribes.map(({listenedId,channelId}) => "Sur l'utilisateur <@"+listenedId+"> sur "+(channelId ? "le channel <#"+channelId+">" : "tout les channels")).join("\n")
+                })
+            }
             if (alreadyInvited.length > 0)
-                for (const {requested,channels} of alreadyInvited) {
+                for (const {requested,keywords,channelsId} of alreadyInvited) {
                     embed.addFields({
                         name: "Vous avez déjà une invitation en attente de validation pour "+(requested.nickname??requested.user.username),
-                        value: "À <@"+requested.id+">"+(channels ? " sur les channels "+channels.map(channel => "<#"+channel.id+">").join(", ") : " sur tout les channels")+"\n"+
-                            (keyWords.length > 0 ? " sur les mot clés "+keyWords.map(w => '"'+w+'"').join(", ") : "")
+                        value: "À <@"+requested.id+">"+(channelsId ? " sur les channels "+channelsId.map(channelId => "<#"+channelId+">").join(", ") : " sur tout les channels")+"\n"+
+                            ((keywords && keywords.length > 0) ? " sur les mot clés "+keywords.map(w => '"'+w+'"').join(", ") : "")
                     });
                 }
             if (usersBlockingMe.length > 0)
@@ -367,7 +409,9 @@ export default class Text extends Command {
         return this.response(false, "COUCOU");
     }
 
-    static async sendTextInvite(requester: GuildMember | User, requested: GuildMember, channelsId: undefined|string[], keywords: undefined|string[], guild: Guild): Promise<boolean> {
+    static async sendInvite(requester: GuildMember | User, requested: GuildMember, guild: Guild, channelsId: undefined|string[], keywords: undefined|string[]): Promise<boolean> {
+        const inviteId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "i";
+
         const acceptButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "a";
         const denyButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "d";
 
@@ -408,6 +452,7 @@ export default class Text extends Command {
         }
 
         TextInvite.create({
+            inviteId,
             buttonId: acceptButtonId,
             requesterId: requester.id,
             requestedId: requested.id,
@@ -418,6 +463,7 @@ export default class Text extends Command {
             serverId: guild.id
         });
         TextInvite.create({
+            inviteId,
             buttonId: denyButtonId,
             requesterId: requester.id,
             requestedId: requested.id,
@@ -426,17 +472,5 @@ export default class Text extends Command {
             serverId: guild.id
         });
         return true;
-    }
-
-    static compareKeyWords(A: string[]|undefined,B: string[]|undefined) {
-        if ((A === undefined) !== (B === undefined))
-            return false;
-        if (A === undefined || B === undefined)
-            return true;
-
-        if (A.length !== B.length)
-            return false;
-
-        return !A.some(w => !B.includes(w));
     }
 }
