@@ -118,7 +118,7 @@ export async function listenAskInviteBackButtons(interaction: ButtonInteraction,
     return true;
 }
 
-async function inviteBack(interaction: ButtonInteraction, requester: GuildMember, requested: GuildMember, server: Guild, type: 'text' | 'vocal', channelsId: string[] | null = null, keywords: string[] | null = null) {
+async function inviteBack(interaction: ButtonInteraction, requester: GuildMember, requested: GuildMember, server: Guild, type: 'text' | 'vocal', keywords: string[] | null = null, channelsId: string[] | null = null) {
     const {inviteBackModel} = classesBySubscribeType[type];
 
     const askBackButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "a";
@@ -244,7 +244,7 @@ export async function listenInviteButtons(interaction: ButtonInteraction, type: 
                     subscribe.keywords = [...(subscribe.keywords??[]), ...keywords]
                     subscribe.save();
                 }
-            } else {
+            } else if (type === "text") {
                 await subscribeModel.deleteMany({
                     serverId: server.id,
                     listenerId: invite.requesterId,
@@ -297,12 +297,12 @@ export async function listenInviteButtons(interaction: ButtonInteraction, type: 
                     });
                     if (existingBackInvite === null) {
                         backInviteSent = true
-                        await inviteBack(interaction, requester, requested, server, type, channelsIdForBackInvite, keywords);
+                        await inviteBack(interaction, requester, requested, server, type, keywords, channelsIdForBackInvite);
                     }
                 }
             } else {
                 backInviteSent = true
-                await inviteBack(interaction, requester, requested, server, type);
+                await inviteBack(interaction, requester, requested, server, type, keywords);
             }
         }
 
