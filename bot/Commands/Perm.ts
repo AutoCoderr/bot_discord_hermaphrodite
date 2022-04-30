@@ -10,11 +10,6 @@ import {
     User
 } from "discord.js";
 import Permissions, {IPermissions} from "../Models/Permissions";
-import {
-    addRoleToSlashCommandPermission,
-    removeRoleFromSlashCommandPermission,
-    setRoleToSlashCommandPermission
-} from "../slashCommands";
 
 export default class Perm extends Command {
     static display = true;
@@ -169,19 +164,15 @@ export default class Perm extends Command {
                     }
                 }
                 permission.roles = [...permission.roles, ...rolesId];
-                await addRoleToSlashCommandPermission(this.guild, <string>command.commandName, rolesId);
                 responses.push("Permission added successfully for the '"+command.commandName+"' command!");
             } else if (action == "set") {
                 permission.roles = rolesId;
-                await setRoleToSlashCommandPermission(this.guild, <string>command.commandName, rolesId);
                 responses.push("Permission setted successfully for the '"+command.commandName+"' command!");
             } else if (action == "clear") {
                 permission.roles = [];
-                await setRoleToSlashCommandPermission(this.guild, <string>command.commandName, []);
                 responses.push("Permission cleared successfully for the '"+command.commandName+"' command!");
             } else if (action == "remove") {
-                permission.roles = permission.roles.filter(roleId => !roles.some(role => role.id == roleId))
-                await removeRoleFromSlashCommandPermission(this.guild, <string>command.commandName, roles);
+                permission.roles = permission.roles.filter(roleId => !roles.some(role => role.id == roleId));
                 responses.push("Permission removed successfully for the '"+command.commandName+"' command!");
             }
             await permission.save();
