@@ -48,8 +48,6 @@ export async function initSlashCommands() {
 
                 const createdSlashCommand = await commands?.create(<ApplicationCommandDataResolvable>generateSlashCommandFromModel(command));
 
-                await initSlashCommandPermissions(guild, createdSlashCommand, <string>command.commandName);
-
                 if (slashCommandsByGuildAndName[guild.id] === undefined)
                     slashCommandsByGuildAndName[guild.id] = {}
                 slashCommandsByGuildAndName[guild.id][<string>command.commandName] = createdSlashCommand;
