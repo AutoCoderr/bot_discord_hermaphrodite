@@ -38,7 +38,7 @@ export default class TextAndVocal extends Command {
 
     type: 'text'|'vocal'|null = null;
 
-    constructor(channel: TextBasedChannels, member: User | GuildMember, guild: null | Guild = null, writtenCommandOrSlashCommandOptions: null | string | CommandInteractionOptionResolver = null, commandOrigin: string, commandName: string, argsModel: any, type: 'vocal'|'text') {
+    constructor(channel: TextBasedChannels, member: User | GuildMember, guild: null | Guild = null, writtenCommandOrSlashCommandOptions: null | string | CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom', commandName: string, argsModel: any, type: 'vocal'|'text') {
         super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, commandName, argsModel);
         this.type = type;
     }

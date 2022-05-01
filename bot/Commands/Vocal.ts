@@ -118,7 +118,7 @@ export default class Vocal extends Command {
 
     static usersWhoAreOnVocal: { [id: string]: VoiceChannel|StageChannel } = {};
 
-    constructor(channel: TextBasedChannels, member: User | GuildMember, guild: null | Guild = null, writtenCommandOrSlashCommandOptions: null | string | CommandInteractionOptionResolver = null, commandOrigin: string) {
+    constructor(channel: TextBasedChannels, member: User | GuildMember, guild: null | Guild = null, writtenCommandOrSlashCommandOptions: null | string | CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
         super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, Vocal.commandName, Vocal.argsModel);
     }
 

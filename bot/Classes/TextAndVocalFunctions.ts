@@ -212,13 +212,13 @@ export async function listenInviteButtons(interaction: ButtonInteraction, type: 
                     } else {
                         existingSubscribe.save();
                     }
-                } else if (existingSubscribeAllChannels === null || !compareKeyWords(keywords??undefined, existingSubscribeAllChannels.keywords)) {
+                } else if (existingSubscribeAllChannels === null || keywords || (existingSubscribeAllChannels.keywords !== undefined && existingSubscribeAllChannels.keywords.length > 0)) {
                     await subscribeModel.create({
                         serverId: invite.serverId,
                         listenerId: invite.requesterId,
                         listenedId: invite.requestedId,
                         channelId: channel.id,
-                        ...(keywords ? {keywords} : {}),
+                        ...(keywords ? {keywords: [...(existingSubscribeAllChannels ? (existingSubscribeAllChannels.keywords??[]) : []), ...keywords]} : {}),
                         timestamp: new Date,
                         enabled: listenerListening,
                     });
