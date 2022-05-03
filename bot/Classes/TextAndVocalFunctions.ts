@@ -325,6 +325,33 @@ export async function listenInviteButtons(interaction: ButtonInteraction, type: 
     return true;
 }
 
+export function userBlockingUsOrChannel(listenedConfig: typeof TextUserConfig|null, listenedId: string, usersBlockingMe: string[], blockedChannelsByUserId: { [userId: string]: string[] }, listenerId: string, channelToListenId: string|null = null, checkForUs = true) {
+    if (listenedConfig === null)
+        return false;
+    let foundBlocking;
+    if ((foundBlocking = listenedConfig.blocking.find(({userId, channelId}) =>
+        (
+            checkForUs &&
+            userId === listenerId &&
+            channelId === undefined
+        ) || (
+            channelToListenId &&
+            (userId === undefined || userId === listenerId) &&
+            channelId === channelToListenId
+        )
+    ))) {
+        if (checkForUs && !foundBlocking.channelId && !usersBlockingMe.includes(listenedId)) {
+            usersBlockingMe.push(listenedId)
+        } else if (channelToListenId) {
+            if (blockedChannelsByUserId[listenedId] === undefined)
+                blockedChannelsByUserId[listenedId] = [];
+            blockedChannelsByUserId[listenedId].push(channelToListenId)
+        }
+        return true;
+    }
+    return false;
+}
+
 export function compareKeyWords(A: string[]|undefined,B: string[]|undefined) {
     if ((A === undefined) !== (B === undefined))
         return false;

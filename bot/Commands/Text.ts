@@ -12,7 +12,7 @@ import TextConfig, {ITextConfig} from "../Models/Text/TextConfig";
 import TextUserConfig, {ITextUserConfig} from "../Models/Text/TextUserConfig";
 import TextSubscribe from "../Models/Text/TextSubscribe";
 import TextInvite from "../Models/Text/TextInvite";
-import {compareKeyWords, removeKeyWords} from "../Classes/TextAndVocalFunctions";
+import {compareKeyWords, removeKeyWords, userBlockingUsOrChannel} from "../Classes/TextAndVocalFunctions";
 
 interface argsType {
     action: 'add' | 'remove' | 'block' | 'unblock' | 'mute' | 'unmute' | 'limit' | 'status',
@@ -166,20 +166,118 @@ export default class Text extends Command {
             );
         }
 
-        const embed = new MessageEmbed()
-            .setAuthor("Herma bot");
+        if (["add","remove"].includes(action)) {
+            const embed = new MessageEmbed()
+                .setAuthor("Herma bot");
 
-        switch (action) {
-            case "add":
-                return this.add(users, channels, keyWords, embed, textConfig);
-            case "remove":
-                return this.remove(users, channels, keyWords, embed);
+            const blockedChannelsByUserId: { [userId: string]: string[] } = {};
+            const blockedChannelsForEveryoneObj: { [channelId: string]: boolean } = {};
+            const usersBlockingMe: string[] = [];
+            const hasNotText: string[] = [];
+
+            const invites: Array<{ requested: GuildMember, channels?: TextBasedChannels[] }> = [];
+            const alreadyInvited: Array<{ requested: GuildMember, channelsId?: string[], keywords: string[] }> = [];
+
+            const updatedSubscribes: Array<{ listenedId: string, channelId?: string }> = [];
+            const deletedSubscribes: Array<{ listenedId: string, channelId?: string }> = [];
+            const cantBeDeleteBecauseOfOnlySubscribeAll: Array<{ listenedId: string, channelId: string }> = [];
+
+
+            switch (action) {
+                case "add":
+                    await this.add(users, channels, keyWords, textConfig, blockedChannelsByUserId, blockedChannelsForEveryoneObj, usersBlockingMe, hasNotText, invites, alreadyInvited, updatedSubscribes);
+                    break;
+                case "remove":
+                    await this.remove(users, channels, keyWords, textConfig, blockedChannelsByUserId, blockedChannelsForEveryoneObj, usersBlockingMe, updatedSubscribes, deletedSubscribes, cantBeDeleteBecauseOfOnlySubscribeAll);
+            }
+
+            if (invites.length > 0)
+                for (const {requested, channels} of invites) {
+                    embed.addFields({
+                        name: "Vous avez envoyé une invitation à " + (requested.nickname ?? requested.user.username),
+                        value: "À <@" + requested.id + ">" + (channels ? " sur les channels " + channels.map(channel => "<#" + channel.id + ">").join(", ") : " sur tout les channels") + "\n" +
+                            (keyWords.length > 0 ? " sur les mot clés " + keyWords.map(w => '"' + w + '"').join(", ") : "")
+                    });
+                }
+            if (updatedSubscribes.length > 0) {
+                embed.addFields({
+                    name: action === "remove" ?
+                        "Les mots clés " + keyWords.map(w => "'" + w + "'").join(", ") + " ont été supprimés des écoutes suivantes :" :
+                        (keyWords.length === 0 ?
+                            "Les mots clé ont été supprimés sur les écoutes suivantes :" :
+                            "Les mots clés " + keyWords.map(w => "'" + w + "'").join(", ") + " ont été ajouté aux écoutes suivantes :"),
+                    value: updatedSubscribes.map(({listenedId, channelId}) =>
+                        "Sur l'utilisateur <@" + listenedId + "> sur " + (channelId ? "le channel <#" + channelId + ">" : "tout les channels")).join("\n")
+                })
+            }
+            if (alreadyInvited.length > 0)
+                for (const {requested, keywords, channelsId} of alreadyInvited) {
+                    embed.addFields({
+                        name: "Vous avez déjà une invitation en attente de validation pour " + (requested.nickname ?? requested.user.username),
+                        value: "À <@" + requested.id + ">" + (channelsId ? " sur les channels " + channelsId.map(channelId => "<#" + channelId + ">").join(", ") : " sur tout les channels") + "\n" +
+                            ((keywords && keywords.length > 0) ? " sur les mot clés " + keywords.map(w => '"' + w + '"').join(", ") : "")
+                    });
+                }
+            if (usersBlockingMe.length > 0)
+                embed.addFields({
+                    name: "Ces utilisateurs vous bloque : ",
+                    value: usersBlockingMe.map(userId => "<@" + userId + ">").join("\n")
+                });
+            if (hasNotText.length > 0)
+                embed.addFields({
+                    name: "Ces utilisateurs n'ont pas la fonctionnalité de notification textuelle : ",
+                    value: hasNotText.map(userId => "<@" + userId + ">").join("\n")
+                });
+            for (const [userId, blockedChannels] of Object.entries(blockedChannelsByUserId)) {
+                embed.addFields({
+                    name: "<@" + userId + "> vous a bloqué pour les channels suivants",
+                    value: blockedChannels.map(channelId => "<#" + channelId + ">").join("\n")
+                });
+            }
+            const blockedChannelsForEveryone = Object.keys(blockedChannelsForEveryoneObj);
+            if (blockedChannelsForEveryone.length > 0) {
+                embed.addFields({
+                    name: "Les channels suivants sont blacklistés sur ce serveur :",
+                    value: blockedChannelsForEveryone.map(channelId => "<#" + channelId + ">").join("\n")
+                });
+            }
+            if (deletedSubscribes.length > 0) {
+                embed.addFields({
+                    name: "Les écoutes suivantes ont été supprimées",
+                    value: deletedSubscribes.map(({listenedId, channelId}) =>
+                        "Sur l'utilisateur <@" + listenedId + "> sur " + (channelId ? "le channel <#" + channelId + ">" : "tout les channels")).join("\n")
+                })
+            }
+
+            if (cantBeDeleteBecauseOfOnlySubscribeAll.length > 0) {
+                embed.addFields({
+                    name: "Les écoutes suivantes n'ont pas put être supprimées, car une écoute sur tout les channels existe déjà",
+                    value: cantBeDeleteBecauseOfOnlySubscribeAll.map(({listenedId,channelId}) =>
+                        "Sur l'utilisateur <@" + listenedId + "> sur " + (channelId ? "le channel <#" + channelId + ">" : "tout les channels")+"" +
+                        "\nVous pouvez utiliser la commande block pour bloquer le channel <#"+channelId+"> sur l'utilisateur <@"+listenedId+">"
+                    ).join("\n\n")
+                })
+            }
+
+            return this.response(true, {embeds: [embed]});
+
         }
 
         return this.response(false, "COUCOU");
     }
 
-    async remove(users: GuildMember[], channels: TextBasedChannels[], keyWords: string[], embed: MessageEmbed) {
+    async remove(
+        users: GuildMember[],
+        channels: TextBasedChannels[],
+        keyWords: string[],
+        textConfig: typeof TextConfig,
+        blockedChannelsByUserId: { [userId: string]: string[] },
+        blockedChannelsForEveryoneObj: { [channelId: string]: boolean },
+        usersBlockingMe: string[],
+        updatedSubscribes: Array<{ listenedId: string, channelId?: string }>,
+        deletedSubscribes: Array<{ listenedId: string, channelId?: string }>,
+        cantBeDeleteBecauseOfOnlySubscribeAll: Array<{ listenedId: string, channelId: string }>) {
+
         if (this.guild === null) {
             return this.response(false,
                 this.sendErrors({
@@ -189,23 +287,22 @@ export default class Text extends Command {
             );
         }
 
-        const updatedSubscribes: Array<{ listenedId: string, channelId?: string }> = [];
-        const deletedSubscribes: Array<{ listenedId: string, channelId?: string }> = [];
-
         if (users.length === 0) {
-            let subscribeAllChannelsByUserId: null|{ [userId: string]: typeof TextSubscribe } = null;
-            if (keyWords.length > 0) {
-                subscribeAllChannelsByUserId = await TextSubscribe.find({
-                    serverId: this.guild.id,
-                    listenerId: this.member.id,
-                    channelId: {$exists: false}
-                }).then(subscribes => subscribes.reduce((acc, subscribe) => ({
-                    ...acc,
-                    [subscribe.listenedId]: subscribe
-                }), {}));
-            }
+            const userConfigById: { [userId: string]: typeof TextUserConfig } = {};
+            let subscribeAllChannelsByUserId: { [userId: string]: typeof TextSubscribe } =  await TextSubscribe.find({
+                serverId: this.guild.id,
+                listenerId: this.member.id,
+                channelId: {$exists: false}
+            }).then(subscribes => subscribes.reduce((acc, subscribe) => ({
+                ...acc,
+                [subscribe.listenedId]: subscribe
+            }), {}));
 
             for (const channel of channels) {
+                if (keyWords.length > 0 && textConfig.channelBlacklist.includes(channel.id)) {
+                    blockedChannelsForEveryoneObj[channel.id] = true;
+                    continue;
+                }
                 const listenedsOnThisChannel: string[] = [];
                 const subscribes: typeof TextSubscribe[] = await TextSubscribe.find({
                     serverId: this.guild.id,
@@ -213,7 +310,12 @@ export default class Text extends Command {
                     channelId: channel.id
                 })
                 for (const subscribe of subscribes) {
+                    if (userConfigById[subscribe.listenedId] === undefined)
+                        userConfigById[subscribe.listenedId] = await TextUserConfig.findOne({userId: subscribe.listenedId});
                     listenedsOnThisChannel.push(subscribe.listenedId);
+                    if (userBlockingUsOrChannel(userConfigById[subscribe.listenedId], subscribe.listenedId, usersBlockingMe, blockedChannelsByUserId, this.member.id, channel.id))
+                        continue;
+
                     if (keyWords.length > 0) {
                         updatedSubscribes.push({
                             listenedId: subscribe.listenedId,
@@ -232,10 +334,15 @@ export default class Text extends Command {
                     });
                     subscribe.remove();
                 }
-                if (keyWords.length > 0 && subscribeAllChannelsByUserId) {
-                    for (const [listenedId, subscribeAllChannels] of Object.entries(subscribeAllChannelsByUserId)) {
-                        if (listenedsOnThisChannel.includes(listenedId))
+                for (const [listenedId, subscribeAllChannels] of Object.entries(subscribeAllChannelsByUserId)) {
+                    if (listenedsOnThisChannel.includes(listenedId))
+                        continue;
+                    if (keyWords.length > 0) {
+                        if (userConfigById[listenedId] === undefined)
+                            userConfigById[listenedId] = await TextUserConfig.findOne({userId: listenedId});
+                        if (userBlockingUsOrChannel(userConfigById[listenedId], listenedId, usersBlockingMe, blockedChannelsByUserId, this.member.id, channel.id))
                             continue;
+
                         updatedSubscribes.push({
                             listenedId,
                             channelId: channel.id
@@ -251,11 +358,23 @@ export default class Text extends Command {
                                 enabled: subscribeAllChannels.enabled
                             })
                         }
+                    } else {
+                        cantBeDeleteBecauseOfOnlySubscribeAll.push({
+                            listenedId,
+                            channelId: channel.id
+                        })
                     }
                 }
             }
         } else {
             for (const user of users) {
+                let requestedConfig: ITextUserConfig|null = await TextUserConfig.findOne({
+                    serverId: this.guild.id,
+                    userId: user.id
+                });
+                if (userBlockingUsOrChannel(requestedConfig, user.id, usersBlockingMe, blockedChannelsByUserId, this.member.id))
+                    continue;
+
                 const subscribeOnAllChannels: typeof TextSubscribe = await TextSubscribe.findOne({
                     serverId: this.guild.id,
                     listenerId: this.member.id,
@@ -263,6 +382,17 @@ export default class Text extends Command {
                     channelId: {$exists: false}
                 })
                 if (channels.length === 0) {
+                    if (requestedConfig)
+                        blockedChannelsByUserId[user.id] = requestedConfig.blocking
+                            .filter(({
+                                         userId,
+                                         channelId
+                                     }) => (userId === this.member.id || userId === undefined) && channelId !== undefined)
+                            .map(({channelId}) => <string>channelId);
+
+                    for (const channelId of textConfig.channelBlacklist) {
+                        blockedChannelsForEveryoneObj[channelId] = true;
+                    }
                     if (keyWords.length > 0) {
                         if (subscribeOnAllChannels) {
                             updatedSubscribes.push({
@@ -275,7 +405,11 @@ export default class Text extends Command {
                             serverId: this.guild.id,
                             listenerId: this.member.id,
                             listenedId: user.id,
-                            channelId: {$exists: true}
+                            $and: [
+                                { channelId: { $exists: true } },
+                                { channelId: { $nin: blockedChannelsByUserId[user.id] } },
+                                { channelId: { $nin: Object.keys(blockedChannelsForEveryoneObj) } }
+                            ]
                         });
                         for (const subscribe of subscribes) {
                             subscribe.keywords = removeKeyWords(subscribe.keywords, keyWords);
@@ -296,11 +430,21 @@ export default class Text extends Command {
                     TextSubscribe.deleteMany({
                         serverId: this.guild.id,
                         listenerId: this.member.id,
-                        listenedId: user.id
+                        listenedId: user.id,
+                        $or: [
+                            { channelId: { $exists: false } },
+                            { $and: [
+                                    { channelId: { $nin: blockedChannelsByUserId[user.id] } },
+                                    { channelId: { $nin: Object.keys(blockedChannelsForEveryoneObj) } }
+                                ] }
+                        ]
                     });
                     continue;
                 }
                 for (const channel of channels) {
+                    if (userBlockingUsOrChannel(requestedConfig, user.id, usersBlockingMe, blockedChannelsByUserId, this.member.id, channel.id, false))
+                        continue;
+
                     let subscribe: typeof TextSubscribe = await TextSubscribe.findOne({
                         serverId: this.guild.id,
                         listenerId: this.member.id,
@@ -346,24 +490,20 @@ export default class Text extends Command {
 
             }
         }
-        if (updatedSubscribes.length > 0) {
-            embed.addFields({
-                name: "Les mots clés " + keyWords.map(w => "'" + w + "'").join(", ") + " ont été supprimés des écoutes suivantes :",
-                value: updatedSubscribes.map(({listenedId, channelId}) =>
-                    "Sur l'utilisateur <@" + listenedId + "> sur " + (channelId ? "le channel <#" + channelId + ">" : "tout les channels")).join("\n")
-            })
-        }
-        if (deletedSubscribes.length > 0) {
-            embed.addFields({
-                name: "Les écoutes suivantes ont été supprimées",
-                value: deletedSubscribes.map(({listenedId, channelId}) =>
-                    "Sur l'utilisateur <@" + listenedId + "> sur " + (channelId ? "le channel <#" + channelId + ">" : "tout les channels")).join("\n")
-            })
-        }
-        return this.response(true, {embeds: [embed]});
     }
 
-    async add(users: GuildMember[], channels: TextBasedChannels[], keyWords: string[], embed: MessageEmbed, textConfig: ITextConfig) {
+    async add(
+        users: GuildMember[],
+        channels: TextBasedChannels[],
+        keyWords: string[],
+        textConfig: ITextConfig,
+        blockedChannelsByUserId: { [userId: string]: string[] },
+        blockedChannelsForEveryoneObj: { [channelId: string]: boolean },
+        usersBlockingMe: string[],
+        hasNotText: string[],
+        invites: Array<{ requested: GuildMember, channels?: TextBasedChannels[] }>,
+        alreadyInvited: Array<{ requested: GuildMember, channelsId?: string[], keywords: string[] }>,
+        updatedSubscribes: Array<{ listenedId: string, channelId?: string }>) {
 
         if (this.guild === null) {
             return this.response(false,
@@ -373,16 +513,6 @@ export default class Text extends Command {
                 })
             );
         }
-
-        const blockedChannelsByUserId: { [userId: string]: string[] } = {};
-        const blockedChannelsForEveryoneObj: { [channelId: string]: boolean } = {};
-        const usersBlockingMe: string[] = [];
-        const hasNotText: string[] = [];
-
-        const invites: Array<{ requested: GuildMember, channels?: TextBasedChannels[] }> = [];
-        const alreadyInvited: Array<{ requested: GuildMember, channelsId?: string[], keywords: string[] }> = [];
-
-        const updatedSubscribes: Array<{ listenedId: string, channelId?: string }> = [];
 
         if (users.length === 0) {
             const userConfigById: { [userId: string]: typeof TextUserConfig } = {};
@@ -409,25 +539,10 @@ export default class Text extends Command {
                 });
                 for (const subscribe of existingSubscribes) {
                     listenedsOnThisChannel.push(subscribe.listenedId);
-                    if (userConfigById[subscribe.listenedId] === undefined) {
+                    if (userConfigById[subscribe.listenedId] === undefined)
                         userConfigById[subscribe.listenedId] = await TextUserConfig.findOne({userId: subscribe.listenedId});
-                    }
-                    let foundBlocking;
-                    if (
-                        userConfigById[subscribe.listenedId] &&
-                        (foundBlocking = userConfigById[subscribe.listenedId].blocking.find(({
-                                                                                                 userId,
-                                                                                                 channelId
-                                                                                             }) => userId === this.member.id || channelId === channel.id))) {
-                        if (!foundBlocking.channelId && !usersBlockingMe.includes(subscribe.listenedId)) {
-                            usersBlockingMe.push(subscribe.listenedId)
-                        } else {
-                            if (blockedChannelsByUserId[subscribe.listenedId] === undefined)
-                                blockedChannelsByUserId[subscribe.listenedId] = [];
-                            blockedChannelsByUserId[subscribe.listenedId].push(channel.id)
-                        }
+                    if (userBlockingUsOrChannel(userConfigById[subscribe.listenedId], subscribe.listenedId, usersBlockingMe, blockedChannelsByUserId, this.member.id, channel.id))
                         continue;
-                    }
                     updatedSubscribes.push({
                         listenedId: subscribe.listenedId,
                         channelId: channel.id
@@ -445,17 +560,8 @@ export default class Text extends Command {
                     if (userConfigById[listenedId] === undefined) {
                         userConfigById[listenedId] = await TextUserConfig.findOne({userId: listenedId});
                     }
-                    let foundBlocking;
-                    if (userConfigById[listenedId] && (foundBlocking = userConfigById[listenedId].blocking.find((userId, channelId) => userId === this.member.id || channelId === channel.id))) {
-                        if (!foundBlocking.channelId && !usersBlockingMe.includes(listenedId)) {
-                            usersBlockingMe.push(listenedId)
-                        } else {
-                            if (blockedChannelsByUserId[listenedId] === undefined)
-                                blockedChannelsByUserId[listenedId] = [];
-                            blockedChannelsByUserId[listenedId].push(channel.id)
-                        }
+                    if (userBlockingUsOrChannel(userConfigById[listenedId], listenedId, usersBlockingMe, blockedChannelsByUserId, this.member.id, channel.id))
                         continue;
-                    }
                     updatedSubscribes.push({
                         listenedId,
                         channelId: channel.id
@@ -486,13 +592,8 @@ export default class Text extends Command {
                     userId: user.id
                 });
 
-                if (requestedConfig && requestedConfig.blocking.some(({
-                                                                          userId,
-                                                                          channelId
-                                                                      }) => userId === this.member.id && channelId === undefined)) {
-                    usersBlockingMe.push(user.id);
+                if (userBlockingUsOrChannel(requestedConfig, user.id, usersBlockingMe, blockedChannelsByUserId, this.member.id))
                     continue;
-                }
 
                 const existingInviteForAllChannels: typeof TextInvite = await TextInvite.findOne({
                     serverId: this.guild.id,
@@ -529,7 +630,11 @@ export default class Text extends Command {
                                 serverId: this.guild.id,
                                 listenerId: this.member.id,
                                 listenedId: user.id,
-                                channelId: {$exists: true}
+                                $and: [
+                                    {channelId: { $exists: true }},
+                                    {channelId: { $nin: blockedChannelsByUserId[user.id] }},
+                                    {channelId: { $nin: Object.keys(blockedChannelsForEveryoneObj)}}
+                                ]
                             });
                         } else {
                             allChannelSubscribe.keywords = [...(allChannelSubscribe.keywords ?? []), ...keyWords];
@@ -537,7 +642,11 @@ export default class Text extends Command {
                                 serverId: this.guild.id,
                                 listenerId: this.member.id,
                                 listenedId: user.id,
-                                channelId: {$exists: true}
+                                $and: [
+                                    {channelId: { $exists: true }},
+                                    {channelId: { $nin:  blockedChannelsByUserId[user.id] }},
+                                    {channelId: { $nin: Object.keys(blockedChannelsForEveryoneObj)}}
+                                ]
                             });
                             for (const subscribe of specifiedChannelsSubscribes) {
                                 subscribe.keywords = [...(subscribe.keywords ?? []), ...keyWords];
@@ -572,15 +681,8 @@ export default class Text extends Command {
                 for (const channel of channels) {
                     let channelBlocked = false;
 
-                    if (requestedConfig && requestedConfig.blocking.some(({
-                                                                              channelId,
-                                                                              userId
-                                                                          }) => channelId === channel.id && (userId === undefined || userId === this.member.id))) {
-                        if (blockedChannelsByUserId[user.id] === undefined)
-                            blockedChannelsByUserId[user.id] = [];
-                        blockedChannelsByUserId[user.id].push(channel.id)
+                    if (userBlockingUsOrChannel(requestedConfig, user.id, usersBlockingMe, blockedChannelsByUserId, this.member.id, channel.id, false))
                         channelBlocked = true;
-                    }
 
                     if (textConfig.channelBlacklist.includes(channel.id)) {
                         blockedChannelsForEveryoneObj[channel.id] = true;
@@ -658,59 +760,6 @@ export default class Text extends Command {
                 }
             }
         }
-
-        if (invites.length > 0)
-            for (const {requested, channels} of invites) {
-                embed.addFields({
-                    name: "Vous avez envoyé une invitation à " + (requested.nickname ?? requested.user.username),
-                    value: "À <@" + requested.id + ">" + (channels ? " sur les channels " + channels.map(channel => "<#" + channel.id + ">").join(", ") : " sur tout les channels") + "\n" +
-                        (keyWords.length > 0 ? " sur les mot clés " + keyWords.map(w => '"' + w + '"').join(", ") : "")
-                });
-            }
-        if (updatedSubscribes.length > 0) {
-            embed.addFields({
-                name: keyWords.length === 0 ?
-                    "Les mots clé ont été supprimés sur les écoutes suivantes :" :
-                    "Les mots clés " + keyWords.map(w => "'" + w + "'").join(", ") + " ont été ajouté aux écoutes suivantes :",
-                value: updatedSubscribes.map(({
-                                                  listenedId,
-                                                  channelId
-                                              }) => "Sur l'utilisateur <@" + listenedId + "> sur " + (channelId ? "le channel <#" + channelId + ">" : "tout les channels")).join("\n")
-            })
-        }
-        if (alreadyInvited.length > 0)
-            for (const {requested, keywords, channelsId} of alreadyInvited) {
-                embed.addFields({
-                    name: "Vous avez déjà une invitation en attente de validation pour " + (requested.nickname ?? requested.user.username),
-                    value: "À <@" + requested.id + ">" + (channelsId ? " sur les channels " + channelsId.map(channelId => "<#" + channelId + ">").join(", ") : " sur tout les channels") + "\n" +
-                        ((keywords && keywords.length > 0) ? " sur les mot clés " + keywords.map(w => '"' + w + '"').join(", ") : "")
-                });
-            }
-        if (usersBlockingMe.length > 0)
-            embed.addFields({
-                name: "Ces utilisateurs vous bloque : ",
-                value: usersBlockingMe.map(userId => "<@" + userId + ">").join("\n")
-            });
-        if (hasNotText.length > 0)
-            embed.addFields({
-                name: "Ces utilisateurs n'ont pas la fonctionnalité de notification textuelle : ",
-                value: hasNotText.map(userId => "<@" + userId + ">").join("\n")
-            });
-        for (const [userId, blockedChannels] of Object.entries(blockedChannelsByUserId)) {
-            embed.addFields({
-                name: "<@" + userId + "> vous a bloqué pour les channels suivants",
-                value: blockedChannels.map(channelId => "<#" + channelId + ">").join("\n")
-            });
-        }
-        const blockedChannelsForEveryone = Object.keys(blockedChannelsForEveryoneObj);
-        if (blockedChannelsForEveryone.length > 0) {
-            embed.addFields({
-                name: "Les channels suivants sont blacklistés sur ce serveur :",
-                value: blockedChannelsForEveryone.map(channelId => "<#" + channelId + ">").join("\n")
-            });
-        }
-
-        return this.response(true, {embeds: [embed]});
     }
 
     static async sendInvite(requester: GuildMember | User, requested: GuildMember, guild: Guild, channelsId: undefined | string[], keywords: undefined | string[]): Promise<boolean> {
