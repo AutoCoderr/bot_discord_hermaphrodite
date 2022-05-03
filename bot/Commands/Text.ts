@@ -429,7 +429,7 @@ export default class Text extends Command {
                     deletedSubscribes.push({
                         listenedId: user.id
                     });
-                    TextSubscribe.deleteMany({
+                    await TextSubscribe.deleteMany({
                         serverId: this.guild.id,
                         listenerId: this.member.id,
                         listenedId: user.id
