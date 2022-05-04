@@ -336,6 +336,15 @@ export default class Text extends Command {
         blockeds: Array<{userId?: string, channelId?: string}>,
         alreadyBlockeds: Array<{userId?: string, channelId?: string}>
     ) {
+        if (this.guild === null) {
+            return this.response(false,
+                this.sendErrors({
+                    name: "Missing guild",
+                    value: "We couldn't find the guild"
+                })
+            );
+        }
+
         if (users.length === 0) {
             for (const channel of channels) {
                 if (ownUserConfig.blocking.some(({userId, channelId}) => channelId === channel.id && userId === undefined)) {
@@ -350,6 +359,11 @@ export default class Text extends Command {
                 ownUserConfig.blocking = [...ownUserConfig.blocking.filter(({channelId}) =>
                     channelId !== channel.id
                 ), {channelId: channel.id}]
+                await TextSubscribe.updateMany({
+                    serverId: this.guild.id,
+                    listenedId: this.member.id,
+                    channelId: channel.id
+                }, {enabled: false});
             }
         } else {
             for (const user of users) {
@@ -366,6 +380,11 @@ export default class Text extends Command {
                     ownUserConfig.blocking = [...ownUserConfig.blocking.filter(({userId}) =>
                         userId !== user.id
                     ), {userId: user.id}]
+                    await TextSubscribe.updateMany({
+                        serverId: this.guild.id,
+                        listenedId: this.member.id,
+                        listenerId: user.id
+                    }, {enabled: false});
                     continue;
                 }
                 for (const channel of channels) {
@@ -384,6 +403,12 @@ export default class Text extends Command {
                         userId: user.id,
                         channelId: channel.id
                     });
+                    await TextSubscribe.updateMany({
+                        serverId: this.guild.id,
+                        listenedId: this.member.id,
+                        listenerId: user.id,
+                        channelId: channel.id
+                    }, {enabled: false});
                 }
             }
         }
@@ -396,12 +421,26 @@ export default class Text extends Command {
         ownUserConfig: ITextUserConfig | typeof TextUserConfig,
         unblockeds: Array<{userId?: string, channelId?: string}>
     ) {
+        if (this.guild === null) {
+            return this.response(false,
+                this.sendErrors({
+                    name: "Missing guild",
+                    value: "We couldn't find the guild"
+                })
+            );
+        }
+
         if (users.length === 0) {
             for (const channel of channels) {
                 ownUserConfig.blocking = ownUserConfig.blocking.filter(({channelId}) => channelId !== channel.id);
                 unblockeds.push({
                     channelId: channel.id
                 })
+                await TextSubscribe.updateMany({
+                    serverId: this.guild.id,
+                    listenedId: this.member.id,
+                    channelId: channel.id
+                }, {enabled: true});
             }
         } else {
             for (const user of users) {
@@ -410,6 +449,11 @@ export default class Text extends Command {
                     unblockeds.push({
                         userId: user.id
                     });
+                    await TextSubscribe.updateMany({
+                        serverId: this.guild.id,
+                        listenedId: this.member.id,
+                        listenerId: user.id
+                    }, {enabled: true});
                     continue;
                 }
                 for (const channel of channels) {
@@ -418,6 +462,12 @@ export default class Text extends Command {
                         userId: user.id,
                         channelId: channel.id
                     });
+                    await TextSubscribe.updateMany({
+                        serverId: this.guild.id,
+                        listenedId: this.member.id,
+                        channelId: channel.id,
+                        listenerId: user.id
+                    }, {enabled: true});
                 }
             }
         }
@@ -513,8 +563,7 @@ export default class Text extends Command {
                                 listenerId: this.member.id,
                                 listenedId,
                                 channelId: channel.id,
-                                keywords: keyWordsAllChannelsUpdated,
-                                enabled: subscribeAllChannels.enabled
+                                keywords: keyWordsAllChannelsUpdated
                             })
                         }
                     } else {
@@ -638,8 +687,7 @@ export default class Text extends Command {
                                 listenerId: this.member.id,
                                 listenedId: user.id,
                                 channelId: channel.id,
-                                keywords: keyWordsAllChannelsUpdated,
-                                enabled: subscribeOnAllChannels.enabled
+                                keywords: keyWordsAllChannelsUpdated
                             })
                         }
                         continue;
@@ -745,8 +793,7 @@ export default class Text extends Command {
                             listenerId: this.member.id,
                             listenedId,
                             channelId: channel.id,
-                            keywords: keyWords.length > 0 ? [...(subscribeOnAllChannel.keywords ?? []), ...keyWords] : undefined,
-                            enabled: subscribeOnAllChannel.enabled
+                            keywords: keyWords.length > 0 ? [...(subscribeOnAllChannel.keywords ?? []), ...keyWords] : undefined
                         })
                     }
                 }
@@ -895,8 +942,7 @@ export default class Text extends Command {
                                 listenerId: this.member.id,
                                 listenedId: user.id,
                                 channelId: channel.id,
-                                keywords: keyWords.length > 0 ? [...(allChannelSubscribe.keywords ?? []), ...keyWords] : undefined,
-                                enabled: allChannelSubscribe.enabled
+                                keywords: keyWords.length > 0 ? [...(allChannelSubscribe.keywords ?? []), ...keyWords] : undefined
                             });
                         }
                         updatedSubscribes.push({
