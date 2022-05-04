@@ -15,7 +15,7 @@ export interface ITextUserConfig {
 const BlockingSchema: Schema = new Schema({
     userId: { type: String, required: false },
     channelId: { type: String, required: false }
-});
+}, { _id: false });
 
 const TextUserConfigSchema: Schema = new Schema({
     userId: { type: String, required: true },

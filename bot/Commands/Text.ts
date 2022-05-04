@@ -5,7 +5,7 @@ import {
     GuildChannel,
     GuildMember, MessageActionRow, MessageButton,
     MessageEmbed,
-    TextBasedChannels,
+    TextChannel,
     User
 } from "discord.js";
 import TextConfig, {ITextConfig} from "../Models/Text/TextConfig";
@@ -17,7 +17,7 @@ import {compareKeyWords, removeKeyWords, userBlockingUsOrChannel} from "../Class
 interface argsType {
     action: 'add' | 'remove' | 'block' | 'unblock' | 'mute' | 'unmute' | 'limit' | 'status',
     users: GuildMember[],
-    channels: TextBasedChannels[],
+    channels: TextChannel[],
     keyWords: string[],
     time?: number
 }
@@ -129,7 +129,7 @@ export default class Text extends Command {
 
     static buttonsTimeout = 48 * 60 * 60 * 1000; // 48h pour répondre à une invitation
 
-    constructor(channel: TextBasedChannels, member: User | GuildMember, guild: null | Guild = null, writtenCommandOrSlashCommandOptions: null | string | CommandInteractionOptionResolver = null, commandOrigin: 'slash' | 'custom') {
+    constructor(channel: TextChannel, member: User | GuildMember, guild: null | Guild = null, writtenCommandOrSlashCommandOptions: null | string | CommandInteractionOptionResolver = null, commandOrigin: 'slash' | 'custom') {
         super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, Text.commandName, Text.argsModel);
     }
 
@@ -189,7 +189,7 @@ export default class Text extends Command {
             const usersBlockingMe: string[] = [];
             const hasNotText: string[] = [];
 
-            const invites: Array<{ requested: GuildMember, channels?: TextBasedChannels[] }> = [];
+            const invites: Array<{ requested: GuildMember, channels?: TextChannel[] }> = [];
             const alreadyInvited: Array<{ requested: GuildMember, channelsId?: string[], keywords: string[] }> = [];
 
             const updatedSubscribes: Array<{ listenedId: string, channelId?: string }> = [];
@@ -249,8 +249,12 @@ export default class Text extends Command {
                     value: hasNotText.map(userId => "<@" + userId + ">").join("\n")
                 });
             for (const [userId, blockedChannels] of Object.entries(blockedChannelsByUserId)) {
+                let member: GuildMember|null = null;
+                try {
+                    member = await this.guild.members.fetch(userId);
+                } catch(e) {}
                 embed.addFields({
-                    name: "<@" + userId + "> vous a bloqué pour les channels suivants",
+                    name: (member ? (member.nickname??member.user.username) : "invalid-user")+" vous a bloqué pour les channels suivants",
                     value: blockedChannels.map(channelId => "<#" + channelId + ">").join("\n")
                 });
             }
@@ -311,7 +315,7 @@ export default class Text extends Command {
 
     async block(
         users: GuildMember[],
-        channels: TextBasedChannels[],
+        channels: TextChannel[],
         ownUserConfig: ITextUserConfig | typeof TextUserConfig,
         blockeds: Array<{userId?: string, channelId?: string}>,
         alreadyBlockeds: Array<{userId?: string, channelId?: string}>
@@ -372,7 +376,7 @@ export default class Text extends Command {
 
     async remove(
         users: GuildMember[],
-        channels: TextBasedChannels[],
+        channels: TextChannel[],
         keyWords: string[],
         textConfig: typeof TextConfig,
         blockedChannelsByUserId: { [userId: string]: string[] },
@@ -473,7 +477,7 @@ export default class Text extends Command {
             }
         } else {
             for (const user of users) {
-                let requestedConfig: ITextUserConfig|null = await TextUserConfig.findOne({
+                const requestedConfig: ITextUserConfig|null = await TextUserConfig.findOne({
                     serverId: this.guild.id,
                     userId: user.id
                 });
@@ -613,14 +617,14 @@ export default class Text extends Command {
 
     async add(
         users: GuildMember[],
-        channels: TextBasedChannels[],
+        channels: TextChannel[],
         keyWords: string[],
         textConfig: ITextConfig,
         blockedChannelsByUserId: { [userId: string]: string[] },
         blockedChannelsForEveryoneObj: { [channelId: string]: boolean },
         usersBlockingMe: string[],
         hasNotText: string[],
-        invites: Array<{ requested: GuildMember, channels?: TextBasedChannels[] }>,
+        invites: Array<{ requested: GuildMember, channels?: TextChannel[] }>,
         alreadyInvited: Array<{ requested: GuildMember, channelsId?: string[], keywords: string[] }>,
         updatedSubscribes: Array<{ listenedId: string, channelId?: string }>) {
 
@@ -796,7 +800,7 @@ export default class Text extends Command {
                     continue;
                 }
 
-                const channelsToInvite: TextBasedChannels[] = [];
+                const channelsToInvite: TextChannel[] = [];
 
                 for (const channel of channels) {
                     let channelBlocked = false;

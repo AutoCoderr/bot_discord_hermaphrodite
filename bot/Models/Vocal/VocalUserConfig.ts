@@ -16,7 +16,7 @@ export interface IVocalUserConfig {
 const BlockedSchema: Schema = new Schema({
     users: { type: Array, required: true },
     roles: { type: Array, required: true }
-});
+}, { _id: false });
 
 const VocalUserConfigSchema: Schema = new Schema({
     userId: { type: String, required: true },

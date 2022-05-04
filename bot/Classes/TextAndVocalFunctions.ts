@@ -364,7 +364,8 @@ export function compareKeyWords(A: string[]|undefined,B: string[]|undefined) {
     return !A.some(w => !B.includes(w));
 }
 
-export function removeKeyWords(L: string[], toRemove: string[]) {
+export function removeKeyWords(L: string[]|undefined, toRemove: string[]) {
+    if (L === undefined) return undefined
     const newL = L.filter(w => !toRemove.includes(w));
     return newL.length > 0 ? newL : undefined;
 }
