@@ -166,7 +166,21 @@ export default class Text extends Command {
             );
         }
 
-        if (["add","remove"].includes(action)) {
+        let ownUserConfig: ITextUserConfig | typeof TextUserConfig = await TextUserConfig.findOne({
+            serverId: this.guild.id,
+            userId: this.member.id
+        });
+
+        if (ownUserConfig === null) {
+            ownUserConfig = await TextUserConfig.create({
+                serverId: this.guild.id,
+                userId: this.member.id,
+                blocking: [],
+                limit: 0
+            });
+        }
+
+        if (["add","remove","block"].includes(action)) {
             const embed = new MessageEmbed()
                 .setAuthor("Herma bot");
 
@@ -182,6 +196,9 @@ export default class Text extends Command {
             const deletedSubscribes: Array<{ listenedId: string, channelId?: string, subscribeAllChannelsExists?: boolean }> = [];
             const cantBeDeleteBecauseOfOnlySubscribeAll: Array<{ listenedId: string, channelId: string }> = [];
 
+            const blockeds: Array<{userId?: string, channelId?: string}> = [];
+            const alreadyBlockeds: Array<{userId?: string, channelId?: string}> = [];
+
 
             switch (action) {
                 case "add":
@@ -189,6 +206,9 @@ export default class Text extends Command {
                     break;
                 case "remove":
                     await this.remove(users, channels, keyWords, textConfig, blockedChannelsByUserId, blockedChannelsForEveryoneObj, usersBlockingMe, updatedSubscribes, deletedSubscribes, cantBeDeleteBecauseOfOnlySubscribeAll);
+                    break;
+                case "block":
+                    await this.block(users, channels, ownUserConfig, blockeds, alreadyBlockeds);
             }
 
             if (invites.length > 0)
@@ -260,11 +280,94 @@ export default class Text extends Command {
                 })
             }
 
+            if (blockeds.length > 0) {
+                embed.addFields({
+                    name: "Vous avez créé les blockages suivant :",
+                    value: blockeds.map(({userId, channelId}) =>
+                        userId ?
+                            "<@"+userId+"> sur "+(channelId ? "le channel <#"+channelId+">" : "tout les channels") :
+                            "Sur le channel <#"+channelId+"> sur tout les utilisateurs"
+                    ).join("\n")
+                })
+            }
+
+            if (alreadyBlockeds.length > 0) {
+                embed.addFields({
+                    name: "Les blockages suivant existent déjà :",
+                    value: alreadyBlockeds.map(({userId, channelId}) =>
+                        userId ?
+                            "<@"+userId+"> sur "+(channelId ? "le channel <#"+channelId+">" : "tout les channels") :
+                            "Sur le channel <#"+channelId+"> sur tout les utilisateurs"
+                    ).join("\n")
+                })
+            }
+
             return this.response(true, {embeds: [embed]});
 
         }
 
         return this.response(false, "COUCOU");
+    }
+
+    async block(
+        users: GuildMember[],
+        channels: TextBasedChannels[],
+        ownUserConfig: ITextUserConfig | typeof TextUserConfig,
+        blockeds: Array<{userId?: string, channelId?: string}>,
+        alreadyBlockeds: Array<{userId?: string, channelId?: string}>
+    ) {
+        if (users.length === 0) {
+            for (const channel of channels) {
+                if (ownUserConfig.blocking.some(({userId, channelId}) => channelId === channel.id && userId === undefined)) {
+                    alreadyBlockeds.push({
+                        channelId: channel.id
+                    });
+                    continue;
+                }
+                blockeds.push({
+                    channelId: channel.id
+                });
+                ownUserConfig.blocking = [...ownUserConfig.blocking.filter(({channelId}) =>
+                    channelId !== channel.id
+                ), {channelId: channel.id}]
+            }
+        } else {
+            for (const user of users) {
+                if (channels.length === 0) {
+                    if (ownUserConfig.blocking.some(({userId, channelId}) => channelId === undefined && userId === user.id)) {
+                        alreadyBlockeds.push({
+                            userId: user.id
+                        });
+                        continue;
+                    }
+                    blockeds.push({
+                        userId: user.id
+                    });
+                    ownUserConfig.blocking = [...ownUserConfig.blocking.filter(({userId}) =>
+                        userId !== user.id
+                    ), {userId: user.id}]
+                    continue;
+                }
+                for (const channel of channels) {
+                    let foundBlocking;
+                    if ((foundBlocking = ownUserConfig.blocking.find(({userId, channelId}) =>
+                        (channelId === channel.id || channelId === undefined) && (userId === user.id || userId === undefined)
+                    ))) {
+                        alreadyBlockeds.push(foundBlocking);
+                        continue;
+                    }
+                    blockeds.push({
+                        userId: user.id,
+                        channelId: channel.id
+                    });
+                    ownUserConfig.blocking.push({
+                        userId: user.id,
+                        channelId: channel.id
+                    });
+                }
+            }
+        }
+        ownUserConfig.save();
     }
 
     async remove(
@@ -588,7 +691,8 @@ export default class Text extends Command {
                             listenerId: this.member.id,
                             listenedId,
                             channelId: channel.id,
-                            keywords: keyWords.length > 0 ? [...(subscribeOnAllChannel.keywords ?? []), ...keyWords] : undefined
+                            keywords: keyWords.length > 0 ? [...(subscribeOnAllChannel.keywords ?? []), ...keyWords] : undefined,
+                            enabled: subscribeOnAllChannel.enabled
                         })
                     }
                 }
@@ -737,7 +841,8 @@ export default class Text extends Command {
                                 listenerId: this.member.id,
                                 listenedId: user.id,
                                 channelId: channel.id,
-                                keywords: keyWords.length > 0 ? [...(allChannelSubscribe.keywords ?? []), ...keyWords] : undefined
+                                keywords: keyWords.length > 0 ? [...(allChannelSubscribe.keywords ?? []), ...keyWords] : undefined,
+                                enabled: allChannelSubscribe.enabled
                             });
                         }
                         updatedSubscribes.push({
