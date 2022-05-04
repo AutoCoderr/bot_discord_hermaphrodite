@@ -325,7 +325,7 @@ export async function listenInviteButtons(interaction: ButtonInteraction, type: 
     return true;
 }
 
-export function userBlockingUsOrChannel(listenedConfig: typeof TextUserConfig|null, listenedId: string, usersBlockingMe: string[], blockedChannelsByUserId: { [userId: string]: string[] }, listenerId: string, channelToListenId: string|null = null, checkForUs = true) {
+export function userBlockingUsOrChannel(listenedConfig: typeof TextUserConfig|null, listenedId: string, usersBlockingMe: null|string[] = null, blockedChannelsByUserId: null|{ [userId: string]: string[] } = null, listenerId: string, channelToListenId: string|null = null, checkForUs = true) {
     if (listenedConfig === null)
         return false;
     let foundBlocking;
@@ -340,9 +340,9 @@ export function userBlockingUsOrChannel(listenedConfig: typeof TextUserConfig|nu
             channelId === channelToListenId
         )
     ))) {
-        if (checkForUs && !foundBlocking.channelId && !usersBlockingMe.includes(listenedId)) {
+        if (checkForUs && usersBlockingMe && !foundBlocking.channelId && !usersBlockingMe.includes(listenedId)) {
             usersBlockingMe.push(listenedId)
-        } else if (channelToListenId) {
+        } else if (channelToListenId && blockedChannelsByUserId) {
             if (blockedChannelsByUserId[listenedId] === undefined)
                 blockedChannelsByUserId[listenedId] = [];
             blockedChannelsByUserId[listenedId].push(channelToListenId)
