@@ -180,7 +180,7 @@ export default class Text extends Command {
             });
         }
 
-        if (["add","remove","block"].includes(action)) {
+        if (["add","remove","block","unblock"].includes(action)) {
             const embed = new MessageEmbed()
                 .setAuthor("Herma bot");
 
@@ -199,6 +199,8 @@ export default class Text extends Command {
             const blockeds: Array<{userId?: string, channelId?: string}> = [];
             const alreadyBlockeds: Array<{userId?: string, channelId?: string}> = [];
 
+            const unblockeds: Array<{userId?: string, channelId?: string}> = [];
+
 
             switch (action) {
                 case "add":
@@ -209,6 +211,9 @@ export default class Text extends Command {
                     break;
                 case "block":
                     await this.block(users, channels, ownUserConfig, blockeds, alreadyBlockeds);
+                    break;
+                case "unblock":
+                    await this.unblock(users, channels, ownUserConfig, unblockeds);
             }
 
             if (invites.length > 0)
@@ -306,6 +311,17 @@ export default class Text extends Command {
                 })
             }
 
+            if (unblockeds.length > 0) {
+                embed.addFields({
+                    name: "Vous avez supprimé les blockages suivant :",
+                    value: unblockeds.map(({userId, channelId}) =>
+                        userId ?
+                            "<@"+userId+"> sur "+(channelId ? "le channel <#"+channelId+">" : "tout les channels") :
+                            "Sur le channel <#"+channelId+"> sur tout les utilisateurs"
+                    ).join("\n")
+                })
+            }
+
             return this.response(true, {embeds: [embed]});
 
         }
@@ -365,6 +381,40 @@ export default class Text extends Command {
                         channelId: channel.id
                     });
                     ownUserConfig.blocking.push({
+                        userId: user.id,
+                        channelId: channel.id
+                    });
+                }
+            }
+        }
+        ownUserConfig.save();
+    }
+
+    async unblock(
+        users: GuildMember[],
+        channels: TextChannel[],
+        ownUserConfig: ITextUserConfig | typeof TextUserConfig,
+        unblockeds: Array<{userId?: string, channelId?: string}>
+    ) {
+        if (users.length === 0) {
+            for (const channel of channels) {
+                ownUserConfig.blocking = ownUserConfig.blocking.filter(({channelId}) => channelId !== channel.id);
+                unblockeds.push({
+                    channelId: channel.id
+                })
+            }
+        } else {
+            for (const user of users) {
+                if (channels.length === 0) {
+                    ownUserConfig.blocking = ownUserConfig.blocking.filter(({userId}) => userId !== user.id);
+                    unblockeds.push({
+                        userId: user.id
+                    });
+                    continue;
+                }
+                for (const channel of channels) {
+                    ownUserConfig.blocking = ownUserConfig.blocking.filter(({userId, channelId}) => userId !== user.id || channelId !== channel.id);
+                    unblockeds.push({
                         userId: user.id,
                         channelId: channel.id
                     });
