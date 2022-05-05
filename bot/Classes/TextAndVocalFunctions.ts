@@ -352,6 +352,52 @@ export function userBlockingUsOrChannel(listenedConfig: typeof TextUserConfig|nu
     return false;
 }
 
+export async function reEnableTextSubscribesAfterUnmute(listenerId, serverId) {
+    const subscribes = await TextSubscribe.find({
+        serverId,
+        listenerId,
+        enabled: false
+    });
+    const userConfigById: { [userId: string]: typeof TextUserConfig } = {};
+    for (const subscribe of subscribes) {
+        if (userConfigById[subscribe.listenedId] === undefined)
+            userConfigById[subscribe.listenedId] = await TextUserConfig.findOne({
+                serverId,
+                userId: subscribe.listenedId
+            });
+
+        if (!userBlockingUsOrChannel(userConfigById[subscribe.listenedId], subscribe.listenedId, null, null, listenerId, subscribe.channelId ?? null)) {
+            subscribe.enabled = true;
+            subscribe.save();
+        }
+    }
+}
+
+export async function reEnableTextSubscribesAfterUnblock(listenedId, serverId, listenerId: null|string = null, channelId: null|string = null) {
+    const subscribes = await TextSubscribe.find({
+        serverId,
+        listenedId,
+        ...(listenerId ? {listenerId} : {}),
+        ...(channelId ? {channelId} : {}),
+        enabled: false
+    });
+    const userConfigById: { [userId: string]: typeof TextUserConfig } = {};
+
+    for (const subscribe of subscribes) {
+        if (userConfigById[subscribe.listenerId] === undefined)
+            userConfigById[subscribe.listenerId] = await TextUserConfig.findOne({
+                serverId: serverId,
+                userId: subscribe.listenerId
+            });
+
+        if (userConfigById[subscribe.listenerId] && (userConfigById[subscribe.listenerId].lastMute === undefined || userConfigById[subscribe.listenerId].mutedFor)) {
+            subscribe.enabled = true;
+            subscribe.save();
+        }
+
+    }
+}
+
 export function compareKeyWords(A: string[]|undefined,B: string[]|undefined) {
     if ((A === undefined) !== (B === undefined))
         return false;
