@@ -9,7 +9,7 @@ import {
     User
 } from "discord.js";
 import TextConfig, {ITextConfig} from "../Models/Text/TextConfig";
-import TextUserConfig, {ITextUserConfig} from "../Models/Text/TextUserConfig";
+import TextUserConfig, {ITextUserConfig,minimumLimit} from "../Models/Text/TextUserConfig";
 import TextSubscribe from "../Models/Text/TextSubscribe";
 import TextInvite from "../Models/Text/TextInvite";
 import {compareKeyWords, removeKeyWords, userBlockingUsOrChannel} from "../Classes/TextAndVocalFunctions";
@@ -175,13 +175,11 @@ export default class Text extends Command {
         if (ownUserConfig === null) {
             ownUserConfig = await TextUserConfig.create({
                 serverId: this.guild.id,
-                userId: this.member.id,
-                blocking: [],
-                limit: 0
+                userId: this.member.id
             });
         }
 
-        if (!["add","remove","block","unblock","mute","unmute"].includes(action))
+        if (!["add","remove","block","unblock","mute","unmute","limit"].includes(action))
             return this.response(false, "COUCOU");
 
 
@@ -225,6 +223,9 @@ export default class Text extends Command {
                 break;
             case "unmute":
                 await this.unmute(ownUserConfig);
+                break;
+            case "limit":
+                await this.limit(<number>time, ownUserConfig);
         }
 
         if (invites.length > 0)
@@ -342,6 +343,17 @@ export default class Text extends Command {
             })
         }
 
+        if (action === "limit") {
+            embed.addFields({
+                name: <number>time < minimumLimit ?
+                    "Changement impossible" :
+                    "Vous avez changé votre limite",
+                value: <number>time < minimumLimit ?
+                    "Vous ne pouvez pas mettre de limite inférieure à "+showTime(extractUTCTime(minimumLimit), 'fr_long') :
+                    "Il y aura maintenant un répit de" + showTime(extractUTCTime(<number>time), 'fr_long') + " entre chaque notification"
+            })
+        }
+
         return this.response(true, {embeds: [embed]});
     }
 
@@ -404,6 +416,16 @@ export default class Text extends Command {
         ownUserConfig.lastMute = undefined;
         ownUserConfig.mutedFor = undefined;
 
+        ownUserConfig.save();
+    }
+
+    async limit(
+        time: number,
+        ownUserConfig: ITextUserConfig | typeof TextUserConfig
+    ) {
+        if (time < minimumLimit)
+            return;
+        ownUserConfig.limit = time;
         ownUserConfig.save();
     }
 
