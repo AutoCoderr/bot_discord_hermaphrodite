@@ -4,19 +4,19 @@ import {
     GuildChannel,
     GuildMember,
     MessageActionRow,
-    MessageButton, MessageEmbed, TextChannel,
+    MessageButton, MessageEmbed,
     ThreadChannel
 } from "discord.js";
 import TextInvite, {ITextInvite} from "../Models/Text/TextInvite";
 import TextAskInviteBack, {ITextAskInviteBack} from "../Models/Text/TextAskInviteBack";
 import client from "../client";
 import Vocal from "../Commands/Vocal";
-import VocalUserConfig from "../Models/Vocal/VocalUserConfig";
+import VocalUserConfig, {IVocalUserConfig} from "../Models/Vocal/VocalUserConfig";
 import VocalSubscribe from "../Models/Vocal/VocalSubscribe";
 import VocalInvite from "../Models/Vocal/VocalInvite";
 import VocalAskInviteBack from "../Models/Vocal/VocalAskInviteBack";
 import Text from "../Commands/Text";
-import TextUserConfig from "../Models/Text/TextUserConfig";
+import TextUserConfig, {ITextUserConfig} from "../Models/Text/TextUserConfig";
 import TextSubscribe from "../Models/Text/TextSubscribe";
 import VocalConfig from "../Models/Vocal/VocalConfig";
 import TextConfig from "../Models/Text/TextConfig";
@@ -204,18 +204,7 @@ export async function listenInviteButtons(interaction: ButtonInteraction, type: 
             serverId: server.id,
             userId: requested.id
         });
-        const blockingThisUser = listenedConfig && (
-            (
-                type === 'vocal' && (
-                    listenedConfig && (
-                        listenedConfig.blocked.users.includes(requester.id) ||
-                        listenedConfig.blocked.roles.some(roleId => requester.roles.cache.some(role => role.id === roleId))
-                    )
-                )
-            ) || (
-                type === 'text' && userBlockingUsOrChannelText(listenedConfig,requested.id,null,null,requester.id)
-            )
-        )
+        const blockingThisUser = userBlockingUsTextOrVocal(listenedConfig,requester,type);
 
         const listenerConfig = await userConfigModel.findOne({
             serverId: server.id,
@@ -239,8 +228,7 @@ export async function listenInviteButtons(interaction: ButtonInteraction, type: 
                     blackListedChannels.push(<GuildChannel>channel);
                     continue;
                 }
-                const blockingThisChannel = type === "text" && listenedConfig &&
-                    userBlockingUsOrChannelText(listenedConfig,requested.id,null,null,requester.id,channel.id,false)
+                const blockingThisChannel = userBlockingUsOrChannelText(listenedConfig,requested.id,null,null,requester.id,channel.id,false)
 
                 const existingSubscribe = await subscribeModel.findOne({
                     serverId: invite.serverId,
@@ -335,20 +323,7 @@ export async function listenInviteButtons(interaction: ButtonInteraction, type: 
         if (
             existingBackInviteAllChannels === null &&
             backSubscribeAllChannels === null &&
-            (
-                (
-                    type === "text" &&
-                    !userBlockingUsOrChannelText(listenerConfig,requester.id, null, null, requested.id)
-                ) || (
-                    type === "vocal" && (
-                        listenerConfig === null ||
-                        (
-                            !listenerConfig.blocked.users.includes(requested.id) &&
-                            !listenerConfig.blocked.roles.some(roleId => requested.roles.cache.some(role => role.id === roleId))
-                        )
-                    )
-                )
-            )
+            !userBlockingUsTextOrVocal(listenerConfig,requested,type)
         ) {
             if (channels) {
                 const channelsIdForBackInvite: string[] = [];
@@ -399,7 +374,23 @@ export async function listenInviteButtons(interaction: ButtonInteraction, type: 
     return true;
 }
 
-export function userBlockingUsOrChannelText(listenedConfig: typeof TextUserConfig|null, listenedId: string, usersBlockingMe: null|string[] = null, blockedChannelsByUserId: null|{ [userId: string]: string[] } = null, listenerId: string, channelToListenId: string|null = null, checkForUs = true) {
+function userBlockingUsTextOrVocal(listenedConfig: any, listener: GuildMember, type: 'text'|'vocal') {
+    return (
+        (type === "vocal" && userBlockingUsVocal(listenedConfig,listener)) ||
+        (type === "text" && userBlockingUsOrChannelText(listenedConfig,null,null,null,listener.id))
+    )
+}
+
+export function userBlockingUsVocal(listenedConfig: IVocalUserConfig|null, listener: GuildMember) {
+    if (listenedConfig === null)
+        return false;
+    return (
+        listenedConfig.blocked.users.includes(listener.id) ||
+        listenedConfig.blocked.roles.some(roleId => listener.roles.cache.some(role => role.id === roleId))
+    )
+}
+
+export function userBlockingUsOrChannelText(listenedConfig: ITextUserConfig|null, listenedId: null|string, usersBlockingMe: null|string[] = null, blockedChannelsByUserId: null|{ [userId: string]: string[] } = null, listenerId: string, channelToListenId: string|null = null, checkForUs = true) {
     if (listenedConfig === null)
         return false;
     let foundBlocking;
@@ -414,9 +405,9 @@ export function userBlockingUsOrChannelText(listenedConfig: typeof TextUserConfi
             channelId === channelToListenId
         )
     ))) {
-        if (checkForUs && usersBlockingMe && !foundBlocking.channelId && !usersBlockingMe.includes(listenedId)) {
+        if (checkForUs && listenedId && usersBlockingMe && !foundBlocking.channelId && !usersBlockingMe.includes(listenedId)) {
             usersBlockingMe.push(listenedId)
-        } else if (channelToListenId && blockedChannelsByUserId) {
+        } else if (channelToListenId && blockedChannelsByUserId && listenedId) {
             if (blockedChannelsByUserId[listenedId] === undefined)
                 blockedChannelsByUserId[listenedId] = [];
             blockedChannelsByUserId[listenedId].push(channelToListenId)
