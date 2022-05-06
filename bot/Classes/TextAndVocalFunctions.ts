@@ -4,7 +4,7 @@ import {
     GuildChannel,
     GuildMember,
     MessageActionRow,
-    MessageButton,
+    MessageButton, MessageEmbed, TextChannel,
     ThreadChannel
 } from "discord.js";
 import TextInvite, {ITextInvite} from "../Models/Text/TextInvite";
@@ -18,6 +18,8 @@ import VocalAskInviteBack from "../Models/Vocal/VocalAskInviteBack";
 import Text from "../Commands/Text";
 import TextUserConfig from "../Models/Text/TextUserConfig";
 import TextSubscribe from "../Models/Text/TextSubscribe";
+import VocalConfig from "../Models/Vocal/VocalConfig";
+import TextConfig from "../Models/Text/TextConfig";
 
 interface getDatasButtonFunctionResponse {
     server: Guild;
@@ -78,14 +80,16 @@ const classesBySubscribeType = {
         userConfigModel: VocalUserConfig,
         subscribeModel: VocalSubscribe,
         inviteModel: VocalInvite,
-        inviteBackModel: VocalAskInviteBack
+        inviteBackModel: VocalAskInviteBack,
+        configModel: VocalConfig
     },
     text: {
         command: Text,
         userConfigModel: TextUserConfig,
         subscribeModel: TextSubscribe,
         inviteModel: TextInvite,
-        inviteBackModel: TextAskInviteBack
+        inviteBackModel: TextAskInviteBack,
+        configModel: TextConfig
     }
 }
 
@@ -123,8 +127,7 @@ async function inviteBack(interaction: ButtonInteraction, requester: GuildMember
 
     const askBackButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "a";
 
-    await interaction.editReply({
-        content: "Invitation acceptée",
+    await interaction.followUp({
         components: [
             new MessageActionRow().addComponents(
                 new MessageButton()
@@ -148,7 +151,7 @@ async function inviteBack(interaction: ButtonInteraction, requester: GuildMember
 
 export async function listenInviteButtons(interaction: ButtonInteraction, type: 'text' | 'vocal'): Promise<boolean> {
 
-    const {command, inviteModel, userConfigModel, subscribeModel} = classesBySubscribeType[type]
+    const {command, inviteModel, userConfigModel, subscribeModel, configModel} = classesBySubscribeType[type]
 
     const currentDate = new Date();
     await inviteModel.deleteMany({
@@ -172,25 +175,58 @@ export async function listenInviteButtons(interaction: ButtonInteraction, type: 
         return false;
     const {server, requested, requester, channels, keywords} = datas;
 
+    const configServer = await configModel.findOne({
+        serverId: server.id
+    })
+
     if (!(await command.staticCheckPermissions(null, requested, server, false))) {
         await interaction.editReply({content: "Vous n'avez plus accès à la fonction vocal sur le serveur '" + server.name + "'"});
         return true;
     }
-    if (!(await command.staticCheckPermissions(null, requester, server, false))) {
-        await interaction.editReply({content: "'" + (requester.nickname ?? requester.user.username) + "' n'a plus accès à la fonction vocal sur le serveur '" + server.name + "'"});
+    if (
+        !(await command.staticCheckPermissions(null, requester, server, false)) ||
+        (
+            configServer &&
+            (
+                configServer.listenerBlacklist.users.includes(requester.id) ||
+                configServer.listenerBlacklist.roles.some(roleId => requester.roles.cache.some(role => role.id === roleId))
+            )
+        )
+    ) {
+        await interaction.editReply({content: "'" + (requester.nickname ?? requester.user.username) + "' n'a plus accès à la fonction vocale sur le serveur '" + server.name + "'"});
         return true;
     }
 
+    const blackListedChannels: GuildChannel[] = [];
+
     if (invite.accept) {
+        const listenedConfig = await userConfigModel.findOne({
+            serverId: server.id,
+            userId: requested.id
+        });
+        const blockingThisUser = listenedConfig && (
+            (
+                type === 'vocal' && (
+                    listenedConfig && (
+                        listenedConfig.blocked.users.includes(requester.id) ||
+                        listenedConfig.blocked.roles.some(roleId => requester.roles.cache.some(role => role.id === roleId))
+                    )
+                )
+            ) || (
+                type === 'text' && userBlockingUsOrChannelText(listenedConfig,requested.id,null,null,requester.id)
+            )
+        )
+
         const listenerConfig = await userConfigModel.findOne({
             serverId: server.id,
-            listenerId: invite.requesterId
+            userId: invite.requesterId
         });
         const listenerListening = listenerConfig ? (
             listenerConfig.listening !== undefined ?
                 listenerConfig.listening :
                 (!listenerConfig.lastMute || listenerConfig.mutedFor !== undefined)
         ) : true;
+
         if (channels) {
             const existingSubscribeAllChannels = await subscribeModel.findOne({
                serverId: server.id,
@@ -199,6 +235,13 @@ export async function listenInviteButtons(interaction: ButtonInteraction, type: 
                channelId: {$exists: false}
             });
             for (const channel of <Array<GuildChannel | ThreadChannel>>channels) {
+                if (configServer.channelBlacklist.includes(channel.id)) {
+                    blackListedChannels.push(<GuildChannel>channel);
+                    continue;
+                }
+                const blockingThisChannel = type === "text" && listenedConfig &&
+                    userBlockingUsOrChannelText(listenedConfig,requested.id,null,null,requester.id,channel.id,false)
+
                 const existingSubscribe = await subscribeModel.findOne({
                     serverId: invite.serverId,
                     listenerId: invite.requesterId,
@@ -220,7 +263,7 @@ export async function listenInviteButtons(interaction: ButtonInteraction, type: 
                         channelId: channel.id,
                         ...(keywords ? {keywords: [...(existingSubscribeAllChannels ? (existingSubscribeAllChannels.keywords??[]) : []), ...keywords]} : {}),
                         timestamp: new Date,
-                        enabled: listenerListening,
+                        enabled: listenerListening && !blockingThisUser && !blockingThisChannel,
                     });
                 }
             }
@@ -231,7 +274,7 @@ export async function listenInviteButtons(interaction: ButtonInteraction, type: 
                 listenedId: invite.requestedId,
                 ...(keywords ? {keywords} : {}),
                 timestamp: new Date,
-                enabled: listenerListening
+                enabled: listenerListening && !blockingThisUser
             });
             if (keywords) {
                 const existingSubscribesOnSpecificChannel = await subscribeModel.find({
@@ -257,7 +300,6 @@ export async function listenInviteButtons(interaction: ButtonInteraction, type: 
             await requester.send((requested.nickname ?? requested.user.username) + " a accepté(e) votre invitation sur '" + server.name + "'" + (!listenerListening ? " (Attention votre écoute n'est pas activée sur ce serveur)" : ""));
         } catch (_) {
         }
-        let backInviteSent = false;
 
         const [backSubscribeAllChannels,existingBackInviteAllChannels] = await Promise.all([
             subscribeModel.findOne({
@@ -274,10 +316,48 @@ export async function listenInviteButtons(interaction: ButtonInteraction, type: 
             })
         ]);
 
-        if (existingBackInviteAllChannels === null && backSubscribeAllChannels === null) {
+        await interaction.editReply({content: "Invitation acceptée"});
+
+        if (blackListedChannels.length > 0) {
+            await interaction.followUp({
+                embeds: [
+                    new MessageEmbed()
+                        .addFields({
+                            name: "L'invitation n'a pas pus s'appliquer sur les channels suivant, car blacklistés :",
+                            value: blackListedChannels.map(channel =>
+                                "<#"+channel.id+">"
+                            ).join("\n")
+                        })
+                ]
+            })
+        }
+
+        if (
+            existingBackInviteAllChannels === null &&
+            backSubscribeAllChannels === null &&
+            (
+                (
+                    type === "text" &&
+                    !userBlockingUsOrChannelText(listenerConfig,requester.id, null, null, requested.id)
+                ) || (
+                    type === "vocal" && (
+                        listenerConfig === null ||
+                        (
+                            !listenerConfig.blocked.users.includes(requested.id) &&
+                            !listenerConfig.blocked.roles.some(roleId => requested.roles.cache.some(role => role.id === roleId))
+                        )
+                    )
+                )
+            )
+        ) {
             if (channels) {
                 const channelsIdForBackInvite: string[] = [];
                 for (const channel of <Array<GuildChannel | ThreadChannel>>channels) {
+                    if (
+                        blackListedChannels.some(channelB => channelB.id === channel.id) ||
+                        userBlockingUsOrChannelText(listenerConfig,requester.id, null, null, requested.id, channel.id, false)
+                    )
+                        continue;
                     const existingSubscribe = await subscribeModel.findOne({
                         serverId: server.id,
                         listenerId: requested.id,
@@ -296,18 +376,12 @@ export async function listenInviteButtons(interaction: ButtonInteraction, type: 
                         channelsId: {$all: channelsIdForBackInvite}
                     });
                     if (existingBackInvite === null) {
-                        backInviteSent = true
                         await inviteBack(interaction, requester, requested, server, type, keywords, channelsIdForBackInvite);
                     }
                 }
             } else {
-                backInviteSent = true
                 await inviteBack(interaction, requester, requested, server, type, keywords);
             }
-        }
-
-        if (!backInviteSent) {
-            await interaction.editReply({content: "Invitation acceptée"});
         }
 
     } else {
@@ -325,7 +399,7 @@ export async function listenInviteButtons(interaction: ButtonInteraction, type: 
     return true;
 }
 
-export function userBlockingUsOrChannel(listenedConfig: typeof TextUserConfig|null, listenedId: string, usersBlockingMe: null|string[] = null, blockedChannelsByUserId: null|{ [userId: string]: string[] } = null, listenerId: string, channelToListenId: string|null = null, checkForUs = true) {
+export function userBlockingUsOrChannelText(listenedConfig: typeof TextUserConfig|null, listenedId: string, usersBlockingMe: null|string[] = null, blockedChannelsByUserId: null|{ [userId: string]: string[] } = null, listenerId: string, channelToListenId: string|null = null, checkForUs = true) {
     if (listenedConfig === null)
         return false;
     let foundBlocking;
@@ -366,7 +440,7 @@ export async function reEnableTextSubscribesAfterUnmute(listenerId, serverId) {
                 userId: subscribe.listenedId
             });
 
-        if (!userBlockingUsOrChannel(userConfigById[subscribe.listenedId], subscribe.listenedId, null, null, listenerId, subscribe.channelId ?? null)) {
+        if (!userBlockingUsOrChannelText(userConfigById[subscribe.listenedId], subscribe.listenedId, null, null, listenerId, subscribe.channelId ?? null)) {
             subscribe.enabled = true;
             subscribe.save();
         }

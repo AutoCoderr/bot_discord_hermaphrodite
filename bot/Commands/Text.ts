@@ -17,7 +17,7 @@ import {
     compareKeyWords, reEnableTextSubscribesAfterUnblock,
     reEnableTextSubscribesAfterUnmute,
     removeKeyWords,
-    userBlockingUsOrChannel
+    userBlockingUsOrChannelText
 } from "../Classes/TextAndVocalFunctions";
 import {extractUTCTime, showTime} from "../Classes/DateTimeManager";
 
@@ -681,7 +681,7 @@ export default class Text extends Command {
                     if (keyWords.length > 0) {
                         if (userConfigById[subscribe.listenedId] === undefined)
                             userConfigById[subscribe.listenedId] = await TextUserConfig.findOne({userId: subscribe.listenedId});
-                        if (userBlockingUsOrChannel(userConfigById[subscribe.listenedId], subscribe.listenedId, this.usersBlockingMe, this.blockedChannelsByUserId, this.member.id, channel.id))
+                        if (userBlockingUsOrChannelText(userConfigById[subscribe.listenedId], subscribe.listenedId, this.usersBlockingMe, this.blockedChannelsByUserId, this.member.id, channel.id))
                             continue;
 
                         this.updatedSubscribes.push({
@@ -708,7 +708,7 @@ export default class Text extends Command {
                     if (keyWords.length > 0) {
                         if (userConfigById[listenedId] === undefined)
                             userConfigById[listenedId] = await TextUserConfig.findOne({userId: listenedId});
-                        if (userBlockingUsOrChannel(userConfigById[listenedId], listenedId, this.usersBlockingMe, this.blockedChannelsByUserId, this.member.id, channel.id))
+                        if (userBlockingUsOrChannelText(userConfigById[listenedId], listenedId, this.usersBlockingMe, this.blockedChannelsByUserId, this.member.id, channel.id))
                             continue;
                         this.updatedSubscribes.push({
                             listenedId,
@@ -738,7 +738,7 @@ export default class Text extends Command {
                     serverId: this.guild.id,
                     userId: user.id
                 });
-                if (keyWords.length > 0 && userBlockingUsOrChannel(requestedConfig, user.id, this.usersBlockingMe, this.blockedChannelsByUserId, this.member.id))
+                if (keyWords.length > 0 && userBlockingUsOrChannelText(requestedConfig, user.id, this.usersBlockingMe, this.blockedChannelsByUserId, this.member.id))
                     continue;
 
                 const subscribeOnAllChannels: typeof TextSubscribe = await TextSubscribe.findOne({
@@ -810,7 +810,7 @@ export default class Text extends Command {
                             channelBlocked = true;
                         }
 
-                        if (userBlockingUsOrChannel(requestedConfig, user.id, this.usersBlockingMe, this.blockedChannelsByUserId, this.member.id, channel.id, false))
+                        if (userBlockingUsOrChannelText(requestedConfig, user.id, this.usersBlockingMe, this.blockedChannelsByUserId, this.member.id, channel.id, false))
                             channelBlocked = true;
 
                         if (channelBlocked)
@@ -913,7 +913,7 @@ export default class Text extends Command {
                     listenedsOnThisChannel.push(subscribe.listenedId);
                     if (userConfigById[subscribe.listenedId] === undefined)
                         userConfigById[subscribe.listenedId] = await TextUserConfig.findOne({userId: subscribe.listenedId});
-                    if (userBlockingUsOrChannel(userConfigById[subscribe.listenedId], subscribe.listenedId, this.usersBlockingMe, this.blockedChannelsByUserId, this.member.id, channel.id))
+                    if (userBlockingUsOrChannelText(userConfigById[subscribe.listenedId], subscribe.listenedId, this.usersBlockingMe, this.blockedChannelsByUserId, this.member.id, channel.id))
                         continue;
                     this.updatedSubscribes.push({
                         listenedId: subscribe.listenedId,
@@ -932,7 +932,7 @@ export default class Text extends Command {
                     if (userConfigById[listenedId] === undefined) {
                         userConfigById[listenedId] = await TextUserConfig.findOne({userId: listenedId});
                     }
-                    if (userBlockingUsOrChannel(userConfigById[listenedId], listenedId, this.usersBlockingMe, this.blockedChannelsByUserId, this.member.id, channel.id))
+                    if (userBlockingUsOrChannelText(userConfigById[listenedId], listenedId, this.usersBlockingMe, this.blockedChannelsByUserId, this.member.id, channel.id))
                         continue;
                     this.updatedSubscribes.push({
                         listenedId,
@@ -964,7 +964,7 @@ export default class Text extends Command {
                     userId: user.id
                 });
 
-                if (userBlockingUsOrChannel(requestedConfig, user.id, this.usersBlockingMe, this.blockedChannelsByUserId, this.member.id))
+                if (userBlockingUsOrChannelText(requestedConfig, user.id, this.usersBlockingMe, this.blockedChannelsByUserId, this.member.id))
                     continue;
 
                 const existingInviteForAllChannels: typeof TextInvite = await TextInvite.findOne({
@@ -1056,7 +1056,7 @@ export default class Text extends Command {
                 for (const channel of channels) {
                     let channelBlocked = false;
 
-                    if (userBlockingUsOrChannel(requestedConfig, user.id, this.usersBlockingMe, this.blockedChannelsByUserId, this.member.id, channel.id, false))
+                    if (userBlockingUsOrChannelText(requestedConfig, user.id, this.usersBlockingMe, this.blockedChannelsByUserId, this.member.id, channel.id, false))
                         channelBlocked = true;
 
                     if (textConfig.channelBlacklist.includes(channel.id)) {
