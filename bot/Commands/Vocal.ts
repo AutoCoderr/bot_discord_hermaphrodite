@@ -660,7 +660,7 @@ export default class Vocal extends Command {
 
                 fieldLines.push(nbSubscribings == 0 ?
                     "Vous n'écoutez personne" :
-                    "Vous écoutez " + nbSubscribings + " personnes, faites '" + config.command_prefix + this.commandName + " status subs' pour plus de détails");
+                    "Vous écoutez " + nbSubscribings + " personne(s), faites '" + config.command_prefix + this.commandName + " status subs' pour plus de détails");
 
                 const nbSubscribeds: number = await VocalSubscribe.count({
                     serverId: this.guild.id,
@@ -669,7 +669,7 @@ export default class Vocal extends Command {
 
                 fieldLines.push(nbSubscribeds == 0 ?
                     "Personne ne vous écoute" :
-                    "Vous êtes écouteé par " + nbSubscribeds + " personnes, faites '" + config.command_prefix + this.commandName + " status subs' pour plus de détails");
+                    "Vous êtes écouté par " + nbSubscribeds + " personne(s), faites '" + config.command_prefix + this.commandName + " status subs' pour plus de détails");
 
                 if (ownUserConfig.blocked.users.length + ownUserConfig.blocked.roles.length == 0) {
                     fieldLines.push("Vous n'avez bloqué aucun utilisateur ni aucun role");

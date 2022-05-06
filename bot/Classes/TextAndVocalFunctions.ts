@@ -189,7 +189,7 @@ export async function listenInviteButtons(interaction: ButtonInteraction, type: 
         const listenerListening = listenerConfig ? (
             listenerConfig.listening !== undefined ?
                 listenerConfig.listening :
-                (!listenerConfig.lastMute || listenerConfig.mutedFor)
+                (!listenerConfig.lastMute || listenerConfig.mutedFor !== undefined)
         ) : true;
         if (channels) {
             const existingSubscribeAllChannels = await subscribeModel.findOne({
@@ -390,7 +390,7 @@ export async function reEnableTextSubscribesAfterUnblock(listenedId, serverId, l
                 userId: subscribe.listenerId
             });
 
-        if (userConfigById[subscribe.listenerId] && (userConfigById[subscribe.listenerId].lastMute === undefined || userConfigById[subscribe.listenerId].mutedFor)) {
+        if (!userConfigById[subscribe.listenerId] || userConfigById[subscribe.listenerId].lastMute === undefined || userConfigById[subscribe.listenerId].mutedFor) {
             subscribe.enabled = true;
             subscribe.save();
         }

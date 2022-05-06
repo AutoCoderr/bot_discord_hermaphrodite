@@ -8,6 +8,7 @@ import {
     TextChannel,
     User
 } from "discord.js";
+import config from "../config";
 import TextConfig, {ITextConfig} from "../Models/Text/TextConfig";
 import TextUserConfig, {ITextUserConfig,minimumLimit} from "../Models/Text/TextUserConfig";
 import TextSubscribe from "../Models/Text/TextSubscribe";
@@ -226,6 +227,9 @@ export default class Text extends Command {
                 break;
             case "limit":
                 await this.limit(<number>time, ownUserConfig, embed);
+                break;
+            case "status":
+                await this.status(ownUserConfig, embed);
         }
 
         return this.showMessages(embed,keyWords,action);
@@ -347,6 +351,85 @@ export default class Text extends Command {
         return this.response(true, {embeds: [embed]});
     }
 
+    async status(
+        ownUserConfig: ITextUserConfig | typeof TextUserConfig,
+        embed: MessageEmbed
+    ) {
+        if (this.guild === null) {
+            return;
+        }
+
+        let fieldLines: string[] = [];
+
+        const now = Math.floor(Date.now() / 1000) * 1000;
+
+        const muted = ownUserConfig.lastMute instanceof Date &&
+            (
+                (
+                    ownUserConfig.mutedFor &&
+                    now - ownUserConfig.lastMute.getTime() < ownUserConfig.mutedFor
+                ) || !ownUserConfig.mutedFor
+            )
+
+        let sinceTimeMuted;
+        let remainingTimeMuted;
+        if (muted && ownUserConfig.mutedFor) {
+            sinceTimeMuted = extractUTCTime(now - ownUserConfig.lastMute.getTime());
+            remainingTimeMuted = extractUTCTime(ownUserConfig.mutedFor - now + ownUserConfig.lastMute.getTime());
+        }
+
+        fieldLines.push(muted ? "Vous êtes mute "+(
+            ownUserConfig.mutedFor ? "depuis "+showTime(sinceTimeMuted, 'fr_long')+
+                    ".\nIl reste" + showTime(remainingTimeMuted, 'fr_long') + "." :
+                    "pour une durée inderterminée"
+            ) : "Vous n'êtes pas mute");
+
+        fieldLines.push("Vous avez" + showTime(extractUTCTime(ownUserConfig.limit), 'fr_long') +
+            " de répit entre chaque notification");
+
+
+        const nbSubscribings: number = await TextSubscribe.aggregate([
+            {$match: {listenerId: this.member.id}},
+            {$group : {_id:"$listenedId"}}
+        ]).then((res) => res.length);
+
+        const commandPrefix = this.commandOrigin === "custom" ? config.command_prefix : "/";
+
+        fieldLines.push(nbSubscribings == 0 ?
+            "Vous n'écoutez personne" :
+            "Vous écoutez " + nbSubscribings + " personne(s), faites '" + commandPrefix + this.commandName + " status subs' pour plus de détails");
+
+        const nbSubscribeds: number = await TextSubscribe.aggregate([
+            {$match: {listenedId: this.member.id}},
+            {$group : {_id:"$listenerId"}}
+        ]).then((res) => res.length);
+
+
+        fieldLines.push(nbSubscribeds == 0 ?
+            "Personne ne vous écoute" :
+            "Vous êtes écouté par " + nbSubscribeds + " personne(s), faites '" + commandPrefix + this.commandName + " status subs' pour plus de détails");
+
+        if (ownUserConfig.blocking.length === 0) {
+            fieldLines.push("Vous n'avez bloqué aucun utilisateur sur aucun role");
+        }
+
+        embed.addFields({
+            name: "Statut :",
+            value: '\n' + fieldLines.join("\n\n")
+        })
+
+        if (ownUserConfig.blocking.length > 0) {
+            embed.addFields({
+                name: "Vous avez effectué les blockages suivants :",
+                value: ownUserConfig.blocking.map(({userId, channelId}) =>
+                    userId ?
+                        "<@"+userId+"> sur "+(channelId ? "le channel <#"+channelId+">" : "tout les channels") :
+                        "Sur le channel <#"+channelId+"> sur tout les utilisateurs"
+                ).join("\n")
+            });
+        }
+    }
+
     async mute(
         time: number | undefined,
         ownUserConfig: ITextUserConfig | typeof TextUserConfig,
@@ -363,7 +446,7 @@ export default class Text extends Command {
 
         const wasAlreadyMute = ownUserConfig.lastMute !== undefined;
 
-        ownUserConfig.lastMute = new Date();
+        ownUserConfig.lastMute = new Date(Math.floor(Date.now() / 1000) * 1000);
         if (time === undefined) {
             ownUserConfig.mutedFor = undefined;
             await TextSubscribe.updateMany({
@@ -404,11 +487,6 @@ export default class Text extends Command {
         ownUserConfig: ITextUserConfig | typeof TextUserConfig,
         embed: MessageEmbed
     ) {
-        if (time < minimumLimit)
-            return;
-        ownUserConfig.limit = time;
-        ownUserConfig.save();
-
         embed.addFields({
             name: <number>time < minimumLimit ?
                 "Changement impossible" :
@@ -417,6 +495,12 @@ export default class Text extends Command {
                 "Vous ne pouvez pas mettre de limite inférieure à "+showTime(extractUTCTime(minimumLimit), 'fr_long') :
                 "Il y aura maintenant un répit de" + showTime(extractUTCTime(<number>time), 'fr_long') + " entre chaque notification"
         })
+
+        if (time < minimumLimit)
+            return;
+        ownUserConfig.limit = time;
+        ownUserConfig.save();
+
     }
 
     async block(
