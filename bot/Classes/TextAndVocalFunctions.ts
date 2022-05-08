@@ -256,12 +256,15 @@ export async function listenInviteButtons(interaction: ButtonInteraction, type: 
                 }
             }
         } else {
-            const blockedChannelIds = listenedConfig.blocking
-                .filter(({
-                             userId,
-                             channelId
-                         }) => (userId === requester.id || userId === undefined) && channelId !== undefined)
-                .map(({channelId}) => <string>channelId);
+            let blockedChannelIds = [];
+            if (listenedConfig) {
+                blockedChannelIds = listenedConfig.blocking
+                    .filter(({
+                                 userId,
+                                 channelId
+                             }) => (userId === requester.id || userId === undefined) && channelId !== undefined)
+                    .map(({channelId}) => <string>channelId);
+            }
             const blockedChannelsForEveryone = configServer.channelBlacklist;
 
             await subscribeModel.create({

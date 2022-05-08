@@ -19,6 +19,14 @@ import {getCustomType, getSlashTypeGetterName} from "../slashCommands";
 
 const validModelCommands = {};
 
+export interface responseResultsType extends Array<string | MessagePayload | MessageOptions>{}
+
+export interface responseType {
+    success: boolean;
+    result: responseResultsType,
+    callback?: Function
+}
+
 export default class Command {
 
     static commandName: null|string = null;
@@ -74,11 +82,11 @@ export default class Command {
             let args: any;
             if (!slashCommand) {
                 const {success, result} = await this.computeArgs(this.parseCommand(),this.argsModel);
-                if (!success) return { result: <Array<string | MessagePayload | MessageOptions >> result};
+                if (!success) return { result: <responseResultsType> result};
                 args = result;
             } else {
                 const {success, result} = await this.getArgsFromSlashOptions();
-                if (!success) return { result: <Array<string | MessagePayload | MessageOptions >> result};
+                if (!success) return { result: <responseResultsType> result};
                 args = result;
             }
 
@@ -91,7 +99,7 @@ export default class Command {
         return false;
     }
 
-    sendErrors(errors: Object|Array<Object>): Array<string | MessagePayload | MessageOptions> {
+    sendErrors(errors: Object|Array<Object>): responseResultsType {
         if (!(errors instanceof Array)) {
             errors = [errors];
         }
@@ -112,7 +120,7 @@ export default class Command {
         return [{embeds: [Embed]}];
     }
 
-    displayHelp(displayHelp = true, fails: null|Array<any> = null, failsExtract: null|Array<any> = null, args: null|{[attr: string]: any} = null): Array<string | MessagePayload | MessageOptions> {
+    displayHelp(displayHelp = true, fails: null|Array<any> = null, failsExtract: null|Array<any> = null, args: null|{[attr: string]: any} = null): responseResultsType {
         const commandName = this.commandName;
         let embeds: Array<MessageEmbed> = [
             new MessageEmbed()
@@ -306,7 +314,7 @@ export default class Command {
         }
     }
 
-    checkIfModelValid(): true|Array<string | MessagePayload | MessageOptions> {
+    checkIfModelValid(): true|responseResultsType {
         if (this.commandName != null && validModelCommands[this.commandName]) return true;
 
         let valid = true;
@@ -392,7 +400,7 @@ export default class Command {
         }
     }
 
-    async getArgsFromSlashOptions(): Promise<{ success: boolean, result: {[attr: string]: any}|Array<string | MessagePayload | MessageOptions> }> {
+    async getArgsFromSlashOptions(): Promise<{ success: boolean, result: {[attr: string]: any}|responseResultsType }> {
         if (this.slashCommandOptions === null) return {success: false, result: {}};
         let args: {[name: string]: any} = {};
         let fails: Array<any> = [];
@@ -500,7 +508,7 @@ export default class Command {
         return args['--help'] || args['-h'];
     }
 
-    async computeArgs(args,model): Promise<{ success: boolean, result: {[attr: string]: any}|Array<string | MessagePayload | MessageOptions> }> {
+    async computeArgs(args,model): Promise<{ success: boolean, result: {[attr: string]: any}|responseResultsType }> {
         if (this.helpAsked(args))
             return this.response(false, this.displayHelp());
 
@@ -747,7 +755,7 @@ export default class Command {
         return {success: true, result: out};
     }
 
-    response(success: boolean, result: Array<string | MessagePayload | MessageOptions>|string | MessagePayload | MessageOptions, callback: null|Function = null):  {success: boolean, result: Array<string | MessagePayload | MessageOptions>, callback?: Function} {
+    response(success: boolean, result: responseResultsType|string | MessagePayload | MessageOptions, callback: null|Function = null): responseType {
         return {
             success,
             result: result instanceof Array ? result : [result],
@@ -759,7 +767,7 @@ export default class Command {
         return new MessageEmbed();
     }
 
-    async action(args: any,bot): Promise<{success: boolean, result: Array<string | MessagePayload | MessageOptions>, callback?: Function}> { // To be overloaded
+    async action(args: any,bot): Promise<responseType> { // To be overloaded
         return this.response(true, 'Hello');
     }
 }

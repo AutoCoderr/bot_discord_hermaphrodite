@@ -1,4 +1,4 @@
-import Command from "../Classes/Command";
+import Command, {responseType} from "../Classes/Command";
 import {
     CommandInteractionOptionResolver,
     Guild,
@@ -19,14 +19,15 @@ import {
     removeKeyWords,
     userBlockingUsOrChannelText
 } from "../Classes/TextAndVocalFunctions";
-import {extractUTCTime, showTime} from "../Classes/DateTimeManager";
+import {extractDate, extractTime, extractUTCTime, showDate, showTime} from "../Classes/DateTimeManager";
 
 interface argsType {
     action: 'add' | 'remove' | 'block' | 'unblock' | 'mute' | 'unmute' | 'limit' | 'status',
     users: GuildMember[],
     channels: TextChannel[],
     keyWords: string[],
-    time?: number
+    time?: number,
+    subs?: boolean
 }
 
 export default class Text extends Command {
@@ -130,6 +131,12 @@ export default class Text extends Command {
                 type: "duration",
                 description: "Le temps durant lequel on souhaite ne pas recevoir de notif (ex: 30s, 5m, 3h, 2j)",
                 valid: (time, args) => args.action === 'limit' || time > 0
+            },
+            subs: {
+                referToSubCommands: ['status'],
+                required: false,
+                type: "boolean",
+                description: "Obtenir plus de détails concernant les écoutes : subs"
             }
         }
     };
@@ -157,7 +164,7 @@ export default class Text extends Command {
     }
 
     async action(args: argsType) {
-        const {action, users, channels, keyWords, time} = args;
+        const {action, users, channels, keyWords, time, subs} = args;
 
         if (this.guild === null) {
             return this.response(false,
@@ -229,7 +236,7 @@ export default class Text extends Command {
                 await this.limit(<number>time, ownUserConfig, embed);
                 break;
             case "status":
-                await this.status(ownUserConfig, embed);
+                return this.status(ownUserConfig, subs??false);
         }
 
         return this.showMessages(embed,keyWords,action);
@@ -351,13 +358,91 @@ export default class Text extends Command {
         return this.response(true, {embeds: [embed]});
     }
 
+    async showSubscribes(type: 'listener'|'listened'): Promise<MessageEmbed> {
+        const embed = new MessageEmbed()
+            .setTitle(type === 'listener' ? "Qui vous écoutez" : "Qui vous écoutez");
+
+        const otherType = type === 'listener' ? 'listened' : 'listener';
+
+        const subscribes: Array<{_id: string, listens: Array<{channelId?: string, keywords?: string[], timestamp: Date, enabled: boolean}> }> = await TextSubscribe.aggregate([
+            { $match: { [type+'Id']: this.member.id, serverId: this.guild?.id } },
+            { $group: {
+                    _id: '$'+otherType+'Id', listens: {
+                        $push: { channelId: "$channelId", keywords: "$keywords", timestamp: "$timestamp", enabled: "$enabled" }
+                    }
+                }
+            }
+        ]);
+
+        if (subscribes.length === 0) {
+            embed.addFields({
+                name: "Aucune écoute en cours",
+                value: type === 'listener' ? "Vous n'écoutez personne" : "Personne ne vous écoute"
+            })
+        }
+
+        for (const {_id, listens} of subscribes) {
+            let otherMember: GuildMember | null | undefined;
+            try {
+                otherMember = await this.guild?.members.fetch(_id);
+            } catch (e) {
+            }
+            if (!otherMember) {
+                embed.addFields({
+                    name: "Membre introuvable sur ce serveur (id: " + _id + ")",
+                    value: "Suppression des abonnements textuels"
+                });
+                await TextSubscribe.deleteMany({
+                    serverId: this.guild?.id,
+                    [type+'Id']: this.member.id,
+                    [otherType+'Id']: _id
+                });
+                continue;
+            }
+
+            for (const {channelId} of listens) {
+                if (channelId === undefined)
+                    continue;
+                const channel = this.guild?.channels.cache.get(channelId);
+                if (channel === undefined) {
+                    await TextSubscribe.deleteMany({
+                        serverId: this.guild?.id,
+                        channelId
+                    })
+                }
+            }
+
+            embed.addFields({
+                name: (type === 'listener' ? "Vous écoutez " : "Vous êtes écouté(e) par ") + (otherMember.nickname ?? otherMember.user.username) + " sur les channels/mots clés suivants :",
+                value: listens.map(({keywords, channelId, timestamp, enabled}) =>
+                    "Sur " + (channelId ? "le channel <#" + channelId + ">" : "tout les channels") +
+                    ((keywords !== undefined && keywords.length > 0) ? " ; Sur les mot clés : " + keywords.map(w => "'" + w + "'").join(", ") : "") +
+                    (!enabled ? " (écoute inactive)" : "") +
+                    "\n" + showDate(extractDate(timestamp), 'fr') + " à " + showTime(extractTime(timestamp), 'fr')
+                ).join("\n\n")
+            })
+        }
+        return embed;
+    }
+
     async status(
         ownUserConfig: ITextUserConfig | typeof TextUserConfig,
-        embed: MessageEmbed
-    ) {
+        subs: boolean
+    ): Promise<responseType> {
+
         if (this.guild === null) {
-            return;
+            return this.response(false,
+                this.sendErrors({
+                    name: "Missing guild",
+                    value: "We couldn't find the guild"
+                })
+            );
         }
+
+        if (subs)
+            return this.response(true, { embeds: await Promise.all(['listener','listened'].map(t => this.showSubscribes(<'listener'|'listened'>t))) });
+
+        const embed = new MessageEmbed().setAuthor("Herma bot");
 
         let fieldLines: string[] = [];
 
@@ -428,6 +513,8 @@ export default class Text extends Command {
                 ).join("\n")
             });
         }
+
+        return this.response(true, { embeds: [embed] })
     }
 
     async mute(
