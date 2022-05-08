@@ -256,6 +256,14 @@ export async function listenInviteButtons(interaction: ButtonInteraction, type: 
                 }
             }
         } else {
+            const blockedChannelIds = listenedConfig.blocking
+                .filter(({
+                             userId,
+                             channelId
+                         }) => (userId === requester.id || userId === undefined) && channelId !== undefined)
+                .map(({channelId}) => <string>channelId);
+            const blockedChannelsForEveryone = configServer.channelBlacklist;
+
             await subscribeModel.create({
                 serverId: invite.serverId,
                 listenerId: invite.requesterId,
@@ -269,7 +277,11 @@ export async function listenInviteButtons(interaction: ButtonInteraction, type: 
                     serverId: server.id,
                     listenerId: invite.requesterId,
                     listenedId: invite.requestedId,
-                    channelId: {$exists: true}
+                    $and: [
+                        { channelId: { $exists: true } },
+                        { channelId: { $nin: blockedChannelIds } },
+                        { channelId: { $nin: blockedChannelsForEveryone } }
+                    ]
                 });
                 for (const subscribe of existingSubscribesOnSpecificChannel) {
                     subscribe.keywords = [...(subscribe.keywords??[]), ...keywords]
@@ -280,7 +292,14 @@ export async function listenInviteButtons(interaction: ButtonInteraction, type: 
                     serverId: server.id,
                     listenerId: invite.requesterId,
                     listenedId: invite.requestedId,
-                    channelId: {$exists: true}
+                    channelId: { $exists: true },
+                    $or: [
+                        { $and: [
+                                { channelId: { $nin: blockedChannelIds } },
+                                { channelId: { $nin: blockedChannelsForEveryone } }
+                            ] },
+                        { keywords: { $exists: false } }
+                    ]
                 });
             }
         }
