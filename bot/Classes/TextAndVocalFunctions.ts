@@ -243,13 +243,13 @@ export async function listenInviteButtons(interaction: ButtonInteraction, type: 
                     } else {
                         existingSubscribe.save();
                     }
-                } else if (existingSubscribeAllChannels === null || keywords || (existingSubscribeAllChannels.keywords !== undefined && existingSubscribeAllChannels.keywords.length > 0)) {
+                } else if (existingSubscribeAllChannels === null || !compareKeyWords(keywords??undefined,existingSubscribeAllChannels.keywords)) {
                     await subscribeModel.create({
                         serverId: invite.serverId,
                         listenerId: invite.requesterId,
                         listenedId: invite.requestedId,
                         channelId: channel.id,
-                        ...(keywords ? {keywords: [...(existingSubscribeAllChannels ? (existingSubscribeAllChannels.keywords??[]) : []), ...keywords]} : {}),
+                        ...(keywords ? {keywords} : {}),
                         timestamp: new Date,
                         enabled: listenerListening && !blockingThisUser && !blockingThisChannel,
                     });
@@ -280,15 +280,11 @@ export async function listenInviteButtons(interaction: ButtonInteraction, type: 
                     serverId: server.id,
                     listenerId: invite.requesterId,
                     listenedId: invite.requestedId,
-                    $and: [
-                        { channelId: { $exists: true } },
-                        { channelId: { $nin: blockedChannelIds } },
-                        { channelId: { $nin: blockedChannelsForEveryone } }
-                    ]
+                    channelId: { $exists: true }
                 });
                 for (const subscribe of existingSubscribesOnSpecificChannel) {
-                    subscribe.keywords = [...(subscribe.keywords??[]), ...keywords]
-                    subscribe.save();
+                    if (compareKeyWords(keywords??undefined,subscribe.keywords))
+                        subscribe.remove();
                 }
             } else if (type === "text") {
                 await subscribeModel.deleteMany({

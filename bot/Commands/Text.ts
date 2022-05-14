@@ -1054,7 +1054,7 @@ export default class Text extends Command {
                     });
                     subscribe.keywords = keyWords.length === 0 ? undefined : [...(subscribe.keywords ?? []), ...keyWords];
                     if (subscribeAllChannelsByUserId[subscribe.listenedId] && compareKeyWords(subscribe.keywords, subscribeAllChannelsByUserId[subscribe.listenedId].keywords)) {
-                        subscribe.delete();
+                        subscribe.remove();
                     } else {
                         subscribe.save();
                     }
@@ -1071,13 +1071,13 @@ export default class Text extends Command {
                         listenedId,
                         channelId: channel.id
                     });
-                    if (keyWords.length > 0 || (subscribeOnAllChannel.keywords !== undefined && subscribeOnAllChannel.keywords.length > 0)) {
+                    if (!compareKeyWords(keyWords,subscribeOnAllChannel.keywords)) {
                         await TextSubscribe.create({
                             serverId: this.guild.id,
                             listenerId: this.member.id,
                             listenedId,
                             channelId: channel.id,
-                            keywords: keyWords.length > 0 ? [...(subscribeOnAllChannel.keywords ?? []), ...keyWords] : undefined
+                            keywords: keyWords.length > 0 ? keyWords : undefined
                         })
                     }
                 }
@@ -1138,10 +1138,13 @@ export default class Text extends Command {
                                 serverId: this.guild.id,
                                 listenerId: this.member.id,
                                 listenedId: user.id,
-                                $and: [
-                                    {channelId: {$exists: true}},
-                                    {channelId: {$nin: this.blockedChannelsByUserId[user.id]}},
-                                    {channelId: {$nin: Object.keys(this.blockedChannelsForEveryoneObj)}}
+                                channelId: {$exists: true},
+                                $or: [
+                                    { keywords: { $exists: false } },
+                                    { $and: [
+                                            {channelId: {$nin: this.blockedChannelsByUserId[user.id]}},
+                                            {channelId: {$nin: Object.keys(this.blockedChannelsForEveryoneObj)}}
+                                        ] }
                                 ]
                             });
                         } else {
@@ -1157,8 +1160,9 @@ export default class Text extends Command {
                                 ]
                             });
                             for (const subscribe of specifiedChannelsSubscribes) {
-                                subscribe.keywords = [...(subscribe.keywords ?? []), ...keyWords];
-                                subscribe.save();
+                                if (compareKeyWords(subscribe.keywords,allChannelSubscribe.keywords)) {
+                                    subscribe.remove();
+                                }
                             }
                         }
 
@@ -1223,13 +1227,13 @@ export default class Text extends Command {
                         continue;
                     }
                     if (allChannelSubscribe) {
-                        if (keyWords.length > 0 || (allChannelSubscribe.keywords !== undefined && allChannelSubscribe.keywords.length > 0)) {
+                        if (!compareKeyWords(keyWords,allChannelSubscribe.keywords)) {
                             existingSubscribe = await TextSubscribe.create({
                                 serverId: this.guild.id,
                                 listenerId: this.member.id,
                                 listenedId: user.id,
                                 channelId: channel.id,
-                                keywords: keyWords.length > 0 ? [...(allChannelSubscribe.keywords ?? []), ...keyWords] : undefined
+                                keywords: keyWords.length > 0 ? keyWords : undefined
                             });
                         }
                         this.updatedSubscribes.push({
@@ -1334,7 +1338,6 @@ export default class Text extends Command {
             return;
 
         for (const {_id: listenerId, listens} of textSubscribes) {
-            console.log({listenerId});
 
             let listener: null|GuildMember = null;
             try {
@@ -1359,10 +1362,14 @@ export default class Text extends Command {
                 continue;
             }
 
-            const listening: aggregatedListening =
-                listens.length === 1 ?
-                    listens[0] :
-                    <aggregatedListening>listens.find(({channelId}) => channelId !== undefined)
+            const acc: {[key: string]: aggregatedListening} = {};
+            const {listeningAllChannels, listening}: {listeningAllChannels: aggregatedListening, listening: aggregatedListening} =
+                    <{listeningAllChannels: aggregatedListening, listening: aggregatedListening}>
+                        listens.reduce((acc,listen) => ({
+                            ...acc,
+                            ...(acc.listening === undefined || listen.channelId !== undefined ? { listening: listen }: {}),
+                            ...(listen.channelId === undefined ? {listeningAllChannels: listen}: {})
+                        }), acc)
 
             if (!listening.enabled)
                 continue;
@@ -1386,10 +1393,14 @@ export default class Text extends Command {
             )
                 continue;
 
+            const keywords = [
+                ...listening.keywords??[],
+                ...((listening.channelId !== undefined && listeningAllChannels) ? listeningAllChannels.keywords??[] : [])
+            ]
+
             if (
-                listening.keywords &&
-                listening.keywords.length > 0 &&
-                !listening.keywords.some(word => findWordInText(word,message.content))
+                keywords.length > 0 &&
+                !keywords.some(word => findWordInText(word,message.content))
             )
                 continue;
 
