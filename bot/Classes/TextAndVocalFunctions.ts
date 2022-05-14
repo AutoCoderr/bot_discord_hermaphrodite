@@ -485,6 +485,24 @@ export async function reEnableTextSubscribesAfterUnblock(listenedId, serverId, l
     }
 }
 
+export function findWordInText(word: string, text: string): boolean {
+    if (word.length > text.length)
+        return false
+
+    for (let i=0;i<=(text.length-word.length);i++) {
+        let wordFound = true;
+        for (let j=0;j<word.length;j++) {
+            if (word[j] !== text[i+j]) {
+                wordFound = false;
+                break;
+            }
+        }
+        if (wordFound)
+            return true;
+    }
+    return false
+}
+
 export function compareKeyWords(A: string[]|undefined,B: string[]|undefined) {
     if ((A === undefined) !== (B === undefined))
         return false;

@@ -120,6 +120,25 @@ export default class ConfigWelcome extends Command {
         return this.response(false, "Aucun action mentionnée");
     }
 
+    static async listenJoinsToWelcome(message: Message) {
+        if (message.author.bot || message.type !== "GUILD_MEMBER_JOIN" || !message.guild)
+            return;
+
+        const welcomeMessage: IWelcomeMessage = await WelcomeMessage.findOne({
+            serverId: message.guild.id,
+            enabled: true
+        });
+        if (welcomeMessage != null) {
+            try {
+                await message.author.send(welcomeMessage.message);
+            } catch (e) {// @ts-ignore
+                if (e.message == "Cannot send messages to this user") {
+                    message.channel.send("<@" + message.author.id + "> \n\n" + welcomeMessage.message);
+                }
+            }
+        }
+    }
+
     help() {
         return new MessageEmbed()
             .setTitle("Exemples :")

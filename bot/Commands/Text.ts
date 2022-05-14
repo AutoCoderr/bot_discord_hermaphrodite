@@ -3,7 +3,7 @@ import {
     CommandInteractionOptionResolver,
     Guild,
     GuildChannel,
-    GuildMember, MessageActionRow, MessageButton,
+    GuildMember, Message, MessageActionRow, MessageButton,
     MessageEmbed,
     TextChannel,
     User
@@ -11,13 +11,14 @@ import {
 import config from "../config";
 import TextConfig, {ITextConfig} from "../Models/Text/TextConfig";
 import TextUserConfig, {ITextUserConfig,minimumLimit} from "../Models/Text/TextUserConfig";
-import TextSubscribe from "../Models/Text/TextSubscribe";
+import TextSubscribe, {ITextSubscribe} from "../Models/Text/TextSubscribe";
 import TextInvite from "../Models/Text/TextInvite";
 import {
     compareKeyWords, reEnableTextSubscribesAfterUnblock,
     reEnableTextSubscribesAfterUnmute,
     removeKeyWords,
-    userBlockingUsOrChannelText
+    userBlockingUsOrChannelText,
+    findWordInText
 } from "../Classes/TextAndVocalFunctions";
 import {extractDate, extractTime, extractUTCTime, showDate, showTime} from "../Classes/DateTimeManager";
 
@@ -29,6 +30,15 @@ interface argsType {
     time?: number,
     subs?: boolean
 }
+
+interface aggregatedListening {
+    channelId?: string;
+    keywords?: string[];
+    timestamp: Date;
+    enabled: boolean
+}
+
+interface aggregatedSubscribes extends Array<{_id: string, listens: Array<aggregatedListening> }> {}
 
 export default class Text extends Command {
     static display = true;
@@ -236,7 +246,7 @@ export default class Text extends Command {
                 await this.limit(<number>time, ownUserConfig, embed);
                 break;
             case "status":
-                return this.status(ownUserConfig, subs??false);
+                return this.status(ownUserConfig, textConfig, subs??false);
         }
 
         return this.showMessages(embed,keyWords,action);
@@ -358,13 +368,15 @@ export default class Text extends Command {
         return this.response(true, {embeds: [embed]});
     }
 
-    async showSubscribes(type: 'listener'|'listened'): Promise<MessageEmbed> {
+    async showSubscribes(type: 'listener'|'listened', textConfig: ITextConfig): Promise<MessageEmbed> {
         const embed = new MessageEmbed()
             .setTitle(type === 'listener' ? "Qui vous écoutez" : "Qui vous écoutez");
+        if (!this.guild)
+            return embed;
 
         const otherType = type === 'listener' ? 'listened' : 'listener';
 
-        const subscribes: Array<{_id: string, listens: Array<{channelId?: string, keywords?: string[], timestamp: Date, enabled: boolean}> }> = await TextSubscribe.aggregate([
+        const subscribes: aggregatedSubscribes = await TextSubscribe.aggregate([
             { $match: { [type+'Id']: this.member.id, serverId: this.guild?.id } },
             { $group: {
                     _id: '$'+otherType+'Id', listens: {
@@ -387,18 +399,45 @@ export default class Text extends Command {
                 otherMember = await this.guild?.members.fetch(_id);
             } catch (e) {
             }
+
             if (!otherMember) {
                 embed.addFields({
                     name: "Membre introuvable sur ce serveur (id: " + _id + ")",
                     value: "Suppression des abonnements textuels"
                 });
                 await TextSubscribe.deleteMany({
-                    serverId: this.guild?.id,
-                    [type+'Id']: this.member.id,
-                    [otherType+'Id']: _id
+                    serverId: this.guild.id,
+                    $or: [
+                        { listenerId: _id },
+                        { listenedId: _id }
+                    ]
                 });
+                await TextUserConfig.deleteMany({
+                    serverId: this.guild.id,
+                    userId: _id
+                })
                 continue;
             }
+
+            const listener = type === 'listener' ? this.member : otherMember;
+            const listened = type === 'listened' ? this.member : otherMember;
+            const listenedConfig = await TextUserConfig.findOne({
+                serverId: this.guild.id,
+                userId: listened.id
+            })
+
+            const blockedChannelsHere: string[] = Object.keys(listenedConfig ?
+                listenedConfig.blocking
+                    .filter(({
+                                 userId,
+                                 channelId
+                    }) => (userId === listener.id || userId === undefined) && channelId !== undefined)
+                    .reduce((acc,{channelId}) => ({
+                        ...acc,
+                        [channelId]: true
+                    }), this.blockedChannelsForEveryoneObj) :
+                this.blockedChannelsForEveryoneObj
+            )
 
             for (const {channelId} of listens) {
                 if (channelId === undefined)
@@ -412,12 +451,14 @@ export default class Text extends Command {
                 }
             }
 
+
             embed.addFields({
                 name: (type === 'listener' ? "Vous écoutez " : "Vous êtes écouté(e) par ") + (otherMember.nickname ?? otherMember.user.username) + " sur les channels/mots clés suivants :",
                 value: listens.map(({keywords, channelId, timestamp, enabled}) =>
                     "Sur " + (channelId ? "le channel <#" + channelId + ">" : "tout les channels") +
-                    ((keywords !== undefined && keywords.length > 0) ? " ; Sur les mot clés : " + keywords.map(w => "'" + w + "'").join(", ") : "") +
-                    (!enabled ? " (écoute inactive)" : "") +
+                    ((channelId === undefined && blockedChannelsHere.length > 0) ? "\nSauf ceux ci : "+blockedChannelsHere.map(channelId => '<#'+channelId+'>').join(", ") : "")+
+                    ((keywords !== undefined && keywords.length > 0) ? "\nSur les mot clés : " + keywords.map(w => "'" + w + "'").join(", ") : "") +
+                    (!enabled ? "\n(écoute inactive)" : "") +
                     "\n" + showDate(extractDate(timestamp), 'fr') + " à " + showTime(extractTime(timestamp), 'fr')
                 ).join("\n\n")
             })
@@ -427,6 +468,7 @@ export default class Text extends Command {
 
     async status(
         ownUserConfig: ITextUserConfig | typeof TextUserConfig,
+        textConfig: ITextConfig,
         subs: boolean
     ): Promise<responseType> {
 
@@ -439,8 +481,12 @@ export default class Text extends Command {
             );
         }
 
-        if (subs)
-            return this.response(true, { embeds: await Promise.all(['listener','listened'].map(t => this.showSubscribes(<'listener'|'listened'>t))) });
+        if (subs) {
+            for (const channelId of textConfig.channelBlacklist) {
+                this.blockedChannelsForEveryoneObj[channelId] = true;
+            }
+            return this.response(true, {embeds: await Promise.all(['listener', 'listened'].map(t => this.showSubscribes(<'listener' | 'listened'>t, textConfig)))});
+        }
 
         const embed = new MessageEmbed().setAuthor("Herma bot");
 
@@ -495,7 +541,7 @@ export default class Text extends Command {
             "Vous êtes écouté par " + nbSubscribeds + " personne(s), faites '" + commandPrefix + this.commandName + " status subs' pour plus de détails");
 
         if (ownUserConfig.blocking.length === 0) {
-            fieldLines.push("Vous n'avez bloqué aucun utilisateur sur aucun role");
+            fieldLines.push("Vous n'avez bloqué aucun utilisateur sur aucun channel");
         }
 
         embed.addFields({
@@ -1220,6 +1266,146 @@ export default class Text extends Command {
                     })
                     Text.sendInvite(this.member, user, this.guild, channelsToInvite.map(channel => channel.id), keyWords.length > 0 ? keyWords : undefined);
                 }
+            }
+        }
+    }
+
+    static async listenTextMessages(message: Message) {
+        if (!message.guild || !message.member)
+            return;
+
+        const serverConfig: ITextConfig = await TextConfig.findOne({
+           serverId: message.guild.id,
+           enabled: true
+        });
+        if (!serverConfig || serverConfig.channelBlacklist.includes(message.channel.id))
+            return;
+
+        const listened: GuildMember = message.member;
+
+        if (!(await Text.staticCheckPermissions(null, listened, message.guild, false))) {
+            await TextSubscribe.deleteMany({
+                serverId: message.guild.id,
+                $or: [
+                    { listenedId: listened.id },
+                    { listenerId: listened.id}
+                ]
+            })
+            return;
+        }
+
+        const listenedConfig: null|ITextUserConfig|typeof TextUserConfig = await TextUserConfig.findOne({
+            serverId: message.guild.id,
+            userId: listened.id
+        });
+
+        if (listenedConfig &&
+            listenedConfig.blocking.some(({channelId, userId}) =>
+                channelId === message.channel.id && userId === undefined))
+            return;
+
+        const textSubscribes: aggregatedSubscribes =
+            await TextSubscribe.aggregate([
+            {
+                $match: {
+                    serverId: message.guild.id,
+                    listenedId: listened.id,
+                    $or: [
+                        {channelId: {$exists: false}},
+                        {channelId: message.channel.id}
+                    ]
+                }
+            },
+            {
+                $group: {
+                    _id: "$listenerId",
+                    listens: {
+                        $push: {
+                            channelId: "$channelId",
+                            keywords: "$keywords",
+                            enabled: "$enabled"
+                        }
+                    }
+                }
+            }
+        ]);
+
+        if (textSubscribes.length === 0)
+            return;
+
+        for (const {_id: listenerId, listens} of textSubscribes) {
+            console.log({listenerId});
+
+            let listener: null|GuildMember = null;
+            try {
+                listener = await message.guild.members.fetch(listenerId);
+            } catch (_) {
+            }
+
+            if (listener === null || !(await Text.staticCheckPermissions(null, listener, message.guild, false))) {
+                await Promise.all([
+                    TextSubscribe.deleteMany({
+                        serverId: message.guild.id,
+                        $or : [
+                            {listenerId: listenerId},
+                            {listenedId: listenerId}
+                        ]
+                    }),
+                    ...(listener === null ? [TextUserConfig.deleteMany({
+                        serverId: message.guild.id,
+                        userId: listenerId
+                    })] : [])
+                ])
+                continue;
+            }
+
+            const listening: aggregatedListening =
+                listens.length === 1 ?
+                    listens[0] :
+                    <aggregatedListening>listens.find(({channelId}) => channelId !== undefined)
+
+            if (!listening.enabled)
+                continue;
+
+            if (listening.channelId === undefined &&
+                listenedConfig &&
+                userBlockingUsOrChannelText(listenedConfig, message.author.id, null, null, listenerId, message.channel.id, false)
+            )
+                continue;
+
+            let listenerConfig: ITextUserConfig|typeof TextUserConfig|null = await TextUserConfig.findOne({
+                serverId: message.guild.id,
+                userId: listenerId
+            });
+
+            if (
+                listenerConfig &&
+                listenerConfig.lastMute &&
+                listenerConfig.mutedFor &&
+                Date.now() < listenerConfig.lastMute.getTime()+listenerConfig.mutedFor
+            )
+                continue;
+
+            if (
+                listening.keywords &&
+                listening.keywords.length > 0 &&
+                !listening.keywords.some(word => findWordInText(word,message.content))
+            )
+                continue;
+
+            if (listenerConfig === null)
+                listenerConfig = await TextUserConfig.create({
+                    serverId: message.guild.id,
+                    userId: listenerId
+                })
+
+            listenerConfig.lastMute = new Date();
+            listenerConfig.mutedFor = listenerConfig.limit;
+            listenerConfig.save();
+
+            try {
+                await (<GuildMember>listener).send("'" + (listened.nickname ?? listened.user.username) + "' a écrit un message sur le channel <#" + message.channel.id + "> sur le serveur '" + message.guild.name + "'");
+            } catch (_) {
             }
         }
     }

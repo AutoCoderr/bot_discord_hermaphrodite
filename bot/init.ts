@@ -4,6 +4,7 @@ import client from "./client";
 import {Interaction, VoiceState} from "discord.js";
 import {initSlashCommands, listenSlashCommands} from "./slashCommands";
 import {listenInviteButtons, listenAskInviteBackButtons} from "./Classes/TextAndVocalFunctions";
+import {listenCustomCommands} from "./listenCustomCommands";
 
 export default function init(bot) {
     setTimeout(async () => {
@@ -29,14 +30,25 @@ export default function init(bot) {
                     ]).then(responses => !responses.includes(true))) {
                         await interaction.editReply({content: "Bouton invalide"});
                     }
-                } else {
-                    listenSlashCommands(interaction);
+                    return;
                 }
+
+                listenSlashCommands(interaction);
             });
 
             client.on('voiceStateUpdate', (oldState: VoiceState, newState: VoiceState) => {
                 //@ts-ignore
                 existingCommands.Vocal.listenVoiceChannelsConnects(oldState, newState);
+            })
+
+            client.on("messageCreate", message => {
+                listenCustomCommands(message);
+
+                //@ts-ignore
+                existingCommands.ConfigWelcome.listenJoinsToWelcome(message)
+
+                //@ts-ignore
+                existingCommands.Text.listenTextMessages(message);
             })
         })
     }, 5000);
