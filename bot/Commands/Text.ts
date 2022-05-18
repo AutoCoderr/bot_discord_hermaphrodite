@@ -105,12 +105,12 @@ export default class Text extends Command {
                 multi: true,
                 description: "Le ou les channels à écouter, ignorer ou bloquer",
                 valid: (channels: GuildChannel | GuildChannel[], args) => {
-                    if (channels instanceof GuildChannel && (channels.type !== 'GUILD_TEXT' || args.channels.some(eachChannel => eachChannel.id === channels.id)))
+                    if (channels instanceof GuildChannel && (!['GUILD_TEXT','GUILD_PUBLIC_THREAD'].includes(channels.type) || args.channels.some(eachChannel => eachChannel.id === channels.id)))
                         return false;
                     if (channels instanceof Array) {
                         let alreadySpecifieds = {};
                         for (const channel of channels) {
-                            if (channel.type !== 'GUILD_TEXT' || alreadySpecifieds[channel.id])
+                            if (!['GUILD_TEXT','GUILD_PUBLIC_THREAD'].includes(channel.type) || alreadySpecifieds[channel.id])
                                 return false;
                             else
                                 alreadySpecifieds[channel.id] = true;
@@ -174,7 +174,7 @@ export default class Text extends Command {
     }
 
     async action(args: argsType) {
-        const {action, users, channels, keyWords, time, subs} = args;
+        let {action, users, channels, keyWords, time, subs} = args;
 
         if (this.guild === null) {
             return this.response(false,
@@ -214,7 +214,8 @@ export default class Text extends Command {
         if (ownUserConfig === null) {
             ownUserConfig = await TextUserConfig.create({
                 serverId: this.guild.id,
-                userId: this.member.id
+                userId: this.member.id,
+                limit: textConfig.defaultLimit
             });
         }
 
@@ -222,6 +223,7 @@ export default class Text extends Command {
         const embed = new MessageEmbed()
             .setAuthor("Herma bot");
 
+        keyWords = keyWords.map(w => w.toLowerCase());
 
         switch (action) {
             case "add":
@@ -370,7 +372,7 @@ export default class Text extends Command {
 
     async showSubscribes(type: 'listener'|'listened', textConfig: ITextConfig): Promise<MessageEmbed> {
         const embed = new MessageEmbed()
-            .setTitle(type === 'listener' ? "Qui vous écoutez" : "Qui vous écoutez");
+            .setTitle(type === 'listener' ? "Qui vous écoutez" : "Qui vous écoute");
         if (!this.guild)
             return embed;
 
@@ -1398,9 +1400,11 @@ export default class Text extends Command {
                 ...((listening.channelId !== undefined && listeningAllChannels) ? listeningAllChannels.keywords??[] : [])
             ]
 
+            const content = message.content.toLowerCase();
+
             if (
                 keywords.length > 0 &&
-                !keywords.some(word => findWordInText(word,message.content))
+                !keywords.some(word => findWordInText(word,content))
             )
                 continue;
 
@@ -1437,7 +1441,10 @@ export default class Text extends Command {
                             .addFields([
                                 ...(channelsId ? [{
                                     name: "Sur les channels suivants :",
-                                    value: channelsId.map(channelId => "<#" + channelId + ">").join("\n")
+                                    value: channelsId.map(channelId => {
+                                        const channel = guild.channels.cache.get(channelId);
+                                        return "<#"+channelId+">"+((channel && channel.type === "GUILD_PUBLIC_THREAD") ? " (Thread "+channel.name+")" : "")
+                                    }).join("\n")
                                 }] : []),
                                 ...(keywords ? [{
                                     name: "Sur les mots clés suivants :",

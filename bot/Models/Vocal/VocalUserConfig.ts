@@ -1,5 +1,6 @@
 import { Schema } from 'mongoose';
 import { connect } from "../../Mongo";
+import {defaultLimit} from "./VocalConfig";
 
 const db = connect();
 
@@ -23,7 +24,7 @@ const VocalUserConfigSchema: Schema = new Schema({
     serverId: { type: String, required: true },
     blocked: { type: BlockedSchema, required: true },
     listening: { type: Boolean, required: true },
-    limit: { type: Number, required: true, default: 0 },
+    limit: { type: Number, required: true, default: defaultLimit },
     mutedFor: { type: Number, required: false },
     lastMute: { type: Date, required: false }
 });

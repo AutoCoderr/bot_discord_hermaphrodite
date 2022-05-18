@@ -164,7 +164,7 @@ export default class Vocal extends Command {
                 userId: this.member.id,
                 blocked: {users: [], roles: []},
                 listening: true,
-                limit: 0
+                limit: vocalConfig.defaultLimit
             });
         }
 

@@ -1,5 +1,6 @@
 import { Schema } from 'mongoose';
 import { connect } from "../../Mongo";
+import {defaultLimit} from "./TextConfig";
 
 const db = connect();
 
@@ -23,7 +24,7 @@ const TextUserConfigSchema: Schema = new Schema({
     userId: { type: String, required: true },
     serverId: { type: String, required: true },
     blocking: [BlockingSchema],
-    limit: { type: Number, required: true, default: 5*60*1000 /* 5 minutes by default */ },
+    limit: { type: Number, required: true, default: defaultLimit },
     mutedFor: { type: Number, required: false },
     lastMute: { type: Date, required: false }
 });
