@@ -10,19 +10,26 @@ import {
     VoiceChannel
 } from "discord.js";
 import {splitFieldsEmbed} from "../Classes/OtherFunctions";
-import TextConfig from "../Models/Text/TextConfig";
-import VocalConfig from "../Models/Vocal/VocalConfig";
+import TextConfig, {minimumLimit as textMinimumLimit} from "../Models/Text/TextConfig";
+import VocalConfig, {minimumLimit as vocalMinimumLimit} from "../Models/Vocal/VocalConfig";
 import Command from "../Classes/Command";
 import VocalSubscribe from "../Models/Vocal/VocalSubscribe";
 import TextSubscribe from "../Models/Text/TextSubscribe";
 import config from "../config";
+import {extractUTCTime, showTime} from "../Classes/DateTimeManager";
 
 interface configTextAndVocalArgs {
-    action: string, subAction: string, blacklistType: string, users: GuildMember[], roles: Role[], channels: VoiceChannel[]
+    action: string,
+    subAction: string,
+    blacklistType: string,
+    users: GuildMember[],
+    roles: Role[],
+    channels: VoiceChannel[],
+    limit?: number
 }
 
 export default abstract class ConfigTextAndVocal extends Command {
-    type: null|'vocal'|'text' = null;
+    type: null | 'vocal' | 'text' = null;
 
     static abstract = true;
 
@@ -30,31 +37,34 @@ export default abstract class ConfigTextAndVocal extends Command {
         vocal: {
             configModel: VocalConfig,
             subscribeModel: VocalSubscribe,
-            channelType: 'GUILD_VOICE'
+            channelTypes: ['GUILD_VOICE'],
+            minimumLimit: vocalMinimumLimit
         },
         text: {
             configModel: TextConfig,
             subscribeModel: TextSubscribe,
-            channelType: 'GUILD_TEXT'
+            channelTypes: ['GUILD_TEXT', 'GUILD_PUBLIC_THREAD'],
+            minimumLimit: textMinimumLimit
         }
     }
 
-    protected constructor(channel: TextBasedChannels, member: User | GuildMember, guild: null | Guild = null, writtenCommandOrSlashCommandOptions: null | string | CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom', commandName: string, argsModel: any, type: 'vocal'|'text') {
+    protected constructor(channel: TextBasedChannels, member: User | GuildMember, guild: null | Guild = null, writtenCommandOrSlashCommandOptions: null | string | CommandInteractionOptionResolver = null, commandOrigin: 'slash' | 'custom', commandName: string, argsModel: any, type: 'vocal' | 'text') {
         super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, commandName, argsModel);
         this.type = type;
     }
 
-    static argsModelFunction = (type: 'vocal'|'text') => ({
+    static argsModelFunction = (type: 'vocal' | 'text') => ({
         $argsByType: {
             action: {
                 isSubCommand: true,
                 required: true,
                 type: "string",
-                description: "L'action à effectuer : blacklist, enable, disable",
+                description: "L'action à effectuer : blacklist, enable, disable, defaultLimit",
                 choices: {
                     blacklist: "Gérer la blacklist",
-                    enable: "Activer l'écoute "+(type === "vocal" ? "vocale" : "textuelle")+" du serveur",
-                    disable: "Désactiver l'écoute "+(type === "vocal" ? "vocale" : "textuelle")+" du serveur"
+                    enable: "Activer l'écoute " + (type === "vocal" ? "vocale" : "textuelle") + " du serveur",
+                    disable: "Désactiver l'écoute " + (type === "vocal" ? "vocale" : "textuelle") + " du serveur",
+                    defaultlimit: "Définir ou voir la limite par défaut des écoutes " + (type === 'vocal' ? "vocales" : "textuelles")
                 }
             },
             subAction: {
@@ -113,18 +123,31 @@ export default abstract class ConfigTextAndVocal extends Command {
                 displayValidErrorEvenIfFound: true,
                 description: "Le ou les channels vocaux à supprimer ou ajouter",
                 valid: (channels: GuildChannel[] | GuildChannel) =>
-                    (channels instanceof Array && !channels.some(channel => channel.type != ConfigTextAndVocal.types[type].channelType)) ||
-                    (channels instanceof GuildChannel && channels.type == ConfigTextAndVocal.types[type].channelType),
+                    (channels instanceof Array && !channels.some(channel => !ConfigTextAndVocal.types[type].channelTypes.includes(channel.type))) ||
+                    (channels instanceof GuildChannel && ConfigTextAndVocal.types[type].channelTypes.includes(channels.type)),
                 errorMessage: (_) => ({
                     name: "Channels non ou mal renseigné",
-                    value: "Ils ne peuvent être que des channels "+(type === "vocal" ? "vocaux" : "textuels")
+                    value: "Ils ne peuvent être que des channels " + (type === "vocal" ? "vocaux" : "textuels")
+                })
+            },
+            limit: {
+                referToSubCommands: ['defaultlimit'],
+                required: false,
+                type: 'duration',
+                description: "Re définir la limite par défaut",
+                valid: (value: number) => value >= ConfigTextAndVocal.types[type].minimumLimit,
+                errorMessage: value => ({
+                    name: "Vous avez mal rentrez la limite",
+                    value: typeof (value) === "number" ?
+                        "Avez vous rentrez une valeur supérieure ou égale à " + showTime(extractUTCTime(ConfigTextAndVocal.types[type].minimumLimit), 'fr')+" ?" :
+                        "Syntaxe incorrecte"
                 })
             }
         }
     })
 
     async action(args: configTextAndVocalArgs) {
-        const {action, subAction, blacklistType, users, roles, channels} = args;
+        const {action, subAction, blacklistType, users, roles, channels, limit} = args;
 
         if (this.type === null || ConfigTextAndVocal.types[this.type] === undefined)
             return this.response(false,
@@ -158,107 +181,133 @@ export default abstract class ConfigTextAndVocal extends Command {
                 configObj.enabled = action === "enable";
                 configObj.save();
             }
-            return this.response(true, "L'abonnement "+(this.type === "vocal" ? "vocal" : "textuel")+" a été " + (action == "enable" ? "activé" : "désactivé") + " sur ce serveur");
+            return this.response(true, "L'abonnement " + (this.type === "vocal" ? "vocal" : "textuel") + " a été " + (action == "enable" ? "activé" : "désactivé") + " sur ce serveur");
 
-        } else { // if action is 'blacklist'
-            if (configObj == null || !configObj.enabled)
-                return this.response(false,
-                    this.sendErrors({
-                        name: (this.type === "vocal" ? "Vocal" : "Textuel")+" désactivé",
-                        value: "Vous devez d'abord activer l'abonnement "+(this.type === "vocal" ? "vocal" : "textuel")+" sur ce serveur avec : \n" + config.command_prefix + this.commandName + " enable"
-                    })
-                );
-            switch (subAction) {
-                case 'add':
-                    const notFoundUserId: string[] = [];
-                    const subscribes: Array<typeof subscribeModel> = await subscribeModel.find({
-                        serverId: this.guild.id
-                    });
-                    if (blacklistType === "channel") {
-                        configObj.channelBlacklist = this.addIdsToList(configObj.channelBlacklist, channels.map(channel => channel.id));
-                    } else {
-                        if (users)
-                            configObj.listenerBlacklist.users = this.addIdsToList(configObj.listenerBlacklist.users, users.map(user => user.id));
-                        if (roles)
-                            configObj.listenerBlacklist.roles = this.addIdsToList(configObj.listenerBlacklist.roles, roles.map(role => role.id));
-                    }
-                    for (const subscribe of subscribes) {
-                        if (blacklistType === "channel") {
-                            if (this.type === "text" && channels.some(channel => channel.id === subscribe.channelId))
-                                subscribe.remove();
-                            continue;
-                        }
+        }
 
-                        if (users !== undefined && users.some(user => user.id === subscribe.listenerId || user.id === subscribe.listenedId)) {
-                            subscribe.remove();
-                            continue;
-                        }
+        // if action is 'blacklist' or 'defaultlimit'
+        if (configObj == null || !configObj.enabled)
+            return this.response(false,
+                this.sendErrors({
+                    name: (this.type === "vocal" ? "Vocal" : "Textuel") + " désactivé",
+                    value: "Vous devez d'abord activer l'abonnement " + (this.type === "vocal" ? "vocal" : "textuel") + " sur ce serveur avec : \n" + config.command_prefix + this.commandName + " enable"
+                })
+            );
 
-                        let listener: null | GuildMember = null;
-                        try {
-                            listener = await this.guild.members.fetch(subscribe.listenerId);
-                        } catch (e) {
-                            notFoundUserId.push(subscribe.listenerId);
-                        }
-                        let listened: null | GuildMember = null;
-                        try {
-                            listened = await this.guild.members.fetch(subscribe.listenedId);
-                        } catch (e) {
-                            notFoundUserId.push(subscribe.listenedId);
-                        }
-                        if (listener === null || listened === null ||
-                            (roles !== undefined && (
-                                listener.roles.cache.some(roleA => roles.some(roleB => roleA.id === roleB.id)) ||
-                                listened.roles.cache.some(roleA => roles.some(roleB => roleA.id === roleB.id))
-                            ))) {
-                            subscribe.remove();
-                        }
-                    }
-                    let msg = "Les " + (blacklistType == "channel" ? "channels" : "utilisateurs/roles") + " ont été ajouté à la blacklist '" + blacklistType + "'"
-                    if (notFoundUserId.length > 0) {
-                        msg += "\n" + notFoundUserId.map(id => "L'utilisateur avec l'id " + id + " est introuvable, son écoute a été supprimée").join("\n")
-                    }
-                    configObj.save();
-                    return this.response(true, msg);
-                case 'remove':
-                    if (blacklistType == "channel") {
-                        configObj.channelBlacklist = this.removeIdsToList(configObj.channelBlacklist, channels.map(channel => channel.id))
-                    } else {
-                        if (users)
-                            configObj.listenerBlacklist.users = this.removeIdsToList(configObj.listenerBlacklist.users, users.map(user => user.id));
-                        if (roles)
-                            configObj.listenerBlacklist.roles = this.removeIdsToList(configObj.listenerBlacklist.roles, roles.map(role => role.id));
-                    }
-                    configObj.save();
-                    return this.response(true,
-                        "Les " + (blacklistType == "channel" ? "channels" : "utilisateurs/roles") + " ont été retirés de la blacklist '" + blacklistType + "'"
-                    );
-                case 'clear':
-                    if (blacklistType == "channel") {
-                        configObj.channelBlacklist = [];
-                    } else {
-                        configObj.listenerBlacklist.users = [];
-                        configObj.listenerBlacklist.roles = [];
-                    }
-                    configObj.save();
-                    return this.response(true, "La blacklist '" + blacklistType + "' a été vidée");
-                case 'show':
-                    let fields: EmbedFieldData[];
-                    if (blacklistType == "channel") {
-                        fields = await this.createEmbedFieldList([configObj.channelBlacklist], ['channel']);
-                    } else {
-                        fields = await this.createEmbedFieldList([configObj.listenerBlacklist.users, configObj.listenerBlacklist.roles], ['user', 'role']);
-                    }
-
-                    configObj.save();
-
-                    const embeds = splitFieldsEmbed(25, fields, (embed: MessageEmbed, nbPart) => {
-                        if (nbPart == 1) {
-                            embed.setTitle("Contenu de la blacklist '" + blacklistType + "'");
-                        }
-                    });
-                    return this.response(true, {embeds});
+        if (action === "defaultlimit") {
+            if (limit) {
+                configObj.defaultLimit = limit;
+                configObj.save();
+                return this.response(true, {
+                    embeds: [
+                        new MessageEmbed().setFields({
+                            name: "Valeur changée avec succès!",
+                            value: "Vous avez fixé la limite par défaut de l'écoute " + (this.type === "vocal" ? "vocale" : "textuelle") + " à " + showTime(extractUTCTime(limit), "fr_long")
+                        })
+                    ]
+                })
             }
+            return this.response(true, {
+                embeds: [
+                    new MessageEmbed().setFields({
+                        name: "Voici la limite par défaut de l'écoute " + (this.type === "vocal" ? "vocale" : "textuelle"),
+                        value: "La limite par défaut est : " + showTime(extractUTCTime(configObj.defaultLimit), "fr_long")
+                    })
+                ]
+            })
+        }
+
+        // If action is blacklist
+        switch (subAction) {
+            case 'add':
+                const notFoundUserId: string[] = [];
+                const subscribes: Array<typeof subscribeModel> = await subscribeModel.find({
+                    serverId: this.guild.id
+                });
+                if (blacklistType === "channel") {
+                    configObj.channelBlacklist = this.addIdsToList(configObj.channelBlacklist, channels.map(channel => channel.id));
+                } else {
+                    if (users)
+                        configObj.listenerBlacklist.users = this.addIdsToList(configObj.listenerBlacklist.users, users.map(user => user.id));
+                    if (roles)
+                        configObj.listenerBlacklist.roles = this.addIdsToList(configObj.listenerBlacklist.roles, roles.map(role => role.id));
+                }
+                for (const subscribe of subscribes) {
+                    if (blacklistType === "channel") {
+                        if (this.type === "text" && channels.some(channel => channel.id === subscribe.channelId))
+                            subscribe.remove();
+                        continue;
+                    }
+
+                    if (users !== undefined && users.some(user => user.id === subscribe.listenerId || user.id === subscribe.listenedId)) {
+                        subscribe.remove();
+                        continue;
+                    }
+
+                    let listener: null | GuildMember = null;
+                    try {
+                        listener = await this.guild.members.fetch(subscribe.listenerId);
+                    } catch (e) {
+                        notFoundUserId.push(subscribe.listenerId);
+                    }
+                    let listened: null | GuildMember = null;
+                    try {
+                        listened = await this.guild.members.fetch(subscribe.listenedId);
+                    } catch (e) {
+                        notFoundUserId.push(subscribe.listenedId);
+                    }
+                    if (listener === null || listened === null ||
+                        (roles !== undefined && (
+                            listener.roles.cache.some(roleA => roles.some(roleB => roleA.id === roleB.id)) ||
+                            listened.roles.cache.some(roleA => roles.some(roleB => roleA.id === roleB.id))
+                        ))) {
+                        subscribe.remove();
+                    }
+                }
+                let msg = "Les " + (blacklistType == "channel" ? "channels" : "utilisateurs/roles") + " ont été ajouté à la blacklist '" + blacklistType + "'"
+                if (notFoundUserId.length > 0) {
+                    msg += "\n" + notFoundUserId.map(id => "L'utilisateur avec l'id " + id + " est introuvable, son écoute a été supprimée").join("\n")
+                }
+                configObj.save();
+                return this.response(true, msg);
+            case 'remove':
+                if (blacklistType == "channel") {
+                    configObj.channelBlacklist = this.removeIdsToList(configObj.channelBlacklist, channels.map(channel => channel.id))
+                } else {
+                    if (users)
+                        configObj.listenerBlacklist.users = this.removeIdsToList(configObj.listenerBlacklist.users, users.map(user => user.id));
+                    if (roles)
+                        configObj.listenerBlacklist.roles = this.removeIdsToList(configObj.listenerBlacklist.roles, roles.map(role => role.id));
+                }
+                configObj.save();
+                return this.response(true,
+                    "Les " + (blacklistType == "channel" ? "channels" : "utilisateurs/roles") + " ont été retirés de la blacklist '" + blacklistType + "'"
+                );
+            case 'clear':
+                if (blacklistType == "channel") {
+                    configObj.channelBlacklist = [];
+                } else {
+                    configObj.listenerBlacklist.users = [];
+                    configObj.listenerBlacklist.roles = [];
+                }
+                configObj.save();
+                return this.response(true, "La blacklist '" + blacklistType + "' a été vidée");
+            case 'show':
+                let fields: EmbedFieldData[];
+                if (blacklistType == "channel") {
+                    fields = await this.createEmbedFieldList([configObj.channelBlacklist], ['channel']);
+                } else {
+                    fields = await this.createEmbedFieldList([configObj.listenerBlacklist.users, configObj.listenerBlacklist.roles], ['user', 'role']);
+                }
+
+                configObj.save();
+
+                const embeds = splitFieldsEmbed(25, fields, (embed: MessageEmbed, nbPart) => {
+                    if (nbPart == 1) {
+                        embed.setTitle("Contenu de la blacklist '" + blacklistType + "'");
+                    }
+                });
+                return this.response(true, {embeds});
         }
         return this.response(false, "Aucune action spécifiée");
     }
@@ -274,7 +323,7 @@ export default abstract class ConfigTextAndVocal extends Command {
 
                 let found = false;
                 let name: string = "introuvable";
-                let value: string = "id: "+id;
+                let value: string = "id: " + id;
                 switch (types[i]) {
                     case 'channel':
                         channel = this.guild?.channels.cache.get(id);
@@ -301,7 +350,7 @@ export default abstract class ConfigTextAndVocal extends Command {
                         }
                 }
                 if (!found)
-                    lists[i].splice(j,1);
+                    lists[i].splice(j, 1);
 
                 return {
                     name: name + (types.length > 1 ? " (" + types[i] + ")" : ""),
@@ -340,15 +389,15 @@ export default abstract class ConfigTextAndVocal extends Command {
             .addFields([
                 {
                     name: "enable",
-                    value: "Activer les écoutes "+(this.type === "vocal" ? "vocales" : "textuelles")+" sur ce serveur"
+                    value: "Activer les écoutes " + (this.type === "vocal" ? "vocales" : "textuelles") + " sur ce serveur"
                 },
                 {
                     name: "disable",
-                    value: "Déactiver les écoutes "+(this.type === "vocal" ? "vocales" : "textuelles")+" sur ce serveur"
+                    value: "Déactiver les écoutes " + (this.type === "vocal" ? "vocales" : "textuelles") + " sur ce serveur"
                 },
                 {
                     name: "blacklist add listener @user1,@user2",
-                    value: "Ajouter @user1 et @user2 dans la blacklist des listeners (ils n'auront plus le droit d'utiliser l'écoute "+(this.type === "vocal" ? "vocales" : "textuelles")+")"
+                    value: "Ajouter @user1 et @user2 dans la blacklist des listeners (ils n'auront plus le droit d'utiliser l'écoute " + (this.type === "vocal" ? "vocales" : "textuelles") + ")"
                 },
                 {
                     name: "blacklist add listener @role1,@role2",

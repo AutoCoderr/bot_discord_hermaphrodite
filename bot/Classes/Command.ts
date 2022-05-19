@@ -380,12 +380,12 @@ export default class Command {
                         fails.push({...argModel, field: attr, value: initialValue});
                     }
                 }
-                if (args[attr] == undefined)
+                if (args[attr] === undefined)
                     args[attr] = initialValue;
             }
 
-            if (!failed && args[attr] && typeof(argModel.valid) == 'function' && !(await argModel.valid(args[attr],args,this))) {
-                fails.push({...argModel, field: attr, value: initialValue});
+            if (!failed && args[attr] !== undefined && typeof(argModel.valid) == 'function' && !(await argModel.valid(args[attr],args,this))) {
+                fails.push({...argModel, field: attr, value: args[attr]});
             }
         } else {
             const subCommand = this.slashCommandOptions.getSubcommand();

@@ -9,8 +9,8 @@ import {
     User
 } from "discord.js";
 import config from "../config";
-import TextConfig, {ITextConfig} from "../Models/Text/TextConfig";
-import TextUserConfig, {ITextUserConfig,minimumLimit} from "../Models/Text/TextUserConfig";
+import TextConfig, {ITextConfig, minimumLimit} from "../Models/Text/TextConfig";
+import TextUserConfig, {ITextUserConfig} from "../Models/Text/TextUserConfig";
 import TextSubscribe, {ITextSubscribe} from "../Models/Text/TextSubscribe";
 import TextInvite from "../Models/Text/TextInvite";
 import {
@@ -140,7 +140,16 @@ export default class Text extends Command {
                 required: (args) => args.action === 'limit',
                 type: "duration",
                 description: "Le temps durant lequel on souhaite ne pas recevoir de notif (ex: 30s, 5m, 3h, 2j)",
-                valid: (time, args) => args.action === 'limit' || time > 0
+                valid: (time, args) =>
+                    (args.action === "mute" && time > 0) ||
+                    (args.action === "limit" && time >= minimumLimit),
+                errorMessage: (value,args) => ({
+                    name: "Vous avez mal rentrez le temps",
+                    ...(typeof(value) === "number" ?
+                            {value: "Êtes vous sur qu'il est supérieur "+(args.action === "limit" ? "ou égal à "+showTime(extractUTCTime(minimumLimit), 'fr') : "à 0")+" ?"} :
+                            {value: "Vous n'avez pas respecté la syntaxe"}
+                    )
+                })
             },
             subs: {
                 referToSubCommands: ['status'],
@@ -623,19 +632,11 @@ export default class Text extends Command {
         embed: MessageEmbed
     ) {
         embed.addFields({
-            name: <number>time < minimumLimit ?
-                "Changement impossible" :
-                "Vous avez changé votre limite",
-            value: <number>time < minimumLimit ?
-                "Vous ne pouvez pas mettre de limite inférieure à "+showTime(extractUTCTime(minimumLimit), 'fr_long') :
-                "Il y aura maintenant un répit de" + showTime(extractUTCTime(<number>time), 'fr_long') + " entre chaque notification"
+            name: "Vous avez changé votre limite",
+            value: "Il y aura maintenant un répit de" + showTime(extractUTCTime(<number>time), 'fr_long') + " entre chaque notification"
         })
-
-        if (time < minimumLimit)
-            return;
         ownUserConfig.limit = time;
         ownUserConfig.save();
-
     }
 
     async block(

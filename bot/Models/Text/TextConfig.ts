@@ -4,7 +4,8 @@ import { connect } from "../../Mongo";
 
 const db = connect();
 
-export const defaultLimit = 5*60*1000;
+export const defaultLimit = 5*60*1000; // By default 5 minutes for the limit, can be changed by admin
+export const minimumLimit = 2*60*1000; // At least 2 minutes for the limit
 
 export interface ITextConfig {
     enabled: boolean;

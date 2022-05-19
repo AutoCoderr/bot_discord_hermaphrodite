@@ -4,7 +4,8 @@ import { connect } from "../../Mongo";
 
 const db = connect();
 
-export const defaultLimit = 0;
+export const defaultLimit = 0; // By default 0 for the limit, can be changed by admin
+export const minimumLimit = 0; // Minimum value for the limit
 
 export interface IVocalConfig {
     enabled: boolean;

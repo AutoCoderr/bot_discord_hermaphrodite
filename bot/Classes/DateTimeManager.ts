@@ -54,17 +54,25 @@ export function extractUTCDate(date: Date|number) {
 
 export function showTime(time: {h: number, m: number, s: number}, format: string): string {
     const {h,m,s} = time;
+    if (h+m+s === 0)
+        return '0';
     switch (format) {
         case 'fr_long':
             return (h > 0 ? ' '+h+' heure'+(h > 1 ? 's' : '') : '')+
                 (m > 0 ? ' '+m+' minute'+(m > 1 ? 's' : '') : '')+
                 (s > 0 ? ' '+s+' seconde'+(s > 1 ? 's' : '') : '');
         case 'fr':
-            return h+'h'+m+'m'+s+'s';
+            return (h > 0 ? ' '+h+'h' : '')+
+            ((m > 0 || h > 0) ? ' '+m+'m' : '')+
+            ((s > 0 || m > 0 ||  h > 0) ? ' '+s+'s' : '');
         case 'classic':
-            return [h,m,s].join(':');
+            const acc: {values: string[], timeNotNull: boolean} = {values: [], timeNotNull: false};
+            return [h,m,s].reduce(({values, timeNotNull},v) => ({
+                timeNotNull: timeNotNull ? timeNotNull : v > 0,
+                values: [...values, ...((v > 0 || timeNotNull) ? [addMissingZero(v)] : [])]
+            }), acc).values.join(':');
         default:
-            return "invalid format";
+            return "invalid time format";
     }
 }
 

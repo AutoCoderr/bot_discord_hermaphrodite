@@ -10,7 +10,7 @@ import {
 } from "discord.js";
 import config from "../config";
 import VocalSubscribe, {IVocalSubscribe} from "../Models/Vocal/VocalSubscribe";
-import VocalConfig, {IVocalConfig} from "../Models/Vocal/VocalConfig";
+import VocalConfig, {IVocalConfig, minimumLimit} from "../Models/Vocal/VocalConfig";
 import VocalUserConfig, {IVocalUserConfig} from "../Models/Vocal/VocalUserConfig";
 import VocalInvite from "../Models/Vocal/VocalInvite";
 import {splitFieldsEmbed} from "../Classes/OtherFunctions";
@@ -107,9 +107,17 @@ export default class Vocal extends Command {
             time: {
                 referToSubCommands: ['limit', 'mute'],
                 required: (args) => ["limit", "mute"].includes(args.action),
-                type: "duration",
+                type: 'duration',
                 description: "Le temps durant lequel on souhaite ne pas recevoir de notif (ex: 30s, 5m, 3h, 2j)",
-                valid: (time, args) => args.action !== 'mute' || time > 0
+                valid: (time, args) => (args.action === 'mute' && time > 0) ||
+                    (args.action === 'limit' && time >= minimumLimit),
+                errorMessage: (value,args) => ({
+                    name: "Vous avez mal rentrez le temps",
+                    ...(typeof(value) === "number" ?
+                            {value: "Êtes vous sur qu'il est supérieur "+(args.action === 'limit' ? "ou égal à "+showTime(extractUTCTime(minimumLimit), 'fr') : "à 0")+" ?"} :
+                            {value: "Vous n'avez pas respecté la syntaxe"}
+                    )
+                })
             }
         }
     }

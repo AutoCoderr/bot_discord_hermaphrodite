@@ -4,8 +4,6 @@ import {defaultLimit} from "./TextConfig";
 
 const db = connect();
 
-export const minimumLimit = 2*60*1000; // at least 2 minutes for the limit
-
 export interface ITextUserConfig {
     userId: string;
     serverId: string;
