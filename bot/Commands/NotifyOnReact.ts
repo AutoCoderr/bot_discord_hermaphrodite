@@ -69,7 +69,7 @@ export default class NotifyOnReact extends Command {
         },
     };
 
-    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: string) {
+    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
         super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, NotifyOnReact.commandName, NotifyOnReact.argsModel);
         this.listenings = NotifyOnReact.listenings;
     }

@@ -19,6 +19,14 @@ import {getCustomType, getSlashTypeGetterName} from "../slashCommands";
 
 const validModelCommands = {};
 
+export interface responseResultsType extends Array<string | MessagePayload | MessageOptions>{}
+
+export interface responseType {
+    success: boolean;
+    result: responseResultsType,
+    callback?: Function
+}
+
 export default class Command {
 
     static commandName: null|string = null;
@@ -26,10 +34,12 @@ export default class Command {
     static description: null|string = null;
     static argsModel: any = {};
 
+    static abstract: boolean = false;
+
     static customCommand: boolean = true;
     static slashCommand: boolean = false;
 
-    commandOrigin: string;
+    commandOrigin: 'slash'|'custom';
 
     commandName: null|string;
     guild: null|Guild;
@@ -40,7 +50,7 @@ export default class Command {
     writtenCommand: null|string = null; // If command called as a custom command, get the message typed by the user
     slashCommandOptions: null|CommandInteractionOptionResolver = null; // If command called as a slash command, get options
 
-    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: string, commandName: null|string, argsModel: any) {
+    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom', commandName: null|string, argsModel: any) {
         this.guild = guild;
         this.channel = channel;
         this.member = member;
@@ -72,11 +82,11 @@ export default class Command {
             let args: any;
             if (!slashCommand) {
                 const {success, result} = await this.computeArgs(this.parseCommand(),this.argsModel);
-                if (!success) return { result: <Array<string | MessagePayload | MessageOptions >> result};
+                if (!success) return { result: <responseResultsType> result};
                 args = result;
             } else {
                 const {success, result} = await this.getArgsFromSlashOptions();
-                if (!success) return { result: <Array<string | MessagePayload | MessageOptions >> result};
+                if (!success) return { result: <responseResultsType> result};
                 args = result;
             }
 
@@ -89,7 +99,7 @@ export default class Command {
         return false;
     }
 
-    sendErrors(errors: Object|Array<Object>): Array<string | MessagePayload | MessageOptions> {
+    sendErrors(errors: Object|Array<Object>): responseResultsType {
         if (!(errors instanceof Array)) {
             errors = [errors];
         }
@@ -110,7 +120,7 @@ export default class Command {
         return [{embeds: [Embed]}];
     }
 
-    displayHelp(displayHelp = true, fails: null|Array<any> = null, failsExtract: null|Array<any> = null, args: null|{[attr: string]: any} = null): Array<string | MessagePayload | MessageOptions> {
+    displayHelp(displayHelp = true, fails: null|Array<any> = null, failsExtract: null|Array<any> = null, args: null|{[attr: string]: any} = null): responseResultsType {
         const commandName = this.commandName;
         let embeds: Array<MessageEmbed> = [
             new MessageEmbed()
@@ -207,7 +217,7 @@ export default class Command {
 
         if (displayHelp)
             embeds.push(this.help())
-        else
+        else if (this.commandOrigin === "custom")
             embeds[embeds.length-1].addFields({
                 name: "Voir l'aide : ",
                 value: "Tapez : "+config.command_prefix+this.commandName+" -h"
@@ -304,7 +314,7 @@ export default class Command {
         }
     }
 
-    checkIfModelValid(): true|Array<string | MessagePayload | MessageOptions> {
+    checkIfModelValid(): true|responseResultsType {
         if (this.commandName != null && validModelCommands[this.commandName]) return true;
 
         let valid = true;
@@ -370,12 +380,12 @@ export default class Command {
                         fails.push({...argModel, field: attr, value: initialValue});
                     }
                 }
-                if (args[attr] == undefined)
+                if (args[attr] === undefined)
                     args[attr] = initialValue;
             }
 
-            if (!failed && args[attr] && typeof(argModel.valid) == 'function' && !(await argModel.valid(args[attr],args,this))) {
-                fails.push({...argModel, field: attr, value: initialValue});
+            if (!failed && args[attr] !== undefined && typeof(argModel.valid) == 'function' && !(await argModel.valid(args[attr],args,this))) {
+                fails.push({...argModel, field: attr, value: args[attr]});
             }
         } else {
             const subCommand = this.slashCommandOptions.getSubcommand();
@@ -390,7 +400,7 @@ export default class Command {
         }
     }
 
-    async getArgsFromSlashOptions(): Promise<{ success: boolean, result: {[attr: string]: any}|Array<string | MessagePayload | MessageOptions> }> {
+    async getArgsFromSlashOptions(): Promise<{ success: boolean, result: {[attr: string]: any}|responseResultsType }> {
         if (this.slashCommandOptions === null) return {success: false, result: {}};
         let args: {[name: string]: any} = {};
         let fails: Array<any> = [];
@@ -498,7 +508,7 @@ export default class Command {
         return args['--help'] || args['-h'];
     }
 
-    async computeArgs(args,model): Promise<{ success: boolean, result: {[attr: string]: any}|Array<string | MessagePayload | MessageOptions> }> {
+    async computeArgs(args,model): Promise<{ success: boolean, result: {[attr: string]: any}|responseResultsType }> {
         if (this.helpAsked(args))
             return this.response(false, this.displayHelp());
 
@@ -745,7 +755,7 @@ export default class Command {
         return {success: true, result: out};
     }
 
-    response(success: boolean, result: Array<string | MessagePayload | MessageOptions>|string | MessagePayload | MessageOptions, callback: null|Function = null):  {success: boolean, result: Array<string | MessagePayload | MessageOptions>, callback?: Function} {
+    response(success: boolean, result: responseResultsType|string | MessagePayload | MessageOptions, callback: null|Function = null): responseType {
         return {
             success,
             result: result instanceof Array ? result : [result],
@@ -757,7 +767,7 @@ export default class Command {
         return new MessageEmbed();
     }
 
-    async action(args: any,bot): Promise<{success: boolean, result: Array<string | MessagePayload | MessageOptions>, callback?: Function}> { // To be overloaded
+    async action(args: any,bot): Promise<responseType> { // To be overloaded
         return this.response(true, 'Hello');
     }
 }

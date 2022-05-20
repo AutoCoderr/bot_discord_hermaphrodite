@@ -1,4 +1,4 @@
-import { existingCommands } from "./CommandsDescription";
+import {existingCommands} from "./CommandsDescription";
 import History from "../Models/History";
 import {
     EmbedFieldData,
@@ -19,7 +19,7 @@ import ListNotifyOnReact from "../Commands/ListNotifyOnReact";
 export function addMissingZero(number, n = 2) {
     number = number.toString();
     while (number.length < n) {
-        number = "0"+number;
+        number = "0" + number;
     }
     return number;
 }
@@ -46,7 +46,7 @@ export function getArgsModelHistory() {
                 if (value != undefined) {
                     return {
                         name: "Liste de commandes invalide",
-                        value: value+" : Une de ces commandes n'existe pas, vous est inaccesible, ou a été spécifiée plusieurs fois"
+                        value: value + " : Une de ces commandes n'existe pas, vous est inaccesible, ou a été spécifiée plusieurs fois"
                     };
                 }
                 return {
@@ -60,7 +60,7 @@ export function getArgsModelHistory() {
             type: "string",
             required: false,
             description: "'asc' ou 'desc/dsc' ('desc' par défaut) pour trier dans l'ordre chronologique dans les deux sens",
-            valid: (value, _) => ['asc','desc','dsc'].includes(value.toLowerCase()),
+            valid: (value, _) => ['asc', 'desc', 'dsc'].includes(value.toLowerCase()),
             default: "desc"
         },
         limit: {
@@ -87,10 +87,10 @@ export function getArgsModelHistory() {
 }
 
 
-export async function getHistory(currentCommand: HistoryCmd|HistoryExec,args: {commands: typeof Command[], sort: string, limit: number, channels: GuildChannel[], users: GuildMember[]}) {
-    let { commands, sort, limit, channels, users } = args;
+export async function getHistory(currentCommand: HistoryCmd | HistoryExec, args: { commands: typeof Command[], sort: string, limit: number, channels: GuildChannel[], users: GuildMember[] }) {
+    let {commands, sort, limit, channels, users} = args;
 
-    let where:any = {serverId: (<Guild>currentCommand.guild).id};
+    let where: any = {serverId: (<Guild>currentCommand.guild).id};
     if (users != undefined) {
         where.userId = {$in: users.map(user => user.id)};
     }
@@ -103,7 +103,7 @@ export async function getHistory(currentCommand: HistoryCmd|HistoryExec,args: {c
             where.commandName.$in.push(command.commandName);
         }
     } else {
-        where.commandName = { $nin: [] };
+        where.commandName = {$nin: []};
         for (let aCommand in existingCommands) {
             if (!await existingCommands[aCommand].staticCheckPermissions(currentCommand.channel, currentCommand.member, currentCommand.guild, false)) {
                 where.commandName.$nin.push(aCommand);
@@ -116,7 +116,7 @@ export async function getHistory(currentCommand: HistoryCmd|HistoryExec,args: {c
     return await History.find(where).limit(limit).sort({dateTime: sort});
 }
 
-export async function forEachNotifyOnReact(callback, channel: undefined|GuildChannel, message: undefined|Message, embed: MessageEmbed, command: CancelNotifyOnReact|ListNotifyOnReact) {
+export async function forEachNotifyOnReact(callback, channel: undefined | GuildChannel, message: undefined | Message, embed: MessageEmbed, command: CancelNotifyOnReact | ListNotifyOnReact) {
     if (command.guild == null) {
         callback(false);
         return;
@@ -125,16 +125,16 @@ export async function forEachNotifyOnReact(callback, channel: undefined|GuildCha
     // @ts-ignore
     let listenings = existingCommands.NotifyOnReact.listenings[serverId];
 
-    if (typeof(listenings) == "undefined") {
+    if (typeof (listenings) == "undefined") {
         callback(false);
     } else if (channel != undefined) {
-        if (typeof(listenings[channel.id]) != "undefined") {
+        if (typeof (listenings[channel.id]) != "undefined") {
             if (message != undefined) {
                 let nbListeneds = 0;
-                if (typeof(listenings[channel.id][message.id]) != "undefined") { // Si un channel et un message ont été spécifiés, regarde dans le message
+                if (typeof (listenings[channel.id][message.id]) != "undefined") { // Si un channel et un message ont été spécifiés, regarde dans le message
                     for (let emoteKey in listenings[channel.id][message.id]) {
                         if (listenings[channel.id][message.id][emoteKey]) {
-                            const contentMessage = message.content.substring(0,Math.min(20,message.content.length)) + "...";
+                            const contentMessage = message.content.substring(0, Math.min(20, message.content.length)) + "...";
                             callback(true, channel, message, contentMessage, emoteKey);
                             nbListeneds += 1;
                         }
@@ -146,13 +146,13 @@ export async function forEachNotifyOnReact(callback, channel: undefined|GuildCha
             } else { // Si un channel a été spécifié, mais pas de message, regarde tout les messages de ce channel
                 let nbListeneds = 0;
                 for (let messageId in listenings[channel.id]) {
-                    let messageListened: Message|null = null;
+                    let messageListened: Message | null = null;
                     try {
                         messageListened = await (<TextChannel>channel).messages.fetch(messageId);
-                    } catch(e) {
+                    } catch (e) {
                         embed.setFields({
                             name: "Message introuvable, écoutes supprimées",
-                            value: "Le message "+messageId+" est introuvable, écoutes supprimées"
+                            value: "Le message " + messageId + " est introuvable, écoutes supprimées"
                         });
                         // @ts-ignore
                         existingCommands.CancelNotifyOnReact.deleteNotifyOnReactInBdd(serverId, channel.id, messageId);
@@ -160,7 +160,7 @@ export async function forEachNotifyOnReact(callback, channel: undefined|GuildCha
                         delete listenings[channel.id][messageId];
                         continue;
                     }
-                    const contentMessage = messageListened.content.substring(0, Math.min(20,messageListened.content.length)) + "...";
+                    const contentMessage = messageListened.content.substring(0, Math.min(20, messageListened.content.length)) + "...";
                     for (let emoteKey in listenings[channel.id][messageId]) {
                         if (listenings[channel.id][messageId][emoteKey]) {
                             nbListeneds += 1;
@@ -179,11 +179,11 @@ export async function forEachNotifyOnReact(callback, channel: undefined|GuildCha
     } else { // Si rien n'a été spécifié en argument, regarde sur tout les messaqes de tout les channels
         let nbListeneds = 0;
         for (let channelId in listenings) {
-            const channel: GuildChannel|ThreadChannel|null = command.guild.channels.cache.get(channelId)??null;
+            const channel: GuildChannel | ThreadChannel | null = command.guild.channels.cache.get(channelId) ?? null;
             if (channel === null) {
                 embed.setFields({
                     name: "Channel introuvable, écoutes supprimées",
-                    value: "Le channel "+channelId+" est introuvable, écoutes supprimées"
+                    value: "Le channel " + channelId + " est introuvable, écoutes supprimées"
                 });
                 // @ts-ignore
                 existingCommands.CancelNotifyOnReact.deleteNotifyOnReactInBdd(serverId, channelId);
@@ -192,13 +192,13 @@ export async function forEachNotifyOnReact(callback, channel: undefined|GuildCha
                 continue;
             }
             for (let messageId in listenings[channelId]) {
-                let messageListened: Message|null = null;
+                let messageListened: Message | null = null;
                 try {
-                    messageListened = await (<TextChannel>channel).messages.fetch(messageId)??null;
+                    messageListened = await (<TextChannel>channel).messages.fetch(messageId) ?? null;
                 } catch (e) {
                     embed.setFields({
                         name: "Message introuvable, écoutes supprimées",
-                        value: "Le message "+messageId+" est introuvable, écoutes supprimées"
+                        value: "Le message " + messageId + " est introuvable, écoutes supprimées"
                     });
                     // @ts-ignore
                     existingCommands.CancelNotifyOnReact.deleteNotifyOnReactInBdd(serverId, channel.id, messageId);
@@ -206,7 +206,7 @@ export async function forEachNotifyOnReact(callback, channel: undefined|GuildCha
                     delete listenings[channelId][messageId];
                     continue;
                 }
-                const contentMessage = messageListened.content.substring(0, Math.min(20,messageListened.content.length)) + "...";
+                const contentMessage = messageListened.content.substring(0, Math.min(20, messageListened.content.length)) + "...";
                 for (let emoteKey in listenings[channelId][messageId]) {
                     if (listenings[channelId][messageId][emoteKey]) {
                         nbListeneds += 1;
@@ -222,16 +222,16 @@ export async function forEachNotifyOnReact(callback, channel: undefined|GuildCha
 }
 
 export function splitFieldsEmbed(nbByPart: number,
-                                     fields: EmbedFieldData[],
-                                     atEachPart: Function): Array<MessageEmbed> {
+                                 fields: EmbedFieldData[],
+                                 atEachPart: Function): Array<MessageEmbed> {
     let Embed: MessageEmbed;
     let Embeds: Array<MessageEmbed> = [];
-    for (let i=0;i<fields.length;i++) {
+    for (let i = 0; i < fields.length; i++) {
         if (i % nbByPart == 0) {
             Embed = new MessageEmbed()
                 .setColor('#0099ff')
                 .setTimestamp();
-            atEachPart(Embed, (i/nbByPart)+1);
+            atEachPart(Embed, (i / nbByPart) + 1);
             Embeds.push(Embed);
         }
         const field = fields[i];
@@ -243,20 +243,20 @@ export function splitFieldsEmbed(nbByPart: number,
 
 export function splitOneFieldLinesEmbed(title: string, nbByPart: number, lines: string[]) {
     let embeds: MessageEmbed[] = [];
-    for (let i=0;i<Math.floor(lines.length/nbByPart)+(lines.length%nbByPart != 0 ? 1 : 0);i++) {
+    for (let i = 0; i < Math.floor(lines.length / nbByPart) + (lines.length % nbByPart != 0 ? 1 : 0); i++) {
         embeds.push(new MessageEmbed()
             .setColor('#0099ff')
             .setTimestamp()
             .addFields({
                 name: title,
-                value: lines.slice(i*nbByPart,Math.min((i+1)*nbByPart,lines.length)).join("\n")
+                value: lines.slice(i * nbByPart, Math.min((i + 1) * nbByPart, lines.length)).join("\n")
             }));
     }
     return embeds;
 }
 
 export function isNumber(num) {
-    return (typeof(num) == 'number' && !isNaN(num)) || (
-      typeof(num) == 'string' && parseInt(num).toString() == num && num != "NaN"
+    return (typeof (num) == 'number' && !isNaN(num)) || (
+        typeof (num) == 'string' && parseInt(num).toString() == num && num != "NaN"
     );
 }

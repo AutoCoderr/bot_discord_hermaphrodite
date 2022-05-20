@@ -3,6 +3,7 @@ import {durationUnits} from "./DateTimeManager";
 export const checkTypes = {
     number: field => typeof(field) == "number",
     string: field => typeof(field) == "string",
+    strings: field => typeof(field) == "string",
     boolean: field => typeof(field) == "boolean",
     unicode: field => checkTypes.string(field) && new RegExp("^[^\u0000-\u007F]+$").test(field),
     id: field => (checkTypes.number(field) || checkTypes.string(field)) && new RegExp("^( )*[0-9]{18}( )*$").test(field.toString()),

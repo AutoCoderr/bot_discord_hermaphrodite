@@ -14,7 +14,7 @@ export default class Help extends Command {
 
     static commandName = "help";
 
-    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: string) {
+    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
         super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, Help.commandName, Help.argsModel);
     }
 

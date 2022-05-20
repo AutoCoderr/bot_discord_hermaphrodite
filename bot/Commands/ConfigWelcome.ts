@@ -37,7 +37,7 @@ export default class ConfigWelcome extends Command {
         ]
     }
 
-    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: string) {
+    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
         super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, ConfigWelcome.commandName, ConfigWelcome.argsModel);
     }
 
@@ -118,6 +118,25 @@ export default class ConfigWelcome extends Command {
                 return this.response(true, resultContent);
         }
         return this.response(false, "Aucun action mentionnée");
+    }
+
+    static async listenJoinsToWelcome(message: Message) {
+        if (message.author.bot || message.type !== "GUILD_MEMBER_JOIN" || !message.guild)
+            return;
+
+        const welcomeMessage: IWelcomeMessage = await WelcomeMessage.findOne({
+            serverId: message.guild.id,
+            enabled: true
+        });
+        if (welcomeMessage != null) {
+            try {
+                await message.author.send(welcomeMessage.message);
+            } catch (e) {// @ts-ignore
+                if (e.message == "Cannot send messages to this user") {
+                    message.channel.send("<@" + message.author.id + "> \n\n" + welcomeMessage.message);
+                }
+            }
+        }
     }
 
     help() {
