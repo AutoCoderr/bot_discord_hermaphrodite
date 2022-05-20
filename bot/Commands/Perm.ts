@@ -80,7 +80,7 @@ export default class Perm extends Command {
         ]
     };
 
-    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: string) {
+    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
         super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, Perm.commandName, Perm.argsModel);
     }
 

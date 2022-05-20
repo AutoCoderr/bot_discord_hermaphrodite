@@ -1,7 +1,10 @@
 import {ApplicationCommandOptionTypes} from "discord.js/typings/enums";
 
 export const slashCommandsTypeDefinitions = {
-    string: {commandType: "slash", type: ApplicationCommandOptionTypes.STRING},
+    string: {
+        mono: {commandType: "slash", type: ApplicationCommandOptionTypes.STRING},
+        multi: {commandType: "custom", type: "strings"}
+    },
     number: {commandType: "slash", type: ApplicationCommandOptionTypes.NUMBER},
     boolean: {commandType: "slash", type: ApplicationCommandOptionTypes.BOOLEAN},
     message: {

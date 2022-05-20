@@ -4,10 +4,10 @@ import { connect } from "../../Mongo";
 
 const db = connect();
 
-export const defaultLimit = 0; // By default 0 for the limit, can be changed by admin
-export const minimumLimit = 0; // Minimum value for the limit
+export const defaultLimit = 5*60*1000; // By default 5 minutes for the limit, can be changed by admin
+export const minimumLimit = 2*60*1000; // At least 2 minutes for the limit
 
-export interface IVocalConfig {
+export interface ITextConfig {
     enabled: boolean;
     listenerBlacklist: { roles: string[], users: string[] };
     channelBlacklist: string[];
@@ -20,7 +20,7 @@ const ListenerBlacklistSchema: Schema = new Schema({
     users: { type: Array, required: true }
 });
 
-const VocalConfigSchema: Schema = new Schema({
+const TextConfigSchema: Schema = new Schema({
     enabled: { type: Boolean, required: true },
     listenerBlacklist: { type: ListenerBlacklistSchema, required: true },
     channelBlacklist: { type: Array, required: true },
@@ -29,4 +29,4 @@ const VocalConfigSchema: Schema = new Schema({
 });
 
 // @ts-ignore
-export default db.model<IVocalConfig>('VocalConfig', VocalConfigSchema);
+export default db.model<ITextConfig>('TextConfig', TextConfigSchema);

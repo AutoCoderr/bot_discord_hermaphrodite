@@ -3,6 +3,8 @@ import {getExistingCommands} from "./Classes/CommandsDescription";
 import client from "./client";
 import {Interaction, VoiceState} from "discord.js";
 import {initSlashCommands, listenSlashCommands} from "./slashCommands";
+import {listenInviteButtons, listenAskInviteBackButtons} from "./Classes/TextAndVocalFunctions";
+import {listenCustomCommands} from "./listenCustomCommands";
 
 export default function init(bot) {
     setTimeout(async () => {
@@ -20,12 +22,15 @@ export default function init(bot) {
 
                 if (interaction.isButton()) {
                     await interaction.deferReply();
-                    if (//@ts-ignore
-                        !(await existingCommands.Vocal.listenInviteButtons(interaction)) &&//@ts-ignore
-                        !(await existingCommands.Vocal.listenAskInviteBackButtons(interaction))
-                    ) {
+                    if (await Promise.all([
+                        listenInviteButtons(interaction, 'text'),
+                        listenInviteButtons(interaction, 'vocal'),
+                        listenAskInviteBackButtons(interaction, 'text'),
+                        listenAskInviteBackButtons(interaction, 'vocal')
+                    ]).then(responses => !responses.includes(true))) {
                         await interaction.editReply({content: "Bouton invalide"});
                     }
+                    return;
                 }
 
                 listenSlashCommands(interaction);
@@ -34,6 +39,16 @@ export default function init(bot) {
             client.on('voiceStateUpdate', (oldState: VoiceState, newState: VoiceState) => {
                 //@ts-ignore
                 existingCommands.Vocal.listenVoiceChannelsConnects(oldState, newState);
+            })
+
+            client.on("messageCreate", message => {
+                listenCustomCommands(message);
+
+                //@ts-ignore
+                existingCommands.ConfigWelcome.listenJoinsToWelcome(message)
+
+                //@ts-ignore
+                existingCommands.Text.listenTextMessages(message);
             })
         })
     }, 5000);
