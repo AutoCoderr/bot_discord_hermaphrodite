@@ -1340,6 +1340,8 @@ export default class Text extends Command {
         if (textSubscribes.length === 0)
             return;
 
+        const channelWhichHasPermissions: GuildChannel = <GuildChannel>((message.channel.type === "GUILD_PUBLIC_THREAD" && message.channel.parent) ? message.channel.parent : message.channel);
+
         for (const {_id: listenerId, listens} of textSubscribes) {
 
             let listener: null|GuildMember = null;
@@ -1362,6 +1364,18 @@ export default class Text extends Command {
                         userId: listenerId
                     })] : [])
                 ])
+                continue;
+            }
+
+            if (!channelWhichHasPermissions.permissionsFor(listener).has('VIEW_CHANNEL')) {
+                await TextSubscribe.deleteMany({
+                    serverId: message.guild.id,
+                    listenerId: listener.id,
+                    $or: [
+                        {channelId: message.channel.id},
+                        ...((message.channel.type === "GUILD_PUBLIC_THREAD" && message.channel.parent) ? [{ channelId: message.channel.parent.id }] : [])
+                    ]
+                });
                 continue;
             }
 
@@ -1420,7 +1434,8 @@ export default class Text extends Command {
             listenerConfig.save();
 
             try {
-                await (<GuildMember>listener).send("'" + (listened.nickname ?? listened.user.username) + "' a écrit un message sur le channel <#" + message.channel.id + "> sur le serveur '" + message.guild.name + "'");
+                await (<GuildMember>listener).send("'" + (listened.nickname ?? listened.user.username) + "' a écrit un message sur le channel "+
+                    (message.channel.type === "GUILD_PUBLIC_THREAD" ? (message.channel.parent ? "<#"+message.channel.parent.id+">->" : "" )+message.channel.name+" (Thread)" : "<#"+message.channel.id+">")+" sur le serveur '" + message.guild.name + "'");
             } catch (_) {
             }
         }
