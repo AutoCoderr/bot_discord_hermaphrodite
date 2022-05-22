@@ -1,11 +1,11 @@
 import {
-    CategoryChannel, Guild,
+    CategoryChannel,
     GuildChannel,
     GuildEmoji,
     GuildMember,
-    Message,
-    Role, TextBasedChannels,
-    ThreadChannel, User,
+    Message, Permissions,
+    Role,
+    ThreadChannel,
     VoiceChannel
 } from "discord.js";
 import client from "../client";
@@ -20,7 +20,22 @@ export const extractTypes = {
         let channelId = field.split("<#")[1];
         channelId = channelId.substring(0,channelId.length-1);
         const channel = command.guild.channels.cache.get(channelId);
-        return channel != undefined ? channel : false;
+        if (!channel)
+            return false;
+        const channelWhichHasPermissions: GuildChannel|ThreadChannel|null = channel.permissionsFor !== undefined ?
+            channel :
+            (channel.parent && channel.parent.permissionsFor) ?
+                channel.parent :
+                null;
+        let channelPermissions: Readonly<Permissions> | null = null;
+        if (
+            channelWhichHasPermissions &&
+            (channelPermissions = channelWhichHasPermissions.permissionsFor(command.member)) &&
+            !channelPermissions.has('VIEW_CHANNEL')
+        )
+            return false;
+
+        return channel;
     },
     channels: (field, command: Command): Array<GuildChannel|ThreadChannel|VoiceChannel>|false => {
         const channelsSplitted = field.split("<#");
