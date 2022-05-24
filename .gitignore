@@ -9,3 +9,4 @@
 /bot/Models/Text/*.js
 /bot/Commands/*.js
 /bot/Classes/*.js
+/bot/scripts/*.js
