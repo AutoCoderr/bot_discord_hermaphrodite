@@ -468,7 +468,7 @@ export default class Text extends Command {
                 value: listens.map(({keywords, channelId, timestamp, enabled}) =>
                     "Sur " + (channelId ? "le channel <#" + channelId + ">" : "tout les channels") +
                     ((channelId === undefined && blockedChannelsHere.length > 0) ? "\nSauf ceux ci : "+blockedChannelsHere.map(channelId => '<#'+channelId+'>').join(", ") : "")+
-                    ((keywords !== undefined && keywords.length > 0) ? "\nSur les mot clés : " + keywords.map(w => "'" + w + "'").join(", ") : "") +
+                    ((keywords !== undefined && keywords.length > 0) ? "\nSur les mot clés : " + keywords.map(w => "'" + w + "'").join(", ") : "\nSans restriction de mots clés") +
                     (!enabled ? "\n(écoute inactive)" : "") +
                     "\n" + showDate(extractDate(timestamp), 'fr') + " à " + showTime(extractTime(timestamp), 'fr')
                 ).join("\n\n")
@@ -1412,7 +1412,12 @@ export default class Text extends Command {
 
             const keywords = [
                 ...listening.keywords??[],
-                ...((listening.channelId !== undefined && listeningAllChannels) ? listeningAllChannels.keywords??[] : [])
+                ...((
+                    listening.channelId !== undefined &&
+                    listeningAllChannels &&
+                    listening.keywords &&
+                    listening.keywords.length > 0
+                ) ? listeningAllChannels.keywords??[] : [])
             ]
 
             const content = message.content.toLowerCase();
@@ -1449,7 +1454,7 @@ export default class Text extends Command {
 
         try {
             await requested.send({
-                content: (requester instanceof GuildMember ? (requester.nickname ?? requester.user.username) : requester.username) + " souhaite pouvoir écouter vos messages textuels sur le serveur '" + guild.name + "'",
+                content: (requester instanceof GuildMember ? (requester.nickname ?? requester.user.username) : requester.username) + " souhaite pouvoir recevoir des notifications de vos messages textuels sur le serveur '" + guild.name + "'",
                 ...((channelsId || keywords) ? {
                     embeds: [
                         new MessageEmbed()
