@@ -716,7 +716,7 @@ export default class Vocal extends Command {
 
         try {
             await requested.send({
-                content: (requester instanceof GuildMember ? (requester.nickname ?? requester.user.username) : requester.username) + " souhaite pouvoir écouter vos connexions vocales sur le serveur '" + guild.name + "'",
+                content: (requester instanceof GuildMember ? (requester.nickname ?? requester.user.username) : requester.username) + " souhaite pouvoir recevoir des notifications de vos connexions vocales sur le serveur '" + guild.name + "'",
                 components: [
                     new MessageActionRow().addComponents(
                         new MessageButton()
