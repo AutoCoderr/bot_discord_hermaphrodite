@@ -1,4 +1,5 @@
 import {
+    BaseGuildTextChannel,
     CategoryChannel,
     GuildChannel,
     GuildEmoji,
@@ -53,9 +54,9 @@ export const extractTypes = {
         const channel = command.guild.channels.cache.get(field);
         return (channel instanceof CategoryChannel && channel.type == "GUILD_CATEGORY") ? channel : false;
     },
-    message: async (field, _: Command, mentionedChannel: GuildChannel|boolean): Promise<Message|false> => {
-        if (mentionedChannel) {
-            try { // @ts-ignore
+    message: async (field, _: Command, mentionedChannel: BaseGuildTextChannel|boolean): Promise<Message|false> => {
+        if (mentionedChannel && mentionedChannel !== true) {
+            try {
                 return await mentionedChannel.messages.fetch(field.toString())
             } catch (e) {
                 return false;
@@ -63,7 +64,9 @@ export const extractTypes = {
         }
         return false;
     },
-    messages: async (field, command: Command, mentionedChannel: GuildChannel|boolean):  Promise<Array<Message>|false> => {
+    messages: async (field, command: Command, mentionedChannel: GuildChannel|BaseGuildTextChannel|boolean):  Promise<Array<Message>|false> => {
+        if (!(mentionedChannel instanceof BaseGuildTextChannel))
+            return false;
         const messages: Array<Message> = [];
         let messageId = "";
         for (let i=0;i<field.length;i++) {

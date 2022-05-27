@@ -2,12 +2,25 @@ import TextAskInviteBack from "../Models/Text/TextAskInviteBack";
 import VocalAskInviteBack from "../Models/Vocal/VocalAskInviteBack";
 import TextConfig from "../Models/Text/TextConfig";
 import VocalConfig from "../Models/Vocal/VocalConfig";
+import TextInvite from "../Models/Text/TextInvite";
+import VocalInvite from "../Models/Vocal/VocalInvite";
+import TextSubscribe from "../Models/Text/TextSubscribe";
+import VocalSubscribe from "../Models/Vocal/VocalSubscribe";
+import TextUserConfig from "../Models/Text/TextUserConfig";
+import VocalUserConfig from "../Models/Vocal/VocalUserConfig";
+import History from "../Models/History";
+import MonitoringMessage from "../Models/MonitoringMessage";
+import Permissions from "../Models/Permissions";
+import StoredNotifyOnReact from "../Models/StoredNotifyOnReact";
+import TicketConfig from "../Models/TicketConfig";
+import WelcomeMessage from "../Models/WelcomeMessage";
 
 import {propAccess, propUpdate} from "../Classes/OtherFunctions";
 
 import client from "../client";
 import config from "../config";
-import {Guild} from "discord.js";
+import {BaseGuildTextChannel, Guild, GuildChannel} from "discord.js";
+import textUserConfig from "../Models/Text/TextUserConfig";
 
 //@ts-ignore
 Array.prototype.promiseReduce = async function(callback,acc) {
@@ -29,12 +42,26 @@ Array.prototype.promiseFindElem = async function(callback,elem = null) {
     return arr.slice(1).promiseFindElem(callback, await callback(arr[0]))
 }
 
+
+const getNeededs = () => ({
+    none: ['server','emote'],
+    server: ['member','channel','role'],
+    channel: ['message']
+});
+
 const getters = {
     server: id => {
         const guild = client.guilds.cache.get(id);
         if (!guild)
             console.log("Guild '"+id+"' does not exist")
-        return guild;
+        return guild??null;
+    },
+    emote: id => {
+        if (new RegExp("^[^\u0000-\u007F]+$").test(id)) return id;
+        const emote = client.emojis.cache.get(id);
+        if (!emote)
+            console.log("Emote '"+id+"' does not exist");
+        return emote??null;
     },
     member: async (id: string, guild: Guild|null = null) => {
         if (!guild)
@@ -69,40 +96,71 @@ const getters = {
             return null;
         }
     },
+    message: async (id: string, channel: BaseGuildTextChannel|null = null) => {
+        if (!(channel instanceof BaseGuildTextChannel))
+            return null;
+
+        try {
+            return await channel.messages.fetch(id)
+        } catch (e) {
+            console.log("message '"+id+"' does not exist on channel '"+channel.name+"' on guild '"+channel.guild.name+"'")
+            return null;
+        }
+    }
 }
 
 
-async function updateDatasDict(dict: any,element, cols: string[], type: 'member'|'channel'|'server', guilds: Guild[]|null = null) { //@ts-ignore
+async function updateDatasDict(dict: any,element, cols: string[], type: 'member'|'channel'|'server', guildsOrChannels: null|Guild[]|GuildChannel[] = null) { //@ts-ignore
     return await (cols ?? []).promiseReduce(async (acc, colName) => ({
         ...acc,
-        ...(await (propAccess(element,colName) instanceof Array ? propAccess(element,colName): [propAccess(element,colName)]).promiseReduce(async (acc,id) => ({
-            ...acc,
-            [id]: acc[id] ? acc[id] :
-                guilds ? //@ts-ignore
-                    await guilds.promiseFindElem(guild => getters[type](id, guild)) :
-                    await getters[type](id)
-        }), acc))
+        ...(propAccess(element, colName) === undefined ? {} :
+                await (propAccess(element,colName) instanceof Array ? propAccess(element,colName): [propAccess(element,colName)]).promiseReduce(async (acc,id) => ({
+                    ...acc,
+                    [id]: acc[id] ? acc[id] :
+                        guildsOrChannels ? //@ts-ignore
+                            await guildsOrChannels.promiseFindElem(guildOrChannel => getters[type](id, guildOrChannel)) :
+                            await getters[type](id)
+                }), acc)
+        )
     }),  dict??{})
 }
 
 function someNonGettedData(dict: any, cols: string[], element) {
-    return (cols??[]).some(colName => !dict[propAccess(element,colName)]);
+    return (cols??[]).some(colName => propAccess(element,colName) !== undefined && !dict[propAccess(element,colName)]);
 }
 
-async function checkDatas(colsTypes, datas, element, guilds: Guild[]) {
-    if (colsTypes.length === 0)
+async function checkDatas(types, colsTypes, datas, element, guildsOrChannels: null|Guild[]|GuildChannel[] = null) {
+    if (types.length === 0)
         return {success: true, datas};
 
-    const [type,cols] = colsTypes[0];
+    const type = types[0];
+    const cols = colsTypes[type];
 
     const newDatas = {
         ...datas,
-        [type+'s']: await updateDatasDict(datas[type+'s'], element, cols, type, guilds)
+        [type+'s']: await updateDatasDict(datas[type+'s'], element, cols, type, guildsOrChannels)
     }
     if (someNonGettedData(newDatas[type+'s'],cols,element))
-        return {success: false, datas: newDatas}
+        return {success: false, datas: newDatas};
 
-    return checkDatas(colsTypes.slice(1), newDatas, element, guilds);
+    return checkDatas(types.slice(1), colsTypes, newDatas, element, guildsOrChannels);
+}
+
+async function checkDatasByNeededFields(neededs, colsTypes, datas, element) {
+    const neededsArray = neededs instanceof Array ? neededs : Object.entries(neededs);
+    if (neededsArray.length === 0)
+        return {success: true, datas};
+
+    const [needed, types] = neededsArray[0];
+
+    const neededDatas = needed === "none" ? null : (colsTypes[needed]??[]).map(colName => datas[needed+'s'][propAccess(element, colName)]);
+
+    const {success, datas: newDatas} = await checkDatas(types, colsTypes, datas, element, neededDatas);
+
+    if (!success)
+        return {success: false, datas: newDatas};
+
+    return checkDatasByNeededFields(neededsArray.slice(1), colsTypes, newDatas, element)
 }
 
 function filterElementsToDelete(elements: Array<any>, colsTypes) {
@@ -111,48 +169,31 @@ function filterElementsToDelete(elements: Array<any>, colsTypes) {
         members?: {[id: string]: string},
         channels?: {[id: string]: string},
         roles?: {[id: string]: string},
+        messages?: {[id: string]: string},
+
         toDelete?: any[],
         toKeep?: any[]
     } = {}
     //@ts-ignore
-    return elements.promiseReduce(async ({toDelete, toKeep, servers, ...datas},element) => {
-        const newServers = await updateDatasDict(servers,element,colsTypes.server,"server");
+    return elements.promiseReduce(async ({toDelete, toKeep, ...datas},element) => {
 
-        if (someNonGettedData(newServers, colsTypes.server, element))
-            return {
-                servers: newServers,
-                ...datas,
-                toDelete: [...(toDelete??[]), element],
-                toKeep: toKeep??[]
-            };
-
-        const {success, datas: newDatas} = await checkDatas(
-            Object.entries(colsTypes),
-            datas,
-            element,
-            colsTypes.server.map(colName => newServers[propAccess(element,colName)])
-        )
-        if (!success) {
-            return {
-                servers: newServers,
-                ...newDatas,
-                toDelete: [...(toDelete??[]), element],
-                toKeep: toKeep??[]
-            };
-        }
+        const {success, datas: newDatas} = await checkDatasByNeededFields(getNeededs(), colsTypes, datas, element);
 
         return {
-            servers: newServers,
             ...newDatas,
-            toDelete: toDelete??[],
-            toKeep: [...(toKeep??[]), element],
-        }
+            toDelete: [...(toDelete??[]), ...(!success ? [element]: [])],
+            toKeep: [...(toKeep??[]), ...(success ? [element]: [])]
+        };
     }, acc)
 }
 
 function updateElementWithNewLists(element, cols, dict, updated = false) {
     if (cols.length === 0)
         return {element,updated};
+
+    if (propAccess(element,cols[0]) === undefined)
+        return updateElementWithNewLists(element, cols.slice(1), dict, updated);
+
     const newList = propAccess(element,cols[0]).filter(id => dict[id]);
     return updateElementWithNewLists(
         newList.length < propAccess(element,cols[0]).length ? propUpdate(element, cols[0], newList) : element,
@@ -162,24 +203,47 @@ function updateElementWithNewLists(element, cols, dict, updated = false) {
     )
 }
 
-async function checkDatasAndDeleteItemsInElementList(element: any, listTypes, datas, guilds: Guild[], updated = false) {
-    if (listTypes.length === 0)
-        return {element, updated};
+async function checkDatasAndDeleteItemsInElementList(types, element: any, listTypes, datas, guildsOrChannel: Guild[]|GuildChannel[]|null, updated = false) {
+    if (types.length === 0)
+        return {element, datas, updated};
 
-    const [type, cols] = listTypes[0];
+    const type = types[0];
+    const cols = listTypes[type]??[];
 
     const newDatas = {
         ...datas,
-        [type+'s']: await updateDatasDict(datas[type+'s'],element, cols, type, guilds)
+        [type+'s']: await updateDatasDict(datas[type+'s'],element, cols, type, guildsOrChannel)
     }
 
     const {element: newElement, updated: newUpdated} = updateElementWithNewLists(element, cols, newDatas[type+'s'], updated)
 
     return checkDatasAndDeleteItemsInElementList(
+        types.slice(1),
         newElement,
-        listTypes.slice(1),
+        listTypes,
         newDatas,
-        guilds,
+        guildsOrChannel,
+        newUpdated
+    )
+}
+
+async function checkDatasByNeededToDeleteItemsInElementList(neededs, element, listTypes, colsTypes, datas, updated = false) {
+    const neededsArray = neededs instanceof Array ? neededs : Object.entries(neededs);
+    if (neededsArray.length === 0)
+        return {element, updated};
+
+    const [needed,types] = neededsArray[0];
+
+    const neededDatas = needed === "none" ? null : colsTypes[needed].map(colName => datas[needed+'s'][propAccess(element, colName)]);
+
+    const {element: newElement, datas: newDatas, updated: newUpdated} = await checkDatasAndDeleteItemsInElementList(types, element, listTypes, datas, neededDatas)
+
+    return checkDatasAndDeleteItemsInElementList(
+        neededsArray.slice(1),
+        newElement,
+        listTypes,
+        colsTypes,
+        newDatas,
         newUpdated
     )
 }
@@ -187,29 +251,31 @@ async function checkDatasAndDeleteItemsInElementList(element: any, listTypes, da
 function checkAndDeleteUselessEntries(model, name, colsTypes, listsTypes = {}) {
     return model.find()
         .then(elements => filterElementsToDelete(elements, colsTypes))
-        .then(({toDelete, toKeep, servers, ...datas}) => {
-            if (toDelete.length === 0) {
+        .then(({toDelete, toKeep, ...datas}) => {
+            if (!toDelete || toDelete.length === 0) {
                 console.log("nothing to delete for "+name);
             }
 
             return Promise.all([
-                ...toDelete.map(element => {
-                    console.log("\nDelete "+name+" => ");
-                    console.log(element);
-                    return element.remove();
+                ...(toDelete??[]).map(element => {
+                    console.log("\nDelete "+name+" "+element._id);
+                    //console.log("\nDelete "+name+" => ");
+                    //console.log(element);
+                    //return element.remove();
                 }),
-                ...toKeep.map(async element => {
-                    const {updated, element: newElement} = await checkDatasAndDeleteItemsInElementList(
+                ...(toKeep??[]).map(async element => {
+                    const {updated, element: newElement} = await checkDatasByNeededToDeleteItemsInElementList(
+                        getNeededs(),
                         element._doc,
-                        Object.entries(listsTypes),
-                        datas,
-                        colsTypes.server.map(colName => servers[propAccess(element,colName)])
+                        listsTypes,
+                        colsTypes,
+                        datas
                     )
                     if (updated) {
-                        console.log('Update '+name+' '+element._id+' with new lists ');
-                        await model.updateOne({
+                        console.log('\nUpdate '+name+' '+element._id+' with new lists ');
+                        /*await model.updateOne({
                             _id: element._id
-                        }, newElement)
+                        }, newElement)*/
                     }
                 })
             ])
@@ -242,6 +308,67 @@ async function cleanDatabase() {
             channel: ['channelBlacklist'],
             member: ['listenerBlacklist.users'],
             role: ['listenerBlacklist.roles']
+        }),
+        checkAndDeleteUselessEntries(TextInvite, "textInvite", {
+            server: ['serverId'],
+            member: ['requesterId','requestedId']
+        }, {
+            channel: ['channelsId']
+        }),
+        checkAndDeleteUselessEntries(VocalInvite, "vocalInvite", {
+            server: ['serverId'],
+            member: ['requesterId','requestedId']
+        }),
+        checkAndDeleteUselessEntries(TextSubscribe, "textSubscribe", {
+            server: ['serverId'],
+            member: ['listenerId','listenedId'],
+            channel: ['channelId']
+        }),
+        checkAndDeleteUselessEntries(VocalSubscribe, "vocalSubscribe", {
+            server: ['serverId'],
+            member: ['listenerId','listenedId'],
+        }),
+        checkAndDeleteUselessEntries(TextUserConfig, "textUserConfig", {
+            server: ['serverId'],
+            member: ['userId']
+        }),
+        checkAndDeleteUselessEntries(VocalUserConfig, "vocalUserConfig", {
+            server: ['serverId'],
+            member: ['userId']
+        }, {
+            member: ['blocked.users'],
+            role: ['blocked.roles']
+        }),
+        /*checkAndDeleteUselessEntries(History, "history", {
+            server: ['serverId'],
+            member: ['userId'],
+            channel: ['channelId']
+        }),*/
+        checkAndDeleteUselessEntries(MonitoringMessage, "monitoringMessage", {
+            server: ['serverId'],
+            channel: ['channelId'],
+            message: ['messageId']
+        }),
+        checkAndDeleteUselessEntries(Permissions, "permission", {
+            server: ['serverId']
+        }, {
+            role: ['roles']
+        }),
+        checkAndDeleteUselessEntries(StoredNotifyOnReact, "storedNotifyOnReact", {
+            server: ['serverId'],
+            emote: ['emoteId'],
+            channel: ['channelToListenId','channelToWriteId'],
+            message: ['messageToListenId']
+        }),
+        checkAndDeleteUselessEntries(TicketConfig, "ticketConfig", {
+            server: ['serverId'],
+            channel: ['categoryId'],
+            role: ['moderatorId']
+        }, {
+            member: ['blacklist']
+        }),
+        checkAndDeleteUselessEntries(WelcomeMessage, "welcomeMessage", {
+            server: ['serverId'],
         })
     ])
 
