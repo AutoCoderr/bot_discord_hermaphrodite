@@ -257,7 +257,7 @@ export async function listenInviteButtons(interaction: ButtonInteraction, type: 
             }
         } else {
             let blockedChannelIds = [];
-            if (listenedConfig) {
+            if (listenedConfig && type === 'text') {
                 blockedChannelIds = listenedConfig.blocking
                     .filter(({
                                  userId,
