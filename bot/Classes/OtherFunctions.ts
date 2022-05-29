@@ -261,8 +261,8 @@ export function isNumber(num) {
     );
 }
 
-export function propAccess(obj: Object, key: string|string[] = []) {
-    if (obj === undefined)
+export function propAccess(obj: Object, key: null|string|string[] = null) {
+    if (obj === undefined || key === null)
         return obj;
     const keyArray: string[] = key instanceof Array ? key : key.split(".");
     if (keyArray.length === 0)

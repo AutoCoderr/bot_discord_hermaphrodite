@@ -110,26 +110,37 @@ const getters = {
 }
 
 
-async function updateDatasDict(dict: any,element, cols: string[], type: 'member'|'channel'|'server', guildsOrChannels: null|Guild[]|GuildChannel[] = null) { //@ts-ignore
-    return await (cols ?? []).promiseReduce(async (acc, colName) => ({
-        ...acc,
-        ...(propAccess(element, colName) === undefined ? {} :
-                await (propAccess(element,colName) instanceof Array ? propAccess(element,colName): [propAccess(element,colName)]).promiseReduce(async (acc,id) => ({
-                    ...acc,
-                    [id]: acc[id] ? acc[id] :
-                        guildsOrChannels ? //@ts-ignore
-                            await guildsOrChannels.promiseFindElem(guildOrChannel => getters[type](id, guildOrChannel)) :
-                            await getters[type](id)
-                }), acc)
-        )
-    }),  dict??{})
+async function updateDatasDict(dict: any,element, cols: string[], type: 'member'|'channel'|'message'|'role'|'emote'|'server', guildsOrChannels: null|Array<Guild|GuildChannel> = null) { //@ts-ignore
+    return await (cols ?? []).promiseReduce(async (acc, col) => {
+        const colName = col.col??col;
+        const attrInItem = col.attr??null;
+        const neededForThisCol = col.needed??null;
+        return {
+            ...acc,
+            ...(propAccess(element, colName) === undefined ? {} :
+                    await (propAccess(element,colName) instanceof Array ? propAccess(element,colName): [propAccess(element,colName)]).promiseReduce(async (acc,item) => ({
+                        ...acc,
+                        [propAccess(item,attrInItem)]: acc[propAccess(item,attrInItem)] !== undefined ? acc[propAccess(item,attrInItem)] :
+                            guildsOrChannels ? //@ts-ignore
+                                await guildsOrChannels.promiseFindElem(guildOrChannel =>
+                                    (neededForThisCol === null || propAccess(element,neededForThisCol) === guildOrChannel.id) &&
+                                    getters[type](propAccess(item,attrInItem), guildOrChannel)
+                                ) :
+                                await getters[type](propAccess(item,attrInItem))
+                    }), acc)
+            )
+        }
+    },  dict??{})
 }
 
-function someNonGettedData(dict: any, cols: string[], element) {
-    return (cols??[]).some(colName => propAccess(element,colName) !== undefined && !dict[propAccess(element,colName)]);
+function someNonGettedData(dict: any, cols: Array<string|{col: string, needed?: string, attr?: string}>, element) {
+    return (cols??[]).some(col => {
+        const colName = typeof(col) == "string" ? col : col.col;
+        return propAccess(element,colName) !== undefined && !dict[propAccess(element,colName)]
+    });
 }
 
-async function checkDatas(types, colsTypes, datas, element, guildsOrChannels: null|Guild[]|GuildChannel[] = null) {
+async function checkDatas(types, colsTypes, datas, element, guildsOrChannels: null|Array<Guild|GuildChannel> = null) {
     if (types.length === 0)
         return {success: true, datas};
 
@@ -140,6 +151,7 @@ async function checkDatas(types, colsTypes, datas, element, guildsOrChannels: nu
         ...datas,
         [type+'s']: await updateDatasDict(datas[type+'s'], element, cols, type, guildsOrChannels)
     }
+
     if (someNonGettedData(newDatas[type+'s'],cols,element))
         return {success: false, datas: newDatas};
 
@@ -153,7 +165,16 @@ async function checkDatasByNeededFields(neededs, colsTypes, datas, element) {
 
     const [needed, types] = neededsArray[0];
 
-    const neededDatas = needed === "none" ? null : (colsTypes[needed]??[]).map(colName => datas[needed+'s'][propAccess(element, colName)]);
+    const neededDatas = needed === "none" ?
+        null :
+        Object.values(<{[id: string]: Guild|GuildChannel}>(colsTypes[needed]??[])
+            .reduce((acc,col) => {
+                const colName = col.col ?? col;
+                return {
+                    ...acc,
+                    [propAccess(element, colName)]: acc[propAccess(element, colName)]??datas[needed + 's'][propAccess(element, colName)]
+                }
+            },{}));
 
     const {success, datas: newDatas} = await checkDatas(types, colsTypes, datas, element, neededDatas);
 
@@ -176,7 +197,6 @@ function filterElementsToDelete(elements: Array<any>, colsTypes) {
     } = {}
     //@ts-ignore
     return elements.promiseReduce(async ({toDelete, toKeep, ...datas},element) => {
-
         const {success, datas: newDatas} = await checkDatasByNeededFields(getNeededs(), colsTypes, datas, element);
 
         return {
@@ -188,24 +208,32 @@ function filterElementsToDelete(elements: Array<any>, colsTypes) {
 }
 
 function updateElementWithNewLists(element, cols, dict, updated = false) {
-    if (cols.length === 0)
-        return {element,updated};
+    if (cols.length === 0) {
+        return {element, updated};
+    }
 
-    if (propAccess(element,cols[0]) === undefined)
+    const col = cols[0];
+    const colName = col.col??col;
+    const attrInItem = col.attr??null;
+
+    if (propAccess(element,colName) === undefined)
         return updateElementWithNewLists(element, cols.slice(1), dict, updated);
 
-    const newList = propAccess(element,cols[0]).filter(id => dict[id]);
+    const list = propAccess(element,colName)??[];
+    const newList = list.filter(item => propAccess(item,attrInItem) === undefined || dict[propAccess(item,attrInItem)]);
+
     return updateElementWithNewLists(
-        newList.length < propAccess(element,cols[0]).length ? propUpdate(element, cols[0], newList) : element,
+        newList.length < list.length ? propUpdate(element, colName, newList) : element,
         cols.slice(1),
         dict,
-        updated||(newList.length < propAccess(element,cols[0]).length)
+        updated||(newList.length < list.length)
     )
 }
 
-async function checkDatasAndDeleteItemsInElementList(types, element: any, listTypes, datas, guildsOrChannel: Guild[]|GuildChannel[]|null, updated = false) {
-    if (types.length === 0)
+async function checkDatasAndDeleteItemsInElementList(types, element: any, listTypes, datas, guildsOrChannel: Array<Guild|GuildChannel>|null, updated = false) {
+    if (types.length === 0) {
         return {element, datas, updated};
+    }
 
     const type = types[0];
     const cols = listTypes[type]??[];
@@ -223,28 +251,38 @@ async function checkDatasAndDeleteItemsInElementList(types, element: any, listTy
         listTypes,
         newDatas,
         guildsOrChannel,
-        newUpdated
+        updated||newUpdated
     )
 }
 
 async function checkDatasByNeededToDeleteItemsInElementList(neededs, element, listTypes, colsTypes, datas, updated = false) {
     const neededsArray = neededs instanceof Array ? neededs : Object.entries(neededs);
-    if (neededsArray.length === 0)
+    if (neededsArray.length === 0) {
         return {element, updated};
+    }
 
     const [needed,types] = neededsArray[0];
 
-    const neededDatas = needed === "none" ? null : colsTypes[needed].map(colName => datas[needed+'s'][propAccess(element, colName)]);
+    const neededDatas = needed === "none" ?
+        null :
+        Object.values(<{[id: string]: Guild|GuildChannel}>(colsTypes[needed]??[])
+            .reduce((acc,col) => {
+                const colName = col.col ?? col;
+                return {
+                    ...acc,
+                    [propAccess(element, colName)]: acc[propAccess(element, colName)]??datas[needed + 's'][propAccess(element, colName)]
+                }
+            },{}));
 
     const {element: newElement, datas: newDatas, updated: newUpdated} = await checkDatasAndDeleteItemsInElementList(types, element, listTypes, datas, neededDatas)
 
-    return checkDatasAndDeleteItemsInElementList(
+    return checkDatasByNeededToDeleteItemsInElementList(
         neededsArray.slice(1),
         newElement,
         listTypes,
         colsTypes,
         newDatas,
-        newUpdated
+        updated||newUpdated
     )
 }
 
@@ -258,10 +296,9 @@ function checkAndDeleteUselessEntries(model, name, colsTypes, listsTypes = {}) {
 
             return Promise.all([
                 ...(toDelete??[]).map(element => {
-                    console.log("\nDelete "+name+" "+element._id);
-                    //console.log("\nDelete "+name+" => ");
-                    //console.log(element);
-                    //return element.remove();
+                    console.log("\nDelete "+name+" => ");
+                    console.log(element);
+                    return element.remove();
                 }),
                 ...(toKeep??[]).map(async element => {
                     const {updated, element: newElement} = await checkDatasByNeededToDeleteItemsInElementList(
@@ -271,11 +308,13 @@ function checkAndDeleteUselessEntries(model, name, colsTypes, listsTypes = {}) {
                         colsTypes,
                         datas
                     )
+
                     if (updated) {
-                        console.log('\nUpdate '+name+' '+element._id+' with new lists ');
-                        /*await model.updateOne({
+                        console.log('\nUpdate '+name+' '+element._id+' with new lists\n');
+                        console.log(newElement);
+                        await model.updateOne({
                             _id: element._id
-                        }, newElement)*/
+                        }, newElement)
                     }
                 })
             ])
@@ -283,7 +322,6 @@ function checkAndDeleteUselessEntries(model, name, colsTypes, listsTypes = {}) {
 }
 
 async function cleanDatabase() {
-
     await Promise.all([
         checkAndDeleteUselessEntries(TextAskInviteBack, "textAskInviteBack", {
             server: ['serverId'],
@@ -331,6 +369,9 @@ async function cleanDatabase() {
         checkAndDeleteUselessEntries(TextUserConfig, "textUserConfig", {
             server: ['serverId'],
             member: ['userId']
+        }, {
+            channel: [{col: 'blocking', attr: 'channelId'}],
+            member: [{col: 'blocking', attr: 'userId'}]
         }),
         checkAndDeleteUselessEntries(VocalUserConfig, "vocalUserConfig", {
             server: ['serverId'],
@@ -339,11 +380,11 @@ async function cleanDatabase() {
             member: ['blocked.users'],
             role: ['blocked.roles']
         }),
-        /*checkAndDeleteUselessEntries(History, "history", {
+        checkAndDeleteUselessEntries(History, "history", {
             server: ['serverId'],
             member: ['userId'],
             channel: ['channelId']
-        }),*/
+        }),
         checkAndDeleteUselessEntries(MonitoringMessage, "monitoringMessage", {
             server: ['serverId'],
             channel: ['channelId'],
@@ -358,7 +399,7 @@ async function cleanDatabase() {
             server: ['serverId'],
             emote: ['emoteId'],
             channel: ['channelToListenId','channelToWriteId'],
-            message: ['messageToListenId']
+            message: [{col: 'messageToListenId', needed: 'channelToListenId'}]
         }),
         checkAndDeleteUselessEntries(TicketConfig, "ticketConfig", {
             server: ['serverId'],
