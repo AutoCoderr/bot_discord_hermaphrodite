@@ -9,4 +9,5 @@
 /bot/Models/Text/*.js
 /bot/Commands/*.js
 /bot/Classes/*.js
-/bot/scripts/*.js
+/bot/scripts/cleanDatabase/*.js
+script_logs/*
