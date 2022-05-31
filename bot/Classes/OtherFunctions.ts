@@ -260,3 +260,26 @@ export function isNumber(num) {
         typeof (num) == 'string' && parseInt(num).toString() == num && num != "NaN"
     );
 }
+
+export function propAccess(obj: Object, key: null|string|string[] = null) {
+    if (obj === undefined || key === null)
+        return obj;
+    const keyArray: string[] = key instanceof Array ? key : key.split(".");
+    if (keyArray.length === 0)
+        return obj;
+    return propAccess(obj[keyArray[0]], keyArray.slice(1));
+}
+
+export function propUpdate(obj: {[key: string]: any}, key: string|string[], value) {
+    if (obj === undefined)
+        return null;
+
+    const keyArray: string[] = key instanceof Array ? key : key.split(".");
+    if (keyArray.length === 0)
+        return value;
+
+    return {
+        ...(obj._doc??obj),
+        [keyArray[0]]: propUpdate(obj[keyArray[0]], keyArray.slice(1), value)
+    }
+}

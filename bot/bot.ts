@@ -1,9 +1,5 @@
-import config from "./config";
 import client from "./client";
-
 import init from "./init";
-
-client.login(config.token);
 
 init(client);
 

@@ -13,6 +13,19 @@ services:
       - bdd
       - exterior
 
+  crontab:
+    build: ./docker/crontab
+    volumes:
+      - ./bot:/bot
+      - ./script_logs:/script_logs
+      - ./cronjobs:/cronjobs
+      - ./crontab:/etc/cron.d/crontab
+    depends_on:
+      - mongodb
+    networks:
+      - bdd
+      - exterior
+
   mongodb:
     image: mongo:bionic
     volumes:
@@ -30,6 +43,7 @@ services:
       - "27017:27017"
     networks:
       - bdd
+
 networks:
   bdd:
     internal: true

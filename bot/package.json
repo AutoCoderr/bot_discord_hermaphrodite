@@ -5,6 +5,7 @@
   "main": "bot.js",
   "scripts": {
     "start": "tsc && node --trace-deprecation --trace-warnings bot.js",
+    "clean_database": "node --trace-deprecation --trace-warnings scripts/cleanDatabase/cleanDatabase.js",
     "watch": "tsc -w",
     "build": "tsc"
   },
