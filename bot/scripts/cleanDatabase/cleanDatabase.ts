@@ -155,7 +155,12 @@ async function cleanDatabase() {
             role: ['moderatorId']
         }, {
             member: ['blacklist', { col:'ticketChannels', attr: 'userId' }],
-            channel: [{ col:'ticketChannels', attr: 'channelId' }]
+            channel: [
+                { col: 'ticketChannels', attr: 'channelId' },
+                { col: 'messagesToListen', attr: 'channelId' }
+            ],
+            message: [{ col: 'messagesToListen', attr: 'messageId' }],
+            emote: [{ col: 'messagesToListen', attr: 'emoteId' }]
         }),
         checkAndDeleteUselessEntries(WelcomeMessage, "welcomeMessage", {
             server: ['serverId'],
