@@ -179,12 +179,12 @@ export async function listenInviteButtons(interaction: ButtonInteraction, type: 
         serverId: server.id
     })
 
-    if (!(await command.staticCheckPermissions(null, requested, server, false))) {
+    if (!(await command.staticCheckPermissions(requested, server))) {
         await interaction.editReply({content: "Vous n'avez plus accès à la fonction vocal sur le serveur '" + server.name + "'"});
         return true;
     }
     if (
-        !(await command.staticCheckPermissions(null, requester, server, false)) ||
+        !(await command.staticCheckPermissions(requester, server)) ||
         (
             configServer &&
             (

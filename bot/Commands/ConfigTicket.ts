@@ -34,6 +34,8 @@ export default class ConfigTicket extends Command {
     static commandName = "configTicket";
     static slashCommand = true;
 
+    static slashCommandIdByGuild: {[guildId: string]: string} = {};
+
     static argsModel = {
         $argsByType: {
             action: {

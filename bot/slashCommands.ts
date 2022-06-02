@@ -31,8 +31,17 @@ export async function initSlashCommands() {
     for (const [,guild] of client.guilds.cache)
         guilds.push(guild);
 
+    const slashCommandsDefinitions = (<Array<typeof Command>>Object.values(existingCommands)).reduce((acc: Object,command) => ({
+        ...acc,
+        ...((command.slashCommand && command.commandName && !command.abstract) ?
+                {[command.commandName.toLowerCase()]: generateSlashCommandFromModel(command)} : {}
+        )
+    }), {})
+
+    console.log("Creating slash commands on all servers");
+
     await Promise.all(guilds.map(async guild => {
-        console.log('Create slash commands for ' + guild.name + ' server');
+        console.log('Creating slash commands for ' + guild.name + ' server');
 
         const commands = guild.commands;
 
@@ -43,21 +52,27 @@ export async function initSlashCommands() {
             }), {})
         );
 
-        return await Promise.all((<Array<typeof Command>>Object.values(existingCommands)).map(async command => {
-            if (command.slashCommand) {
+        return Promise.all([
+            ...(<Array<typeof Command>>Object.values(existingCommands)).map(async command => {
+                if (command.commandName === null || !command.slashCommand || command.abstract)
+                    return null;
 
-                const createdSlashCommand = await commands?.create(<ApplicationCommandDataResolvable>generateSlashCommandFromModel(command));
+                const createdSlashCommand = await commands?.create(<ApplicationCommandDataResolvable>slashCommandsDefinitions[command.commandName.toLowerCase()]);
 
                 if (slashCommandsByGuildAndName[guild.id] === undefined)
                     slashCommandsByGuildAndName[guild.id] = {}
                 slashCommandsByGuildAndName[guild.id][<string>command.commandName] = createdSlashCommand;
-            } else {
-                const foundCommand = existingSlashCommands[(<string>command.commandName).toLowerCase()];
-                if (foundCommand)
-                    foundCommand.delete();
-            }
-        }))
+
+                command.slashCommandIdByGuild[guild.id] = createdSlashCommand.id;
+                return null;
+            }),
+            ...Object.entries(existingSlashCommands).map(([name,slashCommand]) =>
+                !slashCommandsDefinitions[name] ? (<ApplicationCommand>slashCommand).delete().catch(() => null) : null
+            )
+        ])
     }));
+
+    console.log("All slash commands generated");
 }
 
 export async function addRoleToSlashCommandPermission(guild: Guild, commandName: string, rolesId: string[]) {

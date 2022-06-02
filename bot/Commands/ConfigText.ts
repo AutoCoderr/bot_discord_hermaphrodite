@@ -9,6 +9,8 @@ export default class ConfigText extends ConfigTextAndVocal {
     static description = "Pour configurer l'option d'abonnement textuel";
     static commandName = "configText";
 
+    static slashCommandIdByGuild: {[guildId: string]: string} = {};
+
     static abstract = false;
 
     static slashCommand = true;

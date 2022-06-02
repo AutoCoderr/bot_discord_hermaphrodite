@@ -105,7 +105,7 @@ export async function getHistory(currentCommand: HistoryCmd | HistoryExec, args:
     } else {
         where.commandName = {$nin: []};
         for (let aCommand in existingCommands) {
-            if (!await existingCommands[aCommand].staticCheckPermissions(currentCommand.channel, currentCommand.member, currentCommand.guild, false)) {
+            if (!await existingCommands[aCommand].staticCheckPermissions(currentCommand.member, currentCommand.guild)) {
                 where.commandName.$nin.push(aCommand);
             }
         }

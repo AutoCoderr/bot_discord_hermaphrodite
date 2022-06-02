@@ -20,6 +20,8 @@ export default class ListNotifyOnReact extends Command {
     static description = "Pour lister les messages, sur lesquels il y a une écoute de réaction.";
     static commandName = "listNotifyOnReact";
 
+    static slashCommandIdByGuild: {[guildId: string]: string} = {};
+
     static slashCommand = true;
 
     static argsModel = {

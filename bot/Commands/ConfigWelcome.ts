@@ -18,6 +18,8 @@ export default class ConfigWelcome extends Command {
 
     static slashCommand = true;
 
+    static slashCommandIdByGuild: {[guildId: string]: string} = {};
+
     static argsModel = {
 
         $argsByOrder: [

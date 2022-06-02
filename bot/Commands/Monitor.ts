@@ -27,6 +27,8 @@ export default class Monitor extends Command {
     static description = "Pour afficher en temps réel des infos relatives au serveur";
     static commandName = "monitor";
 
+    static slashCommandIdByGuild: {[guildId: string]: string} = {};
+
     static datasCanBeDisplayed = {
         userCount: {
             display: (guild: Guild, Embed: MessageEmbed) => {

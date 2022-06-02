@@ -23,6 +23,8 @@ export default class CancelNotifyOnReact extends Command {
     static display = true;
     static commandName = "cancelNotifyOnReact"
 
+    static slashCommandIdByGuild: {[guildId: string]: string} = {};
+
     static slashCommand = true;
 
     static argsModel = {
