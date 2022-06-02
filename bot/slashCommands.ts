@@ -33,7 +33,7 @@ export async function initSlashCommands() {
 
     const slashCommandsDefinitions = (<Array<typeof Command>>Object.values(existingCommands)).reduce((acc: Object,command) => ({
         ...acc,
-        ...((command.slashCommand && command.commandName && !command.abstract) ?
+        ...((command.commandName && !command.abstract) ?
                 {[command.commandName.toLowerCase()]: generateSlashCommandFromModel(command)} : {}
         )
     }), {})
@@ -54,8 +54,11 @@ export async function initSlashCommands() {
 
         return Promise.all([
             ...(<Array<typeof Command>>Object.values(existingCommands)).map(async command => {
-                if (command.commandName === null || !command.slashCommand || command.abstract)
+                if (!command.commandName || !slashCommandsDefinitions[command.commandName.toLowerCase()])
                     return null;
+
+                if (existingSlashCommands[command.commandName.toLowerCase()])
+                    command.slashCommandIdByGuild[guild.id] = existingSlashCommands[command.commandName.toLowerCase()].id
 
                 const createdSlashCommand = await commands?.create(<ApplicationCommandDataResolvable>slashCommandsDefinitions[command.commandName.toLowerCase()]);
 

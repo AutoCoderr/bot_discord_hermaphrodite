@@ -13,8 +13,6 @@ export default class ConfigVocal extends ConfigTextAndVocal {
 
     static abstract = false;
 
-    static slashCommand = true;
-
     static argsModel = ConfigTextAndVocal.argsModelFunction('vocal')
 
     constructor(channel: TextBasedChannels, member: User | GuildMember, guild: null | Guild = null, writtenCommandOrSlashCommandOptions: null | string | CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {

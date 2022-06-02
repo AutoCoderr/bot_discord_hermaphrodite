@@ -39,7 +39,6 @@ export default class Command {
     static abstract: boolean = false;
 
     static customCommand: boolean = true;
-    static slashCommand: boolean = false;
 
     commandOrigin: 'slash'|'custom';
 

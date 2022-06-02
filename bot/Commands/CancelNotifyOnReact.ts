@@ -25,8 +25,6 @@ export default class CancelNotifyOnReact extends Command {
 
     static slashCommandIdByGuild: {[guildId: string]: string} = {};
 
-    static slashCommand = true;
-
     static argsModel = {
         all: {
             fields: ["--all"],

@@ -32,7 +32,6 @@ export default class ConfigTicket extends Command {
     static display = true;
     static description = "Pour définir la catégorie pour les channels des tickets, activer, ou désactiver les ticket.";
     static commandName = "configTicket";
-    static slashCommand = true;
 
     static slashCommandIdByGuild: {[guildId: string]: string} = {};
 

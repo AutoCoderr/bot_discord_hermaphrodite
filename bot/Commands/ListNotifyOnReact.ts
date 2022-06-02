@@ -22,8 +22,6 @@ export default class ListNotifyOnReact extends Command {
 
     static slashCommandIdByGuild: {[guildId: string]: string} = {};
 
-    static slashCommand = true;
-
     static argsModel = {
         all: {
             fields: ["--all"],

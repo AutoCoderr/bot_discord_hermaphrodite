@@ -30,8 +30,6 @@ export default class Vocal extends Command {
 
     static slashCommandIdByGuild: {[guildId: string]: string} = {};
 
-    static slashCommand = true;
-
     static argsModel = {
         $argsByType: {
             action: {

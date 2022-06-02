@@ -130,8 +130,6 @@ export default class Monitor extends Command {
     static nbListeners = Object.keys(Monitor.datasCanBeDisplayed).filter(data => typeof(Monitor.datasCanBeDisplayed[data].listen) == "function").length;
     static listeneds = {};
 
-    static slashCommand = true;
-
     static argsModel = {
 
         $argsByType: {

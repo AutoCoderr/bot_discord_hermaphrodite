@@ -35,8 +35,6 @@ export default class NotifyOnReact extends Command {
 
     static slashCommandIdByGuild: {[guildId: string]: string} = {};
 
-    static slashCommand = true
-
     static argsModel = {
         channelToListen: {
             fields: ['--listen-channel','-lc'],

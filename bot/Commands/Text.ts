@@ -48,7 +48,6 @@ export default class Text extends Command {
     static slashCommandIdByGuild: {[guildId: string]: string} = {};
 
     static customCommand = false;
-    static slashCommand = true;
 
     static argsModel = {
         $argsByType: {
