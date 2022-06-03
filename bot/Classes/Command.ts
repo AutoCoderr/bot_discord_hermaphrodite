@@ -66,7 +66,7 @@ export default class Command {
 
     async match() {
         if (this.writtenCommand == null || this.commandName == null) return false;
-        return this.writtenCommand.split(" ")[0] == config.command_prefix+this.commandName;
+        return this.writtenCommand.split(" ")[0].toLowerCase() == config.command_prefix+this.commandName.toLowerCase();
     }
 
     async executeCommand(bot, slashCommand = false): Promise<false| { result: Array<string | MessagePayload | MessageOptions>, callback?: Function }> {

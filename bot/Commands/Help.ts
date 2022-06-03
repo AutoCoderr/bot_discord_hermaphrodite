@@ -14,6 +14,8 @@ export default class Help extends Command {
 
     static commandName = "help";
 
+    static description = "Afficher l'aide de toutes les commandes";
+
     constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
         super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, Help.commandName, Help.argsModel);
     }
@@ -40,8 +42,8 @@ export default class Help extends Command {
             for (let commandName of allowedCommands) {
                 const command = existingCommands[commandName];
                 Embed.addFields({
-                    name: config.command_prefix+command.commandName+" :",
-                    value: command.description+"\n"+config.command_prefix+command.commandName+" -h"
+                    name: '/'+command.commandName.toLowerCase()+" :",
+                    value: command.description+"\n/"+command.commandName.toLowerCase()+" -h"+(command.customCommand ? " (Aussi disponible via "+config.command_prefix+command.commandName+" -h)": "")
                 });
             }
         }
