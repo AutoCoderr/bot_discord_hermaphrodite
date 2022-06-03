@@ -143,7 +143,7 @@ export const extractTypes = {
     command: async (field, currentCommand: Command): Promise<typeof Command|false>=> {
         const commandList: typeof Command[] = Object.values(existingCommands);
         for (const eachCommand of commandList) {
-            if (eachCommand.commandName === field && eachCommand.display && await eachCommand.staticCheckPermissions(currentCommand.channel,currentCommand.member, currentCommand.guild, false, eachCommand.commandName)) {
+            if (eachCommand.commandName === field && eachCommand.display && await eachCommand.staticCheckPermissions(currentCommand.member, currentCommand.guild)) {
                 return eachCommand;
             }
         }

@@ -1,10 +1,10 @@
 import config from "../config";
 import * as Discord from "discord.js";
 import {addMissingZero, splitFieldsEmbed} from "./OtherFunctions";
-import Permissions, { IPermissions } from "../Models/Permissions";
 import History, {IHistory} from "../Models/History";
 import {isNumber} from "./OtherFunctions";
 import {
+    ApplicationCommand,
     CommandInteractionOptionResolver,
     Guild,
     GuildMember,
@@ -34,10 +34,11 @@ export default class Command {
     static description: null|string = null;
     static argsModel: any = {};
 
+    static slashCommandIdByGuild: {[guildId: string]: string} = {};
+
     static abstract: boolean = false;
 
     static customCommand: boolean = true;
-    static slashCommand: boolean = false;
 
     commandOrigin: 'slash'|'custom';
 
@@ -65,15 +66,18 @@ export default class Command {
 
     async match() {
         if (this.writtenCommand == null || this.commandName == null) return false;
-        return this.writtenCommand.split(" ")[0] == config.command_prefix+this.commandName;
+        return this.writtenCommand.split(" ")[0].toLowerCase() == config.command_prefix+this.commandName.toLowerCase();
     }
 
     async executeCommand(bot, slashCommand = false): Promise<false| { result: Array<string | MessagePayload | MessageOptions>, callback?: Function }> {
         if (this.writtenCommand === null || await this.match()) {
 
-            const permissionRes = await this.checkPermissions();
-            if (permissionRes !== true)
-                return permissionRes ? {result: permissionRes} : false;
+            if (this.writtenCommand && !(await this.checkPermissions()))
+                return {result: [{ embeds: [new Discord.MessageEmbed()
+                            .setColor('#0099ff')
+                            .setTitle('Permission denied')
+                            .setDescription("Vous n'avez pas le droit d'executer la commande '" + this.commandName + "'")
+                            .setTimestamp()] }] };
 
             const modelValidRes = this.checkIfModelValid();
             if (modelValidRes !== true)
@@ -269,36 +273,20 @@ export default class Command {
         History.create(history);
     }
 
-    checkPermissions(displayMsg = true): Promise<boolean|Array<string | MessagePayload | MessageOptions>> {
-        return Command.staticCheckPermissions(this.channel, this.member, this.guild, displayMsg, this.commandName);
+    checkPermissions(): Promise<boolean> {
+        //@ts-ignore
+        return this.constructor.staticCheckPermissions(this.member,this.guild)
     }
 
-    static async staticCheckPermissions(channel: null|TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, displayMsg = true, commandName: string|null = null): Promise<boolean|Array<string | MessagePayload | MessageOptions>> {
-        if (commandName == null) {
-            commandName = this.commandName;
-        }
+    static async staticCheckPermissions(member: GuildMember|User, guild: null|Guild = null): Promise<boolean> {
+        if (guild === null || !this.slashCommandIdByGuild[guild.id] || member instanceof User)
+            return false;
 
-        if ((channel && channel.type == "DM") || config.roots.includes(member.id) || (guild != null && guild.ownerId == member.id)) return true;
-
-        if (guild && member instanceof GuildMember) {
-            const permission: IPermissions = await Permissions.findOne({
-                serverId: guild.id,
-                command: commandName
-            });
-            if (permission != null) {
-                // @ts-ignore
-                for (let roleId of member._roles) {
-                    if (permission.roles.includes(roleId)) return true;
-                }
-            }
-        }
-        if (displayMsg) {
-            let Embed = new Discord.MessageEmbed()
-                .setColor('#0099ff')
-                .setTitle('Permission denied')
-                .setDescription("Vous n'avez pas le droit d'executer la commande '" + commandName + "'")
-                .setTimestamp();
-            return [{embeds: [Embed]}];
+        const slashCommand: null|ApplicationCommand = await guild.commands.fetch(this.slashCommandIdByGuild[guild.id]).catch(() => null);
+        if (slashCommand) {
+            const permissions = (await slashCommand.permissions.fetch({guild}).catch(() => null))??[];
+            return guild.ownerId == member.id ||
+                member.roles.cache.some(role => permissions.some(({id, permission}) => permission && id === role.id))
         }
         return false;
     }

@@ -14,11 +14,13 @@ export default class Help extends Command {
 
     static commandName = "help";
 
+    static description = "Afficher l'aide de toutes les commandes";
+
     constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
         super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, Help.commandName, Help.argsModel);
     }
 
-    async action(_,bot) {
+    async action() {
         let Embed = new Discord.MessageEmbed()
             .setColor('#0099ff')
             .setTitle('Toutes les commandes')
@@ -27,7 +29,7 @@ export default class Help extends Command {
         let allowedCommands: Array<string> = [];
         for (let commandName in existingCommands) {
             const command = existingCommands[commandName];
-            if (command.display && command.customCommand && await command.staticCheckPermissions(this, false)) {
+            if (command.display && command.customCommand && await command.staticCheckPermissions(this.member, this.guild)) {
                 allowedCommands.push(commandName);
             }
         }
@@ -40,8 +42,8 @@ export default class Help extends Command {
             for (let commandName of allowedCommands) {
                 const command = existingCommands[commandName];
                 Embed.addFields({
-                    name: config.command_prefix+command.commandName+" :",
-                    value: command.description+"\n"+config.command_prefix+command.commandName+" -h"
+                    name: '/'+command.commandName.toLowerCase()+" :",
+                    value: command.description+"\n/"+command.commandName.toLowerCase()+" -h"+(command.customCommand ? " (Aussi disponible via "+config.command_prefix+command.commandName+" -h)": "")
                 });
             }
         }
@@ -49,12 +51,4 @@ export default class Help extends Command {
     }
 
     async saveHistory() {} // overload saveHistory of Command class to save nothing in the history
-
-    async checkPermissions(displayMsg = true) { // overload checkPermission of Command class to permit all users to execute the help command
-        return true;
-    }
-
-    static async staticCheckPermissions(_: TextBasedChannels, __: User|GuildMember, ___: null|Guild = null, ____ = true, _____: string|null = null) { // overload the staticCheckPermission of Command class to permit all users to execute the help command
-        return true
-    }
 }

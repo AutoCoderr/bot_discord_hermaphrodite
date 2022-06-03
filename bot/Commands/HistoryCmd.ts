@@ -17,6 +17,8 @@ export default class HistoryCmd extends Command {
     static description = "Pour accéder à l'historique des commandes.";
     static commandName = "history";
 
+    static slashCommandIdByGuild: {[guildId: string]: string} = {};
+
     static argsModel = getArgsModelHistory();
 
     constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {

@@ -45,8 +45,7 @@ export default class Text extends Command {
     static description = "Pour recevoir des notifications lorsque les personnes abonnées parlent sur un channel textuel";
     static commandName = "text";
 
-    static customCommand = false;
-    static slashCommand = true;
+    static slashCommandIdByGuild: {[guildId: string]: string} = {};
 
     static argsModel = {
         $argsByType: {
@@ -1087,7 +1086,7 @@ export default class Text extends Command {
             }
         } else {
             for (const user of users) {
-                if (!(await Text.staticCheckPermissions(null, user, this.guild, false)) ||
+                if (!(await Text.staticCheckPermissions(user, this.guild)) ||
                     textConfig.listenerBlacklist.users.includes(user.id) ||
                     user.roles.cache.some(role => textConfig.listenerBlacklist.roles.includes(role.id))) {
 
@@ -1290,7 +1289,7 @@ export default class Text extends Command {
 
         const listened: GuildMember = message.member;
 
-        if (!(await Text.staticCheckPermissions(null, listened, message.guild, false))) {
+        if (!(await Text.staticCheckPermissions(listened, message.guild))) {
             await TextSubscribe.deleteMany({
                 serverId: message.guild.id,
                 $or: [
@@ -1350,7 +1349,7 @@ export default class Text extends Command {
             } catch (_) {
             }
 
-            if (listener === null || !(await Text.staticCheckPermissions(null, listener, message.guild, false))) {
+            if (listener === null || !(await Text.staticCheckPermissions(listener, message.guild))) {
                 await Promise.all([
                     TextSubscribe.deleteMany({
                         serverId: message.guild.id,

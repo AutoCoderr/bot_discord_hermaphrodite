@@ -33,6 +33,8 @@ export default abstract class ConfigTextAndVocal extends Command {
 
     static abstract = true;
 
+    static slashCommandIdByGuild: {[guildId: string]: string} = {};
+
     static types = {
         vocal: {
             configModel: VocalConfig,

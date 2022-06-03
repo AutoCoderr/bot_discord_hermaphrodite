@@ -33,7 +33,7 @@ export default class NotifyOnReact extends Command {
     static description = "Pour envoyer un message sur un channel indiqué, quand une réaction à été detectée sur un message.";
     static commandName = "notifyOnReact";
 
-    static slashCommand = true
+    static slashCommandIdByGuild: {[guildId: string]: string} = {};
 
     static argsModel = {
         channelToListen: {

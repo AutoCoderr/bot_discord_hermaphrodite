@@ -27,6 +27,8 @@ export default class Monitor extends Command {
     static description = "Pour afficher en temps réel des infos relatives au serveur";
     static commandName = "monitor";
 
+    static slashCommandIdByGuild: {[guildId: string]: string} = {};
+
     static datasCanBeDisplayed = {
         userCount: {
             display: (guild: Guild, Embed: MessageEmbed) => {
@@ -127,8 +129,6 @@ export default class Monitor extends Command {
 
     static nbListeners = Object.keys(Monitor.datasCanBeDisplayed).filter(data => typeof(Monitor.datasCanBeDisplayed[data].listen) == "function").length;
     static listeneds = {};
-
-    static slashCommand = true;
 
     static argsModel = {
 

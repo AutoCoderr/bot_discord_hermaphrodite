@@ -16,7 +16,7 @@ export default class ConfigWelcome extends Command {
     static description = "Pour activer, désactiver, ou définir le message privé à envoyer aux nouveaux arrivants."
     static commandName = "configWelcome";
 
-    static slashCommand = true;
+    static slashCommandIdByGuild: {[guildId: string]: string} = {};
 
     static argsModel = {
 

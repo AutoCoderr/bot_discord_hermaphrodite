@@ -28,7 +28,7 @@ export default class Vocal extends Command {
     static description = "Être alerté quand une ou plusieurs personnes se connectent à un ou plusieurs channels";
     static commandName = "vocal";
 
-    static slashCommand = true;
+    static slashCommandIdByGuild: {[guildId: string]: string} = {};
 
     static argsModel = {
         $argsByType: {
@@ -199,7 +199,7 @@ export default class Vocal extends Command {
                     continue;
                 }
 
-                if (!(await Vocal.staticCheckPermissions(null, user, this.guild, false)) ||
+                if (!(await Vocal.staticCheckPermissions(user, this.guild)) ||
                     vocalConfig.listenerBlacklist.users.includes(user.id) ||
                     user.roles.cache.some(role => vocalConfig.listenerBlacklist.roles.includes(role.id))) {
 
@@ -823,12 +823,12 @@ export default class Vocal extends Command {
             const listened: GuildMember = await newState.guild.members.fetch(vocalSubscribe.listenedId);
 
             if (allowedUsers[listener.id] === undefined)
-                allowedUsers[listener.id] = (await Vocal.staticCheckPermissions(null, listener, newState.guild, false)) === true;
+                allowedUsers[listener.id] = await Vocal.staticCheckPermissions(listener, newState.guild);
             if (!allowedUsers[listener.id])
                 continue;
 
             if (allowedUsers[listened.id] === undefined)
-                allowedUsers[listened.id] = (await Vocal.staticCheckPermissions(null, listened, newState.guild, false)) === true;
+                allowedUsers[listened.id] = await Vocal.staticCheckPermissions(listened, newState.guild);
             if (!allowedUsers[listened.id])
                 continue;
 
