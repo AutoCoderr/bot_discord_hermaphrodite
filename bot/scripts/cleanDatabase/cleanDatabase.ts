@@ -18,7 +18,6 @@ import filterElementsToDelete from "./filterElementsToDelete";
 
 import client from "../../client";
 import textUserConfig from "../../Models/Text/TextUserConfig";
-import {getNeededs} from "./datasGet";
 import getToUpdateElements from "./getToUpdateElements";
 
 //@ts-ignore
@@ -159,7 +158,7 @@ async function cleanDatabase() {
                 { col: 'ticketChannels', attr: 'channelId' },
                 { col: 'messagesToListen', attr: 'channelId' }
             ],
-            message: [{ col: 'messagesToListen', attr: 'messageId' }],
+            message: [{ col: 'messagesToListen', attr: 'messageId', needed: '$item.channelId' }],
             emote: [{ col: 'messagesToListen', attr: 'emoteId' }]
         }),
         checkAndDeleteUselessEntries(WelcomeMessage, "welcomeMessage", {

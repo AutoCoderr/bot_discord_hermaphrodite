@@ -60,12 +60,16 @@ async function checkDatasByNeededToDeleteItemsInElementList(neededs, element, li
 
     const neededDatas = needed === "none" ?
         null :
-        Object.values(<{[id: string]: Guild|GuildChannel}>(colsTypes[needed]??[])
+        Object.values(<{[id: string]: Guild|GuildChannel}>[...(colsTypes[needed]??[]), ...(listTypes[needed]??[])]
             .reduce((acc,col) => {
                 const colName = col.col ?? col;
+                const attrInItem = col.attr ?? null;
                 return {
                     ...acc,
-                    [propAccess(element, colName)]: acc[propAccess(element, colName)]??datas[needed + 's'][propAccess(element, colName)]
+                    ...(propAccess(element, colName) instanceof Array ? propAccess(element, colName) : [propAccess(element, colName)]).reduce((acc,item) => ({
+                        ...acc,
+                        [propAccess(item, attrInItem)]: acc[propAccess(item, attrInItem)]??datas[needed + 's'][propAccess(item, attrInItem)]
+                    }), acc)
                 }
             },{}));
 

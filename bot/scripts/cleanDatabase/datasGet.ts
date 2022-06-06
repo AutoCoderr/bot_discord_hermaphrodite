@@ -56,11 +56,11 @@ const getters = {
         }
     },
     message: async (id: string, channel: BaseGuildTextChannel|null = null) => {
-        if (!(channel instanceof BaseGuildTextChannel))
+        if (!channel)
             return null;
 
         try {
-            return await channel.messages.fetch(id)
+            return await channel.messages.fetch(id);
         } catch (e) {
             console.log("message '"+id+"' does not exist on channel '"+channel.name+"' on guild '"+channel.guild.name+"'")
             return null;
@@ -68,8 +68,12 @@ const getters = {
     }
 }
 
+function getNeededData(needed,item,element) {
+    const splittedNeeded = needed.split(".");
+    return splittedNeeded[0] === "$item" ? propAccess(item,splittedNeeded.slice(1)) : propAccess(element,splittedNeeded);
+}
 
-export async function updateDatasDict(dict: any,element, cols: string[], type: 'member'|'channel'|'message'|'role'|'emote'|'server', guildsOrChannels: null|Array<Guild|GuildChannel> = null) {//@ts-ignore
+export async function updateDatasDict(dict: any,element, cols: string[], type: 'member'|'channel'|'message'|'role'|'emote'|'server', guildsOrChannels: null|Array<Guild|GuildChannel> = null) {// @ts-ignore
     return (cols ?? []).promiseReduce(async (acc, col) => {
         const colName = col.col??col;
         const attrInItem = col.attr??null;
@@ -81,13 +85,17 @@ export async function updateDatasDict(dict: any,element, cols: string[], type: '
                     {} :
                     await (propAccess(element,colName) instanceof Array ? propAccess(element,colName) : [propAccess(element,colName)]).promiseReduce(async (acc,item) => ({
                         ...acc,
-                        [propAccess(item,attrInItem)]: acc[propAccess(item,attrInItem)] !== undefined ? acc[propAccess(item,attrInItem)] :
-                            guildsOrChannels ? //@ts-ignore
-                                await guildsOrChannels.promiseFindElem(guildOrChannel =>
-                                    (neededForThisCol === null || propAccess(element,neededForThisCol) === guildOrChannel.id) &&
-                                    getters[type](propAccess(item,attrInItem), guildOrChannel)
-                                ) :
-                                await getters[type](propAccess(item,attrInItem))
+                        ...((propAccess(item,attrInItem) !== undefined) ? {
+                            [propAccess(item,attrInItem)]:
+                                acc[propAccess(item,attrInItem)] !== undefined ? acc[propAccess(item,attrInItem)] :
+                                    guildsOrChannels ? //@ts-ignore
+                                        await guildsOrChannels.promiseFindElem(guildOrChannel =>
+                                            (neededForThisCol === null || getNeededData(neededForThisCol,item,element) === guildOrChannel.id) &&
+                                            getters[type](propAccess(item,attrInItem), guildOrChannel)
+                                        ) :
+                                        await getters[type](propAccess(item,attrInItem))
+                        }: {})
+
                     }), acc)
             )
         }
