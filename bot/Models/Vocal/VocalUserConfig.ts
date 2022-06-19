@@ -1,13 +1,14 @@
 import { Schema } from 'mongoose';
 import { connect } from "../../Mongo";
 import {defaultLimit} from "./VocalConfig";
+import {Snowflake} from "discord.js";
 
 const db = connect();
 
 export interface IVocalUserConfig {
     userId: string;
     serverId: string;
-    blocked: { users: string[], roles: string[] };
+    blocked: { users: Snowflake[], roles: Snowflake[] };
     listening: boolean;
     limit: number;
     mutedFor?: number;

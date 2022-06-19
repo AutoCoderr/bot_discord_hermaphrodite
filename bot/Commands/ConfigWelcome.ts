@@ -7,7 +7,7 @@ import {
     GuildMember,
     Message,
     MessageEmbed,
-    TextBasedChannels,
+    TextChannel,
     User
 } from "discord.js";
 
@@ -37,7 +37,7 @@ export default class ConfigWelcome extends Command {
         ]
     }
 
-    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
+    constructor(channel: TextChannel, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
         super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, ConfigWelcome.commandName, ConfigWelcome.argsModel);
     }
 
@@ -142,7 +142,7 @@ export default class ConfigWelcome extends Command {
     help() {
         return new MessageEmbed()
             .setTitle("Exemples :")
-            .addFields([
+            .addFields(<any>[
                 {
                     name: "disable",
                     value: "Désactiver le message de bienvenue"

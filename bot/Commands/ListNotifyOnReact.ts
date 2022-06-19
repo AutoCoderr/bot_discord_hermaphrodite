@@ -9,7 +9,7 @@ import Discord, {
     GuildMember,
     Message,
     MessageEmbed,
-    TextBasedChannels, TextChannel,
+    TextChannel,
     User
 } from "discord.js";
 import {existingCommands} from "../Classes/CommandsDescription";
@@ -50,7 +50,7 @@ export default class ListNotifyOnReact extends Command {
         }
     };
 
-    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
+    constructor(channel: TextChannel, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
         super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, ListNotifyOnReact.commandName, ListNotifyOnReact.argsModel);
     }
 
@@ -85,28 +85,28 @@ export default class ListNotifyOnReact extends Command {
                     emote = reaction ? reaction.emoji : null
                 }
                 if (found) {
-                    Embed.addFields({
-                        name: "Sur '#" + channel.name + "' (" + contentMessage + ") "+(emote ? ':'+emote.name+':' : emoteKey),
-                        value: "Il y a une écoute de réaction sur ce message"
-                    });
+                    Embed.addField(
+                        "Sur '#" + channel.name + "' (" + contentMessage + ") "+(emote ? ':'+emote.name+':' : emoteKey),
+                        "Il y a une écoute de réaction sur ce message"
+                    );
                 } else {
-                    Embed.addFields({
-                        name: "Aucune réaction",
-                        value: "Aucune réaction n'a été trouvée"
-                    });
+                    Embed.addField(
+                        "Aucune réaction",
+                        "Aucune réaction n'a été trouvée"
+                    );
                 }
             }, all ? undefined : channel, all ? undefined : message, Embed, this);
         } else if (listenings && listenings[channel.id] && listenings[channel.id][message.id] && listenings[channel.id][message.id][emoteKey]) {
             const contentMessage = message.content.substring(0,Math.min(20,message.content.length)) + "...";
-            Embed.addFields({
-                name: "sur '#" + channel.name + "' (" + contentMessage + ") "+(emote instanceof GuildEmoji ? ':'+emote.name+':' : emote),
-                value: "Il y a une écoute de réaction sur ce message"
-            });
+            Embed.addField(
+                "sur '#" + channel.name + "' (" + contentMessage + ") "+(emote instanceof GuildEmoji ? ':'+emote.name+':' : emote),
+                "Il y a une écoute de réaction sur ce message"
+            );
         } else {
-            Embed.addFields({
-                name: "Aucune réaction",
-                value: "Aucune réaction n'a été trouvée et supprimée"
-            });
+            Embed.addField(
+                "Aucune réaction",
+                "Aucune réaction n'a été trouvée et supprimée"
+            );
         }
 
         return this.response(true, {embeds: [Embed]});
@@ -115,7 +115,7 @@ export default class ListNotifyOnReact extends Command {
     help() {
         return new MessageEmbed()
             .setTitle("Exemples :")
-            .addFields([
+            .addFields(<any>[
                 {
                     name: "--channel #leChannel",
                     value: "Lister les écoutes de réaction du channel #leChannel"

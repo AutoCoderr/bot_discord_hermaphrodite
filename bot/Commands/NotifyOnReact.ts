@@ -9,8 +9,8 @@ import {
     GuildEmoji,
     GuildMember,
     Message,
-    MessageEmbed,
-    TextBasedChannels,
+    MessageEmbed, Snowflake,
+    TextChannel,
     User
 } from "discord.js";
 import {existingCommands} from "../Classes/CommandsDescription";
@@ -69,7 +69,7 @@ export default class NotifyOnReact extends Command {
         },
     };
 
-    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
+    constructor(channel: TextChannel, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
         super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, NotifyOnReact.commandName, NotifyOnReact.argsModel);
         this.listenings = NotifyOnReact.listenings;
     }
@@ -135,7 +135,7 @@ export default class NotifyOnReact extends Command {
         return this.response(true, "Command sucessfully executed, all reactions to this message will be notified");
     }
 
-    static async reactingAndNotifyOnMessage(messageToListen, channelToWrite, messageToWrite, emoteKey: string, channelToListen) {
+    static async reactingAndNotifyOnMessage(messageToListen, channelToWrite, messageToWrite, emoteKey: Snowflake, channelToListen) {
         const serverId = messageToListen.guild.id;
 
         let userWhoReact;
@@ -275,11 +275,9 @@ export default class NotifyOnReact extends Command {
     help() {
         return new MessageEmbed()
             .setTitle("Exemples :")
-            .addFields([
-                {
-                    name: config.command_prefix+this.commandName+" -lc #ChannelAEcouter -lm IdDuMessageAEcouter -e :emoteAEcouter: --message '$user$ a réagit à ce message' --writeChannel #channelSurLequelEcrire",
-                    value: "Créer une écoute pour qu'un message '$user$ a réagit à ce message' soit posté sur le channel #channelSurLequelEcrire à chaque fois qu'on réagit avec l'émote :emoteAEcouter: sur le message ayant l'id IdDuMessageAEcouter dans le channel #ChannelAEcouter"
-                }
-            ]);
+            .addField(
+                config.command_prefix+this.commandName+" -lc #ChannelAEcouter -lm IdDuMessageAEcouter -e :emoteAEcouter: --message '$user$ a réagit à ce message' --writeChannel #channelSurLequelEcrire",
+                "Créer une écoute pour qu'un message '$user$ a réagit à ce message' soit posté sur le channel #channelSurLequelEcrire à chaque fois qu'on réagit avec l'émote :emoteAEcouter: sur le message ayant l'id IdDuMessageAEcouter dans le channel #ChannelAEcouter"
+            );
     }
 }

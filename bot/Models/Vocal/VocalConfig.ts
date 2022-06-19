@@ -1,5 +1,6 @@
 import { Schema } from 'mongoose';
 import { connect } from "../../Mongo";
+import {Snowflake} from "discord.js";
 
 
 const db = connect();
@@ -9,10 +10,10 @@ export const minimumLimit = 0; // Minimum value for the limit
 
 export interface IVocalConfig {
     enabled: boolean;
-    listenerBlacklist: { roles: string[], users: string[] };
-    channelBlacklist: string[];
+    listenerBlacklist: { roles: Snowflake[], users: Snowflake[] };
+    channelBlacklist: Snowflake[];
     defaultLimit?: number;
-    serverId: string;
+    serverId: Snowflake;
 }
 
 const ListenerBlacklistSchema: Schema = new Schema({
