@@ -11,8 +11,8 @@ import Discord, {
     GuildEmoji,
     GuildMember,
     Message,
-    MessageEmbed, MessageReaction,
-    TextBasedChannels,
+    MessageEmbed, MessageReaction, Snowflake,
+    TextChannel,
     User
 } from "discord.js";
 import {checkTypes} from "../Classes/TypeChecker";
@@ -53,7 +53,7 @@ export default class CancelNotifyOnReact extends Command {
         }
     };
 
-    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
+    constructor(channel: TextChannel, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
         super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, CancelNotifyOnReact.commandName, CancelNotifyOnReact.argsModel);
     }
 
@@ -79,7 +79,7 @@ export default class CancelNotifyOnReact extends Command {
             );
         }
 
-        let emoteKey = emote ? (emote instanceof GuildEmoji ? emote.id : emote) : undefined;
+        let emoteKey: undefined|string|Snowflake = emote ? (emote instanceof GuildEmoji ? emote.id : emote) : undefined;
 
         let Embed = new Discord.MessageEmbed()
             .setColor('#0099ff')
@@ -104,15 +104,12 @@ export default class CancelNotifyOnReact extends Command {
                         emote = reaction.emoji;
                     }
 
-                    Embed.addFields({
-                        name: "Supprimée : sur '#" + channel.name + "' (" + contentMessage + ") " + (emote ? ':'+emote.name+':' : emoteKey),
-                        value: "Cette écoute de réaction a été supprimée"
-                    });
+                    Embed.addField(
+                        "Supprimée : sur '#" + channel.name + "' (" + contentMessage + ") " + (emote ? ':'+emote.name+':' : emoteKey),
+                        "Cette écoute de réaction a été supprimée"
+                    );
                 } else {
-                    Embed.addFields({
-                        name: "Aucune réaction",
-                        value: "Aucune réaction n'a été trouvée et supprimée"
-                    });
+                    Embed.addField("Aucune réaction", "Aucune réaction n'a été trouvée et supprimée");
                 }
             }, all ? undefined : channel, all ? undefined : message, Embed, this);
         } else if (listenings && listenings[channel.id] && listenings[channel.id][message.id] && listenings[channel.id][message.id][emoteKey]) {
@@ -125,20 +122,20 @@ export default class CancelNotifyOnReact extends Command {
             if (reaction) {
                 reaction.users.remove(<ClientUser>client.user);
             }
-            Embed.addFields({
-                name: "sur '#" + channel.name + "' (" + message.content + ") "+(emote instanceof Emoji ? ':'+emote.name+':' : emoteKey),
-                value: "Cette écoute de réaction a été supprimée"
-            });
+            Embed.addField(
+                "sur '#" + channel.name + "' (" + message.content + ") "+(emote instanceof Emoji ? ':'+emote.name+':' : emoteKey),
+                "Cette écoute de réaction a été supprimée"
+            );
         } else {
-            Embed.addFields({
-                name: "Aucune réaction",
-                value: "Aucune réaction n'a été trouvée et supprimée"
-            });
+            Embed.addField(
+                "Aucune réaction",
+                "Aucune réaction n'a été trouvée et supprimée"
+            );
         }
         return this.response(true, {embeds: [Embed]});
     }
 
-    static async deleteNotifyOnReactInBdd(serverId, channelId: string|null = null, messageId: string|null = null, emoteKey: string|null = null) {
+    static async deleteNotifyOnReactInBdd(serverId, channelId: Snowflake|null = null, messageId: Snowflake|null = null, emoteKey: Snowflake|null = null) {
         await StoredNotifyOnReact.deleteMany({
             serverId: serverId,
             ...( channelId ? {channelToListenId: channelId} : {}),
@@ -150,7 +147,7 @@ export default class CancelNotifyOnReact extends Command {
     help() {
         return new MessageEmbed()
             .setTitle("Exemples :")
-            .addFields([
+            .addFields(<any>[
                 {
                     name: "--channel #channel",
                     value: "Désactiver les écoutes de réaction du channel #channel"

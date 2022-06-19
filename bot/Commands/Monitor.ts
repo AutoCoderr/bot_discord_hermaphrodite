@@ -6,9 +6,8 @@ import {
     GuildMember,
     Message,
     MessageEmbed,
-    PartialGuildMember,
-    Role, TextBasedChannels,
-    TextChannel, User
+    PartialGuildMember, Presence,
+    Role, TextChannel, User
 } from "discord.js";
 import config from "../config";
 import MonitoringMessage, {IMonitoringMessage} from "../Models/MonitoringMessage";
@@ -32,10 +31,10 @@ export default class Monitor extends Command {
     static datasCanBeDisplayed = {
         userCount: {
             display: (guild: Guild, Embed: MessageEmbed) => {
-                Embed.addFields({
-                    name: "Nombre d'utilisateurs",
-                    value: guild.memberCount.toString()
-                });
+                Embed.addField(
+                    "Nombre d'utilisateurs",
+                    guild.memberCount.toString()
+                );
             },
             listen: (callback: Function) => {
                 const listener = (member: GuildMember|PartialGuildMember) => callback(member.guild);
@@ -45,10 +44,10 @@ export default class Monitor extends Command {
         },
         memberMax: {
             display: (guild: Guild, Embed: MessageEmbed) => {
-                Embed.addFields({
-                    name: "Nombre maximum d'utilisateurs",
-                    value: guild.maximumMembers ? guild.maximumMembers.toString() : "Infinity"
-                });
+                Embed.addField(
+                    "Nombre maximum d'utilisateurs",
+                    guild.maximumMembers ? guild.maximumMembers.toString() : "Infinity"
+                );
             }
         },
         onlineUserCount: {
@@ -59,14 +58,14 @@ export default class Monitor extends Command {
                 } catch (_) {
                     onlineUserCount = "Fetching error";
                 }
-                Embed.addFields({
-                    name: "Nombre d'utilisateurs en ligne",
-                    value: onlineUserCount
-                });
+                Embed.addField(
+                    "Nombre d'utilisateurs en ligne",
+                    onlineUserCount
+                );
             },
             listen: (callback: Function) => {
                 client.on('presenceUpdate',(oldPresence, newPresence) =>
-                    (oldPresence && newPresence &&
+                    (oldPresence instanceof Presence && newPresence instanceof Presence &&
                         (oldPresence.status == "online" || newPresence.status == "online") &&
                         oldPresence.status != newPresence.status)  && callback(newPresence.guild))
             }
@@ -76,41 +75,41 @@ export default class Monitor extends Command {
                 const {roleId} = params;
                 const role = guild.roles.cache.get(roleId);
                 if (role) {
-                    Embed.addFields({
-                        name: "Nombre de membres du role @" + role.name,
-                        value: role.members.size.toString()
-                    });
+                    Embed.addField(
+                        "Nombre de membres du role @" + role.name,
+                        role.members.size.toString()
+                    );
                 } else {
-                    Embed.addFields({
-                        name: "Membres du role "+roleId,
-                        value: "Role introuvable"
-                    })
+                    Embed.addField(
+                        "Membres du role "+roleId,
+                        "Role introuvable"
+                    )
                 }
             },
             params: {roleId: (role: Role) => role.id}
         },
         emojiCount: {
             display: (guild: Guild, Embed: MessageEmbed) => {
-                Embed.addFields({
-                    name: "Nombre d'emotes",
-                    value: guild.emojis.cache.size.toString()
-                });
+                Embed.addField(
+                    "Nombre d'emotes",
+                    guild.emojis.cache.size.toString()
+                );
             }
         },
         channelCount: {
             display: (guild: Guild, Embed: MessageEmbed) => {
-                Embed.addFields({
-                    name: "Nombre de channels",
-                    value: guild.channels.cache.size.toString()
-                });
+                Embed.addField(
+                    "Nombre de channels",
+                    guild.channels.cache.size.toString()
+                );
             }
         },
         description: {
             display: (guild: Guild, Embed: MessageEmbed) => {
-                Embed.addFields({
-                    name: "Description",
-                    value: guild.description ?? "Aucune description"
-                });
+                Embed.addField(
+                    "Description",
+                    guild.description ?? "Aucune description"
+                );
             }
         },
         icon: {
@@ -118,10 +117,10 @@ export default class Monitor extends Command {
                 if (typeof(guild.iconURL()) == "string") {
                     Embed.setImage(<string>guild.iconURL());
                 } else {
-                    Embed.addFields({
-                        name: "Icône du serveur",
-                        value: "Aucune icône"
-                    });
+                    Embed.addField(
+                        "Icône du serveur",
+                        "Aucune icône"
+                    );
                 }
             }
         }
@@ -240,7 +239,7 @@ export default class Monitor extends Command {
         }
     }
 
-    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
+    constructor(channel: TextChannel, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
         super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, Monitor.commandName, Monitor.argsModel);
     }
 
@@ -342,7 +341,7 @@ export default class Monitor extends Command {
                             Embed.setTitle("Les messages de monitoring")
                         }
                     });
-                    return this.response(true, Embeds.map(Embed => ({embeds: [Embed]})));
+                    return this.response(true, <{embeds: MessageEmbed[]}[]>Embeds.map(Embed => ({embeds: [Embed]})));
                 }
                 return this.response(true, "Il n'y a aucun monitoring sur ce serveur");
             case "remove":
@@ -460,7 +459,7 @@ export default class Monitor extends Command {
     help() {
         return new MessageEmbed()
             .setTitle("Exemples :")
-            .addFields([
+            .addFields(<any>[
                 {
                     name: "add",
                     value: "Ajouter un monitoring (par défaut sur la channel courant)"

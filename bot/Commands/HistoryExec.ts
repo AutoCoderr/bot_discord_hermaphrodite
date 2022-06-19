@@ -6,7 +6,7 @@ import {
     GuildChannel,
     GuildMember,
     MessageEmbed,
-    TextBasedChannels,
+    TextChannel,
     User
 } from "discord.js";
 import {getArgsModelHistory, getHistory} from "../Classes/OtherFunctions";
@@ -20,7 +20,7 @@ export default class HistoryExec extends Command {
 
     static argsModel = getArgsModelHistory();
 
-    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
+    constructor(channel: TextChannel, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
         super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, HistoryExec.commandName, HistoryExec.argsModel);
     }
 
@@ -49,11 +49,8 @@ export default class HistoryExec extends Command {
     help() {
         return new MessageEmbed()
             .setTitle("Exemples")
-            .addFields([
-                {
-                    name: config.command_prefix+this.commandName+" --command notifyOnReact -l 10 --channel #blabla -s desc -u @toto",
-                    value: "Executer les 10 dernières commandes notifyOnReact dans l'ordre décroissant, sur le channel #blabla, effectuées par l'utilisateur @toto"
-                }
-            ]);
+            .addField(
+                config.command_prefix+this.commandName+" --command notifyOnReact -l 10 --channel #blabla -s desc -u @toto",
+                "Executer les 10 dernières commandes notifyOnReact dans l'ordre décroissant, sur le channel #blabla, effectuées par l'utilisateur @toto");
     }
 }

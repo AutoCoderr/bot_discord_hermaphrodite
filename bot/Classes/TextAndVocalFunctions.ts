@@ -4,7 +4,7 @@ import {
     GuildChannel,
     GuildMember,
     MessageActionRow,
-    MessageButton, MessageEmbed,
+    MessageButton, MessageEmbed, Snowflake,
     ThreadChannel
 } from "discord.js";
 import TextInvite, {ITextInvite} from "../Models/Text/TextInvite";
@@ -122,7 +122,7 @@ export async function listenAskInviteBackButtons(interaction: ButtonInteraction,
     return true;
 }
 
-async function inviteBack(interaction: ButtonInteraction, requester: GuildMember, requested: GuildMember, server: Guild, type: 'text' | 'vocal', keywords: string[] | null = null, channelsId: string[] | null = null) {
+async function inviteBack(interaction: ButtonInteraction, requester: GuildMember, requested: GuildMember, server: Guild, type: 'text' | 'vocal', keywords: string[] | null = null, channelsId: Snowflake[] | null = null) {
     const {inviteBackModel} = classesBySubscribeType[type];
 
     const askBackButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "a";
@@ -328,12 +328,12 @@ export async function listenInviteButtons(interaction: ButtonInteraction, type: 
             await interaction.followUp({
                 embeds: [
                     new MessageEmbed()
-                        .addFields({
-                            name: "L'invitation n'a pas pus s'appliquer sur les channels suivant, car blacklistés :",
-                            value: blackListedChannels.map(channel =>
+                        .addField(
+                            "L'invitation n'a pas pus s'appliquer sur les channels suivant, car blacklistés :",
+                            blackListedChannels.map(channel =>
                                 "<#"+channel.id+">"
                             ).join("\n")
-                        })
+                        )
                 ]
             })
         }
@@ -344,7 +344,7 @@ export async function listenInviteButtons(interaction: ButtonInteraction, type: 
             !userBlockingUsTextOrVocal(listenerConfig,requested,type)
         ) {
             if (channels) {
-                const channelsIdForBackInvite: string[] = [];
+                const channelsIdForBackInvite: Snowflake[] = [];
                 for (const channel of <Array<GuildChannel | ThreadChannel>>channels) {
                     if (
                         blackListedChannels.some(channelB => channelB.id === channel.id) ||
@@ -408,7 +408,7 @@ export function userBlockingUsVocal(listenedConfig: IVocalUserConfig|null, liste
     )
 }
 
-export function userBlockingUsOrChannelText(listenedConfig: ITextUserConfig|null, listenedId: null|string, usersBlockingMe: null|string[] = null, blockedChannelsByUserId: null|{ [userId: string]: string[] } = null, listenerId: string, channelToListenId: string|null = null, checkForUs = true) {
+export function userBlockingUsOrChannelText(listenedConfig: ITextUserConfig|null, listenedId: null|Snowflake, usersBlockingMe: null|Snowflake[] = null, blockedChannelsByUserId: null|{ [userId: string]: string[] } = null, listenerId: Snowflake, channelToListenId: Snowflake|null = null, checkForUs = true) {
     if (listenedConfig === null)
         return false;
     let foundBlocking;
@@ -456,7 +456,7 @@ export async function reEnableTextSubscribesAfterUnmute(listenerId, serverId) {
     }
 }
 
-export async function reEnableTextSubscribesAfterUnblock(listenedId, serverId, listenerId: null|string = null, channelId: null|string = null) {
+export async function reEnableTextSubscribesAfterUnblock(listenedId, serverId, listenerId: null|Snowflake = null, channelId: null|Snowflake = null) {
     const subscribes = await TextSubscribe.find({
         serverId,
         listenedId,

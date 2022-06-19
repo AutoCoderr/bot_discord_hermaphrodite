@@ -8,7 +8,7 @@ import Discord, {
     GuildEmoji,
     GuildMember,
     Message,
-    MessageEmbed, PermissionString, Role, TextBasedChannels,
+    MessageEmbed, PermissionString, Role, Snowflake,
     TextChannel, User
 } from "discord.js";
 import {splitFieldsEmbed} from "../Classes/OtherFunctions";
@@ -114,7 +114,7 @@ export default class ConfigTicket extends Command {
         },
     }
 
-    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
+    constructor(channel: TextChannel, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
         super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, ConfigTicket.commandName, ConfigTicket.argsModel);
     }
 
@@ -131,7 +131,7 @@ export default class ConfigTicket extends Command {
         }
 
         let ticketConfig: ITicketConfig;
-        let emoteId: string|null;
+        let emoteId: string|Snowflake;
         let emoteName: string|null;
         let resultContent: string;
 
@@ -395,10 +395,10 @@ export default class ConfigTicket extends Command {
             .setTimestamp()];
 
         if (ticketConfig == null || ticketConfig.blacklist.length == 0) {
-            embeds[0].addFields({
-                name: "Aucun utilisateur",
-                value: "Il n'y a aucun utilisateur dans la blacklist"
-            });
+            embeds[0].addField(
+                "Aucun utilisateur",
+                "Il n'y a aucun utilisateur dans la blacklist"
+            );
         } else {
             const list = ticketConfig.blacklist;
             let users: Array<any> = [];
@@ -435,17 +435,17 @@ export default class ConfigTicket extends Command {
                         const user = users[msg*linePerMessage*userDisplayedPerLine + line*userDisplayedPerLine + userIndex];
                         usersNames.push("@"+(user != null ? user.username : "unknown")+"("+user.id+")");
                     }
-                    embed.addFields({
-                        name: "Les utilisateurs :",
-                        value: usersNames.join(", ")
-                    });
+                    embed.addField(
+                        "Les utilisateurs :",
+                        usersNames.join(", ")
+                    );
                 }
             }
         }
         return this.response(true, {embeds});
     }
 
-    static async listeningMessageExist(listening: {channelId: string, messageId: string, emoteName?: string, emoteId?: string}, guild: Guild) {
+    static async listeningMessageExist(listening: {channelId: Snowflake, messageId: Snowflake, emoteName?: string, emoteId?: Snowflake}, guild: Guild) {
         const channel: undefined | TextChannel = <TextChannel>guild.channels.cache.get(listening.channelId);
         if (!channel)
             return false;
@@ -603,7 +603,7 @@ export default class ConfigTicket extends Command {
     help() {
         return new MessageEmbed()
             .setTitle("Exemples :")
-            .addFields([
+            .addFields(<any>[
                 {
                     name: "set 475435899654125637",
                     value: "Définir la catégorie dans l'aquelle apparaitrons les tickets"

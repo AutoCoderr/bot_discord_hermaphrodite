@@ -7,7 +7,7 @@ import {
     GuildChannel,
     GuildMember,
     MessageEmbed,
-    TextBasedChannels,
+    TextChannel,
     User
 } from "discord.js";
 import {IHistory} from "../Models/History";
@@ -21,7 +21,7 @@ export default class HistoryCmd extends Command {
 
     static argsModel = getArgsModelHistory();
 
-    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
+    constructor(channel: TextChannel, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
         super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, HistoryCmd.commandName, HistoryCmd.argsModel);
     }
 
@@ -71,24 +71,21 @@ export default class HistoryCmd extends Command {
                 .setTitle("L'historique des commandes :")
                 .setDescription("Liste des commandes qui ont été tapées :")
                 .setTimestamp()
-                .addFields({
-                    name: "Aucun historique",
-                    value: "Aucun élément n'a été trouvé dans l'historique"
-                }));
+                .addField(
+                    "Aucun historique",
+                    "Aucun élément n'a été trouvé dans l'historique"
+                ));
         }
-
-        return this.response(true, embeds.map(embed => ({ embeds: [embed] })));
+        return this.response(true, <{embeds: MessageEmbed[]}[]> embeds.map(embed => ({ embeds: [<MessageEmbed>embed] })));
     }
 
     help() {
         return new MessageEmbed()
             .setTitle("Exemples")
-            .addFields([
-                {
-                    name: config.command_prefix+this.commandName+" --command notifyOnReact -l 10 --channel #blabla -s desc -u @toto",
-                    value: "Afficher les 10 dernières commandes notifyOnReact dans l'ordre décroissant, sur le channel #blabla, effectuées par l'utilisateur @toto"
-                }
-            ]);
+            .addField(
+                config.command_prefix+this.commandName+" --command notifyOnReact -l 10 --channel #blabla -s desc -u @toto",
+                "Afficher les 10 dernières commandes notifyOnReact dans l'ordre décroissant, sur le channel #blabla, effectuées par l'utilisateur @toto"
+            );
     }
 
     saveHistory() {} // overload saveHistory of Command class to save nothing in the history

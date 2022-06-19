@@ -5,7 +5,7 @@ import {
     GuildMember,
     MessageEmbed,
     Role,
-    TextBasedChannels,
+    TextChannel,
     ThreadChannel, User,
     VoiceChannel
 } from "discord.js";
@@ -50,7 +50,7 @@ export default abstract class ConfigTextAndVocal extends Command {
         }
     }
 
-    protected constructor(channel: TextBasedChannels, member: User | GuildMember, guild: null | Guild = null, writtenCommandOrSlashCommandOptions: null | string | CommandInteractionOptionResolver = null, commandOrigin: 'slash' | 'custom', commandName: string, argsModel: any, type: 'vocal' | 'text') {
+    protected constructor(channel: TextChannel, member: User | GuildMember, guild: null | Guild = null, writtenCommandOrSlashCommandOptions: null | string | CommandInteractionOptionResolver = null, commandOrigin: 'slash' | 'custom', commandName: string, argsModel: any, type: 'vocal' | 'text') {
         super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, commandName, argsModel);
         this.type = type;
     }
@@ -202,19 +202,19 @@ export default abstract class ConfigTextAndVocal extends Command {
                 configObj.save();
                 return this.response(true, {
                     embeds: [
-                        new MessageEmbed().setFields({
-                            name: "Valeur changée avec succès!",
-                            value: "Vous avez fixé la limite par défaut de l'écoute " + (this.type === "vocal" ? "vocale" : "textuelle") + " à " + showTime(extractUTCTime(limit), "fr_long")
-                        })
+                        new MessageEmbed().addField(
+                            "Valeur changée avec succès!",
+                            "Vous avez fixé la limite par défaut de l'écoute " + (this.type === "vocal" ? "vocale" : "textuelle") + " à " + showTime(extractUTCTime(limit), "fr_long")
+                        )
                     ]
                 })
             }
             return this.response(true, {
                 embeds: [
-                    new MessageEmbed().setFields({
-                        name: "Voici la limite par défaut de l'écoute " + (this.type === "vocal" ? "vocale" : "textuelle"),
-                        value: "La limite par défaut est : " + showTime(extractUTCTime(configObj.defaultLimit), "fr_long")
-                    })
+                    new MessageEmbed().addField(
+                        "Voici la limite par défaut de l'écoute " + (this.type === "vocal" ? "vocale" : "textuelle"),
+                        "La limite par défaut est : " + showTime(extractUTCTime(configObj.defaultLimit), "fr_long")
+                    )
                 ]
             })
         }
@@ -326,30 +326,32 @@ export default abstract class ConfigTextAndVocal extends Command {
                 let found = false;
                 let name: string = "introuvable";
                 let value: string = "id: " + id;
-                switch (types[i]) {
-                    case 'channel':
-                        channel = this.guild?.channels.cache.get(id);
-                        if (channel) {
-                            found = true;
-                            name = '#!' + channel.name;
-                            value = "<#" + channel.id + ">";
-                        }
-                        break;
-                    case 'user':
-                        member = await this.guild?.members.fetch(id);
-                        if (member) {
-                            found = true;
-                            name = '@' + (member.nickname ?? member.user.username);
-                            value = "<@" + member.id + ">";
-                        }
-                        break;
-                    case 'role':
-                        role = this.guild?.roles.cache.get(id);
-                        if (role) {
-                            found = true;
-                            name = '@&' + role.name;
-                            value = "<@&" + role.id + ">";
-                        }
+                if (this.guild) {
+                    switch (types[i]) {
+                        case 'channel':
+                            channel = this.guild.channels.cache.get(id);
+                            if (channel) {
+                                found = true;
+                                name = '#!' + channel.name;
+                                value = "<#" + channel.id + ">";
+                            }
+                            break;
+                        case 'user':
+                            member = await this.guild?.members.fetch(id);
+                            if (member) {
+                                found = true;
+                                name = '@' + (member.nickname ?? member.user.username);
+                                value = "<@" + member.id + ">";
+                            }
+                            break;
+                        case 'role':
+                            role = this.guild?.roles.cache.get(id);
+                            if (role) {
+                                found = true;
+                                name = '@&' + role.name;
+                                value = "<@&" + role.id + ">";
+                            }
+                    }
                 }
                 if (!found)
                     lists[i].splice(j, 1);
@@ -388,7 +390,7 @@ export default abstract class ConfigTextAndVocal extends Command {
     help() {
         return new MessageEmbed()
             .setTitle("Exemples :")
-            .addFields([
+            .addFields(<any>[
                 {
                     name: "enable",
                     value: "Activer les écoutes " + (this.type === "vocal" ? "vocales" : "textuelles") + " sur ce serveur"

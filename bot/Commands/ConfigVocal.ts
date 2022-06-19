@@ -1,6 +1,6 @@
 import {
     CommandInteractionOptionResolver, Guild,
-    GuildMember, TextBasedChannels, User
+    GuildMember, TextChannel, User
 } from "discord.js";
 import ConfigTextAndVocal from "./ConfigTextAndVocal";
 
@@ -15,7 +15,7 @@ export default class ConfigVocal extends ConfigTextAndVocal {
 
     static argsModel = ConfigTextAndVocal.argsModelFunction('vocal')
 
-    constructor(channel: TextBasedChannels, member: User | GuildMember, guild: null | Guild = null, writtenCommandOrSlashCommandOptions: null | string | CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
+    constructor(channel: TextChannel, member: User | GuildMember, guild: null | Guild = null, writtenCommandOrSlashCommandOptions: null | string | CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
         super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, ConfigVocal.commandName, ConfigVocal.argsModel, 'vocal');
     }
 }

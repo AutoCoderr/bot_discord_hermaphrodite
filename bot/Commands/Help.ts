@@ -6,7 +6,7 @@ import {
     CommandInteractionOptionResolver,
     Guild,
     GuildMember,
-    TextBasedChannels,
+    TextChannel,
     User
 } from "discord.js";
 
@@ -16,7 +16,7 @@ export default class Help extends Command {
 
     static description = "Afficher l'aide de toutes les commandes";
 
-    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
+    constructor(channel: TextChannel, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
         super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, Help.commandName, Help.argsModel);
     }
 
@@ -34,10 +34,10 @@ export default class Help extends Command {
             }
         }
         if (allowedCommands.length == 0) {
-            Embed.addFields({
-                name: "Aucune commande",
-                value: "On dirait que vous n'avez accès à aucune commande"
-            });
+            Embed.addField(
+                "Aucune commande",
+                "On dirait que vous n'avez accès à aucune commande"
+            );
         } else {
             for (let commandName of allowedCommands) {
                 const command = existingCommands[commandName];
@@ -45,6 +45,10 @@ export default class Help extends Command {
                     name: '/'+command.commandName.toLowerCase()+" :",
                     value: command.description+"\n/"+command.commandName.toLowerCase()+" -h"+(command.customCommand ? " (Aussi disponible via "+config.command_prefix+command.commandName+" -h)": "")
                 });
+                Embed.addField(
+                    '/'+command.commandName.toLowerCase()+" :",
+                    command.description+"\n/"+command.commandName.toLowerCase()+" -h"+(command.customCommand ? " (Aussi disponible via "+config.command_prefix+command.commandName+" -h)": "")
+                );
             }
         }
         return this.response(true, {embeds: [Embed]});
