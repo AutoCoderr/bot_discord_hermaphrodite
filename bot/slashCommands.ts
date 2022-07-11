@@ -49,7 +49,14 @@ export async function initSlashCommandsOnGuild(guild: Guild) {
     await Promise.all((<Array<typeof Command>>Object.values(existingCommands)).map(async command => {
         if (command.slashCommand) {
 
-            const createdSlashCommand = await commands?.create(<ApplicationCommandDataResolvable>generateSlashCommandFromModel(command));
+            let createdSlashCommand: null|ApplicationCommand = null
+            try {
+                createdSlashCommand = await commands?.create(<ApplicationCommandDataResolvable>generateSlashCommandFromModel(command));
+            } catch (e) {
+                console.log("Can't create command slash '"+command.commandName+"' on server '"+guild.name+"'");
+                console.log((<any>e).message)
+                return;
+            }
 
             if (slashCommandsByGuildAndName[guild.id] === undefined)
                 slashCommandsByGuildAndName[guild.id] = {}
