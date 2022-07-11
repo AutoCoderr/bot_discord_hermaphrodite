@@ -18,8 +18,9 @@ import filterElementsToDelete from "./filterElementsToDelete";
 
 import client from "../../client";
 import textUserConfig from "../../Models/Text/TextUserConfig";
-import {getNeededs} from "./datasGet";
 import getToUpdateElements from "./getToUpdateElements";
+import Text from "../../Commands/Text";
+import Vocal from "../../Commands/Vocal";
 
 //@ts-ignore
 Array.prototype.promiseReduce = async function (callback, acc) {
@@ -41,9 +42,9 @@ Array.prototype.promiseFindElem = async function (callback, elem = null) {
     return arr.slice(1).promiseFindElem(callback, await callback(arr[0]))
 }
 
-function checkAndDeleteUselessEntries(model, name, colsTypes, listsTypes = {}) {
+function checkAndDeleteUselessEntries(model, name, colsTypes, listsTypes = {}, colsExpires = {}) {
     return model.find()
-        .then(elements => filterElementsToDelete(elements, colsTypes))
+        .then(elements => filterElementsToDelete(elements, colsTypes, colsExpires))
         .then(({toDelete, toKeep, ...datas}) => {
             if (!toDelete || toDelete.length === 0) {
                 console.log("nothing to delete for " + name);
@@ -76,10 +77,14 @@ async function cleanDatabase() {
             member: ['requesterId', 'requestedId']
         }, {
             channel: ['channelsId']
+        }, {
+            timestamp: Text.buttonsTimeout
         }),
         checkAndDeleteUselessEntries(VocalAskInviteBack, "vocalAskInviteBack", {
             server: ['serverId'],
             member: ['requesterId', 'requestedId']
+        }, {}, {
+            timestamp: Vocal.buttonsTimeout
         }),
         checkAndDeleteUselessEntries(TextConfig, "textConfig", {
             server: ['serverId']
@@ -100,10 +105,14 @@ async function cleanDatabase() {
             member: ['requesterId', 'requestedId']
         }, {
             channel: ['channelsId']
+        }, {
+            timestamp: Text.buttonsTimeout
         }),
         checkAndDeleteUselessEntries(VocalInvite, "vocalInvite", {
             server: ['serverId'],
             member: ['requesterId', 'requestedId']
+        }, {}, {
+            timestamp: Vocal.buttonsTimeout
         }),
         checkAndDeleteUselessEntries(TextSubscribe, "textSubscribe", {
             server: ['serverId'],
@@ -159,7 +168,7 @@ async function cleanDatabase() {
                 { col: 'ticketChannels', attr: 'channelId' },
                 { col: 'messagesToListen', attr: 'channelId' }
             ],
-            message: [{ col: 'messagesToListen', attr: 'messageId' }],
+            message: [{ col: 'messagesToListen', attr: 'messageId', needed: '$item.channelId' }],
             emote: [{ col: 'messagesToListen', attr: 'emoteId' }]
         }),
         checkAndDeleteUselessEntries(WelcomeMessage, "welcomeMessage", {

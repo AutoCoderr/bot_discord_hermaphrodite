@@ -155,7 +155,7 @@ export async function listenInviteButtons(interaction: ButtonInteraction, type: 
 
     const currentDate = new Date();
     await inviteModel.deleteMany({
-        timestamp: {$lte: new Date(currentDate.getTime() - Vocal.buttonsTimeout)}
+        timestamp: {$lte: new Date(currentDate.getTime() - command.buttonsTimeout)}
     });
 
     const invite = await inviteModel.findOne({
