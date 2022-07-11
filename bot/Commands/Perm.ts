@@ -6,7 +6,7 @@ import {
     GuildMember,
     MessageEmbed,
     Role,
-    TextBasedChannels,
+    TextChannel,
     User
 } from "discord.js";
 import Permissions, {IPermissions} from "../Models/Permissions";
@@ -80,7 +80,7 @@ export default class Perm extends Command {
         ]
     };
 
-    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
+    constructor(channel: TextChannel, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
         super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, Perm.commandName, Perm.argsModel);
     }
 
@@ -108,10 +108,10 @@ export default class Perm extends Command {
                     .setDescription("Liste des permissions pour '"+command.commandName+"'")
                     .setTimestamp();
                 if (permission == null || permission.roles.length == 0) {
-                    embed.addFields({
-                        name: "Aucune permission",
-                        value: "Il n'y a aucune permission trouvée pour la commande " + command.commandName
-                    });
+                    embed.addField(
+                        "Aucune permission",
+                        "Il n'y a aucune permission trouvée pour la commande " + command.commandName
+                    );
                 } else {
                     let roles: Array<string> = [];
                     for (let roleId of permission.roles) { //@ts-ignore
@@ -124,10 +124,10 @@ export default class Perm extends Command {
                         }
                         roles.push('@'+roleName);
                     }
-                    embed.addFields({
-                        name: "Les roles :",
-                        value: roles.join(", ")
-                    });
+                    embed.addField(
+                        "Les roles :",
+                        roles.join(", ")
+                    );
                 }
                 embeds.push(embed);
             }
@@ -183,7 +183,7 @@ export default class Perm extends Command {
     help() {
         return new MessageEmbed()
             .setTitle("Exemples :")
-            .addFields([
+            .addFields(<any>[
                 {
                     name: "add notifyOnReact @Admins",
                     value: "Ajouter le role @&Admins dans la liste des rôles autoriser à utiliser la commande notifyOnReact"

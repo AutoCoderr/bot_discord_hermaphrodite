@@ -10,7 +10,7 @@ import {
     GuildMember,
     MessageEmbed,
     MessageOptions,
-    MessagePayload, TextBasedChannels,
+    MessagePayload, TextChannel,
     User
 } from "discord.js";
 import {checkTypes} from "./TypeChecker";
@@ -43,14 +43,14 @@ export default class Command {
 
     commandName: null|string;
     guild: null|Guild;
-    channel: TextBasedChannels;
+    channel: TextChannel;
     member: User|GuildMember;
     argsModel: any = {};
 
     writtenCommand: null|string = null; // If command called as a custom command, get the message typed by the user
     slashCommandOptions: null|CommandInteractionOptionResolver = null; // If command called as a slash command, get options
 
-    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom', commandName: null|string, argsModel: any) {
+    constructor(channel: TextChannel, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom', commandName: null|string, argsModel: any) {
         this.guild = guild;
         this.channel = channel;
         this.member = member;
@@ -68,7 +68,7 @@ export default class Command {
         return this.writtenCommand.split(" ")[0] == config.command_prefix+this.commandName;
     }
 
-    async executeCommand(bot, slashCommand = false): Promise<false| { result: Array<string | MessagePayload | MessageOptions>, callback?: Function }> {
+    async executeCommand(bot, slashCommand = false): Promise<false| { result: boolean|Array<string | MessagePayload | MessageOptions>, callback?: Function }> {
         if (this.writtenCommand === null || await this.match()) {
 
             const permissionRes = await this.checkPermissions();
@@ -99,7 +99,7 @@ export default class Command {
         return false;
     }
 
-    sendErrors(errors: Object|Array<Object>): responseResultsType {
+    sendErrors(errors: any|Array<any>): responseResultsType {
         if (!(errors instanceof Array)) {
             errors = [errors];
         }
@@ -210,18 +210,18 @@ export default class Command {
 
 
         if (this.argsModel.$argsByOrder !== undefined && this.argsModel.$argsByOrder.length > 1)
-            embeds[embeds.length-1].addFields({
-                name: "Ordre des arguments :",
-                value: config.command_prefix+this.commandName+" "+this.argsModel.$argsByOrder.map(model => "<"+model.field+'>').join(" ")
-            });
+            embeds[embeds.length-1].addField(
+                "Ordre des arguments :",
+                config.command_prefix+this.commandName+" "+this.argsModel.$argsByOrder.map(model => "<"+model.field+'>').join(" ")
+            );
 
         if (displayHelp)
             embeds.push(this.help())
         else if (this.commandOrigin === "custom")
-            embeds[embeds.length-1].addFields({
-                name: "Voir l'aide : ",
-                value: "Tapez : "+config.command_prefix+this.commandName+" -h"
-            });
+            embeds[embeds.length-1].addField(
+                "Voir l'aide : ",
+                "Tapez : "+config.command_prefix+this.commandName+" -h"
+            );
         return [{embeds}];
     }
 
@@ -273,12 +273,12 @@ export default class Command {
         return Command.staticCheckPermissions(this.channel, this.member, this.guild, displayMsg, this.commandName);
     }
 
-    static async staticCheckPermissions(channel: null|TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, displayMsg = true, commandName: string|null = null): Promise<boolean|Array<string | MessagePayload | MessageOptions>> {
+    static async staticCheckPermissions(channel: null|TextChannel, member: User|GuildMember, guild: null|Guild = null, displayMsg = true, commandName: string|null = null): Promise<boolean|Array<string | MessagePayload | MessageOptions>> {
         if (commandName == null) {
             commandName = this.commandName;
         }
 
-        if ((channel && channel.type == "DM") || config.roots.includes(member.id) || (guild != null && guild.ownerId == member.id)) return true;
+        if (config.roots.includes(member.id) || (guild != null && guild.ownerId == member.id)) return true;
 
         if (guild && member instanceof GuildMember) {
             const permission: IPermissions = await Permissions.findOne({

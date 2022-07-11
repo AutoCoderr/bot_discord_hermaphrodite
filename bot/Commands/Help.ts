@@ -6,7 +6,7 @@ import {
     CommandInteractionOptionResolver,
     Guild,
     GuildMember,
-    TextBasedChannels,
+    TextChannel,
     User
 } from "discord.js";
 
@@ -14,7 +14,7 @@ export default class Help extends Command {
 
     static commandName = "help";
 
-    constructor(channel: TextBasedChannels, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
+    constructor(channel: TextChannel, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
         super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, Help.commandName, Help.argsModel);
     }
 
@@ -32,17 +32,17 @@ export default class Help extends Command {
             }
         }
         if (allowedCommands.length == 0) {
-            Embed.addFields({
-                name: "Aucune commande",
-                value: "On dirait que vous n'avez accès à aucune commande"
-            });
+            Embed.addField(
+                "Aucune commande",
+                "On dirait que vous n'avez accès à aucune commande"
+            );
         } else {
             for (let commandName of allowedCommands) {
                 const command = existingCommands[commandName];
-                Embed.addFields({
-                    name: config.command_prefix+command.commandName+" :",
-                    value: command.description+"\n"+config.command_prefix+command.commandName+" -h"
-                });
+                Embed.addField(
+                    config.command_prefix+command.commandName+" :",
+                    command.description+"\n"+config.command_prefix+command.commandName+" -h"
+                );
             }
         }
         return this.response(true, {embeds: [Embed]});
@@ -54,7 +54,7 @@ export default class Help extends Command {
         return true;
     }
 
-    static async staticCheckPermissions(_: TextBasedChannels, __: User|GuildMember, ___: null|Guild = null, ____ = true, _____: string|null = null) { // overload the staticCheckPermission of Command class to permit all users to execute the help command
+    static async staticCheckPermissions(_: TextChannel, __: User|GuildMember, ___: null|Guild = null, ____ = true, _____: string|null = null) { // overload the staticCheckPermission of Command class to permit all users to execute the help command
         return true
     }
 }

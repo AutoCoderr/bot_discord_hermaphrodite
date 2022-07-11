@@ -2,7 +2,7 @@ import client from "./client";
 import {
     ApplicationCommand, ApplicationCommandDataResolvable,
     Guild,
-    Interaction, MessageOptions, MessagePayload,
+    Interaction, InteractionReplyOptions, MessageOptions, MessagePayload,
     Role
 } from "discord.js";
 import {ApplicationCommandOptionTypes} from "discord.js/typings/enums";
@@ -239,7 +239,7 @@ function generateSlashOptionFromModel(attr: string, argModel: any, subCommands: 
     }
 }
 
-async function getAndDisplaySlashCommandsResponse(interaction: Interaction, response: false| { result: Array<string | MessagePayload | MessageOptions>, callback?: Function }, p = 0) {
+async function getAndDisplaySlashCommandsResponse(interaction: Interaction, response: false| { result: Array<string | MessagePayload | InteractionReplyOptions>, callback?: Function }, p = 0) {
     if (!interaction.isCommand()) return;
     if (response) {
         for (let i=0;i<response.result.length;i++) {

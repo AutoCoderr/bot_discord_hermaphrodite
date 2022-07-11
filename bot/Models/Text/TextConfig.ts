@@ -1,5 +1,6 @@
 import { Schema } from 'mongoose';
 import { connect } from "../../Mongo";
+import {Snowflake} from "discord.js";
 
 
 const db = connect();
@@ -9,10 +10,10 @@ export const minimumLimit = 2*60*1000; // At least 2 minutes for the limit
 
 export interface ITextConfig {
     enabled: boolean;
-    listenerBlacklist: { roles: string[], users: string[] };
-    channelBlacklist: string[];
+    listenerBlacklist: { roles: Snowflake[], users: Snowflake[] };
+    channelBlacklist: Snowflake[];
     defaultLimit?: number;
-    serverId: string;
+    serverId: Snowflake;
 }
 
 const ListenerBlacklistSchema: Schema = new Schema({

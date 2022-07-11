@@ -1,5 +1,6 @@
 import { Schema } from 'mongoose';
 import { connect } from "../Mongo";
+import {Snowflake} from "discord.js";
 
 const db = connect();
 
@@ -7,9 +8,9 @@ export interface IHistory {
     commandName: string;
     command: string;
     dateTime: string;
-    channelId: string;
-    userId: string;
-    serverId: string;
+    channelId: Snowflake;
+    userId: Snowflake;
+    serverId: Snowflake;
 }
 
 const HistorySchema: Schema = new Schema({
