@@ -2,8 +2,6 @@ version: '3'
 services:
   bot:
     build: ./docker/bot
-    ports :
-      - "80:80"
     volumes:
       - ./bot:/bot
     working_dir: /bot

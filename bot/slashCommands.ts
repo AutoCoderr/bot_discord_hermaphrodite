@@ -25,113 +25,41 @@ interface optionCommandType {
 
 let slashCommandsByGuildAndName: {[guildId: string]: {[commandName: string]: ApplicationCommand}} = {};
 
-export async function initSlashCommands() {
+export function initSlashCommands() {
 
     const guilds: Guild[] = [];
     for (const [,guild] of client.guilds.cache)
         guilds.push(guild);
 
-    await Promise.all(guilds.map(async guild => {
-        console.log('Create slash commands for ' + guild.name + ' server');
-
-        const commands = guild.commands;
-
-        const existingSlashCommands = await commands.fetch().then(commands =>
-            commands.reduce((acc,command) => ({
-                ...acc,
-                [command.name]: command
-            }), {})
-        );
-
-        return await Promise.all((<Array<typeof Command>>Object.values(existingCommands)).map(async command => {
-            if (command.slashCommand) {
-
-                const createdSlashCommand = await commands?.create(<ApplicationCommandDataResolvable>generateSlashCommandFromModel(command));
-
-                if (slashCommandsByGuildAndName[guild.id] === undefined)
-                    slashCommandsByGuildAndName[guild.id] = {}
-                slashCommandsByGuildAndName[guild.id][<string>command.commandName] = createdSlashCommand;
-            } else {
-                const foundCommand = existingSlashCommands[(<string>command.commandName).toLowerCase()];
-                if (foundCommand)
-                    foundCommand.delete();
-            }
-        }))
-    }));
+    Promise.all(guilds.map(initSlashCommandsOnGuild));
 }
 
-export async function addRoleToSlashCommandPermission(guild: Guild, commandName: string, rolesId: string[]) {
-    if (slashCommandsByGuildAndName[guild.id] === undefined || slashCommandsByGuildAndName[guild.id][commandName] === undefined) return;
-    const command = slashCommandsByGuildAndName[guild.id][commandName];
+export async function initSlashCommandsOnGuild(guild: Guild) {
+    console.log('Create slash commands for ' + guild.name + ' server');
 
-    await command.permissions.add({
-        permissions: rolesId.map(roleId => ({
-            id: roleId,
-            type: 'ROLE',
-            permission: true
-        }))
-    })
-}
+    const commands = guild.commands;
 
-export async function setRoleToSlashCommandPermission(guild: Guild, commandName: string, rolesId: string[]) {
-    if (slashCommandsByGuildAndName[guild.id] === undefined || slashCommandsByGuildAndName[guild.id][commandName] === undefined) return;
-    const command = slashCommandsByGuildAndName[guild.id][commandName];
+    const existingSlashCommands = await commands.fetch().then(commands =>
+        commands.reduce((acc,command) => ({
+            ...acc,
+            [command.name]: command
+        }), {})
+    );
 
-    await command.permissions.set({
-        permissions: [
-            ...rolesId.map(roleId => ({
-                id: roleId,
-                type: 'ROLE',
-                permission: true
-            })),
-            ...config.roots.map(id => ({
-                id,
-                type: 'USER',
-                permission: true
-            })),
-            {
-                id: guild.ownerId,
-                type: 'USER',
-                permission: true
-            }
-        ]
-    })
-}
+    await Promise.all((<Array<typeof Command>>Object.values(existingCommands)).map(async command => {
+        if (command.slashCommand) {
 
-export async function removeRoleFromSlashCommandPermission(guild: Guild, commandName: string, roles: Role[]) {
-    if (slashCommandsByGuildAndName[guild.id] === undefined || slashCommandsByGuildAndName[guild.id][commandName] === undefined) return;
-    const command = slashCommandsByGuildAndName[guild.id][commandName];
+            const createdSlashCommand = await commands?.create(<ApplicationCommandDataResolvable>generateSlashCommandFromModel(command));
 
-    await command.permissions.remove({
-       roles
-    });
-}
-
-async function initSlashCommandPermissions(guild: Guild, command: ApplicationCommand, commandName: string) {
-    const permission: null|IPermissions = await Permissions.findOne({
-        command: commandName,
-        serverId: guild.id
-    });
-
-    await command.permissions.set({
-        permissions: [
-            ...(permission != null ? permission.roles.map(roleId => ({
-                id: roleId,
-                type: 'ROLE',
-                permission: true
-            })) : []),
-            ...config.roots.map(id => ({
-                id,
-                type: 'USER',
-                permission: true
-            })),
-            {
-                id: guild.ownerId,
-                type: 'USER',
-                permission: true
-            }
-        ]
-    });
+            if (slashCommandsByGuildAndName[guild.id] === undefined)
+                slashCommandsByGuildAndName[guild.id] = {}
+            slashCommandsByGuildAndName[guild.id][<string>command.commandName] = createdSlashCommand;
+        } else {
+            const foundCommand = existingSlashCommands[(<string>command.commandName).toLowerCase()];
+            if (foundCommand)
+                foundCommand.delete();
+        }
+    }))
 }
 
 function generateSlashCommandFromModel(command: typeof Command): optionCommandType {

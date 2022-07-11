@@ -574,8 +574,8 @@ export default class ConfigTicket extends Command {
         for (const ticketConfig of ticketConfigs) {
             const guild = client.guilds.cache.get(ticketConfig.serverId);
             if (!guild) {
-                TicketConfig.deleteOne({_id: ticketConfig._id});
                 console.log("server "+ticketConfig.serverId+" does not exist");
+                await TicketConfig.deleteOne({_id: ticketConfig._id});
                 continue;
             }
             let category: CategoryChannel|undefined = undefined;
