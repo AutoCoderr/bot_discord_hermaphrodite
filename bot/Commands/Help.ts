@@ -41,10 +41,6 @@ export default class Help extends Command {
         } else {
             for (let commandName of allowedCommands) {
                 const command = existingCommands[commandName];
-                Embed.addFields({
-                    name: '/'+command.commandName.toLowerCase()+" :",
-                    value: command.description+"\n/"+command.commandName.toLowerCase()+" -h"+(command.customCommand ? " (Aussi disponible via "+config.command_prefix+command.commandName+" -h)": "")
-                });
                 Embed.addField(
                     '/'+command.commandName.toLowerCase()+" :",
                     command.description+"\n/"+command.commandName.toLowerCase()+" -h"+(command.customCommand ? " (Aussi disponible via "+config.command_prefix+command.commandName+" -h)": "")

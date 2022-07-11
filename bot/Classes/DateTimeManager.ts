@@ -12,6 +12,14 @@ export const durationUnitsMult = {
     hour: 60*60*1000
 }
 
+export function extractDurationTime(duration: number) {
+    return {
+        h: Math.floor(duration/(1000*60*60)),
+        m: Math.floor(duration/(1000*60))%60,
+        s: Math.floor(duration/1000)%60
+    }
+}
+
 export function extractTime(date: Date|number) {
     if (typeof(date) === "number")
         date = new Date(date);
