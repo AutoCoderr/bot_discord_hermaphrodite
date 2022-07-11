@@ -2,12 +2,12 @@ import {existingCommands} from "./Classes/CommandsDescription";
 import {getExistingCommands} from "./Classes/CommandsDescription";
 import client from "./client";
 import {Interaction, VoiceState} from "discord.js";
-import {initSlashCommands, listenSlashCommands} from "./slashCommands";
+import {initSlashCommands, initSlashCommandsOnGuild, listenSlashCommands} from "./slashCommands";
 import {listenInviteButtons, listenAskInviteBackButtons} from "./Classes/TextAndVocalFunctions";
 import {listenCustomCommands} from "./listenCustomCommands";
 
 export default function init(bot) {
-    setTimeout(async () => {
+    client.on('ready', () => {
         getExistingCommands().then(() => {
             //@ts-ignore
             existingCommands.NotifyOnReact.applyNotifyOnReactAtStarting(bot);
@@ -16,7 +16,9 @@ export default function init(bot) {
             //@ts-ignore
             existingCommands.ConfigTicket.initListeningAllMessages();
 
-            initSlashCommands()
+            initSlashCommands();
+
+            client.on('guildCreate', initSlashCommandsOnGuild);
 
             client.on('interactionCreate', async (interaction: Interaction) => {
 
@@ -51,5 +53,5 @@ export default function init(bot) {
                 existingCommands.Text.listenTextMessages(message);
             })
         })
-    }, 5000);
+    });
 }
