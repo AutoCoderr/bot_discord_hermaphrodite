@@ -6,9 +6,9 @@ import {
     GuildChannel,
     GuildMember,
     Message,
-    MessageEmbed,
+    MessageEmbed, PermissionResolvable,
     TextChannel,
-    ThreadChannel
+    ThreadChannel, User, VoiceChannel
 } from "discord.js";
 import Command from "./Command";
 import CancelNotifyOnReact from "../Commands/CancelNotifyOnReact";
@@ -282,4 +282,25 @@ export function propUpdate(obj: {[key: string]: any}, key: string|string[], valu
         ...(obj._doc??obj),
         [keyArray[0]]: propUpdate(obj[keyArray[0]], keyArray.slice(1), value)
     }
+}
+
+export function userHasChannelPermissions(user: GuildMember|User, channel: GuildChannel|ThreadChannel|VoiceChannel, permissions: PermissionResolvable[]|PermissionResolvable, all: boolean = false) {
+    const permissionsArray = permissions instanceof Array ? permissions : [permissions];
+    const channelWhichHasPermissions: GuildChannel|ThreadChannel|null = channel.permissionsFor !== undefined ?
+        channel :
+        (channel.parent && channel.parent.permissionsFor) ?
+            channel.parent :
+            null;
+
+    if (!channelWhichHasPermissions)
+        return true;
+
+    const channelPermissions = channelWhichHasPermissions.permissionsFor(user)
+    if (!channelPermissions)
+        return true;
+
+    return (
+        (all && !permissionsArray.some(permission => !channelPermissions.has(permission))) ||
+        (!all && permissionsArray.some(permission => channelPermissions.has(permission)))
+    )
 }
