@@ -18,7 +18,7 @@ import {
     reEnableTextSubscribesAfterUnmute,
     removeKeyWords,
     userBlockingUsOrChannelText,
-    findWordInText
+    findWordInText, memberExistsAndHasChannelPermission
 } from "../Classes/TextAndVocalFunctions";
 import {extractDate, extractTime, extractUTCTime, showDate, showTime} from "../Classes/DateTimeManager";
 
@@ -177,6 +177,9 @@ export default class Text extends Command {
     alreadyBlockeds: Array<{ userId?: Snowflake, channelId?: Snowflake }> = [];
 
     unblockeds: Array<{ userId?: Snowflake, channelId?: Snowflake }> = [];
+
+    notFoundUser: Array<Snowflake> = [];
+    usersBlockedOnChannels: { [channelId: Snowflake]: Snowflake[]} = {};
 
     constructor(channel: TextChannel, member: User | GuildMember, guild: null | Guild = null, writtenCommandOrSlashCommandOptions: null | string | CommandInteractionOptionResolver = null, commandOrigin: 'slash' | 'custom') {
         super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, Text.commandName, Text.argsModel);
@@ -372,6 +375,21 @@ export default class Text extends Command {
                         "<@" + userId + "> sur " + (channelId ? "le channel <#" + channelId + ">" : "tout les channels") :
                         "Sur le channel <#" + channelId + "> sur tout les utilisateurs"
                 ).join("\n")
+            )
+        }
+
+        if (this.notFoundUser.length > 0) {
+            embed.addField(
+                "Ces utilisateurs sont introuvables :",
+                this.notFoundUser.join(", ")
+            )
+        }
+
+        for (const [channelId,userIds] of Object.entries(this.usersBlockedOnChannels)) {
+            const channel = this.guild.channels.cache.get(channelId);
+            embed.addField(
+                "Les utilisateurs suivants n'ont pas accès au channel '"+(channel ? channel.name : "not found")+"' : ",
+                userIds.map(userId => "<@"+userId+">").join(", ")
             )
         }
 
@@ -818,6 +836,9 @@ export default class Text extends Command {
                         if (userBlockingUsOrChannelText(userConfigById[subscribe.listenedId], subscribe.listenedId, this.usersBlockingMe, this.blockedChannelsByUserId, this.member.id, channel.id))
                             continue;
 
+                        if (!(await memberExistsAndHasChannelPermission(subscribe.listenedId, channel, this.guild, this.notFoundUser, this.usersBlockedOnChannels)))
+                            continue;
+
                         this.updatedSubscribes.push({
                             listenedId: subscribe.listenedId,
                             channelId: channel.id
@@ -844,6 +865,10 @@ export default class Text extends Command {
                             userConfigById[listenedId] = await TextUserConfig.findOne({userId: listenedId});
                         if (userBlockingUsOrChannelText(userConfigById[listenedId], listenedId, this.usersBlockingMe, this.blockedChannelsByUserId, this.member.id, channel.id))
                             continue;
+
+                        if (!(await memberExistsAndHasChannelPermission(listenedId, channel, this.guild, this.notFoundUser, this.usersBlockedOnChannels)))
+                            continue;
+
                         this.updatedSubscribes.push({
                             listenedId,
                             channelId: channel.id
@@ -949,6 +974,9 @@ export default class Text extends Command {
 
                         if (channelBlocked)
                             continue;
+
+                        if (!(await memberExistsAndHasChannelPermission(user, channel, this.guild, this.notFoundUser, this.usersBlockedOnChannels)))
+                            continue;
                     }
 
                     let subscribe: typeof TextSubscribe = await TextSubscribe.findOne({
@@ -1045,10 +1073,15 @@ export default class Text extends Command {
                 });
                 for (const subscribe of existingSubscribes) {
                     listenedsOnThisChannel.push(subscribe.listenedId);
+
                     if (userConfigById[subscribe.listenedId] === undefined)
                         userConfigById[subscribe.listenedId] = await TextUserConfig.findOne({userId: subscribe.listenedId});
                     if (userBlockingUsOrChannelText(userConfigById[subscribe.listenedId], subscribe.listenedId, this.usersBlockingMe, this.blockedChannelsByUserId, this.member.id, channel.id))
                         continue;
+
+                    if (!(await memberExistsAndHasChannelPermission(subscribe.listenedId, channel, this.guild, this.notFoundUser, this.usersBlockedOnChannels)))
+                        continue;
+
                     this.updatedSubscribes.push({
                         listenedId: subscribe.listenedId,
                         channelId: channel.id
@@ -1068,6 +1101,10 @@ export default class Text extends Command {
                     }
                     if (userBlockingUsOrChannelText(userConfigById[listenedId], listenedId, this.usersBlockingMe, this.blockedChannelsByUserId, this.member.id, channel.id))
                         continue;
+
+                    if (!(await memberExistsAndHasChannelPermission(listenedId, channel, this.guild, this.notFoundUser, this.usersBlockedOnChannels)))
+                        continue;
+
                     this.updatedSubscribes.push({
                         listenedId,
                         channelId: channel.id
@@ -1203,6 +1240,9 @@ export default class Text extends Command {
                     }
 
                     if (channelBlocked) continue;
+
+                    if (!(await memberExistsAndHasChannelPermission(user, channel, this.guild, this.notFoundUser, this.usersBlockedOnChannels)))
+                        continue;
 
                     let existingSubscribe: typeof TextSubscribe = await TextSubscribe.findOne({
                         serverId: this.guild.id,

@@ -4,7 +4,7 @@ import {
     GuildChannel,
     GuildMember,
     MessageActionRow,
-    MessageButton, MessageEmbed, Snowflake,
+    MessageButton, MessageEmbed, Snowflake, TextChannel,
     ThreadChannel
 } from "discord.js";
 import TextInvite, {ITextInvite} from "../Models/Text/TextInvite";
@@ -20,6 +20,7 @@ import TextUserConfig, {ITextUserConfig} from "../Models/Text/TextUserConfig";
 import TextSubscribe from "../Models/Text/TextSubscribe";
 import VocalConfig from "../Models/Vocal/VocalConfig";
 import TextConfig from "../Models/Text/TextConfig";
+import {userHasChannelPermissions} from "./OtherFunctions";
 
 interface getDatasButtonFunctionResponse {
     server: Guild;
@@ -392,6 +393,33 @@ export async function listenInviteButtons(interaction: ButtonInteraction, type: 
     return true;
 }
 
+
+export async function memberExistsAndHasChannelPermission(userIdOrMember: Snowflake|GuildMember, channel: TextChannel, guild: Guild, notFoundUser: Array<Snowflake>, usersBlockedOnChannels: { [channelId: Snowflake]: Snowflake[]}) {
+    const member: null|GuildMember =
+        userIdOrMember instanceof GuildMember ?
+            userIdOrMember :
+            await guild.members.fetch(userIdOrMember).catch(() => null);
+
+    if (member === null) {
+        await TextSubscribe.deleteMany({
+            serverId: guild.id,
+            $or: [
+                { listenedId: userIdOrMember },
+                { listenerId: userIdOrMember }
+            ]
+        });
+        notFoundUser.push(<Snowflake>userIdOrMember);
+        return false;
+    }
+
+    if (!userHasChannelPermissions(member, channel, 'VIEW_CHANNEL')) {
+        usersBlockedOnChannels[channel.id] = [...(usersBlockedOnChannels[channel.id]??[]), member.id]
+        return false;
+    }
+
+    return true;
+}
+
 function userBlockingUsTextOrVocal(listenedConfig: any, listener: GuildMember, type: 'text'|'vocal') {
     return (
         (type === "vocal" && userBlockingUsVocal(listenedConfig,listener)) ||
@@ -500,15 +528,13 @@ export function findWordInText(word: string, text: string): boolean {
 }
 
 export function compareKeyWords(A: string[]|undefined,B: string[]|undefined) {
-    if ((A === undefined) !== (B === undefined))
-        return false;
-    if (A === undefined || B === undefined)
-        return true;
+    const AArray = A??[];
+    const BArray = B??[];
 
-    if (A.length !== B.length)
+    if (AArray.length !== BArray.length)
         return false;
 
-    return !A.some(w => !B.includes(w));
+    return !AArray.some(w => !AArray.includes(w));
 }
 
 export function removeKeyWords(L: string[]|undefined, toRemove: string[]) {

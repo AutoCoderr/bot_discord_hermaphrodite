@@ -12,7 +12,7 @@ import {
 import client from "../client";
 import {existingCommands} from "./CommandsDescription";
 import Command from "./Command";
-import {isNumber} from "./OtherFunctions";
+import {isNumber, userHasChannelPermissions} from "./OtherFunctions";
 import {durationUnits,durationUnitsMult} from "./DateTimeManager";
 
 export const extractTypes = {
@@ -23,20 +23,8 @@ export const extractTypes = {
         const channel = command.guild.channels.cache.get(channelId);
         if (!channel)
             return false;
-        const channelWhichHasPermissions: GuildChannel|ThreadChannel|null = channel.permissionsFor !== undefined ?
-            channel :
-            (channel.parent && channel.parent.permissionsFor) ?
-                channel.parent :
-                null;
-        let channelPermissions: Readonly<Permissions> | null = null;
-        if (
-            channelWhichHasPermissions &&
-            (channelPermissions = channelWhichHasPermissions.permissionsFor(command.member)) &&
-            !channelPermissions.has('VIEW_CHANNEL')
-        )
-            return false;
 
-        return channel;
+        return userHasChannelPermissions(command.member, channel, 'VIEW_CHANNEL') ? channel : false;
     },
     channels: (field, command: Command): Array<GuildChannel|ThreadChannel|VoiceChannel>|false => {
         const channelsSplitted = field.split("<#");
