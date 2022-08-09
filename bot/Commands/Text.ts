@@ -1403,8 +1403,11 @@ export default class Text extends Command {
                 ])
                 continue;
             }
+            const permissionsForListener = channelWhichHasPermissions.permissionsFor(listener);
+            if (!permissionsForListener || !permissionsForListener.has('VIEW_CHANNEL')) {
+                if (!permissionsForListener)
+                    console.log("permissionFor set to null for user '"+listenerId+"'");
 
-            if (!channelWhichHasPermissions.permissionsFor(listener).has('VIEW_CHANNEL')) {
                 await TextSubscribe.deleteMany({
                     serverId: message.guild.id,
                     listenerId: listener.id,
