@@ -292,11 +292,11 @@ export function userHasChannelPermissions(user: GuildMember|User, channel: Guild
             null;
 
     if (!channelWhichHasPermissions)
-        return true;
+        return false;
 
     const channelPermissions = channelWhichHasPermissions.permissionsFor(user)
     if (!channelPermissions)
-        return true;
+        return false;
 
     return (
         (all && !permissionsArray.some(permission => !channelPermissions.has(permission))) ||
