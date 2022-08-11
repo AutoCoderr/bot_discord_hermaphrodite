@@ -1412,7 +1412,7 @@ export default class Text extends Command {
             const permissionsForListener = channelWhichHasPermissions.permissionsFor(listener);
             if (!permissionsForListener || !permissionsForListener.has(PermissionFlagsBits.ViewChannel)) {
                 if (!permissionsForListener)
-                    console.log("permissionFor set to null for user '"+listenerId+"'");
+                    console.log("permissionFor set to null for user '"+(listener ? listener.nickname??listener.user.username : 'null')+"' ("+listenerId+") and channel '"+channelWhichHasPermissions.name+"' ("+channelWhichHasPermissions.id+")");
 
                 await TextSubscribe.deleteMany({
                     serverId: message.guild.id,
