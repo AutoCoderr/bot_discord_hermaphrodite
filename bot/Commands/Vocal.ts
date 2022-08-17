@@ -557,7 +557,7 @@ export default class Vocal extends Command {
         }
 
         if (action == "status") {
-            let embeds: MessageEmbed[] = [embed];
+            let embeds: MessageEmbed[] = [];
 
             if (subs) {
 
@@ -634,6 +634,10 @@ export default class Vocal extends Command {
                         "Vous n'êtes écouté par personne",
                         "Vous n'êtes écouté par personne",
                     )
+                }
+
+                if (subscribeds.length === 0 || subscribings.length === 0) {
+                    embeds = [embed, ...embeds];
                 }
             } else {
                 let fieldLines: string[] = [];
