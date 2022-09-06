@@ -16,6 +16,7 @@ import {
 import {checkTypes} from "./TypeChecker";
 import {extractTypes} from "./TypeExtractor";
 import {getCustomType, getSlashTypeGetterName} from "../slashCommands";
+import CustomError from "../logging/CustomError";
 
 const validModelCommands = {};
 
@@ -94,7 +95,10 @@ export default class Command {
                 args = result;
             }
 
-            const {success, result, callback} = await this.action(args, bot);
+            const {success, result, callback} = await this.action(args, bot)
+                .catch(e => {
+                    throw new CustomError(e, {commandArguments: args})
+                })
 
             if (success && this.writtenCommand !== null)
                 this.saveHistory();

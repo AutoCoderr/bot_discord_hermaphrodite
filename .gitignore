@@ -2,12 +2,7 @@
 /bot/node_modules
 /mongodb/data
 /.env
-/bot/*.js
+/bot/**/*.js
 !/bot/config.example.js
-/bot/Models/*.js
-/bot/Models/Vocal/*.js
-/bot/Models/Text/*.js
-/bot/Commands/*.js
-/bot/Classes/*.js
-/bot/scripts/cleanDatabase/*.js
 script_logs/*
+logs/error/*.json

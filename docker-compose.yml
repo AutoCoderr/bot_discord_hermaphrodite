@@ -4,6 +4,7 @@ services:
     build: ./docker/bot
     volumes:
       - ./bot:/bot
+      - ./logs:/logs
     working_dir: /bot
     depends_on:
       - mongodb
