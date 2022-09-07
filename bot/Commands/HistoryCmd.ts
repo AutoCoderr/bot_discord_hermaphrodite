@@ -2,11 +2,10 @@ import config from "../config";
 import Command from "../Classes/Command";
 import {getArgsModelHistory, getHistory, splitFieldsEmbed} from "../Classes/OtherFunctions";
 import {
-    CommandInteractionOptionResolver,
+    CommandInteractionOptionResolver, EmbedBuilder,
     Guild,
     GuildChannel,
     GuildMember,
-    MessageEmbed,
     TextChannel,
     User
 } from "discord.js";
@@ -16,6 +15,8 @@ export default class HistoryCmd extends Command {
     static display = true;
     static description = "Pour accéder à l'historique des commandes.";
     static commandName = "history";
+
+    static slashCommandIdByGuild: {[guildId: string]: string} = {};
 
     static argsModel = getArgsModelHistory();
 
@@ -36,7 +37,7 @@ export default class HistoryCmd extends Command {
 
         const histories: Array<IHistory> = await getHistory(this,args);
 
-        let embeds: Array<MessageEmbed> = [];
+        let embeds: Array<EmbedBuilder> = [];
 
         const historByEmbed = 15;
 
@@ -49,10 +50,11 @@ export default class HistoryCmd extends Command {
                 const channelName = channel != undefined ? channel.name : history.channelId
 
                 return {
+                    inline: false,
                     name: "[" + history.dateTime + "] "+userName+" sur #"+channelName+" :",
                     value: config.command_prefix+history.command
                 };
-            }), (Embed: MessageEmbed, partNb: number) => {
+            }), (Embed: EmbedBuilder, partNb: number) => {
                 if (partNb == 1)
                     Embed
                         .setTitle("L'historique des commandes "+(limit > 0 ? "(les "+limit+" premiers)" : "(Sans limite)")+" :")
@@ -64,26 +66,26 @@ export default class HistoryCmd extends Command {
                             (users !== undefined ? (users.length > 1 ? "Par les utilisateurs" : "Par l'utilisateur")+" : "+users.map(user => "<@"+user.id+">" ).join(", ")+"\n" : ''));
             });
         } else {
-            embeds.push(new MessageEmbed()
+            embeds.push(new EmbedBuilder()
                 .setColor('#0099ff')
                 .setTitle("L'historique des commandes :")
                 .setDescription("Liste des commandes qui ont été tapées :")
                 .setTimestamp()
-                .addField(
-                    "Aucun historique",
-                    "Aucun élément n'a été trouvé dans l'historique"
-                ));
+                .addFields({
+                    name: "Aucun historique",
+                    value: "Aucun élément n'a été trouvé dans l'historique"
+                }));
         }
-        return this.response(true, <{embeds: MessageEmbed[]}[]> embeds.map(embed => ({ embeds: [<MessageEmbed>embed] })));
+        return this.response(true, <{embeds: EmbedBuilder[]}[]> embeds.map(embed => ({ embeds: [<EmbedBuilder>embed] })));
     }
 
     help() {
-        return new MessageEmbed()
+        return new EmbedBuilder()
             .setTitle("Exemples")
-            .addField(
-                config.command_prefix+this.commandName+" --command notifyOnReact -l 10 --channel #blabla -s desc -u @toto",
-                "Afficher les 10 dernières commandes notifyOnReact dans l'ordre décroissant, sur le channel #blabla, effectuées par l'utilisateur @toto"
-            );
+            .addFields({
+                name: config.command_prefix + this.commandName + " --command notifyOnReact -l 10 --channel #blabla -s desc -u @toto",
+                value: "Afficher les 10 dernières commandes notifyOnReact dans l'ordre décroissant, sur le channel #blabla, effectuées par l'utilisateur @toto"
+            });
     }
 
     saveHistory() {} // overload saveHistory of Command class to save nothing in the history

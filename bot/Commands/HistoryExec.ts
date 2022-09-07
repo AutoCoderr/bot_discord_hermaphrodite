@@ -1,11 +1,10 @@
 import Command from "../Classes/Command";
 import config from "../config";
 import {
-    CommandInteractionOptionResolver,
+    CommandInteractionOptionResolver, EmbedBuilder,
     Guild,
     GuildChannel,
     GuildMember,
-    MessageEmbed,
     TextChannel,
     User
 } from "discord.js";
@@ -15,6 +14,8 @@ export default class HistoryExec extends Command {
     static display = true;
     static description = "Pour executer des commandes de l'historique.";
     static commandName = "historyExec";
+
+    static slashCommandIdByGuild: {[guildId: string]: string} = {};
 
     static argsModel = getArgsModelHistory();
 
@@ -45,10 +46,11 @@ export default class HistoryExec extends Command {
     saveHistory() {} // overload saveHistory of Command class to save nothing in the history
 
     help() {
-        return new MessageEmbed()
+        return new EmbedBuilder()
             .setTitle("Exemples")
-            .addField(
-                config.command_prefix+this.commandName+" --command notifyOnReact -l 10 --channel #blabla -s desc -u @toto",
-                "Executer les 10 dernières commandes notifyOnReact dans l'ordre décroissant, sur le channel #blabla, effectuées par l'utilisateur @toto");
+            .addFields({
+                name: config.command_prefix + this.commandName + " --command notifyOnReact -l 10 --channel #blabla -s desc -u @toto",
+                value: "Executer les 10 dernières commandes notifyOnReact dans l'ordre décroissant, sur le channel #blabla, effectuées par l'utilisateur @toto"
+            });
     }
 }

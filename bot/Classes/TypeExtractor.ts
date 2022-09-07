@@ -7,7 +7,8 @@ import {
     Message, Permissions,
     Role,
     ThreadChannel,
-    VoiceChannel
+    VoiceChannel,
+    ChannelType
 } from "discord.js";
 import client from "../client";
 import {existingCommands} from "./CommandsDescription";
@@ -24,7 +25,7 @@ export const extractTypes = {
         if (!channel)
             return false;
 
-        return userHasChannelPermissions(command.member, channel, 'VIEW_CHANNEL') ? channel : false;
+        return userHasChannelPermissions(command.member, channel, 'ViewChannel') ? channel : false;
     },
     channels: (field, command: Command): Array<GuildChannel|ThreadChannel|VoiceChannel>|false => {
         const channelsSplitted = field.split("<#");
@@ -40,7 +41,7 @@ export const extractTypes = {
     category: (field, command: Command): CategoryChannel|boolean => {
         if (command.guild == null) return false;
         const channel = command.guild.channels.cache.get(field);
-        return (channel instanceof CategoryChannel && channel.type == "GUILD_CATEGORY") ? channel : false;
+        return (channel instanceof CategoryChannel && channel.type == ChannelType.GuildCategory) ? channel : false;
     },
     message: async (field, _: Command, mentionedChannel: BaseGuildTextChannel|boolean): Promise<Message|false> => {
         if (mentionedChannel && mentionedChannel !== true) {
@@ -55,20 +56,13 @@ export const extractTypes = {
     messages: async (field, command: Command, mentionedChannel: GuildChannel|BaseGuildTextChannel|boolean):  Promise<Array<Message>|false> => {
         if (!(mentionedChannel instanceof BaseGuildTextChannel))
             return false;
-        const messages: Array<Message> = [];
-        let messageId = "";
-        for (let i=0;i<field.length;i++) {
-            if (field[i] !== " " && field[i] != ",") {
-                messageId += field[i];
-            }
-            if (messageId.length == 18) {
+        const messages: Array<Message|false> = await Promise.all(field.split(",")
+            .map(messageId => messageId.trim())
+            .map(async messageId => {
                 const AMessage = await extractTypes.message(messageId, command, mentionedChannel);
-                if (!AMessage) return false;
-                messages.push(AMessage);
-                messageId = "";
-            }
-        }
-        return messages;
+                return AMessage ? AMessage : false;
+            }));
+        return messages.includes(false) ? false : <Array<Message>>messages;
     },
     listenerReactMessage: async (field, command: Command): Promise<{channel: GuildChannel, message: Message}|false> => {
         const channelMention = field.split("/")[0];
@@ -131,7 +125,7 @@ export const extractTypes = {
     command: async (field, currentCommand: Command): Promise<typeof Command|false>=> {
         const commandList: typeof Command[] = Object.values(existingCommands);
         for (const eachCommand of commandList) {
-            if (eachCommand.commandName === field && eachCommand.display && await eachCommand.staticCheckPermissions(currentCommand.channel,currentCommand.member, currentCommand.guild, false, eachCommand.commandName)) {
+            if (eachCommand.commandName === field && eachCommand.display && await eachCommand.staticCheckPermissions(currentCommand.member, currentCommand.guild)) {
                 return eachCommand;
             }
         }

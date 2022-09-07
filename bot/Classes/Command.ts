@@ -1,25 +1,23 @@
 import config from "../config";
-import * as Discord from "discord.js";
 import {addMissingZero, splitFieldsEmbed} from "./OtherFunctions";
-import Permissions, { IPermissions } from "../Models/Permissions";
 import History, {IHistory} from "../Models/History";
 import {isNumber} from "./OtherFunctions";
 import {
+    ApplicationCommand,
     CommandInteractionOptionResolver,
     Guild,
-    GuildMember,
-    MessageEmbed,
-    MessageOptions,
+    GuildMember, InteractionReplyOptions,
     MessagePayload, TextChannel,
-    User
+    User, EmbedBuilder, EmbedField
 } from "discord.js";
 import {checkTypes} from "./TypeChecker";
 import {extractTypes} from "./TypeExtractor";
 import {getCustomType, getSlashTypeGetterName} from "../slashCommands";
+import CustomError from "../logging/CustomError";
 
 const validModelCommands = {};
 
-export interface responseResultsType extends Array<string | MessagePayload | MessageOptions>{}
+export interface responseResultsType extends Array<string | MessagePayload | InteractionReplyOptions>{}
 
 export interface responseType {
     success: boolean;
@@ -34,10 +32,11 @@ export default class Command {
     static description: null|string = null;
     static argsModel: any = {};
 
+    static slashCommandIdByGuild: {[guildId: string]: string} = {};
+
     static abstract: boolean = false;
 
     static customCommand: boolean = true;
-    static slashCommand: boolean = false;
 
     commandOrigin: 'slash'|'custom';
 
@@ -65,15 +64,18 @@ export default class Command {
 
     async match() {
         if (this.writtenCommand == null || this.commandName == null) return false;
-        return this.writtenCommand.split(" ")[0] == config.command_prefix+this.commandName;
+        return this.writtenCommand.split(" ")[0].toLowerCase() == config.command_prefix+this.commandName.toLowerCase();
     }
 
-    async executeCommand(bot, slashCommand = false): Promise<false| { result: boolean|Array<string | MessagePayload | MessageOptions>, callback?: Function }> {
+    async executeCommand(bot, slashCommand = false): Promise<false| { result: Array<string | MessagePayload | InteractionReplyOptions>, callback?: Function }> {
         if (this.writtenCommand === null || await this.match()) {
 
-            const permissionRes = await this.checkPermissions();
-            if (permissionRes !== true)
-                return permissionRes ? {result: permissionRes} : false;
+            if (this.writtenCommand && !(await this.checkPermissions()))
+                return {result: [{ embeds: [new EmbedBuilder()
+                            .setColor('#0099ff')
+                            .setTitle('Permission denied')
+                            .setDescription("Vous n'avez pas le droit d'executer la commande '" + this.commandName + "'")
+                            .setTimestamp()] }] };
 
             const modelValidRes = this.checkIfModelValid();
             if (modelValidRes !== true)
@@ -90,7 +92,10 @@ export default class Command {
                 args = result;
             }
 
-            const {success, result, callback} = await this.action(args, bot);
+            const {success, result, callback} = await this.action(args, bot)
+                .catch(e => {
+                    throw new CustomError(e, {commandArguments: args});
+                })
 
             if (success && this.writtenCommand !== null)
                 this.saveHistory();
@@ -104,7 +109,7 @@ export default class Command {
             errors = [errors];
         }
         const commandName = this.commandName;
-        let Embed = new Discord.MessageEmbed()
+        let Embed = new EmbedBuilder()
             .setColor('#0099ff')
             .setTitle('Erreur sur la commande '+commandName)
             .setDescription("Il y a plusieurs erreurs sur cette commande")
@@ -122,8 +127,8 @@ export default class Command {
 
     displayHelp(displayHelp = true, fails: null|Array<any> = null, failsExtract: null|Array<any> = null, args: null|{[attr: string]: any} = null): responseResultsType {
         const commandName = this.commandName;
-        let embeds: Array<MessageEmbed> = [
-            new MessageEmbed()
+        let embeds: Array<EmbedBuilder> = [
+            new EmbedBuilder()
                 .setTitle("Aide pour la commande "+commandName)
                 .setColor('#0099ff')
         ];
@@ -143,7 +148,7 @@ export default class Command {
                         }
                     }
                 }
-                embeds = [...embeds, ...splitFieldsEmbed(25, subFields, (Embed: MessageEmbed, partNb) => {
+                embeds = [...embeds, ...splitFieldsEmbed(25, subFields, (Embed: EmbedBuilder, partNb) => {
                     if (partNb == 1) {
                         Embed.setTitle("Arguments manquants ou invalides :");
                     }
@@ -166,18 +171,19 @@ export default class Command {
                     }
                 }
 
-                embeds = [...embeds, ...splitFieldsEmbed(25, subFields, (Embed: MessageEmbed, partNb) => {
+                embeds = [...embeds, ...splitFieldsEmbed(25, subFields, (Embed: EmbedBuilder, partNb) => {
                     if (partNb == 1) {
                         Embed.setTitle("Données introuvables");
                     }
                 })];
             }
         } else {
-            const subFields: Array<{name: string, value: string}> = [];
+            const subFields: EmbedField[] = [];
             for (const attr in this.argsModel) {
                 if (attr[0] != "$") {
                     const field = this.argsModel[attr];
                     subFields.push({
+                        inline: false,
                         name: field.fields.join(", "),
                         value: field.description + " | ( "+(field.default != undefined ? "Par défaut : "+field.default+" ; " : "")+"type attendu : " + (field.type ?? field.types) + " )"
                     })
@@ -186,6 +192,7 @@ export default class Command {
             if (this.argsModel.$argsByOrder) {
                 for (const arg of this.argsModel.$argsByOrder) {
                     subFields.push({
+                        inline: false,
                         name: arg.field,
                         value: arg.description + " | ( "+(arg.default != undefined ? "Par défaut : "+arg.default+" ; " : "")+"type attendu : " + (arg.type ?? arg.types) + " )"
                     });
@@ -194,13 +201,14 @@ export default class Command {
                 for (const attr in this.argsModel.$argsByType) {
                     const field = this.argsModel.$argsByType[attr];
                     subFields.push({
+                        inline: false,
                         name: attr,
                         value: field.description + " | ( "+(field.default != undefined ? "Par défaut : "+field.default+" ; " : "")+"type attendu : " + (field.type ?? field.types) + " )"
                     });
                 }
             }
 
-            embeds = [...embeds, ...splitFieldsEmbed(25, subFields, (Embed: MessageEmbed, partNb) => {
+            embeds = [...embeds, ...splitFieldsEmbed(25, subFields, (Embed: EmbedBuilder, partNb) => {
                 if (partNb == 1) {
                     Embed.setTitle("Champs");
                 }
@@ -210,26 +218,27 @@ export default class Command {
 
 
         if (this.argsModel.$argsByOrder !== undefined && this.argsModel.$argsByOrder.length > 1)
-            embeds[embeds.length-1].addField(
-                "Ordre des arguments :",
-                config.command_prefix+this.commandName+" "+this.argsModel.$argsByOrder.map(model => "<"+model.field+'>').join(" ")
-            );
+            embeds[embeds.length-1].addFields({
+                name: "Ordre des arguments :",
+                value: config.command_prefix+this.commandName+" "+this.argsModel.$argsByOrder.map(model => "<"+model.field+'>').join(" ")
+            });
 
         if (displayHelp)
             embeds.push(this.help())
         else if (this.commandOrigin === "custom")
-            embeds[embeds.length-1].addField(
-                "Voir l'aide : ",
-                "Tapez : "+config.command_prefix+this.commandName+" -h"
-            );
+            embeds[embeds.length-1].addFields({
+                name: "Voir l'aide : ",
+                value: "Tapez : "+config.command_prefix + this.commandName + " -h"
+            });
         return [{embeds}];
     }
 
-    getArgsList(args: Array<any>) {
+    getArgsList(args: Array<any>): EmbedField[] {
         return args
             .filter(arg => typeof(arg.errorMessage) != "function")
             .map(arg =>
                 ({
+                    inline: false,
                     name: (arg.fields instanceof Array ? arg.fields.join(", ") : arg.field),
                     value: arg.description + " | ( "+(arg.default != undefined ? "Par défaut : "+arg.default+" ; " : "")+"type attendu : " + (arg.type ?? arg.types) + " )"
                 })
@@ -269,36 +278,20 @@ export default class Command {
         History.create(history);
     }
 
-    checkPermissions(displayMsg = true): Promise<boolean|Array<string | MessagePayload | MessageOptions>> {
-        return Command.staticCheckPermissions(this.channel, this.member, this.guild, displayMsg, this.commandName);
+    checkPermissions(): Promise<boolean> {
+        //@ts-ignore
+        return this.constructor.staticCheckPermissions(this.member,this.guild)
     }
 
-    static async staticCheckPermissions(channel: null|TextChannel, member: User|GuildMember, guild: null|Guild = null, displayMsg = true, commandName: string|null = null): Promise<boolean|Array<string | MessagePayload | MessageOptions>> {
-        if (commandName == null) {
-            commandName = this.commandName;
-        }
+    static async staticCheckPermissions(member: GuildMember|User, guild: null|Guild = null): Promise<boolean> {
+        if (guild === null || !this.slashCommandIdByGuild[guild.id] || member instanceof User)
+            return false;
 
-        if (config.roots.includes(member.id) || (guild != null && guild.ownerId == member.id)) return true;
-
-        if (guild && member instanceof GuildMember) {
-            const permission: IPermissions = await Permissions.findOne({
-                serverId: guild.id,
-                command: commandName
-            });
-            if (permission != null) {
-                // @ts-ignore
-                for (let roleId of member._roles) {
-                    if (permission.roles.includes(roleId)) return true;
-                }
-            }
-        }
-        if (displayMsg) {
-            let Embed = new Discord.MessageEmbed()
-                .setColor('#0099ff')
-                .setTitle('Permission denied')
-                .setDescription("Vous n'avez pas le droit d'executer la commande '" + commandName + "'")
-                .setTimestamp();
-            return [{embeds: [Embed]}];
+        const slashCommand: null|ApplicationCommand = await guild.commands.fetch(this.slashCommandIdByGuild[guild.id]).catch(() => null);
+        if (slashCommand) {
+            const permissions = (await slashCommand.permissions.fetch({guild}).catch(() => null))??[];
+            return guild.ownerId == member.id ||
+                member.roles.cache.some(role => permissions.some(({id, permission}) => permission && id === role.id))
         }
         return false;
     }
@@ -328,7 +321,7 @@ export default class Command {
         }
         if (!valid) {
             return [{embeds: [
-                    new MessageEmbed()
+                    new EmbedBuilder()
                         .setTitle("Modèle de la commande invalide")
                         .setDescription("Le modèle de la commande est invalide")
                         .setColor('#0099ff')
@@ -336,6 +329,80 @@ export default class Command {
                 ]}];
         }
         return true;
+    }
+
+    getSlashRawArguments(): null|{[key: string]: any} {
+        if (this.slashCommandOptions === null)
+            return null;
+        const rawArguments = {};
+        const additionalParams = {
+            subCommandGroupSet: false
+        };
+        for (const attr in this.argsModel) {
+            if (attr[0] == '$') {
+                if (attr == '$argsByOrder') {
+                    for (const argModel of this.argsModel[attr]) {
+                        this.getRawArgumentFromModel(argModel.field,argModel,additionalParams,rawArguments);
+                    }
+                } else {
+                    for (const [attr2,argModel] of Object.entries(this.argsModel[attr])) {
+                        this.getRawArgumentFromModel(attr2,argModel,additionalParams,rawArguments);
+                    }
+                }
+            } else {
+                this.getRawArgumentFromModel(attr,this.argsModel[attr],additionalParams,rawArguments);
+            }
+        }
+        return rawArguments;
+    }
+
+    getRawArgumentFromModel(attr, argModel,additionalParams,rawArguments) {
+        if (this.slashCommandOptions === null)
+            return null;
+        if (!argModel.isSubCommand)
+            rawArguments[attr] = this.slashCommandOptions[getSlashTypeGetterName(argModel)](attr.toLowerCase());
+        else {
+            const subCommand = this.slashCommandOptions.getSubcommand();
+            const subCommandGroup = this.slashCommandOptions.getSubcommandGroup(false);
+
+            if ((subCommandGroup === null || additionalParams.subCommandGroupSet) && additionalParams.subCommand !== null && Object.keys(argModel.choices).includes(subCommand)) {
+                rawArguments[attr] = subCommand;
+            } else if (subCommandGroup !== null && Object.keys(argModel.choices).includes(subCommandGroup)) {
+                additionalParams.subCommandGroupSet = true
+                rawArguments[attr] = subCommandGroup;
+            }
+        }
+    }
+
+    async getArgsFromSlashOptions(): Promise<{ success: boolean, result: {[attr: string]: any}|responseResultsType }> {
+        if (this.slashCommandOptions === null) return {success: false, result: {}};
+        let args: {[name: string]: any} = {};
+        let fails: Array<any> = [];
+        let failsExtract: Array<any> = [];
+
+        const additionalParams = {
+            subCommandGroupSet: false
+        };
+
+        for (const attr in this.argsModel) {
+            if (attr[0] == '$') {
+                if (attr == '$argsByOrder') {
+                    for (const argModel of this.argsModel[attr]) {
+                        await this.getSlashArgFromModel(argModel.field,argModel,args, fails, failsExtract, additionalParams);
+                    }
+                } else {
+                    for (const [attr2,argModel] of Object.entries(this.argsModel[attr])) {
+                        await this.getSlashArgFromModel(attr2,argModel,args, fails, failsExtract, additionalParams);
+                    }
+                }
+            } else {
+                await this.getSlashArgFromModel(attr,this.argsModel[attr],args, fails, failsExtract, additionalParams);
+            }
+        }
+        if (fails.length > 0 || failsExtract.length > 0) {
+            return {success: false, result: this.displayHelp(false, fails, failsExtract, args)};
+        }
+        return {success: true, result: args};
     }
 
     async getSlashArgFromModel(attr: string, argModel: any, args: {[name: string]: any}, fails: Array<any>, failsExtract: Array<any>, additionalParams: {[key: string]: any}) {
@@ -398,37 +465,6 @@ export default class Command {
                 args[attr] = subCommandGroup;
             }
         }
-    }
-
-    async getArgsFromSlashOptions(): Promise<{ success: boolean, result: {[attr: string]: any}|responseResultsType }> {
-        if (this.slashCommandOptions === null) return {success: false, result: {}};
-        let args: {[name: string]: any} = {};
-        let fails: Array<any> = [];
-        let failsExtract: Array<any> = [];
-
-        const additionalParams = {
-            subCommandGroupSet: false
-        };
-
-        for (const attr in this.argsModel) {
-            if (attr[0] == '$') {
-                if (attr == '$argsByOrder') {
-                    for (const argModel of this.argsModel[attr]) {
-                        await this.getSlashArgFromModel(argModel.field,argModel,args, fails, failsExtract, additionalParams);
-                    }
-                } else {
-                    for (const [attr2,argModel] of Object.entries(this.argsModel[attr])) {
-                        await this.getSlashArgFromModel(attr2,argModel,args, fails, failsExtract, additionalParams);
-                    }
-                }
-            } else {
-                await this.getSlashArgFromModel(attr,this.argsModel[attr],args, fails, failsExtract, additionalParams);
-            }
-        }
-        if (fails.length > 0 || failsExtract.length > 0) {
-            return {success: false, result: this.displayHelp(false, fails, failsExtract, args)};
-        }
-        return {success: true, result: args};
     }
 
     parseCommand(): any {
@@ -698,7 +734,7 @@ export default class Command {
                                 continue;
                         }
 
-                        if (args[i] != undefined && (
+                        if (args[i] !== undefined && (
                             typeof(argType) == "string" && (
                                 argType == "string" || checkTypes[argType](args[i]) || (argType == "boolean" && args[i] === attr)
                             ))
@@ -755,7 +791,7 @@ export default class Command {
         return {success: true, result: out};
     }
 
-    response(success: boolean, result: responseResultsType|string | MessagePayload | MessageOptions, callback: null|Function = null): responseType {
+    response(success: boolean, result: responseResultsType|string | MessagePayload | InteractionReplyOptions, callback: null|Function = null): responseType {
         return {
             success,
             result: result instanceof Array ? result : [result],
@@ -763,8 +799,8 @@ export default class Command {
         };
     }
 
-    help(): MessageEmbed { // To be overloaded
-        return new MessageEmbed();
+    help(): EmbedBuilder { // To be overloaded
+        return new EmbedBuilder();
     }
 
     async action(args: any,bot): Promise<responseType> { // To be overloaded

@@ -4,6 +4,5 @@ module.exports = {
     password_mongo: "password",
     database_mongo: "db",
     command_prefix: "%",
-    token: "please_enter_your_token",
-    roots: [] // List of super users IDs
+    token: "please_enter_your_token"
 }

@@ -2,21 +2,22 @@ import config from "../config";
 import Command from "../Classes/Command";
 import WelcomeMessage, {IWelcomeMessage} from "../Models/WelcomeMessage";
 import {
-    CommandInteractionOptionResolver,
+    CommandInteractionOptionResolver, EmbedBuilder,
     Guild,
     GuildMember,
     Message,
-    MessageEmbed,
+    MessageType,
     TextChannel,
     User
 } from "discord.js";
+import CustomError from "../logging/CustomError";
 
 export default class ConfigWelcome extends Command {
     static display = true;
     static description = "Pour activer, désactiver, ou définir le message privé à envoyer aux nouveaux arrivants."
     static commandName = "configWelcome";
 
-    static slashCommand = true;
+    static slashCommandIdByGuild: {[guildId: string]: string} = {};
 
     static argsModel = {
 
@@ -121,26 +122,27 @@ export default class ConfigWelcome extends Command {
     }
 
     static async listenJoinsToWelcome(message: Message) {
-        if (message.author.bot || message.type !== "GUILD_MEMBER_JOIN" || !message.guild)
+        if (message.author.bot || message.type !== MessageType.UserJoin || !message.guild)
             return;
-
         const welcomeMessage: IWelcomeMessage = await WelcomeMessage.findOne({
             serverId: message.guild.id,
             enabled: true
         });
-        if (welcomeMessage != null) {
-            try {
+        try {
+            if (welcomeMessage != null) {
                 await message.author.send(welcomeMessage.message);
-            } catch (e) {// @ts-ignore
-                if (e.message == "Cannot send messages to this user") {
-                    message.channel.send("<@" + message.author.id + "> \n\n" + welcomeMessage.message);
-                }
+            }
+        } catch (e) {//@ts-ignore
+            if (e.message == "Cannot send messages to this user" && welcomeMessage != null) {
+                message.channel.send("<@" + message.author.id + "> \n\n" + welcomeMessage.message);
+            } else {
+                throw new CustomError(<Error>e, {welcomeMessage});
             }
         }
     }
 
     help() {
-        return new MessageEmbed()
+        return new EmbedBuilder()
             .setTitle("Exemples :")
             .addFields(<any>[
                 {

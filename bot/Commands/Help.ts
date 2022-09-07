@@ -3,7 +3,7 @@ import { existingCommands } from "../Classes/CommandsDescription";
 import * as Discord from "discord.js";
 import config from "../config";
 import {
-    CommandInteractionOptionResolver,
+    CommandInteractionOptionResolver, EmbedBuilder,
     Guild,
     GuildMember,
     TextChannel,
@@ -14,12 +14,14 @@ export default class Help extends Command {
 
     static commandName = "help";
 
+    static description = "Afficher l'aide de toutes les commandes";
+
     constructor(channel: TextChannel, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
         super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, Help.commandName, Help.argsModel);
     }
 
-    async action(_,bot) {
-        let Embed = new Discord.MessageEmbed()
+    async action() {
+        let Embed = new EmbedBuilder()
             .setColor('#0099ff')
             .setTitle('Toutes les commandes')
             .setDescription("Liste de toutes les commandes :")
@@ -27,34 +29,26 @@ export default class Help extends Command {
         let allowedCommands: Array<string> = [];
         for (let commandName in existingCommands) {
             const command = existingCommands[commandName];
-            if (command.display && command.customCommand && await command.staticCheckPermissions(this, false)) {
+            if (command.display && command.customCommand && await command.staticCheckPermissions(this.member, this.guild)) {
                 allowedCommands.push(commandName);
             }
         }
         if (allowedCommands.length == 0) {
-            Embed.addField(
-                "Aucune commande",
-                "On dirait que vous n'avez accès à aucune commande"
-            );
+            Embed.addFields({
+                name: "Aucune commande",
+                value: "On dirait que vous n'avez accès à aucune commande"
+            });
         } else {
             for (let commandName of allowedCommands) {
                 const command = existingCommands[commandName];
-                Embed.addField(
-                    config.command_prefix+command.commandName+" :",
-                    command.description+"\n"+config.command_prefix+command.commandName+" -h"
-                );
+                Embed.addFields({
+                    name: '/' + command.commandName.toLowerCase() + " :",
+                    value: command.description + "\n/" + command.commandName.toLowerCase() + " -h" + (command.customCommand ? " (Aussi disponible via " + config.command_prefix + command.commandName + " -h)" : "")
+                });
             }
         }
         return this.response(true, {embeds: [Embed]});
     }
 
     async saveHistory() {} // overload saveHistory of Command class to save nothing in the history
-
-    async checkPermissions(displayMsg = true) { // overload checkPermission of Command class to permit all users to execute the help command
-        return true;
-    }
-
-    static async staticCheckPermissions(_: TextChannel, __: User|GuildMember, ___: null|Guild = null, ____ = true, _____: string|null = null) { // overload the staticCheckPermission of Command class to permit all users to execute the help command
-        return true
-    }
 }

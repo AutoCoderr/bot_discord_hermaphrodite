@@ -1,19 +1,26 @@
 import client from "./client";
 import {
-    ApplicationCommand, ApplicationCommandDataResolvable,
+    ApplicationCommand, ApplicationCommandDataResolvable, CommandInteraction,
     Guild,
-    Interaction, InteractionReplyOptions, MessageOptions, MessagePayload,
-    Role
+    InteractionReplyOptions, MessagePayload,
+    ApplicationCommandOptionType
 } from "discord.js";
-import {ApplicationCommandOptionTypes} from "discord.js/typings/enums";
 import Command from "./Classes/Command";
 import {existingCommands} from "./Classes/CommandsDescription";
 import {getterNameBySlashType, slashCommandsTypeDefinitions} from "./Classes/slashCommandsTypeDefinitions";
-import Permissions, {IPermissions} from "./Models/Permissions";
-import config from "./config";
+import CustomError from "./logging/CustomError";
 
 interface optionCommandType {
-    type?: ApplicationCommandOptionTypes.BOOLEAN | ApplicationCommandOptionTypes.CHANNEL | ApplicationCommandOptionTypes.INTEGER | ApplicationCommandOptionTypes.MENTIONABLE | ApplicationCommandOptionTypes.NUMBER | ApplicationCommandOptionTypes.ROLE | ApplicationCommandOptionTypes.STRING | ApplicationCommandOptionTypes.SUB_COMMAND | ApplicationCommandOptionTypes.SUB_COMMAND_GROUP | ApplicationCommandOptionTypes.USER;
+    type?: ApplicationCommandOptionType.Boolean |
+        ApplicationCommandOptionType.Channel |
+        ApplicationCommandOptionType.Integer |
+        ApplicationCommandOptionType.Mentionable |
+        ApplicationCommandOptionType.Number |
+        ApplicationCommandOptionType.Role |
+        ApplicationCommandOptionType.String |
+        ApplicationCommandOptionType.Subcommand |
+        ApplicationCommandOptionType.SubcommandGroup |
+        ApplicationCommandOptionType.User;
     name: string;
     description: string;
     required?: boolean;
@@ -23,50 +30,72 @@ interface optionCommandType {
     defaultPermission?: boolean;
 }
 
-let slashCommandsByGuildAndName: {[guildId: string]: {[commandName: string]: ApplicationCommand}} = {};
+
+let slashCommandsByGuildAndName: { [guildId: string]: { [commandName: string]: ApplicationCommand } } = {};
 
 export function initSlashCommands() {
-
     const guilds: Guild[] = [];
-    for (const [,guild] of client.guilds.cache)
+    for (const [, guild] of client.guilds.cache)
         guilds.push(guild);
 
-    Promise.all(guilds.map(initSlashCommandsOnGuild));
+    const slashCommandsDefinition = getSlashCommandsDefinition();
+
+    return Promise.all(guilds.map(guild => initSlashCommandsOnGuild(guild, slashCommandsDefinition)
+        .catch(e => {
+            throw new CustomError(e, {guild})
+        })
+    ));
 }
 
-export async function initSlashCommandsOnGuild(guild: Guild) {
-    console.log('Create slash commands for ' + guild.name + ' server');
+function getSlashCommandsDefinition() {
+    return (<Array<typeof Command>>Object.values(existingCommands)).reduce((acc: Object, command) => ({
+        ...acc,
+        ...((command.commandName && !command.abstract) ?
+                {[command.commandName.toLowerCase()]: generateSlashCommandFromModel(command)} : {}
+        )
+    }), {})
+}
+
+export async function initSlashCommandsOnGuild(guild: Guild, slashCommandsDefinitions = getSlashCommandsDefinition()) {
+    console.log('Creating slash commands for ' + guild.name + ' server');
 
     const commands = guild.commands;
 
     const existingSlashCommands = await commands.fetch().then(commands =>
-        commands.reduce((acc,command) => ({
+        commands.reduce((acc, command) => ({
             ...acc,
             [command.name]: command
         }), {})
     );
 
-    await Promise.all((<Array<typeof Command>>Object.values(existingCommands)).map(async command => {
-        if (command.slashCommand) {
+    await Promise.all([
+        ...(<Array<typeof Command>>Object.values(existingCommands)).map(async command => {
+            if (!command.commandName || !slashCommandsDefinitions[command.commandName.toLowerCase()])
+                return null;
+
+            if (existingSlashCommands[command.commandName.toLowerCase()])
+                command.slashCommandIdByGuild[guild.id] = existingSlashCommands[command.commandName.toLowerCase()].id
 
             let createdSlashCommand: null|ApplicationCommand = null
             try {
-                createdSlashCommand = await commands?.create(<ApplicationCommandDataResolvable>generateSlashCommandFromModel(command));
+                createdSlashCommand = await commands?.create(<ApplicationCommandDataResolvable>slashCommandsDefinitions[command.commandName.toLowerCase()]);
             } catch (e) {
                 console.log("Can't create command slash '"+command.commandName+"' on server '"+guild.name+"'");
                 console.log((<any>e).message)
-                return;
+                return null;
             }
 
             if (slashCommandsByGuildAndName[guild.id] === undefined)
                 slashCommandsByGuildAndName[guild.id] = {}
             slashCommandsByGuildAndName[guild.id][<string>command.commandName] = createdSlashCommand;
-        } else {
-            const foundCommand = existingSlashCommands[(<string>command.commandName).toLowerCase()];
-            if (foundCommand)
-                foundCommand.delete();
-        }
-    }))
+
+            command.slashCommandIdByGuild[guild.id] = createdSlashCommand.id;
+            return null;
+        }),
+        ...Object.entries(existingSlashCommands).map(([name, slashCommand]) =>
+            !slashCommandsDefinitions[name] ? (<ApplicationCommand>slashCommand).delete().catch(() => null) : null
+        )
+    ])
 }
 
 function generateSlashCommandFromModel(command: typeof Command): optionCommandType {
@@ -104,7 +133,7 @@ function sortRequiredAndNotRequiredArgumentsInSlashCommand(node: optionCommandTy
     const notRequireds: optionCommandType[] = [];
 
     for (const option of node.options) {
-        if (option.type == ApplicationCommandOptionTypes.SUB_COMMAND || option.type == ApplicationCommandOptionTypes.SUB_COMMAND_GROUP) {
+        if (option.type == ApplicationCommandOptionType.Subcommand || option.type == ApplicationCommandOptionType.SubcommandGroup) {
             sortRequiredAndNotRequiredArgumentsInSlashCommand(option);
             isSubCommandGroup = true;
         } else if (option.required)
@@ -120,7 +149,7 @@ function sortRequiredAndNotRequiredArgumentsInSlashCommand(node: optionCommandTy
     }
 }
 
-function generateSlashOptionFromModel(attr: string, argModel: any, subCommands: {[attr: string]: any}, slashCommandModel: optionCommandType) {
+function generateSlashOptionFromModel(attr: string, argModel: any, subCommands: { [attr: string]: any }, slashCommandModel: optionCommandType) {
     const chooseSubCommands: any[] = [];
     if (argModel.referToSubCommands instanceof Array)
         for (const referedSubCommand of argModel.referToSubCommands) {
@@ -129,30 +158,30 @@ function generateSlashOptionFromModel(attr: string, argModel: any, subCommands: 
             }
         }
     else
-        chooseSubCommands.push([null,slashCommandModel]);
-    for (const [chooseSubCommandName,chooseSubCommand] of chooseSubCommands) {
+        chooseSubCommands.push([null, slashCommandModel]);
+    for (const [chooseSubCommandName, chooseSubCommand] of chooseSubCommands) {
         if (!(chooseSubCommand.options instanceof Array))
             chooseSubCommand.options = [];
         if (argModel.isSubCommand) {
             if (chooseSubCommand.noSubCommandGroup)
                 throw new Error("You cannot blend normal arguments and sub commands in another sub command");
 
-            for (const [choice,description] of argModel.choices ? Object.entries(argModel.choices) : []) {
+            for (const [choice, description] of argModel.choices ? Object.entries(argModel.choices) : []) {
                 const option: optionCommandType = {
                     name: choice.toLowerCase(),
                     description: <string>description,
-                    type: ApplicationCommandOptionTypes.SUB_COMMAND,
-                    args: {...(chooseSubCommand.args??{}), [attr]: choice}
+                    type: ApplicationCommandOptionType.Subcommand,
+                    args: {...(chooseSubCommand.args ?? {}), [attr]: choice}
                 };
                 chooseSubCommand.options.push(option);
-                subCommands[chooseSubCommandName === null ? choice : chooseSubCommandName+"."+choice] = option;
+                subCommands[chooseSubCommandName === null ? choice : chooseSubCommandName + "." + choice] = option;
             }
-            if (chooseSubCommand.type == ApplicationCommandOptionTypes.SUB_COMMAND)
-                chooseSubCommand.type = ApplicationCommandOptionTypes.SUB_COMMAND_GROUP;
+            if (chooseSubCommand.type == ApplicationCommandOptionType.Subcommand)
+                chooseSubCommand.type = ApplicationCommandOptionType.SubcommandGroup;
         } else {
-            if (chooseSubCommand.type == ApplicationCommandOptionTypes.SUB_COMMAND_GROUP)
+            if (chooseSubCommand.type == ApplicationCommandOptionType.SubcommandGroup)
                 throw new Error("You cannot add normal argument to a sub command group");
-            if (chooseSubCommand.type == ApplicationCommandOptionTypes.SUB_COMMAND)
+            if (chooseSubCommand.type == ApplicationCommandOptionType.Subcommand)
                 chooseSubCommand.noSubCommandGroup = true;
 
             const option: optionCommandType = {
@@ -162,10 +191,10 @@ function generateSlashOptionFromModel(attr: string, argModel: any, subCommands: 
                 required:
                     argModel.required === undefined ||
                     (
-                        typeof(argModel.required) == "function" &&
+                        typeof (argModel.required) == "function" &&
                         argModel.required(chooseSubCommand.args ?? {}, null, true)
                     ) || (
-                        typeof(argModel.required) == "boolean" &&
+                        typeof (argModel.required) == "boolean" &&
                         argModel.required
                     )
             }
@@ -174,10 +203,9 @@ function generateSlashOptionFromModel(attr: string, argModel: any, subCommands: 
     }
 }
 
-async function getAndDisplaySlashCommandsResponse(interaction: Interaction, response: false| { result: Array<string | MessagePayload | InteractionReplyOptions>, callback?: Function }, p = 0) {
-    if (!interaction.isCommand()) return;
+async function getAndDisplaySlashCommandsResponse(interaction: CommandInteraction, response: false | { result: Array<string | MessagePayload | InteractionReplyOptions>, callback?: Function }, p = 0) {
     if (response) {
-        for (let i=0;i<response.result.length;i++) {
+        for (let i = 0; i < response.result.length; i++) {
             const payload = response.result[i];
             if (i == 0 && p == 0)
                 await interaction.editReply(payload);
@@ -185,28 +213,30 @@ async function getAndDisplaySlashCommandsResponse(interaction: Interaction, resp
                 await interaction.followUp(payload);
         }
         if (response.callback) {
-            await getAndDisplaySlashCommandsResponse(interaction, await response.callback(), p+1);
+            await getAndDisplaySlashCommandsResponse(interaction, await response.callback(), p + 1);
         }
     } else {
         await interaction.editReply("Aucune réponse");
     }
 }
 
-export async function listenSlashCommands(interaction: Interaction) {
-    if (!interaction.isCommand()) return;
-
+export async function listenSlashCommands(interaction: CommandInteraction) {
     const {commandName, options} = interaction;
 
     for (const CommandClass of <any[]>Object.values(existingCommands)) {
-        if (CommandClass.slashCommand && CommandClass.commandName.toLowerCase() === commandName) {
+        if (CommandClass.commandName.toLowerCase() === commandName) {
             await interaction.deferReply({
                 ephemeral: true
             });
-            const command = new CommandClass(interaction.channel, interaction.member, interaction.guild, options, 'slash');
+            const command = <Command>(new CommandClass(interaction.channel, interaction.member, interaction.guild, options, 'slash'));
+            try {
+                const response = await command.executeCommand(client, true);
 
-            const response = await command.executeCommand(client, true);
-
-            await getAndDisplaySlashCommandsResponse(interaction, response);
+                await getAndDisplaySlashCommandsResponse(interaction, response);
+                return;
+            } catch(e) {
+                throw new CustomError(<Error|CustomError>e, {commandRawArguments: command.getSlashRawArguments()??undefined})
+            }
         }
     }
 }
@@ -225,7 +255,7 @@ function getSlashType(argModel) {
     const slashTypeDefinition = getSlashTypeDefinition(argModel);
     return (slashTypeDefinition && slashTypeDefinition.commandType == 'slash')
         ? slashTypeDefinition.type :
-        ApplicationCommandOptionTypes.STRING
+        ApplicationCommandOptionType.String
 }
 
 export function getCustomType(argModel) {
@@ -244,4 +274,4 @@ export function getSlashTypeGetterName(argModel) {
     return getterNameBySlashType[getSlashType(argModel)]
 }
 
-const sleep = ms => new Promise(resolve => setTimeout(resolve,ms));
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
