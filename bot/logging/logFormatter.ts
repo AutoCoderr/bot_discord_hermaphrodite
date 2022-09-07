@@ -14,11 +14,11 @@ const {printf} = format
 function extractObjectData<TObj>(obj: TObj, keys: (keyof TObj)[], getters: {[key in keyof TObj]?: (value: TObj[key]) => any} = {}) {
     if (obj === null || obj === undefined)
         return obj;
-    return Object.entries(obj)
-        .filter(([key]) => keys.includes(<keyof TObj>key))
-        .reduce((acc,[key,value]) => ({
+    return [...Object.keys(obj), ...Object.keys(Object.getOwnPropertyDescriptors((<Object>obj).constructor.prototype))]
+        .filter((key) => keys.includes(<keyof TObj>key))
+        .reduce((acc,key) => ({
             ...acc,
-            [key]: getters[key] ? getters[key](value) : value
+            [key]: getters[key] ? getters[key](obj[key]) : obj[key]
         }), {})
 }
 
@@ -42,7 +42,7 @@ const channelTypesWithoutNameAndParent = [DMChannel].reduce((acc,channelClass) =
 const formatByType = {
     [User.name]: (user: User) => extractObjectData(user, ['id','username']),
     [GuildMember.name]: (member: GuildMember) => ({
-        ...extractObjectData(member,['id','user','guild','deleted','moderatable','manageable','kickable','pending','roles'], {
+        ...extractObjectData(member,['id','user','guild','bannable','moderatable','manageable','kickable','pending','roles'], {
             roles: (roles) => Array.from(roles.cache.values()).map(role => extractObjectData(role, ['id','name'])),
             guild: (guild) => extractObjectData(guild, ['id']),
             user: (user) => extractObjectData(user, ['id','username'])
@@ -50,15 +50,15 @@ const formatByType = {
         username: member.nickname??member.user.username
     }),
     [VoiceState.name]: (voiceState: VoiceState) => extractObjectData(voiceState, ['id','sessionId','channelId']),
-    [Guild.name]: (guild: Guild) => extractObjectData(guild, ['id','name','description','memberCount','available','deleted']),
-    [Message.name]: (message: Message) => extractObjectData(message, ['id','channelId','guildId','content','createdAt','editedAt','deleted','deletable','editable','tts','type','system']),
+    [Guild.name]: (guild: Guild) => extractObjectData(guild, ['id','name','description','memberCount','available']),
+    [Message.name]: (message: Message) => extractObjectData(message, ['id','channelId','guildId','content','createdAt','editedAt','deletable','editable','tts','type','system']),
 
 
     ...channelTypesWithNameAndParent,
     ...channelTypesWithoutNameAndParent,
 
 
-    [Emoji.name]: (emote: Emoji) => extractObjectData(emote, ['id','name','animated','createdAt','deleted']),
+    [Emoji.name]: (emote: Emoji) => extractObjectData(emote, ['id','name','animated','createdAt']),
 
     [Array.name]: (elems: any[]) => elems.map(elem =>
         (elem !== null && elem !== undefined && formatByType[elem.constructor.name]) ?

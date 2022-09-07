@@ -1,13 +1,13 @@
 import Command from "../Classes/Command";
 import {
-    CommandInteractionOptionResolver,
+    CommandInteractionOptionResolver, EmbedBuilder,
     Guild,
     GuildChannel,
     GuildMember,
     Message,
-    MessageEmbed,
     PartialGuildMember, Presence,
-    Role, TextChannel, User
+    Role, TextChannel, User,
+    ChannelType
 } from "discord.js";
 import config from "../config";
 import MonitoringMessage, {IMonitoringMessage} from "../Models/MonitoringMessage";
@@ -31,11 +31,11 @@ export default class Monitor extends Command {
 
     static datasCanBeDisplayed = {
         userCount: {
-            display: (guild: Guild, Embed: MessageEmbed) => {
-                Embed.addField(
-                    "Nombre d'utilisateurs",
-                    guild.memberCount.toString()
-                );
+            display: (guild: Guild, Embed: EmbedBuilder) => {
+                Embed.addFields({
+                    name: "Nombre d'utilisateurs",
+                    value: guild.memberCount.toString()
+                });
             },
             listen: (callback: Function) => {
                 const listener = (member: GuildMember|PartialGuildMember) => callback(member.guild);
@@ -44,25 +44,25 @@ export default class Monitor extends Command {
             }
         },
         memberMax: {
-            display: (guild: Guild, Embed: MessageEmbed) => {
-                Embed.addField(
-                    "Nombre maximum d'utilisateurs",
-                    guild.maximumMembers ? guild.maximumMembers.toString() : "Infinity"
-                );
+            display: (guild: Guild, Embed: EmbedBuilder) => {
+                Embed.addFields({
+                    name: "Nombre maximum d'utilisateurs",
+                    value: guild.maximumMembers ? guild.maximumMembers.toString() : "Infinity"
+                });
             }
         },
         onlineUserCount: {
-            display: async (guild: Guild, Embed: MessageEmbed) => {
+            display: async (guild: Guild, Embed: EmbedBuilder) => {
                 let onlineUserCount;
                 try {
                     onlineUserCount = (await guild.members.fetch()).filter(member => member.presence != null && member.presence.status == "online").size.toString();
                 } catch (_) {
                     onlineUserCount = "Fetching error";
                 }
-                Embed.addField(
-                    "Nombre d'utilisateurs en ligne",
-                    onlineUserCount
-                );
+                Embed.addFields({
+                    name: "Nombre d'utilisateurs en ligne",
+                    value: onlineUserCount
+                });
             },
             listen: (callback: Function) => {
                 client.on('presenceUpdate',(oldPresence, newPresence) =>
@@ -72,56 +72,56 @@ export default class Monitor extends Command {
             }
         },
         roleMembersCount: {
-            display: (guild: Guild, Embed: MessageEmbed, params: {roleId: string}) => {
+            display: (guild: Guild, Embed: EmbedBuilder, params: {roleId: string}) => {
                 const {roleId} = params;
                 const role = guild.roles.cache.get(roleId);
                 if (role) {
-                    Embed.addField(
-                        "Nombre de membres du role @" + role.name,
-                        role.members.size.toString()
-                    );
+                    Embed.addFields({
+                        name: "Nombre de membres du role @" +role.name,
+                        value: role.members.size.toString()
+                    });
                 } else {
-                    Embed.addField(
-                        "Membres du role "+roleId,
-                        "Role introuvable"
-                    )
+                    Embed.addFields({
+                        name: "Membres du role "+roleId,
+                        value: "Role introuvable"
+                    })
                 }
             },
             params: {roleId: (role: Role) => role.id}
         },
         emojiCount: {
-            display: (guild: Guild, Embed: MessageEmbed) => {
-                Embed.addField(
-                    "Nombre d'emotes",
-                    guild.emojis.cache.size.toString()
-                );
+            display: (guild: Guild, Embed: EmbedBuilder) => {
+                Embed.addFields({
+                    name: "Nombre d'emotes",
+                    value: guild.emojis.cache.size.toString()
+                });
             }
         },
         channelCount: {
-            display: (guild: Guild, Embed: MessageEmbed) => {
-                Embed.addField(
-                    "Nombre de channels",
-                    guild.channels.cache.size.toString()
-                );
+            display: (guild: Guild, Embed: EmbedBuilder) => {
+                Embed.addFields({
+                    name: "Nombre de channels",
+                    value: guild.channels.cache.size.toString()
+                });
             }
         },
         description: {
-            display: (guild: Guild, Embed: MessageEmbed) => {
-                Embed.addField(
-                    "Description",
-                    guild.description ?? "Aucune description"
-                );
+            display: (guild: Guild, Embed: EmbedBuilder) => {
+                Embed.addFields({
+                    name: "Description",
+                    value: guild.description ?? "Aucune description"
+                });
             }
         },
         icon: {
-            display: (guild: Guild, Embed: MessageEmbed) => {
+            display: (guild: Guild, Embed: EmbedBuilder) => {
                 if (typeof(guild.iconURL()) == "string") {
                     Embed.setImage(<string>guild.iconURL());
                 } else {
-                    Embed.addField(
-                        "Icône du serveur",
-                        "Aucune icône"
-                    );
+                    Embed.addFields({
+                        name: "Icône du serveur",
+                        value: "Aucune icône"
+                    });
                 }
             }
         }
@@ -151,7 +151,7 @@ export default class Monitor extends Command {
                 description: "Le channel sur lequel monitorer le serveur",
                 default: (_, command: Command) => command.channel,
                 required: false,
-                valid: (elem: GuildChannel, _) => elem.type == "GUILD_TEXT",
+                valid: (elem: GuildChannel, _) => elem.type == ChannelType.GuildText,
                 errorMessage: (value, _) => {
                     if (value != undefined) {
                         return {
@@ -325,6 +325,7 @@ export default class Monitor extends Command {
                         }
                         const exist = await Monitor.checkMonitoringMessageExist(monitoringMessage, this.guild, channelsById[monitoringMessage.channelId]);
                         return {
+                            inline: false,
                             name: exist ? "Sur la channel #" + exist.channel.name : "Ce message et/ou ce salon n'existe plus",
                             value: exist ?
                                 "Message " + exist.message.id + " ; Données : " + monitoringMessage.datas.map(data =>
@@ -337,12 +338,12 @@ export default class Monitor extends Command {
                                         }, "")+")").join(", ")
                                 : "Supprimé"
                         }
-                    })), (Embed: MessageEmbed, partNb: number) => {
+                    })), (Embed: EmbedBuilder, partNb: number) => {
                         if (partNb == 1) {
                             Embed.setTitle("Les messages de monitoring")
                         }
                     });
-                    return this.response(true, <{embeds: MessageEmbed[]}[]>Embeds.map(Embed => ({embeds: [Embed]})));
+                    return this.response(true, <{embeds: EmbedBuilder[]}[]>Embeds.map(Embed => ({embeds: [Embed]})));
                 }
                 return this.response(true, "Il n'y a aucun monitoring sur ce serveur");
             case "remove":
@@ -373,7 +374,7 @@ export default class Monitor extends Command {
         if (!channel && guild) {
             channel = <TextChannel>guild.channels.cache.get(monitoringMessage.channelId);
         }
-        if (channel && channel.type != "GUILD_TEXT") channel = null
+        if (channel && channel.type != ChannelType.GuildText) channel = null
 
         let message: null | Message = null;
         if (channel) {
@@ -406,7 +407,7 @@ export default class Monitor extends Command {
     }
 
     static async getMonitorMessage(guild: Guild, datasToDisplay: Array<string|{data: string, params: any}>) {
-        const Embed = new MessageEmbed()
+        const Embed = new EmbedBuilder()
             .setColor('#0099ff')
             .setTitle('Serveur : '+guild.name)
             .setTimestamp();
@@ -462,9 +463,9 @@ export default class Monitor extends Command {
     }
 
     help() {
-        return new MessageEmbed()
+        return new EmbedBuilder()
             .setTitle("Exemples :")
-            .addFields(<any>[
+            .addFields([
                 {
                     name: "add",
                     value: "Ajouter un monitoring (par défaut sur la channel courant)"

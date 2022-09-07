@@ -2,11 +2,11 @@ import config from "../config";
 import Command from "../Classes/Command";
 import WelcomeMessage, {IWelcomeMessage} from "../Models/WelcomeMessage";
 import {
-    CommandInteractionOptionResolver,
+    CommandInteractionOptionResolver, EmbedBuilder,
     Guild,
     GuildMember,
     Message,
-    MessageEmbed,
+    MessageType,
     TextChannel,
     User
 } from "discord.js";
@@ -122,7 +122,7 @@ export default class ConfigWelcome extends Command {
     }
 
     static async listenJoinsToWelcome(message: Message) {
-        if (message.author.bot || message.type !== "GUILD_MEMBER_JOIN" || !message.guild)
+        if (message.author.bot || message.type !== MessageType.UserJoin || !message.guild)
             return;
         const welcomeMessage: IWelcomeMessage = await WelcomeMessage.findOne({
             serverId: message.guild.id,
@@ -142,7 +142,7 @@ export default class ConfigWelcome extends Command {
     }
 
     help() {
-        return new MessageEmbed()
+        return new EmbedBuilder()
             .setTitle("Exemples :")
             .addFields(<any>[
                 {

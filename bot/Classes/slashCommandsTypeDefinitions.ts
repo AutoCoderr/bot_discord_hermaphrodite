@@ -1,25 +1,25 @@
-import {ApplicationCommandOptionTypes} from "discord.js/typings/enums";
+import {ApplicationCommandOptionType} from "discord.js";
 
 export const slashCommandsTypeDefinitions = {
     string: {
-        mono: {commandType: "slash", type: ApplicationCommandOptionTypes.STRING},
+        mono: {commandType: "slash", type: ApplicationCommandOptionType.String},
         multi: {commandType: "custom", type: "strings"}
     },
-    number: {commandType: "slash", type: ApplicationCommandOptionTypes.NUMBER},
-    boolean: {commandType: "slash", type: ApplicationCommandOptionTypes.BOOLEAN},
+    number: {commandType: "slash", type: ApplicationCommandOptionType.Number},
+    boolean: {commandType: "slash", type: ApplicationCommandOptionType.Boolean},
     message: {
         multi: {commandType: "custom", type: "messages"}
     },
     channel: {
-        mono: {commandType: "slash", type: ApplicationCommandOptionTypes.CHANNEL},
+        mono: {commandType: "slash", type: ApplicationCommandOptionType.Channel},
         multi: {commandType: "custom", type: "channels"}
     },
     user: {
-        mono: { commandType: "slash", type: ApplicationCommandOptionTypes.USER },
+        mono: { commandType: "slash", type: ApplicationCommandOptionType.User },
         multi: { commandType: "custom", type: "users" }
     },
     role: {
-        mono: {commandType: "slash", type: ApplicationCommandOptionTypes.ROLE},
+        mono: {commandType: "slash", type: ApplicationCommandOptionType.Role},
         multi: {commandType: "custom", type: "roles"}
     },
     command: {
@@ -28,12 +28,12 @@ export const slashCommandsTypeDefinitions = {
 }
 
 export const getterNameBySlashType = {
-    [ApplicationCommandOptionTypes.STRING]: 'getString',
-    [ApplicationCommandOptionTypes.INTEGER]: 'getInteger',
-    [ApplicationCommandOptionTypes.BOOLEAN]: 'getBoolean',
-    [ApplicationCommandOptionTypes.USER]: 'getUser',
-    [ApplicationCommandOptionTypes.CHANNEL]: 'getChannel',
-    [ApplicationCommandOptionTypes.ROLE]: 'getRole',
-    [ApplicationCommandOptionTypes.MENTIONABLE]: 'getMentionable',
-    [ApplicationCommandOptionTypes.NUMBER]: 'getNumber'
+    [ApplicationCommandOptionType.String]: 'getString',
+    [ApplicationCommandOptionType.Integer]: 'getInteger',
+    [ApplicationCommandOptionType.Boolean]: 'getBoolean',
+    [ApplicationCommandOptionType.User]: 'getUser',
+    [ApplicationCommandOptionType.Channel]: 'getChannel',
+    [ApplicationCommandOptionType.Role]: 'getRole',
+    [ApplicationCommandOptionType.Mentionable]: 'getMentionable',
+    [ApplicationCommandOptionType.Number]: 'getNumber'
 }

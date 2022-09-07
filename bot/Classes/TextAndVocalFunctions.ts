@@ -1,11 +1,11 @@
 import {
+    ActionRowBuilder, ButtonBuilder,
     ButtonInteraction,
     Guild,
     GuildChannel,
-    GuildMember,
-    MessageActionRow,
-    MessageButton, MessageEmbed, Snowflake, TextChannel,
-    ThreadChannel
+    GuildMember, Snowflake, TextChannel,
+    ButtonStyle,
+    ThreadChannel, EmbedBuilder
 } from "discord.js";
 import TextInvite, {ITextInvite} from "../Models/Text/TextInvite";
 import TextAskInviteBack, {ITextAskInviteBack} from "../Models/Text/TextAskInviteBack";
@@ -137,13 +137,14 @@ async function inviteBack(interaction: ButtonInteraction, requester: GuildMember
     const askBackButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "a";
 
     await interaction.followUp({
-        components: [
-            new MessageActionRow().addComponents(
-                new MessageButton()
-                    .setCustomId(askBackButtonId)
-                    .setLabel("Inviter en retour")
-                    .setStyle("PRIMARY")
-            )
+        components: [ //@ts-ignore
+            new ActionRowBuilder()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setCustomId(askBackButtonId)
+                        .setLabel("Inviter en retour")
+                        .setStyle(ButtonStyle.Primary)
+                )
         ]
     });
 
@@ -339,13 +340,13 @@ export async function listenInviteButtons(interaction: ButtonInteraction, type: 
             if (blackListedChannels.length > 0) {
                 await interaction.followUp({
                     embeds: [
-                        new MessageEmbed()
-                            .addField(
-                                "L'invitation n'a pas pus s'appliquer sur les channels suivant, car blacklistés :",
-                                blackListedChannels.map(channel =>
+                        new EmbedBuilder()
+                            .addFields({
+                                name: "L'invitation n'a pas pus s'appliquer sur les channels suivant, car blacklistés :",
+                                value: blackListedChannels.map(channel =>
                                     "<#" + channel.id + ">"
                                 ).join("\n")
-                            )
+                            })
                     ]
                 })
             }
@@ -430,7 +431,7 @@ export async function memberExistsAndHasChannelPermission(userIdOrMember: Snowfl
         return false;
     }
 
-    if (!userHasChannelPermissions(member, channel, 'VIEW_CHANNEL')) {
+    if (!userHasChannelPermissions(member, channel, 'ViewChannel')) {
         usersBlockedOnChannels[channel.id] = [...(usersBlockedOnChannels[channel.id]??[]), member.id]
         return false;
     }

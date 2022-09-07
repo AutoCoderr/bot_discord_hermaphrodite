@@ -1,13 +1,13 @@
 import {
     CommandInteractionOptionResolver,
-    EmbedFieldData, Guild,
+    Guild,
     GuildChannel,
     GuildMember,
-    MessageEmbed,
     Role,
     TextChannel,
     ThreadChannel, User,
-    VoiceChannel
+    VoiceChannel,
+    ChannelType, EmbedBuilder, EmbedField
 } from "discord.js";
 import {splitFieldsEmbed} from "../Classes/OtherFunctions";
 import TextConfig, {minimumLimit as textMinimumLimit} from "../Models/Text/TextConfig";
@@ -39,13 +39,13 @@ export default abstract class ConfigTextAndVocal extends Command {
         vocal: {
             configModel: VocalConfig,
             subscribeModel: VocalSubscribe,
-            channelTypes: ['GUILD_VOICE'],
+            channelTypes: [ChannelType.GuildVoice],
             minimumLimit: vocalMinimumLimit
         },
         text: {
             configModel: TextConfig,
             subscribeModel: TextSubscribe,
-            channelTypes: ['GUILD_TEXT', 'GUILD_PUBLIC_THREAD'],
+            channelTypes: [ChannelType.GuildText,ChannelType.GuildPublicThread],
             minimumLimit: textMinimumLimit
         }
     }
@@ -202,19 +202,19 @@ export default abstract class ConfigTextAndVocal extends Command {
                 configObj.save();
                 return this.response(true, {
                     embeds: [
-                        new MessageEmbed().addField(
-                            "Valeur changée avec succès!",
-                            "Vous avez fixé la limite par défaut de l'écoute " + (this.type === "vocal" ? "vocale" : "textuelle") + " à " + showTime(extractUTCTime(limit), "fr_long")
-                        )
+                        new EmbedBuilder().addFields({
+                            name: "Valeur changée avec succès!",
+                            value: "Vous avez fixé la limite par défaut de l'écoute " +(this.type === "vocal" ? "vocale" : "textuelle") + " à " + showTime(extractUTCTime(limit), "fr_long")
+                        })
                     ]
                 })
             }
             return this.response(true, {
                 embeds: [
-                    new MessageEmbed().addField(
-                        "Voici la limite par défaut de l'écoute " + (this.type === "vocal" ? "vocale" : "textuelle"),
-                        "La limite par défaut est : " + showTime(extractUTCTime(configObj.defaultLimit), "fr_long")
-                    )
+                    new EmbedBuilder().addFields({
+                        name: "Voici la limite par défaut de l'écoute " +(this.type === "vocal" ? "vocale" : "textuelle"),
+                        value: "La limite par défaut est : " +showTime(extractUTCTime(configObj.defaultLimit), "fr_long")
+                    })
                 ]
             })
         }
@@ -295,7 +295,7 @@ export default abstract class ConfigTextAndVocal extends Command {
                 configObj.save();
                 return this.response(true, "La blacklist '" + blacklistType + "' a été vidée");
             case 'show':
-                let fields: EmbedFieldData[];
+                let fields: EmbedField[];
                 if (blacklistType == "channel") {
                     fields = await this.createEmbedFieldList([configObj.channelBlacklist], ['channel']);
                 } else {
@@ -304,7 +304,7 @@ export default abstract class ConfigTextAndVocal extends Command {
 
                 configObj.save();
 
-                const embeds = splitFieldsEmbed(25, fields, (embed: MessageEmbed, nbPart) => {
+                const embeds = splitFieldsEmbed(25, fields, (embed: EmbedBuilder, nbPart) => {
                     if (nbPart == 1) {
                         embed.setTitle("Contenu de la blacklist '" + blacklistType + "'");
                     }
@@ -314,11 +314,11 @@ export default abstract class ConfigTextAndVocal extends Command {
         return this.response(false, "Aucune action spécifiée");
     }
 
-    async createEmbedFieldList(lists, types): Promise<EmbedFieldData[]> {
-        let outList: EmbedFieldData[] = [];
+    async createEmbedFieldList(lists, types): Promise<EmbedField[]> {
+        let outList: EmbedField[] = [];
         if (lists.length != types.length) return outList;
         for (let i = 0; i < lists.length; i++) {
-            const embeds: EmbedFieldData[] = await Promise.all(lists[i].map(async (id: string, j: number) => {
+            const embeds: EmbedField[] = await Promise.all(lists[i].map(async (id: string, j: number) => {
                 let member: GuildMember | undefined;
                 let role: Role | undefined;
                 let channel: GuildChannel | VoiceChannel | ThreadChannel | undefined;
@@ -364,6 +364,7 @@ export default abstract class ConfigTextAndVocal extends Command {
             outList = [...outList, ...embeds];
         }
         return outList.length > 0 ? outList : [{
+            inline: false,
             name: "Aucun élement",
             value: "Il n'y a aucun élement dans cette liste"
         }];
@@ -388,7 +389,7 @@ export default abstract class ConfigTextAndVocal extends Command {
     }
 
     help() {
-        return new MessageEmbed()
+        return new EmbedBuilder()
             .setTitle("Exemples :")
             .addFields(<any>[
                 {

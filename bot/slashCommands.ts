@@ -2,16 +2,25 @@ import client from "./client";
 import {
     ApplicationCommand, ApplicationCommandDataResolvable, CommandInteraction,
     Guild,
-    Interaction, InteractionReplyOptions, MessagePayload
+    InteractionReplyOptions, MessagePayload,
+    ApplicationCommandOptionType
 } from "discord.js";
-import {ApplicationCommandOptionTypes} from "discord.js/typings/enums";
 import Command from "./Classes/Command";
 import {existingCommands} from "./Classes/CommandsDescription";
 import {getterNameBySlashType, slashCommandsTypeDefinitions} from "./Classes/slashCommandsTypeDefinitions";
 import CustomError from "./logging/CustomError";
 
 interface optionCommandType {
-    type?: ApplicationCommandOptionTypes.BOOLEAN | ApplicationCommandOptionTypes.CHANNEL | ApplicationCommandOptionTypes.INTEGER | ApplicationCommandOptionTypes.MENTIONABLE | ApplicationCommandOptionTypes.NUMBER | ApplicationCommandOptionTypes.ROLE | ApplicationCommandOptionTypes.STRING | ApplicationCommandOptionTypes.SUB_COMMAND | ApplicationCommandOptionTypes.SUB_COMMAND_GROUP | ApplicationCommandOptionTypes.USER;
+    type?: ApplicationCommandOptionType.Boolean |
+        ApplicationCommandOptionType.Channel |
+        ApplicationCommandOptionType.Integer |
+        ApplicationCommandOptionType.Mentionable |
+        ApplicationCommandOptionType.Number |
+        ApplicationCommandOptionType.Role |
+        ApplicationCommandOptionType.String |
+        ApplicationCommandOptionType.Subcommand |
+        ApplicationCommandOptionType.SubcommandGroup |
+        ApplicationCommandOptionType.User;
     name: string;
     description: string;
     required?: boolean;
@@ -123,7 +132,7 @@ function sortRequiredAndNotRequiredArgumentsInSlashCommand(node: optionCommandTy
     const notRequireds: optionCommandType[] = [];
 
     for (const option of node.options) {
-        if (option.type == ApplicationCommandOptionTypes.SUB_COMMAND || option.type == ApplicationCommandOptionTypes.SUB_COMMAND_GROUP) {
+        if (option.type == ApplicationCommandOptionType.Subcommand || option.type == ApplicationCommandOptionType.SubcommandGroup) {
             sortRequiredAndNotRequiredArgumentsInSlashCommand(option);
             isSubCommandGroup = true;
         } else if (option.required)
@@ -160,18 +169,18 @@ function generateSlashOptionFromModel(attr: string, argModel: any, subCommands: 
                 const option: optionCommandType = {
                     name: choice.toLowerCase(),
                     description: <string>description,
-                    type: ApplicationCommandOptionTypes.SUB_COMMAND,
+                    type: ApplicationCommandOptionType.Subcommand,
                     args: {...(chooseSubCommand.args ?? {}), [attr]: choice}
                 };
                 chooseSubCommand.options.push(option);
                 subCommands[chooseSubCommandName === null ? choice : chooseSubCommandName + "." + choice] = option;
             }
-            if (chooseSubCommand.type == ApplicationCommandOptionTypes.SUB_COMMAND)
-                chooseSubCommand.type = ApplicationCommandOptionTypes.SUB_COMMAND_GROUP;
+            if (chooseSubCommand.type == ApplicationCommandOptionType.Subcommand)
+                chooseSubCommand.type = ApplicationCommandOptionType.SubcommandGroup;
         } else {
-            if (chooseSubCommand.type == ApplicationCommandOptionTypes.SUB_COMMAND_GROUP)
+            if (chooseSubCommand.type == ApplicationCommandOptionType.SubcommandGroup)
                 throw new Error("You cannot add normal argument to a sub command group");
-            if (chooseSubCommand.type == ApplicationCommandOptionTypes.SUB_COMMAND)
+            if (chooseSubCommand.type == ApplicationCommandOptionType.Subcommand)
                 chooseSubCommand.noSubCommandGroup = true;
 
             const option: optionCommandType = {
@@ -193,8 +202,7 @@ function generateSlashOptionFromModel(attr: string, argModel: any, subCommands: 
     }
 }
 
-async function getAndDisplaySlashCommandsResponse(interaction: Interaction, response: false | { result: Array<string | MessagePayload | InteractionReplyOptions>, callback?: Function }, p = 0) {
-    if (!interaction.isCommand()) return;
+async function getAndDisplaySlashCommandsResponse(interaction: CommandInteraction, response: false | { result: Array<string | MessagePayload | InteractionReplyOptions>, callback?: Function }, p = 0) {
     if (response) {
         for (let i = 0; i < response.result.length; i++) {
             const payload = response.result[i];
@@ -246,7 +254,7 @@ function getSlashType(argModel) {
     const slashTypeDefinition = getSlashTypeDefinition(argModel);
     return (slashTypeDefinition && slashTypeDefinition.commandType == 'slash')
         ? slashTypeDefinition.type :
-        ApplicationCommandOptionTypes.STRING
+        ApplicationCommandOptionType.String
 }
 
 export function getCustomType(argModel) {

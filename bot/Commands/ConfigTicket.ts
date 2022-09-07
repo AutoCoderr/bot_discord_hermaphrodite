@@ -8,8 +8,9 @@ import Discord, {
     GuildEmoji,
     GuildMember,
     Message,
-    MessageEmbed, PermissionString, Role, Snowflake,
-    TextChannel, User
+    Role, Snowflake,
+    TextChannel, User, PermissionFlagsBits, PermissionResolvable,
+    ChannelType, EmbedBuilder, EmbedField
 } from "discord.js";
 import {splitFieldsEmbed} from "../Classes/OtherFunctions";
 import client from "../client";
@@ -18,17 +19,24 @@ import reportError from "../logging/reportError";
 import CustomError from "../logging/CustomError";
 
 
-const toDenyToEveryone: Array<PermissionString> = ['SEND_MESSAGES','VIEW_CHANNEL','SEND_TTS_MESSAGES', 'MANAGE_CHANNELS', 'MANAGE_MESSAGES'];
-const toAllowToAuthorAndModerators: Array<PermissionString> = [
-    'SEND_MESSAGES',
-    'SEND_TTS_MESSAGES',
-    'ADD_REACTIONS',
-    'VIEW_CHANNEL',
-    'MANAGE_MESSAGES',
-    'MANAGE_CHANNELS',
-    'EMBED_LINKS',
-    'ATTACH_FILES',
-    'READ_MESSAGE_HISTORY'];
+const toDenyToEveryone: Array<PermissionResolvable> = [
+    PermissionFlagsBits.SendMessages,
+    PermissionFlagsBits.ViewChannel,
+    PermissionFlagsBits.SendTTSMessages,
+    PermissionFlagsBits.ManageChannels,
+    PermissionFlagsBits.ManageMessages
+];
+const toAllowToAuthorAndModerators: Array<PermissionResolvable> = [
+    PermissionFlagsBits.SendMessages,
+    PermissionFlagsBits.SendTTSMessages,
+    PermissionFlagsBits.AddReactions,
+    PermissionFlagsBits.ViewChannel,
+    PermissionFlagsBits.ManageMessages,
+    PermissionFlagsBits.ManageChannels,
+    PermissionFlagsBits.EmbedLinks,
+    PermissionFlagsBits.AttachFiles,
+    PermissionFlagsBits.ReadMessageHistory
+];
 
 export default class ConfigTicket extends Command {
     static display = true;
@@ -98,7 +106,7 @@ export default class ConfigTicket extends Command {
                 required: (args, _, modelizeSlashCommand = false) => args.action == "listen" && (args.subAction == "add" || (args.subAction == "remove" && !args.allListen && !modelizeSlashCommand)),
                 type: "channel",
                 description: "Le channel sur lequel ajouter, retirer, ou afficher les écoutes de réaction",
-                valid: (elem: GuildChannel,_) => elem.type == "GUILD_TEXT"
+                valid: (elem: GuildChannel,_) => elem.type == ChannelType.GuildText
             },
             emoteListen: {
                 referToSubCommands: ["listen.add"],
@@ -298,7 +306,7 @@ export default class ConfigTicket extends Command {
                         emoteName = emoteListen instanceof GuildEmoji ? emoteListen.name : emoteListen;
                         emoteId = emoteListen instanceof GuildEmoji ? emoteListen.id : emoteListen;
 
-                        const fields: Array<{name: string, value: string}> = [];
+                        const fields: Array<EmbedField> = [];
                         for (let i=0;i<ticketConfig.messagesToListen.length;i++) {
                             const message = ticketConfig.messagesToListen[i];
                             if ((!emoteId || message.emoteName === emoteName || message.emoteId === emoteId) &&
@@ -306,9 +314,11 @@ export default class ConfigTicket extends Command {
                                 (!channelListen || message.channelId === channelListen.id)) {
                                 const exist = await ConfigTicket.listeningMessageExist(message,this.guild);
                                 fields.push(exist ? {
+                                    inline: false,
                                     name: "#"+exist.channel.name+" > ("+exist.message.content.substring(0,Math.min(20,exist.message.content.length))+"...) "+(exist.emote instanceof Emoji ? ":"+exist.emote.name+":" : exist.emote),
                                     value: "Channel : #"+exist.channel.name+" ; Id du message : "+exist.message.id
                                 } : {
+                                    inline: false,
                                     name: "Message/channel introuvable",
                                     value: "Le message de cette écoute n'existe plus"
                                 });
@@ -322,7 +332,7 @@ export default class ConfigTicket extends Command {
                             return this.response(false, "Aucune écoute de réaction trouvée");
                         } // @ts-ignore
                         ticketConfig.save();
-                        const embeds: Array<MessageEmbed> = splitFieldsEmbed(25,fields,(Embed: MessageEmbed, partNb: number) => {
+                        const embeds: Array<EmbedBuilder> = splitFieldsEmbed(25,fields,(Embed: EmbedBuilder, partNb: number) => {
                             if (partNb == 1) {
                                 Embed.setTitle("Les écoutes de réactions pour le ticketing");
                             }
@@ -390,17 +400,17 @@ export default class ConfigTicket extends Command {
     async showUsersInBlackList(bot, serverId) {
         let ticketConfig: ITicketConfig = await TicketConfig.findOne({serverId: serverId});
 
-        let embeds = [new Discord.MessageEmbed()
+        let embeds = [new EmbedBuilder()
             .setColor('#0099ff')
             .setTitle("Les utilisateurs de la blacklist :")
             .setDescription("Liste des utilisateurs de la blacklist")
             .setTimestamp()];
 
         if (ticketConfig == null || ticketConfig.blacklist.length == 0) {
-            embeds[0].addField(
-                "Aucun utilisateur",
-                "Il n'y a aucun utilisateur dans la blacklist"
-            );
+            embeds[0].addFields({
+                name: "Aucun utilisateur",
+                value: "Il n'y a aucun utilisateur dans la blacklist"
+            });
         } else {
             const list = ticketConfig.blacklist;
             let users: Array<any> = [];
@@ -424,7 +434,7 @@ export default class ConfigTicket extends Command {
 
             for  (let msg=0; msg*linePerMessage*userDisplayedPerLine < users.length; msg ++) {
                 if (msg > 0) {
-                    embeds.push(new Discord.MessageEmbed()
+                    embeds.push(new EmbedBuilder()
                         .setColor('#0099ff')
                         .setTitle("Les utilisateurs de la blacklist (Partie "+(msg+1)+") :")
                         .setDescription("Liste des utilisateurs de la blacklist")
@@ -437,10 +447,10 @@ export default class ConfigTicket extends Command {
                         const user = users[msg*linePerMessage*userDisplayedPerLine + line*userDisplayedPerLine + userIndex];
                         usersNames.push("@"+(user != null ? user.username : "unknown")+"("+user.id+")");
                     }
-                    embed.addField(
-                        "Les utilisateurs :",
-                        usersNames.join(", ")
-                    );
+                    embed.addFields({
+                        name: "Les utilisateurs :",
+                        value: usersNames.join(", ")
+                    });
                 }
             }
         }
@@ -527,8 +537,9 @@ export default class ConfigTicket extends Command {
                             const member: GuildMember = await guild.members.fetch(userWhoReact.id);
 
                             const username = member.nickname ? member.nickname : userWhoReact.username;
-                            channel = await guild.channels.create('Ticket de ' + username + " " + userWhoReact.id, {
-                                type: "GUILD_TEXT"
+                            channel = await guild.channels.create({
+                                name: 'Ticket de ' + username + " " + userWhoReact.id,
+                                type: ChannelType.GuildText
                             });
                             await channel.setParent(category);
                             await channel.permissionOverwrites.set([
@@ -616,7 +627,7 @@ export default class ConfigTicket extends Command {
     }
 
     help() {
-        return new MessageEmbed()
+        return new EmbedBuilder()
             .setTitle("Exemples :")
             .addFields(<any>[
                 {

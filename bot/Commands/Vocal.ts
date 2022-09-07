@@ -1,12 +1,11 @@
 import Command from "../Classes/Command";
 import {
-    CommandInteractionOptionResolver,
+    ActionRowBuilder, ButtonBuilder,
+    CommandInteractionOptionResolver, EmbedBuilder,
     Guild,
     GuildMember,
-    MessageActionRow,
-    MessageButton,
-    MessageEmbed,
-    Role, StageChannel, TextChannel, User, VoiceChannel, VoiceState
+    Role, StageChannel, TextChannel, User, VoiceChannel, VoiceState,
+    ButtonStyle
 } from "discord.js";
 import config from "../config";
 import VocalSubscribe, {IVocalSubscribe} from "../Models/Vocal/VocalSubscribe";
@@ -176,7 +175,7 @@ export default class Vocal extends Command {
             });
         }
 
-        const embed = new MessageEmbed();
+        const embed = new EmbedBuilder();
 
         if (action == 'add') {
             const hasNotVocal: GuildMember[] = [];
@@ -245,40 +244,40 @@ export default class Vocal extends Command {
 
             }
             if (forbiddens.length > 0)
-                embed.addField(
-                    "Vous êtes bloqués par :",
-                    forbiddens.map(user => "<@" + user.id + ">").join("\n")
-                );
+                embed.addFields({
+                    name: "Vous êtes bloqués par :",
+                    value: forbiddens.map(user => "<@" + user.id + ">").join("\n")
+                });
             if (hasNotVocal.length > 0)
-                embed.addField(
-                    "Ces utilisateurs n'ont pas accès à la fonction vocal :",
-                    hasNotVocal.map(user => "<@" + user.id + ">").join("\n")
-                );
+                embed.addFields({
+                    name: "Ces utilisateurs n'ont pas accès à la fonction vocal :",
+                    value: hasNotVocal.map(user => "<@" + user.id + ">").join("\n")
+                });
             if (alreadySubscribeds.length > 0)
-                embed.addField(
-                    "Déjà écoutés  :",
-                    alreadySubscribeds.map(user => "<@" + user.id + ">").join("\n")
-                );
+                embed.addFields({
+                    name: "Déjà écoutés  :",
+                    value: alreadySubscribeds.map(user => "<@" + user.id + ">").join("\n")
+                });
             if (alreadyInviteds.length > 0)
-                embed.addField(
-                    "Déjà invités :",
-                    alreadyInviteds.map(user => "<@" + user.id + ">").join("\n")
-                );
+                embed.addFields({
+                    name: "Déjà invités :",
+                    value: alreadyInviteds.map(user => "<@" + user.id + ">").join("\n")
+                });
             if (inviteds.length > 0)
-                embed.addField(
-                    "Invités avec succès :",
-                    inviteds.map(user => "<@" + user.id + ">").join("\n")
-                );
+                embed.addFields({
+                    name: "Invités avec succès :",
+                    value: inviteds.map(user => "<@" + user.id + ">").join("\n")
+                });
             if (usersCantBeDM.length > 0)
-                embed.addField(
-                    "Ces utilisateurs refusent les messages privés :",
-                    usersCantBeDM.map(user => "<@" + user.id + ">").join("\n")
-                )
+                embed.addFields({
+                    name: "Ces utilisateurs refusent les messages privés :",
+                    value: usersCantBeDM.map(user => "<@" + user.id + ">").join("\n")
+                })
             if (!ownUserConfig.listening) {
-                embed.addField(
-                    "Votre écoute est désactivée",
-                    "Vous avez désactivé votre écoute, donc vous ne recevrez pas de notif"
-                );
+                embed.addFields({
+                    name: "Votre écoute est désactivée",
+                    value: "Vous avez désactivé votre écoute, donc vous ne recevrez pas de notif"
+                });
             }
 
             return this.response(true, {embeds: [embed]});
@@ -305,15 +304,15 @@ export default class Vocal extends Command {
             }
 
             if (doesntExist.length > 0)
-                embed.addField(
-                    "Vous n'avez pas d'écoute sur :",
-                    doesntExist.map(user => "<@" + user.id + ">").join("\n")
-                );
+                embed.addFields({
+                    name: "Vous n'avez pas d'écoute sur :",
+                    value: doesntExist.map(user => "<@" + user.id + ">").join("\n")
+                });
             if (deleted.length > 0)
-                embed.addField(
-                    "Supprimés avec succès :",
-                    deleted.map(user => "<@" + user.id + ">").join("\n")
-                );
+                embed.addFields({
+                    name: "Supprimés avec succès :",
+                    value: deleted.map(user => "<@" + user.id + ">").join("\n")
+                });
 
             return this.response(true, {embeds: [embed]});
         }
@@ -368,20 +367,20 @@ export default class Vocal extends Command {
             ownUserConfig.save();
 
             if (notFoundUsersId.length > 0)
-                embed.addField(
-                    "Utilisateurs introuvables : ",
-                    notFoundUsersId.map(userId => "<@" + userId + ">").join("\n")
-                );
+                embed.addFields({
+                    name: "Utilisateurs introuvables : ",
+                    value: notFoundUsersId.map(userId => "<@" + userId + ">").join("\n")
+                });
             if (alreadyBlocked.length > 0)
-                embed.addField(
-                    "Déjà bloqués :",
-                    alreadyBlocked.map(elem => "<@" + (elem instanceof Role ? "&" : "") + elem.id + "> (" + (elem instanceof Role ? 'role' : 'user') + ")").join("\n")
-                );
+                embed.addFields({
+                    name: "Déjà bloqués :",
+                    value: alreadyBlocked.map(elem => "<@" + (elem instanceof Role ? "&" : "") + elem.id + "> (" + (elem instanceof Role ? 'role' : 'user') + ")").join("\n")
+                });
             if (blocked.length > 0)
-                embed.addField(
-                    "Bloqués avec succès : ",
-                    blocked.map(elem => "<@" + (elem instanceof Role ? "&" : "") + elem.id + "> (" + (elem instanceof Role ? 'role' : 'user') + ")").join("\n")
-                );
+                embed.addFields({
+                    name: "Bloqués avec succès : ",
+                    value: blocked.map(elem => "<@" + (elem instanceof Role ? "&" : "") + elem.id + "> (" + (elem instanceof Role ? 'role' : 'user') + ")").join("\n")
+                });
 
             return this.response(true, {embeds: [embed]});
         }
@@ -441,25 +440,25 @@ export default class Vocal extends Command {
             ownUserConfig.save();
 
             if (notFoundUsersId.length > 0)
-                embed.addField(
-                    "Utilisateurs introuvables : ",
-                    notFoundUsersId.map(userId => "<@" + userId + ">").join("\n")
-                );
+                embed.addFields({
+                    name: "Utilisateurs introuvables : ",
+                    value: notFoundUsersId.map(userId => "<@" + userId + ">").join("\n")
+                });
             if (alreadyUnblocked.length > 0)
-                embed.addField(
-                    "Non bloqués :",
-                    alreadyUnblocked.map(elem => "<@" + (elem instanceof Role ? "&" : "") + elem.id + "> (" + (elem instanceof Role ? 'role' : 'user') + ")").join("\n")
-                );
+                embed.addFields({
+                    name: "Non bloqués :",
+                    value: alreadyUnblocked.map(elem => "<@" + (elem instanceof Role ? "&" : "") + elem.id + "> (" + (elem instanceof Role ? 'role' : 'user') + ")").join("\n")
+                });
             if (unBlocked.length > 0)
-                embed.addField(
-                    "débloqués avec succès : ",
-                    unBlocked.map(elem => "<@" + (elem instanceof Role ? "&" : "") + elem.id + "> (" + (elem instanceof Role ? 'role' : 'user') + ")").join("\n")
-                );
+                embed.addFields({
+                    name: "débloqués avec succès : ",
+                    value: unBlocked.map(elem => "<@" + (elem instanceof Role ? "&" : "") + elem.id + "> (" + (elem instanceof Role ? 'role' : 'user') + ")").join("\n")
+                });
             if (!ownUserConfig.listening)
-                embed.addField(
-                    "Votre écoute est désactivée",
-                    "Vous avez désactivé votre écoute, donc vous ne recevrez pas de notif"
-                );
+                embed.addFields({
+                    name: "Votre écoute est désactivée",
+                    value: "Vous avez désactivé votre écoute, donc vous ne recevrez pas de notif"
+                });
 
             return this.response(true, {embeds: [embed]});
         }
@@ -476,10 +475,10 @@ export default class Vocal extends Command {
                 enabled: false
             });
 
-            embed.addField(
-                "Ecoute désactivée",
-                "Ecoute désactivée avec succès"
-            );
+            embed.addFields({
+                name: "Ecoute désactivée",
+                value: "Ecoute désactivée avec succès"
+            });
 
             return this.response(true, {embeds: [embed]});
         }
@@ -511,10 +510,10 @@ export default class Vocal extends Command {
                 vocalSubscribe.save();
             }
 
-            embed.addField(
-                "Ecoute activée",
-                "Ecoute activée avec succès"
-            );
+            embed.addFields({
+                name: "Ecoute activée",
+                value: "Ecoute activée avec succès"
+            });
 
             return this.response(true, {embeds: [embed]});
         }
@@ -558,7 +557,7 @@ export default class Vocal extends Command {
 
         if (action == "status") {
             if (subs) {
-                let embeds: MessageEmbed[] = [];
+                let embeds: EmbedBuilder[] = [];
 
                 const subscribings: Array<IVocalSubscribe | typeof VocalSubscribe> = await VocalSubscribe.find({
                     serverId: this.guild.id,
@@ -574,22 +573,23 @@ export default class Vocal extends Command {
                             subscribe.remove();
                         }
                         return {
+                            inline: false,
                             name: member ? (member.nickname ?? member.user.username) : 'Not found user (' + subscribe.listenedId + ')',
                             value: member ?
                                 "Vous écoutez <@" + subscribe.listenedId + ">" + (!subscribe.enabled ? " (écoute désactivée)" : "") +
                                 (subscribe.timestamp ? " depuis le "+showDate(extractDate(subscribe.timestamp), 'fr')+" à "+showTime(extractTime(subscribe.timestamp), 'fr') : '') :
                                     "N'est plus présent sur le serveur, écoute supprimée"
                         }
-                    })), (embed: MessageEmbed, nbPart) => {
+                    })), (embed: EmbedBuilder, nbPart) => {
                         if (nbPart == 1)
                             embed.setTitle("Vous écoutez " + subscribings.length + " personnes");
                     });
                     embeds = [...embeds, ...subscribingsEmbeds]
                 } else {
-                    embed.addField(
-                        "Vous n'écoutez personnes",
-                        "Vous n'écoutez personnes",
-                    )
+                    embed.addFields({
+                        name: "Vous n'écoutez personnes",
+                        value: "Vous n'écoutez personnes",
+                    })
                 }
 
                 const subscribeds: Array<IVocalSubscribe | typeof VocalSubscribe> = await VocalSubscribe.find({
@@ -617,22 +617,23 @@ export default class Vocal extends Command {
                                 Date.now() - userConfig.lastMute.getTime() < userConfig.mutedFor;
                         }
                         return {
+                            inline: false,
                             name: member ? (member.nickname ?? member.user.username) : 'Not found user (' + subscribe.listenerId + ')',
                             value: member ? "<@" + subscribe.listenerId + "> vous écoute" +
                                 (!subscribe.enabled ? " (écoute désactivée)" :
                                         muted ? " (il/elle est mute)" : ""
                                 ) : "N'est plus présent sur le serveur, écoute supprimée"
                         }
-                    })), (embed: MessageEmbed, nbPart) => {
+                    })), (embed: EmbedBuilder, nbPart) => {
                         if (nbPart == 1)
                             embed.setTitle("Vous êtes écouté par " + subscribeds.length + " personnes");
                     });
                     embeds = [...embeds, ...subscribedsEmbeds]
                 } else {
-                    embed.addField(
-                        "Vous n'êtes écouté par personne",
-                        "Vous n'êtes écouté par personne",
-                    )
+                    embed.addFields({
+                        name: "Vous n'êtes écouté par personne",
+                        value: "Vous n'êtes écouté par personne",
+                    })
                 }
                 return this.response(true, {embeds: subscribeds.length === 0 || subscribings.length === 0 ? [embed, ...embeds] : embeds})
             }
@@ -683,22 +684,22 @@ export default class Vocal extends Command {
                 fieldLines.push("Vous n'avez bloqué aucun utilisateur ni aucun role");
             }
 
-            embed.addField(
-                "Status :",
-                '\n' + fieldLines.join("\n\n")
-            )
+            embed.addFields({
+                name: "Status :",
+                value: '\n' +fieldLines.join("\n\n")
+            })
 
             if (ownUserConfig.blocked.users.length > 0) {
-                embed.addField(
-                    "Les utilisateurs que vous avez bloqué",
-                        ownUserConfig.blocked.users.map(userId => "<@" + userId + ">").join("\n")
-                );
+                embed.addFields({
+                    name: "Les utilisateurs que vous avez bloqué",
+                    value: ownUserConfig.blocked.users.map(userId => "<@" + userId + ">").join("\n")
+                });
             }
             if (ownUserConfig.blocked.roles.length > 0) {
-                embed.addField(
-                    "Les roles que vous avez bloqué",
-                        ownUserConfig.blocked.roles.map(userId => "<@&" + userId + ">").join("\n")
-                );
+                embed.addFields({
+                    name: "Les roles que vous avez bloqué",
+                    value: ownUserConfig.blocked.roles.map(userId => "<@&" + userId + ">").join("\n")
+                });
             }
             return this.response(true, {embeds: [embed]});
         }
@@ -715,16 +716,16 @@ export default class Vocal extends Command {
         try {
             await requested.send({
                 content: (requester instanceof GuildMember ? (requester.nickname ?? requester.user.username) : requester.username) + " souhaite pouvoir recevoir des notifications de vos connexions vocales sur le serveur '" + guild.name + "'",
-                components: [
-                    new MessageActionRow().addComponents(
-                        <any>new MessageButton()
+                components: [ //@ts-ignore
+                    new ActionRowBuilder().addComponents(
+                        new ButtonBuilder()
                             .setCustomId(acceptButtonId)
                             .setLabel("Accepter")
-                            .setStyle("SUCCESS"),
-                        <any>new MessageButton()
+                            .setStyle(ButtonStyle.Success),
+                        new ButtonBuilder()
                             .setCustomId(denyButtonId)
                             .setLabel("Refuser")
-                            .setStyle("DANGER"),
+                            .setStyle(ButtonStyle.Danger),
                     )
                 ]
             })
@@ -844,9 +845,9 @@ export default class Vocal extends Command {
     }
 
     help() {
-        return new MessageEmbed()
+        return new EmbedBuilder()
             .setTitle("Exemples :")
-            .addFields(<any>[
+            .addFields([
                 {
                     name: "add @user",
                     value: "Demander à @user si on peut écouter ses connexions vocales"
