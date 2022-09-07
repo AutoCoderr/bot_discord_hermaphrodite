@@ -21,6 +21,7 @@ import TextSubscribe from "../Models/Text/TextSubscribe";
 import VocalConfig from "../Models/Vocal/VocalConfig";
 import TextConfig from "../Models/Text/TextConfig";
 import {userHasChannelPermissions} from "./OtherFunctions";
+import CustomError from "../logging/CustomError";
 
 interface getDatasButtonFunctionResponse {
     server: Guild;
@@ -108,19 +109,26 @@ export async function listenAskInviteBackButtons(interaction: ButtonInteraction,
     if (inviteBackButton === null)
         return false;
 
-    const datas = await getDatasButton(inviteBackButton, interaction, type);
-    if (!datas)
-        return false;
+    try {
+        const datas = await getDatasButton(inviteBackButton, interaction, type);
+        if (!datas)
+            return false;
 
-    const {server, requested, requester, channels, keywords} = datas;
+        const {server, requested, requester, channels, keywords} = datas;
 
-    await command.sendInvite(requester, requested, server, channels ? channels.map(channel => (<GuildChannel>channel).id) : undefined, keywords ?? undefined);
+        await command.sendInvite(requester, requested, server, channels ? channels.map(channel => (<GuildChannel>channel).id) : undefined, keywords ?? undefined);
 
-    await inviteBackButton.remove();
+        await inviteBackButton.remove();
 
-    await interaction.editReply({content: "Invitation envoyée en retour"});
+        await interaction.editReply({content: "Invitation envoyée en retour"});
 
-    return true;
+        return true;
+    } catch (e) {
+        throw new CustomError(<Error>e, {
+            from: type === "text" ? "textInviteBack" : "vocalInviteBack",
+            buttonData: inviteBackButton
+        })
+    }
 }
 
 async function inviteBack(interaction: ButtonInteraction, requester: GuildMember, requested: GuildMember, server: Guild, type: 'text' | 'vocal', keywords: string[] | null = null, channelsId: Snowflake[] | null = null) {
@@ -171,226 +179,236 @@ export async function listenInviteButtons(interaction: ButtonInteraction, type: 
         return false;
     }
 
-    const datas = await getDatasButton(invite, interaction, type);
-    if (!datas)
-        return false;
-    const {server, requested, requester, channels, keywords} = datas;
+    try {
+        const datas = await getDatasButton(invite, interaction, type);
+        if (!datas)
+            return false;
+        const {server, requested, requester, channels, keywords} = datas;
 
-    const configServer = await configModel.findOne({
-        serverId: server.id
-    })
+        const configServer = await configModel.findOne({
+            serverId: server.id
+        })
 
-    if (!(await command.staticCheckPermissions(requested, server))) {
-        await interaction.editReply({content: "Vous n'avez plus accès à la fonction vocal sur le serveur '" + server.name + "'"});
-        return true;
-    }
-    if (
-        !(await command.staticCheckPermissions(requester, server)) ||
-        (
-            configServer &&
+        if (!(await command.staticCheckPermissions(requested, server))) {
+            await interaction.editReply({content: "Vous n'avez plus accès à la fonction vocal sur le serveur '" + server.name + "'"});
+            return true;
+        }
+        if (
+            !(await command.staticCheckPermissions(requester, server)) ||
             (
-                configServer.listenerBlacklist.users.includes(requester.id) ||
-                configServer.listenerBlacklist.roles.some(roleId => requester.roles.cache.some(role => role.id === roleId))
+                configServer &&
+                (
+                    configServer.listenerBlacklist.users.includes(requester.id) ||
+                    configServer.listenerBlacklist.roles.some(roleId => requester.roles.cache.some(role => role.id === roleId))
+                )
             )
-        )
-    ) {
-        await interaction.editReply({content: "'" + (requester.nickname ?? requester.user.username) + "' n'a plus accès à la fonction vocale sur le serveur '" + server.name + "'"});
-        return true;
-    }
+        ) {
+            await interaction.editReply({content: "'" + (requester.nickname ?? requester.user.username) + "' n'a plus accès à la fonction vocale sur le serveur '" + server.name + "'"});
+            return true;
+        }
 
-    const blackListedChannels: GuildChannel[] = [];
+        const blackListedChannels: GuildChannel[] = [];
 
-    if (invite.accept) {
-        const listenedConfig = await userConfigModel.findOne({
-            serverId: server.id,
-            userId: requested.id
-        });
-        const blockingThisUser = userBlockingUsTextOrVocal(listenedConfig,requester,type);
-
-        const listenerConfig = await userConfigModel.findOne({
-            serverId: server.id,
-            userId: invite.requesterId
-        });
-        const listenerListening = listenerConfig ? (
-            listenerConfig.listening !== undefined ?
-                listenerConfig.listening :
-                (!listenerConfig.lastMute || listenerConfig.mutedFor !== undefined)
-        ) : true;
-
-        if (channels) {
-            const existingSubscribeAllChannels = await subscribeModel.findOne({
-               serverId: server.id,
-               listenerId: requester.id,
-               listenedId: requested.id,
-               channelId: {$exists: false}
+        if (invite.accept) {
+            const listenedConfig = await userConfigModel.findOne({
+                serverId: server.id,
+                userId: requested.id
             });
-            for (const channel of <Array<GuildChannel | ThreadChannel>>channels) {
-                if (configServer.channelBlacklist.includes(channel.id)) {
-                    blackListedChannels.push(<GuildChannel>channel);
-                    continue;
-                }
-                const blockingThisChannel = userBlockingUsOrChannelText(listenedConfig,requested.id,null,null,requester.id,channel.id,false)
+            const blockingThisUser = userBlockingUsTextOrVocal(listenedConfig, requester, type);
 
-                const existingSubscribe = await subscribeModel.findOne({
-                    serverId: invite.serverId,
-                    listenerId: invite.requesterId,
-                    listenedId: invite.requestedId,
-                    channelId: channel.id,
+            const listenerConfig = await userConfigModel.findOne({
+                serverId: server.id,
+                userId: invite.requesterId
+            });
+            const listenerListening = listenerConfig ? (
+                listenerConfig.listening !== undefined ?
+                    listenerConfig.listening :
+                    (!listenerConfig.lastMute || listenerConfig.mutedFor !== undefined)
+            ) : true;
+
+            if (channels) {
+                const existingSubscribeAllChannels = await subscribeModel.findOne({
+                    serverId: server.id,
+                    listenerId: requester.id,
+                    listenedId: requested.id,
+                    channelId: {$exists: false}
                 });
-                if (existingSubscribe) {
-                    existingSubscribe.keywords = keywords ? [...(existingSubscribe.keywords??[]), ...keywords] : undefined;
-                    if (existingSubscribeAllChannels && compareKeyWords(existingSubscribe.keywords, existingSubscribeAllChannels.keywords)) {
-                        existingSubscribe.remove();
-                    } else {
-                        existingSubscribe.save();
+                for (const channel of <Array<GuildChannel | ThreadChannel>>channels) {
+                    if (configServer.channelBlacklist.includes(channel.id)) {
+                        blackListedChannels.push(<GuildChannel>channel);
+                        continue;
                     }
-                } else if (existingSubscribeAllChannels === null || !compareKeyWords(keywords??undefined,existingSubscribeAllChannels.keywords)) {
-                    await subscribeModel.create({
+                    const blockingThisChannel = userBlockingUsOrChannelText(listenedConfig, requested.id, null, null, requester.id, channel.id, false)
+
+                    const existingSubscribe = await subscribeModel.findOne({
                         serverId: invite.serverId,
                         listenerId: invite.requesterId,
                         listenedId: invite.requestedId,
                         channelId: channel.id,
-                        ...(keywords ? {keywords} : {}),
-                        timestamp: new Date,
-                        enabled: listenerListening && !blockingThisUser && !blockingThisChannel,
                     });
-                }
-            }
-        } else {
-            let blockedChannelIds = [];
-            if (listenedConfig && type === 'text') {
-                blockedChannelIds = listenedConfig.blocking
-                    .filter(({
-                                 userId,
-                                 channelId
-                             }) => (userId === requester.id || userId === undefined) && channelId !== undefined)
-                    .map(({channelId}) => <string>channelId);
-            }
-            const blockedChannelsForEveryone = configServer.channelBlacklist;
-
-            await subscribeModel.create({
-                serverId: invite.serverId,
-                listenerId: invite.requesterId,
-                listenedId: invite.requestedId,
-                ...(keywords ? {keywords} : {}),
-                timestamp: new Date,
-                enabled: listenerListening && !blockingThisUser
-            });
-            if (keywords) {
-                const existingSubscribesOnSpecificChannel = await subscribeModel.find({
-                    serverId: server.id,
-                    listenerId: invite.requesterId,
-                    listenedId: invite.requestedId,
-                    channelId: { $exists: true }
-                });
-                for (const subscribe of existingSubscribesOnSpecificChannel) {
-                    if (compareKeyWords(keywords??undefined,subscribe.keywords))
-                        subscribe.remove();
-                }
-            } else if (type === "text") {
-                await subscribeModel.deleteMany({
-                    serverId: server.id,
-                    listenerId: invite.requesterId,
-                    listenedId: invite.requestedId,
-                    channelId: { $exists: true },
-                    $or: [
-                        { $and: [
-                                { channelId: { $nin: blockedChannelIds } },
-                                { channelId: { $nin: blockedChannelsForEveryone } }
-                            ] },
-                        { keywords: { $exists: false } }
-                    ]
-                });
-            }
-        }
-        try {
-            await requester.send((requested.nickname ?? requested.user.username) + " a accepté(e) votre invitation sur '" + server.name + "'" + (!listenerListening ? " (Attention votre écoute n'est pas activée sur ce serveur)" : ""));
-        } catch (_) {
-        }
-
-        const [backSubscribeAllChannels,existingBackInviteAllChannels] = await Promise.all([
-            subscribeModel.findOne({
-                serverId: server.id,
-                listenerId: requested.id,
-                listenedId: requester.id,
-                ...(type === "text" ? {channelId: {$exists: false}} : {})
-            }),
-            inviteModel.findOne({
-                serverId: server.id,
-                requesterId: requested.id,
-                requestedId: requester.id,
-                ...(type === "text" ? {"channelsId.0": {$exists: false}} : {})
-            })
-        ]);
-
-        await interaction.editReply({content: "Invitation acceptée"});
-
-        if (blackListedChannels.length > 0) {
-            await interaction.followUp({
-                embeds: [
-                    new MessageEmbed()
-                        .addField(
-                            "L'invitation n'a pas pus s'appliquer sur les channels suivant, car blacklistés :",
-                            blackListedChannels.map(channel =>
-                                "<#"+channel.id+">"
-                            ).join("\n")
-                        )
-                ]
-            })
-        }
-
-        if (
-            existingBackInviteAllChannels === null &&
-            backSubscribeAllChannels === null &&
-            !userBlockingUsTextOrVocal(listenerConfig,requested,type)
-        ) {
-            if (channels) {
-                const channelsIdForBackInvite: Snowflake[] = [];
-                for (const channel of <Array<GuildChannel | ThreadChannel>>channels) {
-                    if (
-                        blackListedChannels.some(channelB => channelB.id === channel.id) ||
-                        userBlockingUsOrChannelText(listenerConfig,requester.id, null, null, requested.id, channel.id, false)
-                    )
-                        continue;
-                    const existingSubscribe = await subscribeModel.findOne({
-                        serverId: server.id,
-                        listenerId: requested.id,
-                        listenedId: requester.id,
-                        channelId: channel.id
-                    });
-                    if (existingSubscribe === null) {
-                        channelsIdForBackInvite.push(channel.id)
-                    }
-                }
-                if (channelsIdForBackInvite.length > 0) {
-                    const existingBackInvite = await inviteModel.findOne({
-                        serverId: server.id,
-                        requesterId: requested.id,
-                        requestedId: requester.id,
-                        channelsId: {$all: channelsIdForBackInvite}
-                    });
-                    if (existingBackInvite === null) {
-                        await inviteBack(interaction, requester, requested, server, type, keywords, channelsIdForBackInvite);
+                    if (existingSubscribe) {
+                        existingSubscribe.keywords = keywords ? [...(existingSubscribe.keywords ?? []), ...keywords] : undefined;
+                        if (existingSubscribeAllChannels && compareKeyWords(existingSubscribe.keywords, existingSubscribeAllChannels.keywords)) {
+                            existingSubscribe.remove();
+                        } else {
+                            existingSubscribe.save();
+                        }
+                    } else if (existingSubscribeAllChannels === null || !compareKeyWords(keywords ?? undefined, existingSubscribeAllChannels.keywords)) {
+                        await subscribeModel.create({
+                            serverId: invite.serverId,
+                            listenerId: invite.requesterId,
+                            listenedId: invite.requestedId,
+                            channelId: channel.id,
+                            ...(keywords ? {keywords} : {}),
+                            timestamp: new Date,
+                            enabled: listenerListening && !blockingThisUser && !blockingThisChannel,
+                        });
                     }
                 }
             } else {
-                await inviteBack(interaction, requester, requested, server, type, keywords);
+                let blockedChannelIds = [];
+                if (listenedConfig && type === 'text') {
+                    blockedChannelIds = listenedConfig.blocking
+                        .filter(({
+                                     userId,
+                                     channelId
+                                 }) => (userId === requester.id || userId === undefined) && channelId !== undefined)
+                        .map(({channelId}) => <string>channelId);
+                }
+                const blockedChannelsForEveryone = configServer.channelBlacklist;
+
+                await subscribeModel.create({
+                    serverId: invite.serverId,
+                    listenerId: invite.requesterId,
+                    listenedId: invite.requestedId,
+                    ...(keywords ? {keywords} : {}),
+                    timestamp: new Date,
+                    enabled: listenerListening && !blockingThisUser
+                });
+                if (keywords) {
+                    const existingSubscribesOnSpecificChannel = await subscribeModel.find({
+                        serverId: server.id,
+                        listenerId: invite.requesterId,
+                        listenedId: invite.requestedId,
+                        channelId: {$exists: true}
+                    });
+                    for (const subscribe of existingSubscribesOnSpecificChannel) {
+                        if (compareKeyWords(keywords ?? undefined, subscribe.keywords))
+                            subscribe.remove();
+                    }
+                } else if (type === "text") {
+                    await subscribeModel.deleteMany({
+                        serverId: server.id,
+                        listenerId: invite.requesterId,
+                        listenedId: invite.requestedId,
+                        channelId: {$exists: true},
+                        $or: [
+                            {
+                                $and: [
+                                    {channelId: {$nin: blockedChannelIds}},
+                                    {channelId: {$nin: blockedChannelsForEveryone}}
+                                ]
+                            },
+                            {keywords: {$exists: false}}
+                        ]
+                    });
+                }
             }
+            try {
+                await requester.send((requested.nickname ?? requested.user.username) + " a accepté(e) votre invitation sur '" + server.name + "'" + (!listenerListening ? " (Attention votre écoute n'est pas activée sur ce serveur)" : ""));
+            } catch (_) {
+            }
+
+            const [backSubscribeAllChannels, existingBackInviteAllChannels] = await Promise.all([
+                subscribeModel.findOne({
+                    serverId: server.id,
+                    listenerId: requested.id,
+                    listenedId: requester.id,
+                    ...(type === "text" ? {channelId: {$exists: false}} : {})
+                }),
+                inviteModel.findOne({
+                    serverId: server.id,
+                    requesterId: requested.id,
+                    requestedId: requester.id,
+                    ...(type === "text" ? {"channelsId.0": {$exists: false}} : {})
+                })
+            ]);
+
+            await interaction.editReply({content: "Invitation acceptée"});
+
+            if (blackListedChannels.length > 0) {
+                await interaction.followUp({
+                    embeds: [
+                        new MessageEmbed()
+                            .addField(
+                                "L'invitation n'a pas pus s'appliquer sur les channels suivant, car blacklistés :",
+                                blackListedChannels.map(channel =>
+                                    "<#" + channel.id + ">"
+                                ).join("\n")
+                            )
+                    ]
+                })
+            }
+
+            if (
+                existingBackInviteAllChannels === null &&
+                backSubscribeAllChannels === null &&
+                !userBlockingUsTextOrVocal(listenerConfig, requested, type)
+            ) {
+                if (channels) {
+                    const channelsIdForBackInvite: Snowflake[] = [];
+                    for (const channel of <Array<GuildChannel | ThreadChannel>>channels) {
+                        if (
+                            blackListedChannels.some(channelB => channelB.id === channel.id) ||
+                            userBlockingUsOrChannelText(listenerConfig, requester.id, null, null, requested.id, channel.id, false)
+                        )
+                            continue;
+                        const existingSubscribe = await subscribeModel.findOne({
+                            serverId: server.id,
+                            listenerId: requested.id,
+                            listenedId: requester.id,
+                            channelId: channel.id
+                        });
+                        if (existingSubscribe === null) {
+                            channelsIdForBackInvite.push(channel.id)
+                        }
+                    }
+                    if (channelsIdForBackInvite.length > 0) {
+                        const existingBackInvite = await inviteModel.findOne({
+                            serverId: server.id,
+                            requesterId: requested.id,
+                            requestedId: requester.id,
+                            channelsId: {$all: channelsIdForBackInvite}
+                        });
+                        if (existingBackInvite === null) {
+                            await inviteBack(interaction, requester, requested, server, type, keywords, channelsIdForBackInvite);
+                        }
+                    }
+                } else {
+                    await inviteBack(interaction, requester, requested, server, type, keywords);
+                }
+            }
+
+        } else {
+            try {
+                await requester.send((requested.nickname ?? requested.user.username) + " a refusé(e) votre invitation sur '" + server.name + "'");
+            } catch (_) {
+            }
+            await interaction.editReply({content: "Invitation refusée"});
         }
 
-    } else {
-        try {
-            await requester.send((requested.nickname ?? requested.user.username) + " a refusé(e) votre invitation sur '" + server.name + "'");
-        } catch (_) {
-        }
-        await interaction.editReply({content: "Invitation refusée"});
+        await inviteModel.deleteMany({
+            inviteId: invite.inviteId
+        });
+
+        return true;
+
+    } catch (e) {
+        throw new CustomError(<Error>e, {
+            from: type === "text" ? "textInvite" : "vocalInvite",
+            buttonData: invite
+        })
     }
-
-    await inviteModel.deleteMany({
-        inviteId: invite.inviteId
-    });
-
-    return true;
 }
 
 

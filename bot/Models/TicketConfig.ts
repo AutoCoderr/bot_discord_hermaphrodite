@@ -4,13 +4,21 @@ import {Snowflake} from "discord.js";
 
 const db = connect();
 
+export interface IMessageToListen {
+    _id?: string,
+    channelId: Snowflake,
+    messageId: Snowflake,
+    emoteName?: string,
+    emoteId?: Snowflake
+}
+
 export interface ITicketConfig {
     _id?: string;
     enabled: boolean;
     categoryId: null|Snowflake;
     moderatorId?: null|Snowflake;
     blacklist: Array<Snowflake>;
-    messagesToListen?: Array<{_id?: string, channelId: Snowflake, messageId: Snowflake, emoteName?: string, emoteId?: Snowflake}>;
+    messagesToListen?: Array<IMessageToListen>;
     ticketChannels?: Array<{_id?: string, channelId: Snowflake, userId: Snowflake}>;
     serverId: Snowflake;
 }

@@ -10,6 +10,7 @@ import {
     TextChannel,
     User
 } from "discord.js";
+import CustomError from "../logging/CustomError";
 
 export default class ConfigWelcome extends Command {
     static display = true;
@@ -123,18 +124,19 @@ export default class ConfigWelcome extends Command {
     static async listenJoinsToWelcome(message: Message) {
         if (message.author.bot || message.type !== "GUILD_MEMBER_JOIN" || !message.guild)
             return;
-
         const welcomeMessage: IWelcomeMessage = await WelcomeMessage.findOne({
             serverId: message.guild.id,
             enabled: true
         });
-        if (welcomeMessage != null) {
-            try {
+        try {
+            if (welcomeMessage != null) {
                 await message.author.send(welcomeMessage.message);
-            } catch (e) {// @ts-ignore
-                if (e.message == "Cannot send messages to this user") {
-                    message.channel.send("<@" + message.author.id + "> \n\n" + welcomeMessage.message);
-                }
+            }
+        } catch (e) {//@ts-ignore
+            if (e.message == "Cannot send messages to this user" && welcomeMessage != null) {
+                message.channel.send("<@" + message.author.id + "> \n\n" + welcomeMessage.message);
+            } else {
+                throw new CustomError(<Error>e, {welcomeMessage});
             }
         }
     }

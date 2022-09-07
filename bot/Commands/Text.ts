@@ -45,6 +45,8 @@ export default class Text extends Command {
     static description = "Pour recevoir des notifications lorsque les personnes abonnées parlent sur un channel textuel";
     static commandName = "text";
 
+    static customCommand = false;
+
     static slashCommandIdByGuild: {[guildId: string]: string} = {};
 
     static argsModel = {
@@ -127,12 +129,18 @@ export default class Text extends Command {
                             "Vous ne pouvez renseigner que des channels textuels, et vous ne pouvez pas renseigner plusieurs fois le même channel"
                     }
             },
+            subs: {
+                referToSubCommands: ['status'],
+                required: false,
+                type: "boolean",
+                description: "Obtenir plus de détails concernant les écoutes : subs"
+            },
             keyWords: {
                 referToSubCommands: ['add', 'remove'],
                 required: false,
                 type: 'string',
                 multi: true,
-                description: "Le ou les mots clé à définir, retirer, ou ajoiter"
+                description: "Le ou les mots clé à définir, retirer, ou ajouter"
             },
             time: {
                 referToSubCommands: ['limit', 'mute'],
@@ -149,12 +157,6 @@ export default class Text extends Command {
                             {value: "Vous n'avez pas respecté la syntaxe"}
                     )
                 })
-            },
-            subs: {
-                referToSubCommands: ['status'],
-                required: false,
-                type: "boolean",
-                description: "Obtenir plus de détails concernant les écoutes : subs"
             }
         }
     };
@@ -1220,7 +1222,7 @@ export default class Text extends Command {
                         requested: user
                     });
 
-                    Text.sendInvite(this.member, user, <Guild>this.guild, undefined, keyWords.length > 0 ? keyWords : undefined);
+                    await Text.sendInvite(this.member, user, <Guild>this.guild, undefined, keyWords.length > 0 ? keyWords : undefined);
 
                     continue;
                 }
@@ -1308,7 +1310,7 @@ export default class Text extends Command {
                         requested: user,
                         channels: channelsToInvite
                     })
-                    Text.sendInvite(this.member, user, <Guild>this.guild, channelsToInvite.map(channel => channel.id), keyWords.length > 0 ? keyWords : undefined);
+                    await Text.sendInvite(this.member, user, <Guild>this.guild, channelsToInvite.map(channel => channel.id), keyWords.length > 0 ? keyWords : undefined);
                 }
             }
         }

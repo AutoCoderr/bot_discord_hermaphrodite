@@ -14,6 +14,8 @@ import Discord, {
 import {splitFieldsEmbed} from "../Classes/OtherFunctions";
 import client from "../client";
 import {checkTypes} from "../Classes/TypeChecker";
+import reportError from "../logging/reportError";
+import CustomError from "../logging/CustomError";
 
 
 const toDenyToEveryone: Array<PermissionString> = ['SEND_MESSAGES','VIEW_CHANNEL','SEND_TTS_MESSAGES', 'MANAGE_CHANNELS', 'MANAGE_MESSAGES'];
@@ -504,7 +506,7 @@ export default class ConfigTicket extends Command {
 
                 const reaction = collected.first();
                 if (reaction)
-                    reaction.users.remove(userWhoReact);
+                    await reaction.users.remove(userWhoReact);
 
                 let category: CategoryChannel;
 
@@ -547,14 +549,14 @@ export default class ConfigTicket extends Command {
                                     }
                                 ] : [])
                             ]);
-                            channel.send((moderatorRole ? '<@&' + moderatorRole.id + '> ! ' : '') + "Nouveau ticket de <@" + userWhoReact.id + ">");
+                            await channel.send((moderatorRole ? '<@&' + moderatorRole.id + '> ! ' : '') + "Nouveau ticket de <@" + userWhoReact.id + ">");
                             if (ticketChannel)
                                 ticketChannel.channelId = channel.id;
                             else
                                 ticketConfig.ticketChannels.push({channelId: channel.id, userId: userWhoReact.id});
 
                             //@ts-ignore
-                            ticketConfig.save();
+                            await ticketConfig.save();
 
                         } else
                             userWhoReact.send("Vous ne pouvez créer de ticket sur le serveur "+guild.name+" car vous êtes dans la blacklist").catch(() => {});
@@ -563,8 +565,13 @@ export default class ConfigTicket extends Command {
                 ConfigTicket.listenMessageTicket(message, emoteKey, _idConfigTicket, _idMessageToListen);
             })
             .catch(e => {
-                console.log("Catch event in listenMessageTicket() function ");
-                console.error(e);
+                reportError(new CustomError(e, {
+                    from: "initTicketMessageListening",
+                    message,
+                    guild: message.guild??undefined,
+                    channel: message.channel??undefined,
+                    idConfigTicket: _idConfigTicket
+                }))
             });
     }
 
@@ -573,29 +580,37 @@ export default class ConfigTicket extends Command {
         const ticketConfigs: Array<ITicketConfig> = await TicketConfig.find();
 
         for (const ticketConfig of ticketConfigs) {
-            const guild = client.guilds.cache.get(ticketConfig.serverId);
-            if (!guild) {
-                console.log("server "+ticketConfig.serverId+" does not exist");
-                await TicketConfig.deleteOne({_id: ticketConfig._id});
-                continue;
-            }
-            let category: CategoryChannel|undefined = undefined;
-            if (ticketConfig.categoryId == undefined || (category = <CategoryChannel>guild.channels.cache.get(ticketConfig.categoryId)) == undefined) {
-                console.log("Category of "+guild.name+" is not defined or not found");
-            }
-
-            if (!(ticketConfig.messagesToListen instanceof Array)) continue;
-            for (let i=0;i<ticketConfig.messagesToListen.length;i++) {
-                const listening = ticketConfig.messagesToListen[i];
-                const exist = await ConfigTicket.listeningMessageExist(listening,guild);
-                if (exist) {
-                    ConfigTicket.listenMessageTicket(exist.message,exist.emote instanceof Emoji ? exist.emote.id : exist.emote, ticketConfig._id,listening._id);
-                } else {
-                    ticketConfig.messagesToListen.splice(i,1);
-                    i -= 1;
+            try {
+                const guild = client.guilds.cache.get(ticketConfig.serverId);
+                if (!guild) {
+                    console.log("server " + ticketConfig.serverId + " does not exist");
+                    await TicketConfig.deleteOne({_id: ticketConfig._id});
+                    continue;
                 }
-            }// @ts-ignore
-            ticketConfig.save();
+                let category: CategoryChannel | undefined = undefined;
+                if (ticketConfig.categoryId == undefined || (category = <CategoryChannel>guild.channels.cache.get(ticketConfig.categoryId)) == undefined) {
+                    console.log("Category of " + guild.name + " is not defined or not found");
+                }
+
+                if (!(ticketConfig.messagesToListen instanceof Array)) continue;
+                for (let i = 0; i < ticketConfig.messagesToListen.length; i++) {
+                    const listening = ticketConfig.messagesToListen[i];
+                    try {
+                        const exist = await ConfigTicket.listeningMessageExist(listening, guild);
+                        if (exist) {
+                            ConfigTicket.listenMessageTicket(exist.message, exist.emote instanceof Emoji ? exist.emote.id : exist.emote, ticketConfig._id, listening._id);
+                        } else {
+                            ticketConfig.messagesToListen.splice(i, 1);
+                            i -= 1;
+                        }
+                    } catch (e) {
+                        throw new CustomError(<Error>e, {listening});
+                    }
+                }// @ts-ignore
+                await ticketConfig.save();
+            } catch (e) {
+                throw new CustomError(<Error|CustomError>e, {ticketConfig});
+            }
         }
         console.log("All ticketing message listened");
     }

@@ -7,7 +7,7 @@ import {
     ApplicationCommand,
     CommandInteractionOptionResolver,
     Guild,
-    GuildMember,
+    GuildMember, InteractionReplyOptions,
     MessageEmbed,
     MessageOptions,
     MessagePayload, TextChannel,
@@ -16,10 +16,11 @@ import {
 import {checkTypes} from "./TypeChecker";
 import {extractTypes} from "./TypeExtractor";
 import {getCustomType, getSlashTypeGetterName} from "../slashCommands";
+import CustomError from "../logging/CustomError";
 
 const validModelCommands = {};
 
-export interface responseResultsType extends Array<string | MessagePayload | MessageOptions>{}
+export interface responseResultsType extends Array<string | MessagePayload | InteractionReplyOptions>{}
 
 export interface responseType {
     success: boolean;
@@ -69,7 +70,7 @@ export default class Command {
         return this.writtenCommand.split(" ")[0].toLowerCase() == config.command_prefix+this.commandName.toLowerCase();
     }
 
-    async executeCommand(bot, slashCommand = false): Promise<false| { result: boolean|Array<string | MessagePayload | MessageOptions>, callback?: Function }> {
+    async executeCommand(bot, slashCommand = false): Promise<false| { result: Array<string | MessagePayload | InteractionReplyOptions>, callback?: Function }> {
         if (this.writtenCommand === null || await this.match()) {
 
             if (this.writtenCommand && !(await this.checkPermissions()))
@@ -94,7 +95,10 @@ export default class Command {
                 args = result;
             }
 
-            const {success, result, callback} = await this.action(args, bot);
+            const {success, result, callback} = await this.action(args, bot)
+                .catch(e => {
+                    throw new CustomError(e, {commandArguments: args});
+                })
 
             if (success && this.writtenCommand !== null)
                 this.saveHistory();
@@ -326,6 +330,80 @@ export default class Command {
         return true;
     }
 
+    getSlashRawArguments(): null|{[key: string]: any} {
+        if (this.slashCommandOptions === null)
+            return null;
+        const rawArguments = {};
+        const additionalParams = {
+            subCommandGroupSet: false
+        };
+        for (const attr in this.argsModel) {
+            if (attr[0] == '$') {
+                if (attr == '$argsByOrder') {
+                    for (const argModel of this.argsModel[attr]) {
+                        this.getRawArgumentFromModel(argModel.field,argModel,additionalParams,rawArguments);
+                    }
+                } else {
+                    for (const [attr2,argModel] of Object.entries(this.argsModel[attr])) {
+                        this.getRawArgumentFromModel(attr2,argModel,additionalParams,rawArguments);
+                    }
+                }
+            } else {
+                this.getRawArgumentFromModel(attr,this.argsModel[attr],additionalParams,rawArguments);
+            }
+        }
+        return rawArguments;
+    }
+
+    getRawArgumentFromModel(attr, argModel,additionalParams,rawArguments) {
+        if (this.slashCommandOptions === null)
+            return null;
+        if (!argModel.isSubCommand)
+            rawArguments[attr] = this.slashCommandOptions[getSlashTypeGetterName(argModel)](attr.toLowerCase());
+        else {
+            const subCommand = this.slashCommandOptions.getSubcommand();
+            const subCommandGroup = this.slashCommandOptions.getSubcommandGroup(false);
+
+            if ((subCommandGroup === null || additionalParams.subCommandGroupSet) && additionalParams.subCommand !== null && Object.keys(argModel.choices).includes(subCommand)) {
+                rawArguments[attr] = subCommand;
+            } else if (subCommandGroup !== null && Object.keys(argModel.choices).includes(subCommandGroup)) {
+                additionalParams.subCommandGroupSet = true
+                rawArguments[attr] = subCommandGroup;
+            }
+        }
+    }
+
+    async getArgsFromSlashOptions(): Promise<{ success: boolean, result: {[attr: string]: any}|responseResultsType }> {
+        if (this.slashCommandOptions === null) return {success: false, result: {}};
+        let args: {[name: string]: any} = {};
+        let fails: Array<any> = [];
+        let failsExtract: Array<any> = [];
+
+        const additionalParams = {
+            subCommandGroupSet: false
+        };
+
+        for (const attr in this.argsModel) {
+            if (attr[0] == '$') {
+                if (attr == '$argsByOrder') {
+                    for (const argModel of this.argsModel[attr]) {
+                        await this.getSlashArgFromModel(argModel.field,argModel,args, fails, failsExtract, additionalParams);
+                    }
+                } else {
+                    for (const [attr2,argModel] of Object.entries(this.argsModel[attr])) {
+                        await this.getSlashArgFromModel(attr2,argModel,args, fails, failsExtract, additionalParams);
+                    }
+                }
+            } else {
+                await this.getSlashArgFromModel(attr,this.argsModel[attr],args, fails, failsExtract, additionalParams);
+            }
+        }
+        if (fails.length > 0 || failsExtract.length > 0) {
+            return {success: false, result: this.displayHelp(false, fails, failsExtract, args)};
+        }
+        return {success: true, result: args};
+    }
+
     async getSlashArgFromModel(attr: string, argModel: any, args: {[name: string]: any}, fails: Array<any>, failsExtract: Array<any>, additionalParams: {[key: string]: any}) {
         if (this.slashCommandOptions === null) return;
         if (!argModel.isSubCommand) {
@@ -386,37 +464,6 @@ export default class Command {
                 args[attr] = subCommandGroup;
             }
         }
-    }
-
-    async getArgsFromSlashOptions(): Promise<{ success: boolean, result: {[attr: string]: any}|responseResultsType }> {
-        if (this.slashCommandOptions === null) return {success: false, result: {}};
-        let args: {[name: string]: any} = {};
-        let fails: Array<any> = [];
-        let failsExtract: Array<any> = [];
-
-        const additionalParams = {
-            subCommandGroupSet: false
-        };
-
-        for (const attr in this.argsModel) {
-            if (attr[0] == '$') {
-                if (attr == '$argsByOrder') {
-                    for (const argModel of this.argsModel[attr]) {
-                        await this.getSlashArgFromModel(argModel.field,argModel,args, fails, failsExtract, additionalParams);
-                    }
-                } else {
-                    for (const [attr2,argModel] of Object.entries(this.argsModel[attr])) {
-                        await this.getSlashArgFromModel(attr2,argModel,args, fails, failsExtract, additionalParams);
-                    }
-                }
-            } else {
-                await this.getSlashArgFromModel(attr,this.argsModel[attr],args, fails, failsExtract, additionalParams);
-            }
-        }
-        if (fails.length > 0 || failsExtract.length > 0) {
-            return {success: false, result: this.displayHelp(false, fails, failsExtract, args)};
-        }
-        return {success: true, result: args};
     }
 
     parseCommand(): any {
@@ -686,7 +733,7 @@ export default class Command {
                                 continue;
                         }
 
-                        if (args[i] != undefined && (
+                        if (args[i] !== undefined && (
                             typeof(argType) == "string" && (
                                 argType == "string" || checkTypes[argType](args[i]) || (argType == "boolean" && args[i] === attr)
                             ))
@@ -743,7 +790,7 @@ export default class Command {
         return {success: true, result: out};
     }
 
-    response(success: boolean, result: responseResultsType|string | MessagePayload | MessageOptions, callback: null|Function = null): responseType {
+    response(success: boolean, result: responseResultsType|string | MessagePayload | InteractionReplyOptions, callback: null|Function = null): responseType {
         return {
             success,
             result: result instanceof Array ? result : [result],

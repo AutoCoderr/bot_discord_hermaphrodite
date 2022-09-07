@@ -55,20 +55,13 @@ export const extractTypes = {
     messages: async (field, command: Command, mentionedChannel: GuildChannel|BaseGuildTextChannel|boolean):  Promise<Array<Message>|false> => {
         if (!(mentionedChannel instanceof BaseGuildTextChannel))
             return false;
-        const messages: Array<Message> = [];
-        let messageId = "";
-        for (let i=0;i<field.length;i++) {
-            if (field[i] !== " " && field[i] != ",") {
-                messageId += field[i];
-            }
-            if (messageId.length == 18) {
+        const messages: Array<Message|false> = await Promise.all(field.split(",")
+            .map(messageId => messageId.trim())
+            .map(async messageId => {
                 const AMessage = await extractTypes.message(messageId, command, mentionedChannel);
-                if (!AMessage) return false;
-                messages.push(AMessage);
-                messageId = "";
-            }
-        }
-        return messages;
+                return AMessage ? AMessage : false;
+            }));
+        return messages.includes(false) ? false : <Array<Message>>messages;
     },
     listenerReactMessage: async (field, command: Command): Promise<{channel: GuildChannel, message: Message}|false> => {
         const channelMention = field.split("/")[0];

@@ -1,16 +1,14 @@
 import client from "./client";
 import {
-    ApplicationCommand, ApplicationCommandDataResolvable,
+    ApplicationCommand, ApplicationCommandDataResolvable, CommandInteraction,
     Guild,
-    Interaction, InteractionReplyOptions, MessageOptions, MessagePayload,
-    Role
+    Interaction, InteractionReplyOptions, MessagePayload
 } from "discord.js";
 import {ApplicationCommandOptionTypes} from "discord.js/typings/enums";
 import Command from "./Classes/Command";
 import {existingCommands} from "./Classes/CommandsDescription";
 import {getterNameBySlashType, slashCommandsTypeDefinitions} from "./Classes/slashCommandsTypeDefinitions";
-import Permissions, {IPermissions} from "./Models/Permissions";
-import config from "./config";
+import CustomError from "./logging/CustomError";
 
 interface optionCommandType {
     type?: ApplicationCommandOptionTypes.BOOLEAN | ApplicationCommandOptionTypes.CHANNEL | ApplicationCommandOptionTypes.INTEGER | ApplicationCommandOptionTypes.MENTIONABLE | ApplicationCommandOptionTypes.NUMBER | ApplicationCommandOptionTypes.ROLE | ApplicationCommandOptionTypes.STRING | ApplicationCommandOptionTypes.SUB_COMMAND | ApplicationCommandOptionTypes.SUB_COMMAND_GROUP | ApplicationCommandOptionTypes.USER;
@@ -26,14 +24,17 @@ interface optionCommandType {
 let slashCommandsByGuildAndName: { [guildId: string]: { [commandName: string]: ApplicationCommand } } = {};
 
 export function initSlashCommands() {
-
     const guilds: Guild[] = [];
     for (const [, guild] of client.guilds.cache)
         guilds.push(guild);
 
     const slashCommandsDefinition = getSlashCommandsDefinition();
 
-    Promise.all(guilds.map(guild => initSlashCommandsOnGuild(guild, slashCommandsDefinition)));
+    return Promise.all(guilds.map(guild => initSlashCommandsOnGuild(guild, slashCommandsDefinition)
+        .catch(e => {
+            throw new CustomError(e, {guild})
+        })
+    ));
 }
 
 function getSlashCommandsDefinition() {
@@ -210,9 +211,7 @@ async function getAndDisplaySlashCommandsResponse(interaction: Interaction, resp
     }
 }
 
-export async function listenSlashCommands(interaction: Interaction) {
-    if (!interaction.isCommand()) return;
-
+export async function listenSlashCommands(interaction: CommandInteraction) {
     const {commandName, options} = interaction;
 
     for (const CommandClass of <any[]>Object.values(existingCommands)) {
@@ -220,12 +219,15 @@ export async function listenSlashCommands(interaction: Interaction) {
             await interaction.deferReply({
                 ephemeral: true
             });
-            const command = new CommandClass(interaction.channel, interaction.member, interaction.guild, options, 'slash');
+            const command = <Command>(new CommandClass(interaction.channel, interaction.member, interaction.guild, options, 'slash'));
+            try {
+                const response = await command.executeCommand(client, true);
 
-            const response = await command.executeCommand(client, true);
-
-            await getAndDisplaySlashCommandsResponse(interaction, response);
-            return;
+                await getAndDisplaySlashCommandsResponse(interaction, response);
+                return;
+            } catch(e) {
+                throw new CustomError(<Error|CustomError>e, {commandRawArguments: command.getSlashRawArguments()??undefined})
+            }
         }
     }
 }

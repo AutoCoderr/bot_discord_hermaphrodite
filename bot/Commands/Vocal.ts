@@ -557,9 +557,8 @@ export default class Vocal extends Command {
         }
 
         if (action == "status") {
-            let embeds: MessageEmbed[] = [];
-
             if (subs) {
+                let embeds: MessageEmbed[] = [];
 
                 const subscribings: Array<IVocalSubscribe | typeof VocalSubscribe> = await VocalSubscribe.find({
                     serverId: this.guild.id,
@@ -635,77 +634,73 @@ export default class Vocal extends Command {
                         "Vous n'êtes écouté par personne",
                     )
                 }
-
-                if (subscribeds.length === 0 || subscribings.length === 0) {
-                    embeds = [embed, ...embeds];
-                }
-            } else {
-                let fieldLines: string[] = [];
-
-                const now = Math.floor(Date.now() / 1000) * 1000;
-
-                const muted = typeof (ownUserConfig.mutedFor) == "number" &&
-                    ownUserConfig.lastMute instanceof Date &&
-                    now - ownUserConfig.lastMute.getTime() < ownUserConfig.mutedFor;
-
-                let sinceTimeMuted;
-                let remaningTimeMuted;
-                if (muted) {
-                    sinceTimeMuted = extractUTCTime(now - ownUserConfig.lastMute.getTime());
-                    remaningTimeMuted = extractUTCTime(ownUserConfig.mutedFor - now + ownUserConfig.lastMute.getTime());
-                }
-
-                fieldLines.push(muted ? "Vous êtes mute depuis" + showTime(sinceTimeMuted, 'fr_long') +
-                    ".\nIl reste" + showTime(remaningTimeMuted, 'fr_long') + "." : "Vous n'êtes pas mute");
-
-                fieldLines.push((ownUserConfig.limit > 0 ? "Vous avez" + showTime(extractUTCTime(ownUserConfig.limit), 'fr_long') : "Vous n'avez pas") +
-                    " de répit entre chaque notification");
-
-                fieldLines.push("L'écoute est " + (ownUserConfig.listening ? "activée" : "désactivée"));
-
-
-                const nbSubscribings: number = await VocalSubscribe.count({
-                    serverId: this.guild.id,
-                    listenerId: this.member.id
-                })
-
-                fieldLines.push(nbSubscribings == 0 ?
-                    "Vous n'écoutez personne" :
-                    "Vous écoutez " + nbSubscribings + " personne(s), faites '" + config.command_prefix + this.commandName + " status subs' pour plus de détails");
-
-                const nbSubscribeds: number = await VocalSubscribe.count({
-                    serverId: this.guild.id,
-                    listenedId: this.member.id
-                })
-
-                fieldLines.push(nbSubscribeds == 0 ?
-                    "Personne ne vous écoute" :
-                    "Vous êtes écouté par " + nbSubscribeds + " personne(s), faites '" + config.command_prefix + this.commandName + " status subs' pour plus de détails");
-
-                if (ownUserConfig.blocked.users.length + ownUserConfig.blocked.roles.length == 0) {
-                    fieldLines.push("Vous n'avez bloqué aucun utilisateur ni aucun role");
-                }
-
-                embed.addField(
-                    "Status :",
-                    '\n' + fieldLines.join("\n\n")
-                )
-
-                if (ownUserConfig.blocked.users.length > 0) {
-                    embed.addField(
-                        "Les utilisateurs que vous avez bloqué",
-                        ownUserConfig.blocked.users.map(userId => "<@" + userId + ">").join("\n")
-                    );
-                }
-                if (ownUserConfig.blocked.roles.length > 0) {
-                    embed.addField(
-                        "Les roles que vous avez bloqué",
-                        ownUserConfig.blocked.roles.map(userId => "<@&" + userId + ">").join("\n")
-                    );
-                }
+                return this.response(true, {embeds: subscribeds.length === 0 || subscribings.length === 0 ? [embed, ...embeds] : embeds})
             }
 
-            return this.response(true, {embeds})
+            let fieldLines: string[] = [];
+
+            const now = Math.floor(Date.now() / 1000) * 1000;
+
+            const muted = typeof (ownUserConfig.mutedFor) == "number" &&
+                ownUserConfig.lastMute instanceof Date &&
+                now - ownUserConfig.lastMute.getTime() < ownUserConfig.mutedFor;
+
+            let sinceTimeMuted;
+            let remaningTimeMuted;
+            if (muted) {
+                sinceTimeMuted = extractUTCTime(now - ownUserConfig.lastMute.getTime());
+                remaningTimeMuted = extractUTCTime(ownUserConfig.mutedFor - now + ownUserConfig.lastMute.getTime());
+            }
+
+            fieldLines.push(muted ? "Vous êtes mute depuis" + showTime(sinceTimeMuted, 'fr_long') +
+                ".\nIl reste" + showTime(remaningTimeMuted, 'fr_long') + "." : "Vous n'êtes pas mute");
+
+            fieldLines.push((ownUserConfig.limit > 0 ? "Vous avez" + showTime(extractUTCTime(ownUserConfig.limit), 'fr_long') : "Vous n'avez pas") +
+                " de répit entre chaque notification");
+
+            fieldLines.push("L'écoute est " + (ownUserConfig.listening ? "activée" : "désactivée"));
+
+
+            const nbSubscribings: number = await VocalSubscribe.count({
+                serverId: this.guild.id,
+                listenerId: this.member.id
+            })
+
+            fieldLines.push(nbSubscribings == 0 ?
+                "Vous n'écoutez personne" :
+                "Vous écoutez " + nbSubscribings + " personne(s), faites '" + config.command_prefix + this.commandName + " status subs' pour plus de détails");
+
+            const nbSubscribeds: number = await VocalSubscribe.count({
+                serverId: this.guild.id,
+                listenedId: this.member.id
+            })
+
+            fieldLines.push(nbSubscribeds == 0 ?
+                "Personne ne vous écoute" :
+                "Vous êtes écouté par " + nbSubscribeds + " personne(s), faites '" + config.command_prefix + this.commandName + " status subs' pour plus de détails");
+
+            if (ownUserConfig.blocked.users.length + ownUserConfig.blocked.roles.length == 0) {
+                fieldLines.push("Vous n'avez bloqué aucun utilisateur ni aucun role");
+            }
+
+            embed.addField(
+                "Status :",
+                '\n' + fieldLines.join("\n\n")
+            )
+
+            if (ownUserConfig.blocked.users.length > 0) {
+                embed.addField(
+                    "Les utilisateurs que vous avez bloqué",
+                        ownUserConfig.blocked.users.map(userId => "<@" + userId + ">").join("\n")
+                );
+            }
+            if (ownUserConfig.blocked.roles.length > 0) {
+                embed.addField(
+                    "Les roles que vous avez bloqué",
+                        ownUserConfig.blocked.roles.map(userId => "<@&" + userId + ">").join("\n")
+                );
+            }
+            return this.response(true, {embeds: [embed]});
         }
 
         return this.response(false, "Vous n'avez rentré aucune option");
@@ -783,7 +778,6 @@ export default class Vocal extends Command {
         const allowedUsers: { [id: string]: boolean } = {};
 
         for (const vocalSubscribe of vocalSubscribes) {
-
             if (Vocal.usersWhoAreOnVocal[vocalSubscribe.listenerId] && Vocal.usersWhoAreOnVocal[vocalSubscribe.listenerId].id === newState.channelId)
                 continue;
 

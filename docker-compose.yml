@@ -2,8 +2,10 @@ version: '3'
 services:
   bot:
     build: ./docker/bot
+    restart: always
     volumes:
       - ./bot:/bot
+      - ./logs:/logs
     working_dir: /bot
     depends_on:
       - mongodb

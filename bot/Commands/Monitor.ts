@@ -13,6 +13,7 @@ import config from "../config";
 import MonitoringMessage, {IMonitoringMessage} from "../Models/MonitoringMessage";
 import {splitFieldsEmbed} from "../Classes/OtherFunctions";
 import client from "../client";
+import CustomError from "../logging/CustomError";
 
 interface messageChannelAndGuild {
     message: Message;
@@ -67,7 +68,7 @@ export default class Monitor extends Command {
                 client.on('presenceUpdate',(oldPresence, newPresence) =>
                     (oldPresence instanceof Presence && newPresence instanceof Presence &&
                         (oldPresence.status == "online" || newPresence.status == "online") &&
-                        oldPresence.status != newPresence.status)  && callback(newPresence.guild))
+                        oldPresence.status != newPresence.status) && callback(newPresence.guild))
             }
         },
         roleMembersCount: {
@@ -446,11 +447,15 @@ export default class Monitor extends Command {
         console.log("Init all monitoring event listeners");
         const monitoringMessages: Array<IMonitoringMessage> = await MonitoringMessage.find();
         for (const monitoringMessage of monitoringMessages) {
-            const exist = await this.checkMonitoringMessageExist(monitoringMessage);
-            if (exist) {
-                this.startMonitoringMessageEvent(monitoringMessage);
-                this.refreshMonitor(monitoringMessage,exist);
-                if (Object.keys(this.listeneds).length == this.nbListeners) break;
+            try {
+                const exist = await this.checkMonitoringMessageExist(monitoringMessage);
+                if (exist) {
+                    this.startMonitoringMessageEvent(monitoringMessage);
+                    await this.refreshMonitor(monitoringMessage, exist);
+                    if (Object.keys(this.listeneds).length == this.nbListeners) break;
+                }
+            } catch (e) {
+                throw new CustomError(<Error>e, {monitoringMessage});
             }
         }
         console.log("All monitorings listened");
