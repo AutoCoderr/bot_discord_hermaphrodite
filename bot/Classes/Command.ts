@@ -1,5 +1,4 @@
 import config from "../config";
-import * as Discord from "discord.js";
 import {addMissingZero, splitFieldsEmbed} from "./OtherFunctions";
 import History, {IHistory} from "../Models/History";
 import {isNumber} from "./OtherFunctions";
@@ -8,10 +7,8 @@ import {
     CommandInteractionOptionResolver,
     Guild,
     GuildMember, InteractionReplyOptions,
-    MessageEmbed,
-    MessageOptions,
     MessagePayload, TextChannel,
-    User
+    User, EmbedBuilder, EmbedField
 } from "discord.js";
 import {checkTypes} from "./TypeChecker";
 import {extractTypes} from "./TypeExtractor";
@@ -74,7 +71,7 @@ export default class Command {
         if (this.writtenCommand === null || await this.match()) {
 
             if (this.writtenCommand && !(await this.checkPermissions()))
-                return {result: [{ embeds: [new Discord.MessageEmbed()
+                return {result: [{ embeds: [new EmbedBuilder()
                             .setColor('#0099ff')
                             .setTitle('Permission denied')
                             .setDescription("Vous n'avez pas le droit d'executer la commande '" + this.commandName + "'")
@@ -112,7 +109,7 @@ export default class Command {
             errors = [errors];
         }
         const commandName = this.commandName;
-        let Embed = new Discord.MessageEmbed()
+        let Embed = new EmbedBuilder()
             .setColor('#0099ff')
             .setTitle('Erreur sur la commande '+commandName)
             .setDescription("Il y a plusieurs erreurs sur cette commande")
@@ -130,8 +127,8 @@ export default class Command {
 
     displayHelp(displayHelp = true, fails: null|Array<any> = null, failsExtract: null|Array<any> = null, args: null|{[attr: string]: any} = null): responseResultsType {
         const commandName = this.commandName;
-        let embeds: Array<MessageEmbed> = [
-            new MessageEmbed()
+        let embeds: Array<EmbedBuilder> = [
+            new EmbedBuilder()
                 .setTitle("Aide pour la commande "+commandName)
                 .setColor('#0099ff')
         ];
@@ -151,7 +148,7 @@ export default class Command {
                         }
                     }
                 }
-                embeds = [...embeds, ...splitFieldsEmbed(25, subFields, (Embed: MessageEmbed, partNb) => {
+                embeds = [...embeds, ...splitFieldsEmbed(25, subFields, (Embed: EmbedBuilder, partNb) => {
                     if (partNb == 1) {
                         Embed.setTitle("Arguments manquants ou invalides :");
                     }
@@ -174,18 +171,19 @@ export default class Command {
                     }
                 }
 
-                embeds = [...embeds, ...splitFieldsEmbed(25, subFields, (Embed: MessageEmbed, partNb) => {
+                embeds = [...embeds, ...splitFieldsEmbed(25, subFields, (Embed: EmbedBuilder, partNb) => {
                     if (partNb == 1) {
                         Embed.setTitle("Données introuvables");
                     }
                 })];
             }
         } else {
-            const subFields: Array<{name: string, value: string}> = [];
+            const subFields: EmbedField[] = [];
             for (const attr in this.argsModel) {
                 if (attr[0] != "$") {
                     const field = this.argsModel[attr];
                     subFields.push({
+                        inline: false,
                         name: field.fields.join(", "),
                         value: field.description + " | ( "+(field.default != undefined ? "Par défaut : "+field.default+" ; " : "")+"type attendu : " + (field.type ?? field.types) + " )"
                     })
@@ -194,6 +192,7 @@ export default class Command {
             if (this.argsModel.$argsByOrder) {
                 for (const arg of this.argsModel.$argsByOrder) {
                     subFields.push({
+                        inline: false,
                         name: arg.field,
                         value: arg.description + " | ( "+(arg.default != undefined ? "Par défaut : "+arg.default+" ; " : "")+"type attendu : " + (arg.type ?? arg.types) + " )"
                     });
@@ -202,13 +201,14 @@ export default class Command {
                 for (const attr in this.argsModel.$argsByType) {
                     const field = this.argsModel.$argsByType[attr];
                     subFields.push({
+                        inline: false,
                         name: attr,
                         value: field.description + " | ( "+(field.default != undefined ? "Par défaut : "+field.default+" ; " : "")+"type attendu : " + (field.type ?? field.types) + " )"
                     });
                 }
             }
 
-            embeds = [...embeds, ...splitFieldsEmbed(25, subFields, (Embed: MessageEmbed, partNb) => {
+            embeds = [...embeds, ...splitFieldsEmbed(25, subFields, (Embed: EmbedBuilder, partNb) => {
                 if (partNb == 1) {
                     Embed.setTitle("Champs");
                 }
@@ -218,26 +218,27 @@ export default class Command {
 
 
         if (this.argsModel.$argsByOrder !== undefined && this.argsModel.$argsByOrder.length > 1)
-            embeds[embeds.length-1].addField(
-                "Ordre des arguments :",
-                config.command_prefix+this.commandName+" "+this.argsModel.$argsByOrder.map(model => "<"+model.field+'>').join(" ")
-            );
+            embeds[embeds.length-1].addFields({
+                name: "Ordre des arguments :",
+                value: config.command_prefix+this.commandName+" "+this.argsModel.$argsByOrder.map(model => "<"+model.field+'>').join(" ")
+            });
 
         if (displayHelp)
             embeds.push(this.help())
         else if (this.commandOrigin === "custom")
-            embeds[embeds.length-1].addField(
-                "Voir l'aide : ",
-                "Tapez : "+config.command_prefix+this.commandName+" -h"
-            );
+            embeds[embeds.length-1].addFields({
+                name: "Voir l'aide : ",
+                value: "Tapez : "+config.command_prefix + this.commandName + " -h"
+            });
         return [{embeds}];
     }
 
-    getArgsList(args: Array<any>) {
+    getArgsList(args: Array<any>): EmbedField[] {
         return args
             .filter(arg => typeof(arg.errorMessage) != "function")
             .map(arg =>
                 ({
+                    inline: false,
                     name: (arg.fields instanceof Array ? arg.fields.join(", ") : arg.field),
                     value: arg.description + " | ( "+(arg.default != undefined ? "Par défaut : "+arg.default+" ; " : "")+"type attendu : " + (arg.type ?? arg.types) + " )"
                 })
@@ -320,7 +321,7 @@ export default class Command {
         }
         if (!valid) {
             return [{embeds: [
-                    new MessageEmbed()
+                    new EmbedBuilder()
                         .setTitle("Modèle de la commande invalide")
                         .setDescription("Le modèle de la commande est invalide")
                         .setColor('#0099ff')
@@ -798,8 +799,8 @@ export default class Command {
         };
     }
 
-    help(): MessageEmbed { // To be overloaded
-        return new MessageEmbed();
+    help(): EmbedBuilder { // To be overloaded
+        return new EmbedBuilder();
     }
 
     async action(args: any,bot): Promise<responseType> { // To be overloaded

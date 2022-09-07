@@ -7,7 +7,8 @@ import {
     Message, Permissions,
     Role,
     ThreadChannel,
-    VoiceChannel
+    VoiceChannel,
+    ChannelType
 } from "discord.js";
 import client from "../client";
 import {existingCommands} from "./CommandsDescription";
@@ -24,7 +25,7 @@ export const extractTypes = {
         if (!channel)
             return false;
 
-        return userHasChannelPermissions(command.member, channel, 'VIEW_CHANNEL') ? channel : false;
+        return userHasChannelPermissions(command.member, channel, 'ViewChannel') ? channel : false;
     },
     channels: (field, command: Command): Array<GuildChannel|ThreadChannel|VoiceChannel>|false => {
         const channelsSplitted = field.split("<#");
@@ -40,7 +41,7 @@ export const extractTypes = {
     category: (field, command: Command): CategoryChannel|boolean => {
         if (command.guild == null) return false;
         const channel = command.guild.channels.cache.get(field);
-        return (channel instanceof CategoryChannel && channel.type == "GUILD_CATEGORY") ? channel : false;
+        return (channel instanceof CategoryChannel && channel.type == ChannelType.GuildCategory) ? channel : false;
     },
     message: async (field, _: Command, mentionedChannel: BaseGuildTextChannel|boolean): Promise<Message|false> => {
         if (mentionedChannel && mentionedChannel !== true) {

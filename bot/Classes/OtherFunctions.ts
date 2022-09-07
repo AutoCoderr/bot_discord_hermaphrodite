@@ -1,12 +1,11 @@
 import {existingCommands} from "./CommandsDescription";
 import History from "../Models/History";
 import {
-    EmbedFieldData,
+    EmbedBuilder, EmbedField,
     Guild,
     GuildChannel,
     GuildMember,
-    Message,
-    MessageEmbed, PermissionResolvable,
+    Message, PermissionResolvable,
     TextChannel,
     ThreadChannel, User, VoiceChannel
 } from "discord.js";
@@ -116,7 +115,7 @@ export async function getHistory(currentCommand: HistoryCmd | HistoryExec, args:
     return await History.find(where).limit(limit).sort({dateTime: sort});
 }
 
-export async function forEachNotifyOnReact(callback, channel: undefined | GuildChannel, message: undefined | Message, embed: MessageEmbed, command: CancelNotifyOnReact | ListNotifyOnReact) {
+export async function forEachNotifyOnReact(callback, channel: undefined | GuildChannel, message: undefined | Message, embed: EmbedBuilder, command: CancelNotifyOnReact | ListNotifyOnReact) {
     if (command.guild == null) {
         callback(false);
         return;
@@ -222,13 +221,13 @@ export async function forEachNotifyOnReact(callback, channel: undefined | GuildC
 }
 
 export function splitFieldsEmbed(nbByPart: number,
-                                 fields: EmbedFieldData[],
-                                 atEachPart: Function): Array<MessageEmbed> {
-    let Embed: MessageEmbed;
-    let Embeds: Array<MessageEmbed> = [];
+                                 fields: EmbedField[],
+                                 atEachPart: Function): Array<EmbedBuilder> {
+    let Embed: EmbedBuilder;
+    let Embeds: Array<EmbedBuilder> = [];
     for (let i = 0; i < fields.length; i++) {
         if (i % nbByPart == 0) {
-            Embed = new MessageEmbed()
+            Embed = new EmbedBuilder()
                 .setColor('#0099ff')
                 .setTimestamp();
             atEachPart(Embed, (i / nbByPart) + 1);
@@ -242,9 +241,9 @@ export function splitFieldsEmbed(nbByPart: number,
 }
 
 export function splitOneFieldLinesEmbed(title: string, nbByPart: number, lines: string[]) {
-    let embeds: MessageEmbed[] = [];
+    let embeds: EmbedBuilder[] = [];
     for (let i = 0; i < Math.floor(lines.length / nbByPart) + (lines.length % nbByPart != 0 ? 1 : 0); i++) {
-        embeds.push(new MessageEmbed()
+        embeds.push(new EmbedBuilder()
             .setColor('#0099ff')
             .setTimestamp()
             .addFields({

@@ -3,7 +3,7 @@ import { existingCommands } from "../Classes/CommandsDescription";
 import * as Discord from "discord.js";
 import config from "../config";
 import {
-    CommandInteractionOptionResolver,
+    CommandInteractionOptionResolver, EmbedBuilder,
     Guild,
     GuildMember,
     TextChannel,
@@ -21,7 +21,7 @@ export default class Help extends Command {
     }
 
     async action() {
-        let Embed = new Discord.MessageEmbed()
+        let Embed = new EmbedBuilder()
             .setColor('#0099ff')
             .setTitle('Toutes les commandes')
             .setDescription("Liste de toutes les commandes :")
@@ -34,17 +34,17 @@ export default class Help extends Command {
             }
         }
         if (allowedCommands.length == 0) {
-            Embed.addField(
-                "Aucune commande",
-                "On dirait que vous n'avez accès à aucune commande"
-            );
+            Embed.addFields({
+                name: "Aucune commande",
+                value: "On dirait que vous n'avez accès à aucune commande"
+            });
         } else {
             for (let commandName of allowedCommands) {
                 const command = existingCommands[commandName];
-                Embed.addField(
-                    '/'+command.commandName.toLowerCase()+" :",
-                    command.description+"\n/"+command.commandName.toLowerCase()+" -h"+(command.customCommand ? " (Aussi disponible via "+config.command_prefix+command.commandName+" -h)": "")
-                );
+                Embed.addFields({
+                    name: '/' + command.commandName.toLowerCase() + " :",
+                    value: command.description + "\n/" + command.commandName.toLowerCase() + " -h" + (command.customCommand ? " (Aussi disponible via " + config.command_prefix + command.commandName + " -h)" : "")
+                });
             }
         }
         return this.response(true, {embeds: [Embed]});
