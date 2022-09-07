@@ -125,7 +125,7 @@ export async function listenAskInviteBackButtons(interaction: ButtonInteraction,
         return true;
     } catch (e) {
         throw new CustomError(<Error>e, {
-            from: type === "text" ? "textInviteBack" : "vocalInvite",
+            from: type === "text" ? "textInviteBack" : "vocalInviteBack",
             buttonData: inviteBackButton
         })
     }

@@ -90,7 +90,7 @@ export default class CancelNotifyOnReact extends Command {
         let listenings = existingCommands.NotifyOnReact.listenings[this.guild.id];
 
         if (emoteKey === undefined || all) {
-            CancelNotifyOnReact.deleteNotifyOnReactInBdd(this.guild.id, (channel && !all) ? channel.id : null, (message && !all) ? message.id : null)
+            await CancelNotifyOnReact.deleteNotifyOnReactInBdd(this.guild.id, (channel && !all) ? channel.id : null, (message && !all) ? message.id : null)
             await forEachNotifyOnReact(async (found, channel, message: Message, contentMessage, emoteKey) => {
                 if (found) { // @ts-ignore
                     listenings[channel.id][message.id][emoteKey] = false;
@@ -98,7 +98,7 @@ export default class CancelNotifyOnReact extends Command {
                     let emote: Emoji|null = checkTypes.id(emoteKey) ? (<Guild>this.guild).emojis.cache.get(emoteKey)??null : null
                     const reaction: null|MessageReaction = message.reactions.cache.find(reaction => (reaction.emoji.id??reaction.emoji.name) === emoteKey)??null;
                     if (reaction)
-                        reaction.users.remove(<ClientUser>client.user);
+                        await reaction.users.remove(<ClientUser>client.user);
 
                     if (checkTypes.id(emoteKey) && emote === null && reaction) {
                         emote = reaction.emoji;
@@ -113,14 +113,14 @@ export default class CancelNotifyOnReact extends Command {
                 }
             }, all ? undefined : channel, all ? undefined : message, Embed, this);
         } else if (listenings && listenings[channel.id] && listenings[channel.id][message.id] && listenings[channel.id][message.id][emoteKey]) {
-            CancelNotifyOnReact.deleteNotifyOnReactInBdd(this.guild.id,channel.id,message.id,emoteKey);
+            await CancelNotifyOnReact.deleteNotifyOnReactInBdd(this.guild.id,channel.id,message.id,emoteKey);
             listenings[channel.id][message.id][emoteKey] = false;
             if (emote instanceof Emoji) {
-                CancelNotifyOnReact.deleteNotifyOnReactInBdd(this.guild.id,channel.id,message.id,emote.name);
+                await CancelNotifyOnReact.deleteNotifyOnReactInBdd(this.guild.id,channel.id,message.id,emote.name);
             }
             const reaction = message.reactions.cache.find(reaction => reaction.emoji.id === (<Emoji>emote).id);
             if (reaction) {
-                reaction.users.remove(<ClientUser>client.user);
+                await reaction.users.remove(<ClientUser>client.user);
             }
             Embed.addField(
                 "sur '#" + channel.name + "' (" + message.content + ") "+(emote instanceof Emoji ? ':'+emote.name+':' : emoteKey),

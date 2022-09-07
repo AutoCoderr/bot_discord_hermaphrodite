@@ -13,9 +13,25 @@ import {
     VoiceChannel,
     VoiceState
 } from "discord.js";
+import {IStoredNotifyOnReact} from "../Models/StoredNotifyOnReact";
+import {IMonitoringMessage} from "../Models/MonitoringMessage";
+import {IMessageToListen, ITicketConfig} from "../Models/TicketConfig";
+import {IWelcomeMessage} from "../Models/WelcomeMessage";
 
 export interface IReportedErrorData {
-    from?: 'guildCreate'|'initSlashCommands'|'messageCreate'|'customCommand'|'slashCommand'|'vocalInvite'|'textInvite'|'vocalInviteBack'|'textInviteBack'|'voiceConnect',
+    from?: 'guildCreate'|
+        'initSlashCommands'|
+        'messageCreate'|
+        'customCommand'|
+        'slashCommand'|
+        'vocalInvite'|
+        'textInvite'|
+        'vocalInviteBack'|
+        'textInviteBack'|
+        'voiceConnect'|
+        'listeningNotifyOnReact'|
+        'listeningMonitoring'|
+        'initTicketMessageListening',
     guild?: Guild,
     message?: Message,
     user?: User|GuildMember,
@@ -24,11 +40,21 @@ export interface IReportedErrorData {
     command?: string,
     commandId?: Snowflake,
     commandArguments?: {[key: string]: any},
+    commandRawArguments?: {[key: string]: any},
 
     buttonData?: ITextInvite|ITextAskInviteBack|IVocalInvite|IVocalAskInviteBack,
 
     oldVoiceState?: VoiceState,
     newVoiceState?: VoiceState,
+
+    storedNotifyOnReact?: IStoredNotifyOnReact,
+    monitoringMessage?: IMonitoringMessage,
+
+    idConfigTicket?: string,
+    ticketConfig?: ITicketConfig,
+    listening?: IMessageToListen
+
+    welcomeMessage?: IWelcomeMessage
 }
 
 export default class CustomError extends Error {

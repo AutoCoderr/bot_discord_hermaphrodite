@@ -12,11 +12,20 @@ export default function init(bot) {
     client.on('ready', () => {
         getExistingCommands().then(() => {
             //@ts-ignore
-            existingCommands.NotifyOnReact.applyNotifyOnReactAtStarting(bot);
+            existingCommands.NotifyOnReact.applyNotifyOnReactAtStarting(bot)
+                .catch(e => {
+                    reportError(new CustomError(e, {from: "listeningNotifyOnReact"}));
+                })
             //@ts-ignore
-            existingCommands.Monitor.initAllEventListeners();
+            existingCommands.Monitor.initAllEventListeners()
+                .catch(e => {
+                    reportError(new CustomError(e, {from: "listeningMonitoring"}));
+                })
             //@ts-ignore
-            existingCommands.ConfigTicket.initListeningAllMessages();
+            existingCommands.ConfigTicket.initListeningAllMessages()
+                .catch(e => {
+                    reportError(new CustomError(e, {from: "initTicketMessageListening"}));
+                })
 
             initSlashCommands()
                 .catch(e => {
@@ -24,7 +33,7 @@ export default function init(bot) {
                 });
 
             client.on('guildCreate', guild => initSlashCommandsOnGuild(guild).catch(e => {
-                reportError(new CustomError(e, {from: "guildCreate", guild}))
+                reportError(new CustomError(e, {from: "guildCreate", guild}));
             }));
 
             client.on('interactionCreate', async (interaction: Interaction) => {
@@ -48,16 +57,17 @@ export default function init(bot) {
                                 throw new CustomError(e, {
                                     from: 'slashCommand',
                                     command: interaction.commandName,
-                                    commandId: interaction.commandId,
-                                    user: (<GuildMember>interaction.member) ?? interaction.user,
-                                    channel: interaction.channel ?? undefined,
-                                    guild: interaction.guild ?? undefined
+                                    commandId: interaction.commandId
                                 })
                             })
                 } catch(e) {
                     if (interaction.isCommand() || interaction.isButton())
                         await interaction.editReply({content: "Une erreur interne est survenue"})
-                    reportError(<Error|CustomError> e)
+                    reportError(new CustomError(<CustomError>e, {
+                        user: (<GuildMember>interaction.member) ?? interaction.user,
+                        channel: interaction.channel ?? undefined,
+                        guild: interaction.guild ?? undefined
+                    }))
                 }
             });
 

@@ -219,12 +219,15 @@ export async function listenSlashCommands(interaction: CommandInteraction) {
             await interaction.deferReply({
                 ephemeral: true
             });
-            const command = new CommandClass(interaction.channel, interaction.member, interaction.guild, options, 'slash');
+            const command = <Command>(new CommandClass(interaction.channel, interaction.member, interaction.guild, options, 'slash'));
+            try {
+                const response = await command.executeCommand(client, true);
 
-            const response = await command.executeCommand(client, true);
-
-            await getAndDisplaySlashCommandsResponse(interaction, response);
-            return;
+                await getAndDisplaySlashCommandsResponse(interaction, response);
+                return;
+            } catch(e) {
+                throw new CustomError(<Error|CustomError>e, {commandRawArguments: command.getSlashRawArguments()??undefined})
+            }
         }
     }
 }
