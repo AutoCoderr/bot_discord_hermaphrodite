@@ -10,7 +10,6 @@ import TextUserConfig from "../../Models/Text/TextUserConfig";
 import VocalUserConfig from "../../Models/Vocal/VocalUserConfig";
 import History from "../../Models/History";
 import MonitoringMessage from "../../Models/MonitoringMessage";
-import Permissions from "../../Models/Permissions";
 import StoredNotifyOnReact from "../../Models/StoredNotifyOnReact";
 import TicketConfig from "../../Models/TicketConfig";
 import WelcomeMessage from "../../Models/WelcomeMessage";
@@ -146,11 +145,6 @@ async function cleanDatabase() {
             server: ['serverId'],
             channel: ['channelId'],
             message: ['messageId']
-        }),
-        checkAndDeleteUselessEntries(Permissions, "permission", {
-            server: ['serverId']
-        }, {
-            role: ['roles']
         }),
         checkAndDeleteUselessEntries(StoredNotifyOnReact, "storedNotifyOnReact", {
             server: ['serverId'],
