@@ -21,6 +21,7 @@ import {
     showTime,
     showDate
 } from "../Classes/DateTimeManager";
+import {IArgsModel} from "../Classes/CommandInterfaces";
 
 export default class Vocal extends Command {
     static display = true;
@@ -29,7 +30,7 @@ export default class Vocal extends Command {
 
     static slashCommandIdByGuild: {[guildId: string]: string} = {};
 
-    static argsModel = {
+    static argsModel: IArgsModel = {
         $argsByType: {
             action: {
                 isSubCommand: true,

@@ -17,6 +17,7 @@ import Discord, {
 } from "discord.js";
 import {checkTypes} from "../Classes/TypeChecker";
 import client from "../client";
+import {IArgsModel} from "../Classes/CommandInterfaces";
 
 export default class CancelNotifyOnReact extends Command {
     static description = "Pour désactiver l'écoute d'une réaction sur un ou plusieurs messages.";
@@ -25,31 +26,33 @@ export default class CancelNotifyOnReact extends Command {
 
     static slashCommandIdByGuild: {[guildId: string]: string} = {};
 
-    static argsModel = {
-        all: {
-            fields: ["--all"],
-            type: "boolean",
-            description: "à mettre sans rien d'autre, pour désactiver l'écoute sur tout les messages",
-            required: false
-        },
-        channel: {
-            fields: ["--channel","-ch"],
-            type:"channel",
-            description: "Spécifier le channel sur lequel désactifier l'écoute de réaction",
-            required: (args, _, modelizeSlashCommand = false) => !modelizeSlashCommand && (args.all == undefined || !args.all)
-        },
-        emote: {
-            fields: ["--emote", "-e"],
-            type: "emote",
-            description: "Spécifier l'émote pour laquelle il faut désactiver l'écoute (nécessite --channel et --message)",
-            required: false
-        },
-        message: {
-            fields: ["--message", "-m"],
-            type: "message",
-            description: "Spécifier l'id du message sur lequel désactiver l'écoute (nécessite le champs --channel)",
-            required: (args, _, modelizeSlashCommand = false) => !modelizeSlashCommand && args.emote != undefined,
-            moreDatas: (args) => args.channel
+    static argsModel: IArgsModel = {
+        $argsByName: {
+            all: {
+                fields: ["--all"],
+                type: "boolean",
+                description: "à mettre sans rien d'autre, pour désactiver l'écoute sur tout les messages",
+                required: false
+            },
+            channel: {
+                fields: ["--channel","-ch"],
+                type:"channel",
+                description: "Spécifier le channel sur lequel désactifier l'écoute de réaction",
+                required: (args, _, modelizeSlashCommand = false) => !modelizeSlashCommand && (args.all == undefined || !args.all)
+            },
+            emote: {
+                fields: ["--emote", "-e"],
+                type: "emote",
+                description: "Spécifier l'émote pour laquelle il faut désactiver l'écoute (nécessite --channel et --message)",
+                required: false
+            },
+            message: {
+                fields: ["--message", "-m"],
+                type: "message",
+                description: "Spécifier l'id du message sur lequel désactiver l'écoute (nécessite le champs --channel)",
+                required: (args, _, modelizeSlashCommand = false) => !modelizeSlashCommand && args.emote != undefined,
+                moreDatas: (args) => args.channel
+            }
         }
     };
 

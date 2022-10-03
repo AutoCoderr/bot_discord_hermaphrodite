@@ -106,19 +106,14 @@ function generateSlashCommandFromModel(command: typeof Command): optionCommandTy
     };
     const subCommands = {};
     for (const attr in command.argsModel) {
-        if (attr[0] === '$') {
-            if (attr === '$argsByOrder') {
-                for (const argModel of command.argsModel[attr]) {
-                    generateSlashOptionFromModel(argModel.field, argModel, subCommands, slashCommandModel);
-                }
-            } else {
-                for (const [attr2, argModel] of <Array<any>>Object.entries(command.argsModel[attr])) {
-                    generateSlashOptionFromModel(attr2, argModel, subCommands, slashCommandModel);
-                }
+        if (attr === '$argsByOrder' && command.argsModel.$argsByOrder) {
+            for (const argModel of command.argsModel.$argsByOrder) {
+                generateSlashOptionFromModel(argModel.field, argModel, subCommands, slashCommandModel);
             }
         } else {
-            const argModel = command.argsModel[attr];
-            generateSlashOptionFromModel(attr, argModel, subCommands, slashCommandModel);
+            for (const [attr2, argModel] of <Array<any>>Object.entries(command.argsModel[attr])) {
+                generateSlashOptionFromModel(attr2, argModel, subCommands, slashCommandModel);
+            }
         }
     }
     sortRequiredAndNotRequiredArgumentsInSlashCommand(slashCommandModel);

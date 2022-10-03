@@ -14,6 +14,7 @@ import CancelNotifyOnReact from "../Commands/CancelNotifyOnReact";
 import HistoryExec from "../Commands/HistoryExec";
 import HistoryCmd from "../Commands/HistoryCmd";
 import ListNotifyOnReact from "../Commands/ListNotifyOnReact";
+import {IArgsModel} from "./CommandInterfaces";
 
 export function addMissingZero(number, n = 2) {
     number = number.toString();
@@ -23,65 +24,66 @@ export function addMissingZero(number, n = 2) {
     return number;
 }
 
-export function getArgsModelHistory() {
+export function getArgsModelHistory(): IArgsModel {
     return {
-        commands: {
-            fields: ['-c', '--command'],
-            type: "commands",
-            required: false,
-            description: "La ou les commandes dont on souhaite voir l'historique",
-            valid: async (commandList: typeof Command[], _) => { // Vérifie si une commande n'a pas été tapée plusieurs fois
-                const alreadySpecifiedCommands = {};
-                for (const command of commandList) {
-                    if (alreadySpecifiedCommands[<string>command.commandName] === undefined) {
-                        alreadySpecifiedCommands[<string>command.commandName] = true;
-                    } else {
-                        return false;
+        $argsByName: {
+            commands: {
+                fields: ['-c', '--command'],
+                type: "commands",
+                required: false,
+                description: "La ou les commandes dont on souhaite voir l'historique",
+                valid: async (commandList: typeof Command[], _) => { // Vérifie si une commande n'a pas été tapée plusieurs fois
+                    const alreadySpecifiedCommands = {};
+                    for (const command of commandList) {
+                        if (alreadySpecifiedCommands[<string>command.commandName] === undefined) {
+                            alreadySpecifiedCommands[<string>command.commandName] = true;
+                        } else {
+                            return false;
+                        }
                     }
-                }
-                return true;
-            },
-            errorMessage: (value, _) => {
-                if (value != undefined) {
+                    return true;
+                },
+                errorMessage: (value, _) => {
+                    if (value != undefined) {
+                        return {
+                            name: "Liste de commandes invalide",
+                            value: value + " : Une de ces commandes n'existe pas, vous est inaccesible, ou a été spécifiée plusieurs fois"
+                        };
+                    }
                     return {
-                        name: "Liste de commandes invalide",
-                        value: value + " : Une de ces commandes n'existe pas, vous est inaccesible, ou a été spécifiée plusieurs fois"
+                        name: "Nom de commande manquant",
+                        value: "Nom de la commande non spécifié"
                     };
                 }
-                return {
-                    name: "Nom de commande manquant",
-                    value: "Nom de la commande non spécifié"
-                };
+            },
+            sort: {
+                fields: ['-s', '--sort'],
+                type: "string",
+                required: false,
+                description: "'asc' ou 'desc/dsc' ('desc' par défaut) pour trier dans l'ordre chronologique dans les deux sens",
+                valid: (value, _) => ['asc', 'desc', 'dsc'].includes(value.toLowerCase()),
+                default: "desc"
+            },
+            limit: {
+                fields: ['-l', '--limit'],
+                type: "number",
+                required: false,
+                default: 15,
+                description: "Pour afficher les n dernières commandes de la listes"
+            },
+            channels: {
+                fields: ['-ch', '--channel'],
+                type: "channels",
+                required: false,
+                description: "Pour afficher les commandes executées dans un ou des channels spécifiques"
+            },
+            users: {
+                fields: ['-u', '--user'],
+                type: "users",
+                required: false,
+                description: "Pour afficher les commandes executées par un ou des utilisateurs spécifiques"
             }
-        },
-        sort: {
-            fields: ['-s', '--sort'],
-            type: "string",
-            required: false,
-            description: "'asc' ou 'desc/dsc' ('desc' par défaut) pour trier dans l'ordre chronologique dans les deux sens",
-            valid: (value, _) => ['asc', 'desc', 'dsc'].includes(value.toLowerCase()),
-            default: "desc"
-        },
-        limit: {
-            fields: ['-l', '--limit'],
-            type: "number",
-            required: false,
-            default: 15,
-            description: "Pour afficher les n dernières commandes de la listes"
-        },
-        channels: {
-            fields: ['-ch', '--channel'],
-            type: "channels",
-            required: false,
-            description: "Pour afficher les commandes executées dans un ou des channels spécifiques"
-        },
-        users: {
-            fields: ['-u', '--user'],
-            type: "users",
-            required: false,
-            description: "Pour afficher les commandes executées par un ou des utilisateurs spécifiques"
         }
-
     };
 }
 

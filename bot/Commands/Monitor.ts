@@ -14,6 +14,7 @@ import MonitoringMessage, {IMonitoringMessage} from "../Models/MonitoringMessage
 import {splitFieldsEmbed} from "../Classes/OtherFunctions";
 import client from "../client";
 import CustomError from "../logging/CustomError";
+import {IArgsModel} from "../Classes/CommandInterfaces";
 
 interface messageChannelAndGuild {
     message: Message;
@@ -130,8 +131,7 @@ export default class Monitor extends Command {
     static nbListeners = Object.keys(Monitor.datasCanBeDisplayed).filter(data => typeof(Monitor.datasCanBeDisplayed[data].listen) == "function").length;
     static listeneds = {};
 
-    static argsModel = {
-
+    static argsModel: IArgsModel = {
         $argsByType: {
             action: {
                 isSubCommand: true,
@@ -175,68 +175,70 @@ export default class Monitor extends Command {
             }
         },
 
-        showUserCount: {
-            referToSubCommands: ["add"],
-            fields: ["-uc", "--user-count", "--show-user-count"],
-            type: "boolean",
-            description: "Pour afficher ou non le nombre d'utilisateurs",
-            default: true,
-            required: false
-        },
-        showDescription: {
-            referToSubCommands: ["add"],
-            fields: ["-d", "--description", "--show-description"],
-            type: "boolean",
-            description: "Pour afficher ou non la description",
-            default: true,
-            required: false
-        },
-        showIcon: {
-            referToSubCommands: ["add"],
-            fields: ["-i", "--icon", "--show-icon"],
-            type: "boolean",
-            description: "Pour afficher ou non l'icone",
-            default: true,
-            required: false
-        },
-        showOnlineUserCount: {
-            referToSubCommands: ["add"],
-            fields: ["-ouc", "--online-user-count", "--show-online-user-count"],
-            type: "boolean",
-            description: "Pour afficher ou non le nombre d'utilisateurs connectées",
-            default: true,
-            required: false
-        },
-        showMemberMax: {
-            referToSubCommands: ["add"],
-            fields: ["-mm", "--member-max", "--show-member-max"],
-            type: "boolean",
-            description: "Pour afficher ou non le nombre maximum de membres",
-            default: false,
-            required: false
-        },
-        showRoleMembersCount: {
-            referToSubCommands: ["add"],
-            fields: ["-rmc", "--role-members-count", "--show-role-members-count"],
-            type: "roles",
-            description: "Pour afficher le nombre de membres d'un/des rôles spécifiés (exemple: "+config.command_prefix+"monitor -rmc @moderateurs)",
-            required: false
-        },
-        showEmojiCount: {
-            referToSubCommands: ["add"],
-            fields: ["-ec", "--emoji-count", "--show-emoji-count"],
-            type: "boolean",
-            description: "Pour afficher ou non le nombre d'emotes",
-            default: false,
-            required: false
-        },
-        showChannelCount: {
-            referToSubCommands: ["add"],
-            fields: ["-cc", "--channel-count", "--show-channel-count"],
-            type: "boolean",
-            description: "Pour afficher ou non le nombre de channels",
-            default: false,
-            required: false
+        $argsByName: {
+            showUserCount: {
+                referToSubCommands: ["add"],
+                fields: ["-uc", "--user-count", "--show-user-count"],
+                type: "boolean",
+                description: "Pour afficher ou non le nombre d'utilisateurs",
+                default: true,
+                required: false
+            },
+            showDescription: {
+                referToSubCommands: ["add"],
+                fields: ["-d", "--description", "--show-description"],
+                type: "boolean",
+                description: "Pour afficher ou non la description",
+                default: true,
+                required: false
+            },
+            showIcon: {
+                referToSubCommands: ["add"],
+                fields: ["-i", "--icon", "--show-icon"],
+                type: "boolean",
+                description: "Pour afficher ou non l'icone",
+                default: true,
+                required: false
+            },
+            showOnlineUserCount: {
+                referToSubCommands: ["add"],
+                fields: ["-ouc", "--online-user-count", "--show-online-user-count"],
+                type: "boolean",
+                description: "Pour afficher ou non le nombre d'utilisateurs connectées",
+                default: true,
+                required: false
+            },
+            showMemberMax: {
+                referToSubCommands: ["add"],
+                fields: ["-mm", "--member-max", "--show-member-max"],
+                type: "boolean",
+                description: "Pour afficher ou non le nombre maximum de membres",
+                default: false,
+                required: false
+            },
+            showRoleMembersCount: {
+                referToSubCommands: ["add"],
+                fields: ["-rmc", "--role-members-count", "--show-role-members-count"],
+                type: "roles",
+                description: "Pour afficher le nombre de membres d'un/des rôles spécifiés (exemple: "+config.command_prefix+"monitor -rmc @moderateurs)",
+                required: false
+            },
+            showEmojiCount: {
+                referToSubCommands: ["add"],
+                fields: ["-ec", "--emoji-count", "--show-emoji-count"],
+                type: "boolean",
+                description: "Pour afficher ou non le nombre d'emotes",
+                default: false,
+                required: false
+            },
+            showChannelCount: {
+                referToSubCommands: ["add"],
+                fields: ["-cc", "--channel-count", "--show-channel-count"],
+                type: "boolean",
+                description: "Pour afficher ou non le nombre de channels",
+                default: false,
+                required: false
+            }
         }
     }
 

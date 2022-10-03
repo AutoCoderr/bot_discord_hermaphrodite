@@ -18,6 +18,7 @@ import {checkTypes} from "../Classes/TypeChecker";
 import client from "../client";
 import CustomError from "../logging/CustomError";
 import reportError from "../logging/reportError";
+import {IArgsModel} from "../Classes/CommandInterfaces";
 
 export default class NotifyOnReact extends Command {
     static listenings = {}; /* example : {
@@ -37,38 +38,40 @@ export default class NotifyOnReact extends Command {
 
     static slashCommandIdByGuild: {[guildId: string]: string} = {};
 
-    static argsModel = {
-        channelToListen: {
-            fields: ['--listen-channel','-lc'],
-            type: "channel",
-            description: "Indique le channel sur lequel écouter",
-            required: true
-        },
-        messageToListen: {
-            fields: ["--listen-message","-lm"],
-            type: "message",
-            description: "Indique le message à écouter (nécessite d'avoir spécifié le channel)",
-            required: true,
-            moreDatas: (args) => args.channelToListen
-        },
-        messageToWrite: {
-            fields: ["--message", "-m"],
-            type: "string",
-            description: "Le message à afficher dés qu'une réaction sur le message est detectée",
-            required: true
-        },
-        channelToWrite: {
-            fields: ["--writeChannel", "-wc"],
-            type: "channel",
-            description: "le channel sur lequel écrire le message à chaque réaction",
-            required: true
-        },
-        emoteToReact: {
-            fields: ["--emote", "-e"],
-            type: "emote",
-            description: "Indique l'emote à laquelle réagir",
-            required: true
-        },
+    static argsModel: IArgsModel = {
+        $argsByName: {
+            channelToListen: {
+                fields: ['--listen-channel','-lc'],
+                type: "channel",
+                description: "Indique le channel sur lequel écouter",
+                required: true
+            },
+            messageToListen: {
+                fields: ["--listen-message","-lm"],
+                type: "message",
+                description: "Indique le message à écouter (nécessite d'avoir spécifié le channel)",
+                required: true,
+                moreDatas: (args) => args.channelToListen
+            },
+            messageToWrite: {
+                fields: ["--message", "-m"],
+                type: "string",
+                description: "Le message à afficher dés qu'une réaction sur le message est detectée",
+                required: true
+            },
+            channelToWrite: {
+                fields: ["--writeChannel", "-wc"],
+                type: "channel",
+                description: "le channel sur lequel écrire le message à chaque réaction",
+                required: true
+            },
+            emoteToReact: {
+                fields: ["--emote", "-e"],
+                type: "emote",
+                description: "Indique l'emote à laquelle réagir",
+                required: true
+            },
+        }
     };
 
     constructor(channel: TextChannel, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {

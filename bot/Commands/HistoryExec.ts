@@ -9,6 +9,7 @@ import {
     User
 } from "discord.js";
 import {getArgsModelHistory, getHistory} from "../Classes/OtherFunctions";
+import {IArgsModel} from "../Classes/CommandInterfaces";
 
 export default class HistoryExec extends Command {
     static display = true;
@@ -17,7 +18,7 @@ export default class HistoryExec extends Command {
 
     static slashCommandIdByGuild: {[guildId: string]: string} = {};
 
-    static argsModel = getArgsModelHistory();
+    static argsModel: IArgsModel = getArgsModelHistory();
 
     constructor(channel: TextChannel, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
         super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, HistoryExec.commandName, HistoryExec.argsModel);
