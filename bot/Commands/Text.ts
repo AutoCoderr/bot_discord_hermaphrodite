@@ -1,4 +1,4 @@
-import Command, {responseType} from "../Classes/Command";
+import Command from "../Classes/Command";
 import {
     CommandInteractionOptionResolver,
     Guild,
@@ -24,6 +24,7 @@ import {
 } from "../Classes/TextAndVocalFunctions";
 import {extractDate, extractTime, extractUTCTime, showDate, showTime} from "../Classes/DateTimeManager";
 import {Channel} from "diagnostics_channel";
+import {IArgsModel, responseType} from "../Classes/CommandInterfaces";
 
 interface argsType {
     action: 'add' | 'remove' | 'block' | 'unblock' | 'mute' | 'unmute' | 'limit' | 'status',
@@ -52,7 +53,7 @@ export default class Text extends Command {
 
     static slashCommandIdByGuild: {[guildId: string]: string} = {};
 
-    static argsModel = {
+    static argsModel: IArgsModel = {
         $argsByType: {
             action: {
                 isSubCommand: true,

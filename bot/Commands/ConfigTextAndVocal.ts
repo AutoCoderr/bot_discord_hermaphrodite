@@ -17,6 +17,7 @@ import VocalSubscribe from "../Models/Vocal/VocalSubscribe";
 import TextSubscribe from "../Models/Text/TextSubscribe";
 import config from "../config";
 import {extractUTCTime, showTime} from "../Classes/DateTimeManager";
+import {IArgsModel} from "../Classes/CommandInterfaces";
 
 interface configTextAndVocalArgs {
     action: string,
@@ -55,7 +56,7 @@ export default abstract class ConfigTextAndVocal extends Command {
         this.type = type;
     }
 
-    static argsModelFunction = (type: 'vocal' | 'text') => ({
+    static argsModelFunction: (type: 'vocal'|'text') => IArgsModel = (type) => ({
         $argsByType: {
             action: {
                 isSubCommand: true,
