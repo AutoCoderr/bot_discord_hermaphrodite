@@ -30,6 +30,7 @@ interface optionCommandType {
     defaultPermission?: boolean;
 }
 
+
 let slashCommandsByGuildAndName: { [guildId: string]: { [commandName: string]: ApplicationCommand } } = {};
 
 export function initSlashCommands() {

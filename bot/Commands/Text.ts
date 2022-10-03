@@ -13,7 +13,7 @@ import {
 import config from "../config";
 import TextConfig, {ITextConfig, minimumLimit} from "../Models/Text/TextConfig";
 import TextUserConfig, {ITextUserConfig} from "../Models/Text/TextUserConfig";
-import TextSubscribe, {ITextSubscribe} from "../Models/Text/TextSubscribe";
+import TextSubscribe from "../Models/Text/TextSubscribe";
 import TextInvite from "../Models/Text/TextInvite";
 import {
     compareKeyWords, reEnableTextSubscribesAfterUnblock,
@@ -23,7 +23,6 @@ import {
     findWordInText, memberExistsAndHasChannelPermission
 } from "../Classes/TextAndVocalFunctions";
 import {extractDate, extractTime, extractUTCTime, showDate, showTime} from "../Classes/DateTimeManager";
-import {Channel} from "diagnostics_channel";
 import {IArgsModel, responseType} from "../Classes/CommandInterfaces";
 
 interface argsType {
@@ -380,6 +379,21 @@ export default class Text extends Command {
                         "<@" + userId + "> sur " + (channelId ? "le channel <#" + channelId + ">" : "tout les channels") :
                         "Sur le channel <#" + channelId + "> sur tout les utilisateurs"
                 ).join("\n")
+            })
+        }
+
+        if (this.notFoundUser.length > 0) {
+            embed.addFields({
+                name: "Ces utilisateurs sont introuvables :",
+                value: this.notFoundUser.join(", ")
+            })
+        }
+
+        for (const [channelId,userIds] of Object.entries(this.usersBlockedOnChannels)) {
+            const channel = this.guild.channels.cache.get(channelId);
+            embed.addFields({
+                name: "Les utilisateurs suivants n'ont pas accès au channel '"+(channel ? channel.name : "not found") + "' : ",
+                value: userIds.map(userId => "<@" + userId + ">").join(", ")
             })
         }
 
@@ -1411,6 +1425,7 @@ export default class Text extends Command {
                 continue;
             }
             const permissionsForListener = channelWhichHasPermissions.permissionsFor(listener);
+
             if (!permissionsForListener || !permissionsForListener.has(PermissionFlagsBits.ViewChannel)) {
                 if (!permissionsForListener)
                     console.log("permissionFor set to null for user '"+(listener ? listener.nickname??listener.user.username : 'null')+"' ("+listenerId+") and channel '"+channelWhichHasPermissions.name+"' ("+channelWhichHasPermissions.id+")");
