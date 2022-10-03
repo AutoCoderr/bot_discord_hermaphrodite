@@ -17,6 +17,7 @@ import client from "../client";
 import {checkTypes} from "../Classes/TypeChecker";
 import reportError from "../logging/reportError";
 import CustomError from "../logging/CustomError";
+import {IArgsModel} from "../Classes/CommandInterfaces";
 
 
 const toDenyToEveryone: Array<PermissionResolvable> = [
@@ -45,7 +46,7 @@ export default class ConfigTicket extends Command {
 
     static slashCommandIdByGuild: {[guildId: string]: string} = {};
 
-    static argsModel = {
+    static argsModel: IArgsModel = {
         $argsByType: {
             action: {
                 isSubCommand: true,

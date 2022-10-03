@@ -11,6 +11,7 @@ import {
     User
 } from "discord.js";
 import CustomError from "../logging/CustomError";
+import {IArgsModel} from "../Classes/CommandInterfaces";
 
 export default class ConfigWelcome extends Command {
     static display = true;
@@ -19,8 +20,7 @@ export default class ConfigWelcome extends Command {
 
     static slashCommandIdByGuild: {[guildId: string]: string} = {};
 
-    static argsModel = {
-
+    static argsModel: IArgsModel = {
         $argsByOrder: [
             {
                 isSubCommand: true,

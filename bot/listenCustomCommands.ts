@@ -1,11 +1,11 @@
 import config from "./config";
-import {Message, MessageOptions, MessagePayload} from "discord.js";
+import {Message, MessageCreateOptions, MessagePayload} from "discord.js";
 import client from "./client";
 import {existingCommands} from "./Classes/CommandsDescription";
 import CustomError from "./logging/CustomError";
 import Command from "./Classes/Command";
 
-type TResponse = false | { result: Array<string | MessagePayload | MessageOptions>, callback?: Function }
+type TResponse = false | { result: Array<string | MessagePayload | MessageCreateOptions>, callback?: Function }
 
 async function getAndDisplayCustomCommandsResponse(message: Message, response: TResponse) {
     if (response !== false) {

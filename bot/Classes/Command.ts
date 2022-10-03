@@ -14,23 +14,16 @@ import {checkTypes} from "./TypeChecker";
 import {extractTypes} from "./TypeExtractor";
 import {getCustomType, getSlashTypeGetterName} from "../slashCommands";
 import CustomError from "../logging/CustomError";
+import {IArgsModel, responseResultsType, responseType} from "./CommandInterfaces";
 
 const validModelCommands = {};
-
-export interface responseResultsType extends Array<string | MessagePayload | InteractionReplyOptions>{}
-
-export interface responseType {
-    success: boolean;
-    result: responseResultsType,
-    callback?: Function
-}
 
 export default class Command {
 
     static commandName: null|string = null;
     static display: boolean = false;
     static description: null|string = null;
-    static argsModel: any = {};
+    static argsModel: IArgsModel;
 
     static slashCommandIdByGuild: {[guildId: string]: string} = {};
 
@@ -44,12 +37,12 @@ export default class Command {
     guild: null|Guild;
     channel: TextChannel;
     member: User|GuildMember;
-    argsModel: any = {};
+    argsModel: IArgsModel;
 
     writtenCommand: null|string = null; // If command called as a custom command, get the message typed by the user
     slashCommandOptions: null|CommandInteractionOptionResolver = null; // If command called as a slash command, get options
 
-    constructor(channel: TextChannel, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom', commandName: null|string, argsModel: any) {
+    constructor(channel: TextChannel, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom', commandName: null|string, argsModel: IArgsModel) {
         this.guild = guild;
         this.channel = channel;
         this.member = member;
@@ -339,18 +332,14 @@ export default class Command {
             subCommandGroupSet: false
         };
         for (const attr in this.argsModel) {
-            if (attr[0] == '$') {
-                if (attr == '$argsByOrder') {
-                    for (const argModel of this.argsModel[attr]) {
-                        this.getRawArgumentFromModel(argModel.field,argModel,additionalParams,rawArguments);
-                    }
-                } else {
-                    for (const [attr2,argModel] of Object.entries(this.argsModel[attr])) {
-                        this.getRawArgumentFromModel(attr2,argModel,additionalParams,rawArguments);
-                    }
+            if (attr == '$argsByOrder' && this.argsModel.$argsByOrder) {
+                for (const argModel of this.argsModel.$argsByOrder) {
+                    this.getRawArgumentFromModel(argModel.field,argModel,additionalParams,rawArguments);
                 }
             } else {
-                this.getRawArgumentFromModel(attr,this.argsModel[attr],additionalParams,rawArguments);
+                for (const [attr2,argModel] of Object.entries(this.argsModel[attr])) {
+                    this.getRawArgumentFromModel(attr2,argModel,additionalParams,rawArguments);
+                }
             }
         }
         return rawArguments;
@@ -385,18 +374,14 @@ export default class Command {
         };
 
         for (const attr in this.argsModel) {
-            if (attr[0] == '$') {
-                if (attr == '$argsByOrder') {
-                    for (const argModel of this.argsModel[attr]) {
-                        await this.getSlashArgFromModel(argModel.field,argModel,args, fails, failsExtract, additionalParams);
-                    }
-                } else {
-                    for (const [attr2,argModel] of Object.entries(this.argsModel[attr])) {
-                        await this.getSlashArgFromModel(attr2,argModel,args, fails, failsExtract, additionalParams);
-                    }
+            if (attr == '$argsByOrder' && this.argsModel.$argsByOrder) {
+                for (const argModel of this.argsModel.$argsByOrder) {
+                    await this.getSlashArgFromModel(argModel.field,argModel,args, fails, failsExtract, additionalParams);
                 }
             } else {
-                await this.getSlashArgFromModel(attr,this.argsModel[attr],args, fails, failsExtract, additionalParams);
+                for (const [attr2,argModel] of Object.entries(this.argsModel[attr])) {
+                    await this.getSlashArgFromModel(attr2,argModel,args, fails, failsExtract, additionalParams);
+                }
             }
         }
         if (fails.length > 0 || failsExtract.length > 0) {
@@ -554,67 +539,70 @@ export default class Command {
         let argsWithoutKeyDefined = false;
 
         for (const attr in model) {
-            if (attr[0] != "$") {
-                let found = false;
-                let incorrectField = false;
-                let extractFailed = false;
-                let triedValue;
+            if (attr === "$argsByName") {
+                const argsByName = model.$argsByName;
+                for (const attr in argsByName) {
+                    let found = false;
+                    let incorrectField = false;
+                    let extractFailed = false;
+                    let triedValue;
 
-                for (let field of model[attr].fields) {
-                    let argType: string = model[attr].type;
-                    if (args[field] != undefined &&
-                        (
-                            typeof(argType) == "string" && (
-                                argType == "string" || await checkTypes[argType](args[field])
+                    for (let field of argsByName[attr].fields) {
+                        let argType: string = argsByName[attr].type;
+                        if (args[field] != undefined &&
+                            (
+                                typeof(argType) == "string" && (
+                                    argType == "string" || await checkTypes[argType](args[field])
+                                )
                             )
-                        )
-                    ) {
-                        if (extractTypes[<string>argType]) {
-                            const moreDatas = typeof(model[attr].moreDatas) == "function" ? await model[attr].moreDatas(out,argType, this) : null
-                            const data = await extractTypes[<string>argType](args[field],this,moreDatas);
-                            if (data !== false) {
-                                if (typeof(model[attr].valid) != "function" || await model[attr].valid(data,out, this))
-                                    out[attr] = data;
-                                else {
-                                    incorrectField = true;
+                        ) {
+                            if (extractTypes[<string>argType]) {
+                                const moreDatas = typeof(argsByName[attr].moreDatas) == "function" ? await argsByName[attr].moreDatas(out,argType, this) : null
+                                const data = await extractTypes[<string>argType](args[field],this,moreDatas);
+                                if (data !== false) {
+                                    if (typeof(argsByName[attr].valid) != "function" || await argsByName[attr].valid(data,out, this))
+                                        out[attr] = data;
+                                    else {
+                                        incorrectField = true;
+                                        triedValue = args[field];
+                                    }
+                                } else {
+                                    extractFailed = true;
                                     triedValue = args[field];
                                 }
-                            } else {
-                                extractFailed = true;
+                            } else if (typeof(argsByName[attr].valid) != "function" || await argsByName[attr].valid(args[field],out, this))
+                                out[attr] = argType == "string" ? args[field].toString() : args[field];
+                            else {
+                                incorrectField = true;
                                 triedValue = args[field];
                             }
-                        } else if (typeof(model[attr].valid) != "function" || await model[attr].valid(args[field],out, this))
-                            out[attr] = argType == "string" ? args[field].toString() : args[field];
-                        else {
-                            incorrectField = true;
+
+                            if (out[attr] != undefined) {
+                                found = true;
+                                break;
+                            }
+                        } else if (args[field] != undefined) {
                             triedValue = args[field];
+                            incorrectField = true;
                         }
+                    }
+                    const required = argsByName[attr].required == undefined ||
+                        (typeof(argsByName[attr].required) == "boolean" && argsByName[attr].required) ||
+                        (typeof(argsByName[attr].required) == "function" && await argsByName[attr].required(out, this));
 
-                        if (out[attr] != undefined) {
+                    if (!found && !incorrectField && !extractFailed) {
+                        const defaultValue = typeof (argsByName[attr].default) == "function" ? argsByName[attr].default(out, this) : argsByName[attr].default;
+                        if (defaultValue != undefined) {
+                            out[attr] = defaultValue;
                             found = true;
-                            break;
                         }
-                    } else if (args[field] != undefined) {
-                        triedValue = args[field];
-                        incorrectField = true;
                     }
-                }
-                const required = model[attr].required == undefined ||
-                    (typeof(model[attr].required) == "boolean" && model[attr].required) ||
-                    (typeof(model[attr].required) == "function" && await model[attr].required(out, this));
-
-                if (!found && !incorrectField && !extractFailed) {
-                    const defaultValue = typeof (model[attr].default) == "function" ? model[attr].default(out, this) : model[attr].default;
-                    if (defaultValue != undefined) {
-                        out[attr] = defaultValue;
-                        found = true;
-                    }
-                }
-                if (!found) {
-                    if (extractFailed) {
-                        failsExtract.push({...model[attr], value: triedValue});
-                    } else if (incorrectField || required) {
-                        fails.push({...model[attr], value: triedValue });
+                    if (!found) {
+                        if (extractFailed) {
+                            failsExtract.push({...argsByName[attr], value: triedValue});
+                        } else if (incorrectField || required) {
+                            fails.push({...argsByName[attr], value: triedValue });
+                        }
                     }
                 }
             } else if (attr == "$argsByOrder" && !argsWithoutKeyDefined) {
