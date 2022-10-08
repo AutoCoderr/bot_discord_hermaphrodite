@@ -9,7 +9,7 @@ import {
     User
 } from "discord.js";
 import {getArgsModelHistory, getHistory} from "../Classes/OtherFunctions";
-import {IArgsModel} from "../Classes/CommandInterfaces";
+import {IArgsModel} from "../interfaces/CommandInterfaces";
 
 export default class HistoryExec extends Command {
     static display = true;

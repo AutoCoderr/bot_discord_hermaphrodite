@@ -14,7 +14,7 @@ import MonitoringMessage, {IMonitoringMessage} from "../Models/MonitoringMessage
 import {splitFieldsEmbed} from "../Classes/OtherFunctions";
 import client from "../client";
 import CustomError from "../logging/CustomError";
-import {IArgsModel} from "../Classes/CommandInterfaces";
+import {IArgsModel} from "../interfaces/CommandInterfaces";
 
 interface messageChannelAndGuild {
     message: Message;

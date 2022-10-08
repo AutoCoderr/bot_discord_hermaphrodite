@@ -10,7 +10,7 @@ import {
     User
 } from "discord.js";
 import {IHistory} from "../Models/History";
-import {IArgsModel} from "../Classes/CommandInterfaces";
+import {IArgsModel} from "../interfaces/CommandInterfaces";
 
 export default class HistoryCmd extends Command {
     static display = true;

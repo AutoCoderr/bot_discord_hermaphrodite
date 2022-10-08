@@ -23,7 +23,7 @@ import {
     findWordInText, memberExistsAndHasChannelPermission
 } from "../Classes/TextAndVocalFunctions";
 import {extractDate, extractTime, extractUTCTime, showDate, showTime} from "../Classes/DateTimeManager";
-import {IArgsModel, responseType} from "../Classes/CommandInterfaces";
+import {IArgsModel, responseType} from "../interfaces/CommandInterfaces";
 
 interface argsType {
     action: 'add' | 'remove' | 'block' | 'unblock' | 'mute' | 'unmute' | 'limit' | 'status',

@@ -11,7 +11,7 @@ import {
     User
 } from "discord.js";
 import CustomError from "../logging/CustomError";
-import {IArgsModel} from "../Classes/CommandInterfaces";
+import {IArgsModel} from "../interfaces/CommandInterfaces";
 
 export default class ConfigWelcome extends Command {
     static display = true;

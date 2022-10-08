@@ -17,7 +17,7 @@ import VocalSubscribe from "../Models/Vocal/VocalSubscribe";
 import TextSubscribe from "../Models/Text/TextSubscribe";
 import config from "../config";
 import {extractUTCTime, showTime} from "../Classes/DateTimeManager";
-import {IArgsModel} from "../Classes/CommandInterfaces";
+import {IArgsModel} from "../interfaces/CommandInterfaces";
 
 interface configTextAndVocalArgs {
     action: string,

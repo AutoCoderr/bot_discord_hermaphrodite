@@ -5,9 +5,8 @@ import {
     ThreadChannel, User,
     VoiceChannel, VoiceState
 } from "discord.js";
-import {IReportedErrorData} from "./CustomError";
+import IReportedData from "../interfaces/IReportedDatas";
 import {format} from "winston";
-import ticketConfig, {ITicketConfig} from "../Models/TicketConfig";
 import TicketConfig from "../Models/TicketConfig";
 const {printf} = format
 
@@ -49,7 +48,9 @@ const formatByType = {
         }),
         username: member.nickname??member.user.username
     }),
-    [VoiceState.name]: (voiceState: VoiceState) => extractObjectData(voiceState, ['id','sessionId','channelId']),
+    [VoiceState.name]: (voiceState: VoiceState) => extractObjectData(voiceState, ['id','sessionId','channelId','channel'], {
+        channel: (channel) => channel !== null ? extractObjectData(channel, ['id', 'name', 'type']) : null
+    }),
     [Guild.name]: (guild: Guild) => extractObjectData(guild, ['id','name','description','memberCount','available']),
     [Message.name]: (message: Message) => extractObjectData(message, ['id','channelId','guildId','content','createdAt','editedAt','deletable','editable','tts','type','system']),
 
@@ -73,10 +74,10 @@ const formatByType = {
     ticketConfig: (ticketConfig: typeof TicketConfig) => extractObjectData(ticketConfig._doc, ['_id','enabled','categoryId','moderatorId','serverId','ticketChannels'])
 }
 
-const logFormatter = printf(({level, message, stack, data}: {level: string, message: string, stack?: string, data?: IReportedErrorData}) => JSON.stringify({
+const logFormatter = printf(({level, message, stack, data}: {level: string, message: string, stack?: string, data?: IReportedData}) => JSON.stringify({
     level,
     message,
-    stack: stack ? stack.split("\n") : null,
+    stack,
     data: data ? Object.entries(data).sort().reduce((acc,[key,value]) => ({
         ...acc,
         [key]: (value === undefined || value === null) ? value :

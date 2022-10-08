@@ -18,7 +18,7 @@ import {checkTypes} from "../Classes/TypeChecker";
 import client from "../client";
 import CustomError from "../logging/CustomError";
 import reportError from "../logging/reportError";
-import {IArgsModel} from "../Classes/CommandInterfaces";
+import {IArgsModel} from "../interfaces/CommandInterfaces";
 
 export default class NotifyOnReact extends Command {
     static listenings = {}; /* example : {

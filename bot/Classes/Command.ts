@@ -14,7 +14,7 @@ import {checkTypes} from "./TypeChecker";
 import {extractTypes} from "./TypeExtractor";
 import {getCustomType, getSlashTypeGetterName} from "../slashCommands";
 import CustomError from "../logging/CustomError";
-import {IArgsModel, responseResultsType, responseType} from "./CommandInterfaces";
+import {IArgsModel, responseResultsType, responseType} from "../interfaces/CommandInterfaces";
 
 const validModelCommands = {};
 

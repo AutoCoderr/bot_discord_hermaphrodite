@@ -1,6 +1,6 @@
 import CustomError from "./CustomError";
-import logger from "./logger";
+import {logError} from "./logger";
 
 export default function reportError(e: Error|CustomError) {
-    logger().error(e.message, {stack: e.stack, data: e instanceof CustomError ? e.data : null})
+    logError(e.message, {stack: e.stack ? e.stack.split("\n") : null, data: e instanceof CustomError ? e.data : null})
 }

@@ -17,7 +17,7 @@ import Discord, {
 } from "discord.js";
 import {checkTypes} from "../Classes/TypeChecker";
 import client from "../client";
-import {IArgsModel} from "../Classes/CommandInterfaces";
+import {IArgsModel} from "../interfaces/CommandInterfaces";
 
 export default class CancelNotifyOnReact extends Command {
     static description = "Pour désactiver l'écoute d'une réaction sur un ou plusieurs messages.";
