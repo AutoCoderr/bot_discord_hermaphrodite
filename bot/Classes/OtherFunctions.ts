@@ -14,7 +14,7 @@ import CancelNotifyOnReact from "../Commands/CancelNotifyOnReact";
 import HistoryExec from "../Commands/HistoryExec";
 import HistoryCmd from "../Commands/HistoryCmd";
 import ListNotifyOnReact from "../Commands/ListNotifyOnReact";
-import {IArgsModel} from "./CommandInterfaces";
+import {IArgsModel} from "../interfaces/CommandInterfaces";
 
 export function addMissingZero(number, n = 2) {
     number = number.toString();

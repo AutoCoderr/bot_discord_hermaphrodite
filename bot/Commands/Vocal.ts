@@ -21,7 +21,8 @@ import {
     showTime,
     showDate
 } from "../Classes/DateTimeManager";
-import {IArgsModel} from "../Classes/CommandInterfaces";
+import {IArgsModel} from "../interfaces/CommandInterfaces";
+import reportDebug from "../logging/reportDebug";
 
 export default class Vocal extends Command {
     static display = true;
@@ -756,7 +757,6 @@ export default class Vocal extends Command {
     }
 
     static async listenVoiceChannelsConnects(oldState: VoiceState, newState: VoiceState) {
-
         if (oldState.channelId === newState.channelId || newState.member === null)
             return;
 
@@ -764,6 +764,8 @@ export default class Vocal extends Command {
             delete Vocal.usersWhoAreOnVocal[newState.member.id];
             return;
         }
+        const newStateChannel = newState.channel;
+
         Vocal.usersWhoAreOnVocal[newState.member.id] = newState.channel;
 
         const vocalConfig: IVocalConfig = await VocalConfig.findOne({serverId: newState.guild.id, enabled: true});
@@ -780,6 +782,17 @@ export default class Vocal extends Command {
         const allowedUsers: { [id: string]: boolean } = {};
 
         for (const vocalSubscribe of vocalSubscribes) {
+            if (newState.channel === null) {
+                reportDebug("Channel is not longer defined, whereas it was defined", {
+                    newVoiceState: newState,
+                    oldVoiceState: oldState,
+                    from: "voiceConnect",
+                    guild: oldState.guild,
+                    user: newState.member,
+                    channel: newStateChannel
+                });
+                return;
+            }
             if (Vocal.usersWhoAreOnVocal[vocalSubscribe.listenerId] && Vocal.usersWhoAreOnVocal[vocalSubscribe.listenerId].id === newState.channelId)
                 continue;
 

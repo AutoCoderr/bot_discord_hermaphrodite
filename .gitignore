@@ -5,4 +5,4 @@
 /bot/**/*.js
 !/bot/config.example.js
 script_logs/*
-logs/error/*.json
+logs/**/*.json

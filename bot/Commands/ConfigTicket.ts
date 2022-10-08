@@ -17,7 +17,7 @@ import client from "../client";
 import {checkTypes} from "../Classes/TypeChecker";
 import reportError from "../logging/reportError";
 import CustomError from "../logging/CustomError";
-import {IArgsModel} from "../Classes/CommandInterfaces";
+import {IArgsModel} from "../interfaces/CommandInterfaces";
 
 
 const toDenyToEveryone: Array<PermissionResolvable> = [

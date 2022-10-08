@@ -13,7 +13,7 @@ import Discord, {
 } from "discord.js";
 import {existingCommands} from "../Classes/CommandsDescription";
 import {checkTypes} from "../Classes/TypeChecker";
-import {IArgsModel} from "../Classes/CommandInterfaces";
+import {IArgsModel} from "../interfaces/CommandInterfaces";
 
 export default class ListNotifyOnReact extends Command {
     static display = true;

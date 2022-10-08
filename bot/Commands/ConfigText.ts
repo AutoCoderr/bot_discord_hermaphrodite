@@ -3,7 +3,7 @@ import {
     GuildMember, TextChannel, User
 } from "discord.js";
 import ConfigTextAndVocal from "./ConfigTextAndVocal";
-import {IArgsModel} from "../Classes/CommandInterfaces";
+import {IArgsModel} from "../interfaces/CommandInterfaces";
 
 export default class ConfigText extends ConfigTextAndVocal {
     static display = true;

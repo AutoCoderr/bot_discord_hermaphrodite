@@ -1,6 +1,6 @@
 import {InteractionReplyOptions, MessagePayload} from "discord.js";
-import {checkTypes} from "./TypeChecker";
-import Command from "./Command";
+import {checkTypes} from "../Classes/TypeChecker";
+import Command from "../Classes/Command";
 
 export interface responseResultsType extends Array<string | MessagePayload | InteractionReplyOptions>{};
 
