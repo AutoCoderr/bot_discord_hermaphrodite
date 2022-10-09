@@ -764,7 +764,6 @@ export default class Vocal extends Command {
             delete Vocal.usersWhoAreOnVocal[newState.member.id];
             return;
         }
-        const newStateChannel = newState.channel;
 
         Vocal.usersWhoAreOnVocal[newState.member.id] = newState.channel;
 
@@ -773,62 +772,71 @@ export default class Vocal extends Command {
 
         if (vocalConfig.channelBlacklist.includes(newState.channelId)) return;
 
+        const listened = newState.member;
+
         const vocalSubscribes: IVocalSubscribe[] = await VocalSubscribe.find({
             serverId: newState.guild.id,
-            listenedId: newState.member.id,
+            listenedId: listened.id,
             enabled: true
         });
 
         const allowedUsers: { [id: string]: boolean } = {};
 
         for (const vocalSubscribe of vocalSubscribes) {
-            if (newState.channel === null)
+            const {channel,channelId,member,guild} = newState;
+            if (guild === null || member?.id !== listened.id)
                 return;
-            if (Vocal.usersWhoAreOnVocal[vocalSubscribe.listenerId] && Vocal.usersWhoAreOnVocal[vocalSubscribe.listenerId].id === newState.channelId)
+            if ([channel,channelId].some(elem => elem === null)) {
+                delete Vocal.usersWhoAreOnVocal[listened.id];
+                return;
+            }
+            if (channel.id !== Vocal.usersWhoAreOnVocal[listened.id].id) {
+                Vocal.usersWhoAreOnVocal[listened.id] = channel;
+            }
+
+            if (Vocal.usersWhoAreOnVocal[vocalSubscribe.listenerId] && Vocal.usersWhoAreOnVocal[vocalSubscribe.listenerId].id === channelId)
                 continue;
 
             let listener: null | GuildMember = null;
             try {
-                listener = await newState.guild.members.fetch(vocalSubscribe.listenerId);
+                listener = await guild.members.fetch(vocalSubscribe.listenerId);
             } catch (_) {
             }
 
             if (listener === null) {
                 await VocalSubscribe.deleteMany({
-                    serverId: newState.guild.id,
+                    serverId: guild.id,
                     listenerId: vocalSubscribe.listenerId
                 });
                 await VocalUserConfig.deleteMany({
-                    serverId: newState.guild.id,
+                    serverId: guild.id,
                     userId: vocalSubscribe.listenerId
                 })
                 continue;
             }
 
-            const permissionsForListener = newState.channel.permissionsFor(listener);
+            const permissionsForListener = channel.permissionsFor(listener);
             if (!permissionsForListener || !permissionsForListener.has(PermissionFlagsBits.ViewChannel))
                 continue;
 
-            const listened: GuildMember = await newState.guild.members.fetch(vocalSubscribe.listenedId);
-
             if (allowedUsers[listener.id] === undefined)
-                allowedUsers[listener.id] = await Vocal.staticCheckPermissions(listener, newState.guild);
+                allowedUsers[listener.id] = await Vocal.staticCheckPermissions(listener, guild);
             if (!allowedUsers[listener.id])
                 continue;
 
             if (allowedUsers[listened.id] === undefined)
-                allowedUsers[listened.id] = await Vocal.staticCheckPermissions(listened, newState.guild);
+                allowedUsers[listened.id] = await Vocal.staticCheckPermissions(listened, guild);
             if (!allowedUsers[listened.id])
                 continue;
 
             let listenerConfig: IVocalUserConfig | typeof VocalUserConfig = await VocalUserConfig.findOne({
-                serverId: newState.guild.id,
+                serverId: guild.id,
                 userId: vocalSubscribe.listenerId
             });
 
             if (listenerConfig === null) {
                 listenerConfig = await VocalUserConfig.create({
-                    serverId: newState.guild.id,
+                    serverId: guild.id,
                     userId: vocalSubscribe.listenerId,
                     blocked: {users: [], roles: []},
                     listening: true,
@@ -843,7 +851,7 @@ export default class Vocal extends Command {
             ) continue;
 
             try {
-                await listener.send("'" + (newState.member.nickname ?? newState.member.user.username) + "' s'est connecté sur le channel vocal <#" + newState.channel.id + "> sur le serveur '" + newState.guild.name + "'");
+                await listener.send("'" + (member.nickname ?? member.user.username) + "' s'est connecté sur le channel vocal <#" + channel.id + "> sur le serveur '" + guild.name + "'");
             } catch (_) {
                 continue;
             }
