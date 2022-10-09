@@ -782,17 +782,8 @@ export default class Vocal extends Command {
         const allowedUsers: { [id: string]: boolean } = {};
 
         for (const vocalSubscribe of vocalSubscribes) {
-            if (newState.channel === null) {
-                reportDebug("Channel is not longer defined, whereas it was defined", {
-                    newVoiceState: newState,
-                    oldVoiceState: oldState,
-                    from: "voiceConnect",
-                    guild: oldState.guild,
-                    user: newState.member,
-                    channel: newStateChannel
-                });
+            if (newState.channel === null)
                 return;
-            }
             if (Vocal.usersWhoAreOnVocal[vocalSubscribe.listenerId] && Vocal.usersWhoAreOnVocal[vocalSubscribe.listenerId].id === newState.channelId)
                 continue;
 
