@@ -12,6 +12,7 @@ import {
 } from "discord.js";
 import CustomError from "../logging/CustomError";
 import {IArgsModel} from "../interfaces/CommandInterfaces";
+import client from "../client";
 
 export default class ConfigWelcome extends Command {
     static display = true;
@@ -89,6 +90,11 @@ export default class ConfigWelcome extends Command {
                             );
                         };
                         bot.on('messageCreate', listener);
+
+                        setTimeout(() => {
+                            client.off('messageCreate', listener);
+                            resolve(this.response(false, "Délai dépassé"));
+                        }, 10 * 60 * 1000)
                     }));
             case "show":
                 welcomeMessage = await WelcomeMessage.findOne({serverId: this.guild.id});

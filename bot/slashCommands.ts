@@ -10,6 +10,7 @@ import {existingCommands} from "./Classes/CommandsDescription";
 import {getterNameBySlashType, slashCommandsTypeDefinitions} from "./Classes/slashCommandsTypeDefinitions";
 import CustomError from "./logging/CustomError";
 import {responseType} from "./interfaces/CommandInterfaces";
+import {type} from "os";
 
 interface optionCommandType {
     type?: ApplicationCommandOptionType.Boolean |
@@ -207,7 +208,14 @@ async function getAndDisplaySlashCommandsResponse(interaction: CommandInteractio
             if (i == 0 && p == 0)
                 await interaction.editReply(payload);
             else
-                await interaction.followUp(payload);
+                await interaction.followUp(payload instanceof MessagePayload ? payload : {
+                    ephemeral: true,
+                    ...(
+                        typeof(payload) === "string" ?
+                            {content: payload} :
+                            payload
+                    )
+                });
         }
         if (response.callback) {
             await getAndDisplaySlashCommandsResponse(interaction, await response.callback(), p + 1);

@@ -13,11 +13,13 @@ import {
 } from "discord.js";
 import XPData, {IXPData} from "../Models/XP/XPData";
 import client from "../client";
+import {extractUTCTime, showTime} from "../Classes/DateTimeManager";
 
 interface IConfigXPArgs {
-    action: 'enable'|'disable'|'active_role'|'channel_role'|'presentation_message',
+    action: 'enable'|'disable'|'active_role'|'channel_role'|'presentation_message'|'first_message_time',
     setOrShowSubAction: 'set'|'show',
-    role: Role
+    role: Role,
+    duration: number
 }
 
 export default class ConfigXP extends Command<IConfigXPArgs> {
@@ -41,11 +43,12 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                     channel_role: "Visionner ou configurer le rôle d'accès aux channels du système d'XP",
                     enable: "Activer le système d'XP",
                     disable: "Désactiver le système d'XP",
-                    presentation_message: "Visionner ou définir le message de bienvenue du système d'XP"
+                    presentation_message: "Visionner ou définir le message de bienvenue du système d'XP",
+                    first_message_time: "Visionner ou définir l'heure minimale du premier message de la journée"
                 }
             },
             setOrShowSubAction: {
-                referToSubCommands: ['active_role','channel_role', 'presentation_message'],
+                referToSubCommands: ['active_role','channel_role', 'presentation_message', 'first_message_time'],
                 isSubCommand: true,
                 required: true,
                 type: "string",
@@ -58,9 +61,16 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
             role: {
                 referToSubCommands: ['active_role.set', 'channel_role.set'],
                 type: "role",
-                required: (args, command, modelizeSlashCommand = false) =>
-                    modelizeSlashCommand || (["active_role","channel_role"].includes(args.action) && args.setOrShowSubAction === "set"),
+                required: args =>
+                    ["active_role","channel_role"].includes(args.action) && args.setOrShowSubAction === "set",
                 description: "Quel rôle définir"
+            },
+            duration: {
+                referToSubCommands: ['first_message_time.set'],
+                type: "duration",
+                required: args =>
+                    args.action == "first_message_time" && args.setOrShowSubAction === "set",
+                description: "Donnez une durée (ex: 7h, 6h30, etc...)"
             }
         }
     }
@@ -133,6 +143,34 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
         })
     }
 
+    async actionFirst_message_time(args: IConfigXPArgs, XPServerConfig: IXPData) {
+        if (args.setOrShowSubAction === "show")
+            return this.response(true, {
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("Heure minimale du premier message")
+                        .setFields({
+                            name: "Heure configurée :",
+                            value: showTime(extractUTCTime(XPServerConfig.firstMessageTime), 'fr')
+                        })
+                ]
+            })
+
+        XPServerConfig.firstMessageTime = args.duration;
+        await XPServerConfig.save();
+
+        return this.response(true, {
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle("Heure minimale du premier message")
+                    .setFields({
+                        name: "Vous avez configuré avec succès l'heure suivante :",
+                        value: showTime(extractUTCTime(args.duration), 'fr')
+                    })
+            ]
+        })
+    }
+
     async actionPresentation_message(args: IConfigXPArgs, XPServerConfig: IXPData) {
         if (args.setOrShowSubAction === "show")
             return this.response(true, XPServerConfig.presentationMessage ?
@@ -157,6 +195,11 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                 resolve(this.response(true, "Message envoyé avec succès ! Vous pouvez le revisionner avec /configxp presentation_message show"))
             }
             client.on('messageCreate', listener);
+
+            setTimeout(() => {
+                client.off('messageCreate', listener);
+                resolve(this.response(false, "Délai dépassé"));
+            }, 10 * 60 * 1000)
         }))
     }
 

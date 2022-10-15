@@ -60,7 +60,7 @@ export function extractUTCDate(date: Date|number) {
     }
 }
 
-export function showTime(time: {h: number, m: number, s: number}, format: string): string {
+export function showTime(time: {h: number, m: number, s: number}, format: 'fr_long'|'fr'|'classic'): string {
     const {h,m,s} = time;
     if (h+m+s === 0)
         return '0';
