@@ -18,12 +18,12 @@ import {IArgsModel, responseResultsType, responseType} from "../interfaces/Comma
 
 const validModelCommands = {};
 
-export default class Command {
+export default class Command<IArgs = {[key: string]: any}> {
 
     static commandName: null|string = null;
     static display: boolean = false;
     static description: null|string = null;
-    static argsModel: IArgsModel;
+    static argsModel: IArgsModel<any>;
 
     static slashCommandIdByGuild: {[guildId: string]: string} = {};
 
@@ -37,12 +37,12 @@ export default class Command {
     guild: null|Guild;
     channel: TextChannel;
     member: User|GuildMember;
-    argsModel: IArgsModel;
+    argsModel: IArgsModel<IArgs>;
 
     writtenCommand: null|string = null; // If command called as a custom command, get the message typed by the user
     slashCommandOptions: null|CommandInteractionOptionResolver = null; // If command called as a slash command, get options
 
-    constructor(channel: TextChannel, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom', commandName: null|string, argsModel: IArgsModel) {
+    constructor(channel: TextChannel, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom', commandName: null|string, argsModel: IArgsModel<IArgs>) {
         this.guild = guild;
         this.channel = channel;
         this.member = member;

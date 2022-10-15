@@ -9,10 +9,10 @@ export interface IXPUserData {
     DMEnabled: boolean;
     XP: number;
     todayXP: number;
-    gradeId: null|string;
+    gradeId?: string;
     lastNotifiedLevel: number;
     currentLevel: number;
-    lastFirstDayMessageTimestamp: null|Date;
+    lastFirstDayMessageTimestamp?: Date;
 }
 
 const XPUserDataSchema: Schema = new Schema({

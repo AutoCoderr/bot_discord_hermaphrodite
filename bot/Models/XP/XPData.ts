@@ -1,5 +1,6 @@
 import { Schema } from 'mongoose';
 import { connect } from "../../Mongo";
+import IModel from "../../interfaces/IModel";
 
 const db = connect();
 
@@ -18,13 +19,13 @@ interface IGrade {
     roleId: string;
 }
 
-export interface IXPData {
+export interface IXPData extends IModel {
     serverId: string;
     enabled: boolean;
-    activeRoleId: null|string;
-    channelRoleId: null|string;
+    activeRoleId?: string;
+    channelRoleId?: string;
 
-    welcomeMessage: null|string;
+    welcomeMessage?: string;
 
     XPByMessage: number;
     XPByFirstMessage: number;
