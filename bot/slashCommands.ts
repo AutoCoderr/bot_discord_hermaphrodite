@@ -9,6 +9,7 @@ import Command from "./Classes/Command";
 import {existingCommands} from "./Classes/CommandsDescription";
 import {getterNameBySlashType, slashCommandsTypeDefinitions} from "./Classes/slashCommandsTypeDefinitions";
 import CustomError from "./logging/CustomError";
+import {responseType} from "./interfaces/CommandInterfaces";
 
 interface optionCommandType {
     type?: ApplicationCommandOptionType.Boolean |
@@ -198,7 +199,8 @@ function generateSlashOptionFromModel(attr: string, argModel: any, subCommands: 
     }
 }
 
-async function getAndDisplaySlashCommandsResponse(interaction: CommandInteraction, response: false | { result: Array<string | MessagePayload | InteractionReplyOptions>, callback?: Function }, p = 0) {
+
+async function getAndDisplaySlashCommandsResponse(interaction: CommandInteraction, response: false | Omit<responseType, 'success'>, p = 0) {
     if (response) {
         for (let i = 0; i < response.result.length; i++) {
             const payload = response.result[i];

@@ -1,10 +1,21 @@
 import Command from "../Classes/Command";
 import { IArgsModel} from "../interfaces/CommandInterfaces";
-import {CommandInteractionOptionResolver, EmbedBuilder, Guild, GuildMember, Role, TextChannel, User} from "discord.js";
+import {
+    bold,
+    CommandInteractionOptionResolver,
+    EmbedBuilder,
+    Guild,
+    GuildMember,
+    Message,
+    Role,
+    TextChannel,
+    User
+} from "discord.js";
 import XPData, {IXPData} from "../Models/XP/XPData";
+import client from "../client";
 
 interface IConfigXPArgs {
-    action: 'enable'|'disable'|'active_role'|'channel_role',
+    action: 'enable'|'disable'|'active_role'|'channel_role'|'presentation_message',
     setOrShowSubAction: 'set'|'show',
     role: Role
 }
@@ -29,11 +40,12 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                     active_role: "Visionner ou configurer le rôle actif du système d'XP",
                     channel_role: "Visionner ou configurer le rôle d'accès aux channels du système d'XP",
                     enable: "Activer le système d'XP",
-                    disable: "Désactiver le système d'XP"
+                    disable: "Désactiver le système d'XP",
+                    presentation_message: "Visionner ou définir le message de bienvenue du système d'XP"
                 }
             },
             setOrShowSubAction: {
-                referToSubCommands: ['active_role','channel_role'],
+                referToSubCommands: ['active_role','channel_role', 'presentation_message'],
                 isSubCommand: true,
                 required: true,
                 type: "string",
@@ -119,6 +131,33 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                     })
             ]
         })
+    }
+
+    async actionPresentation_message(args: IConfigXPArgs, XPServerConfig: IXPData) {
+        if (args.setOrShowSubAction === "show")
+            return this.response(true, XPServerConfig.presentationMessage ?
+                "Voici le message de présentation du système d'XP : \n\n\n"+
+                XPServerConfig.presentationMessage
+            : "Vous n'avez configuré aucun message de présentation")
+
+
+        return this.response(true, "Veuillez rentrer un message :", () => new Promise(resolve => {
+            const listener = async (response: Message) => {
+                if (response.author.id !== this.member.id)
+                    return;
+
+                XPServerConfig.presentationMessage = response.content
+
+                await XPServerConfig.save();
+
+                await response.delete();
+
+                client.off('messageCreate', listener);
+
+                resolve(this.response(true, "Message envoyé avec succès ! Vous pouvez le revisionner avec /configxp presentation_message show"))
+            }
+            client.on('messageCreate', listener);
+        }))
     }
 
     async actionActive_role(args: IConfigXPArgs, XPServerConfig: IXPData) {

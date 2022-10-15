@@ -2,7 +2,9 @@ import {InteractionReplyOptions, MessagePayload} from "discord.js";
 import {checkTypes} from "../Classes/TypeChecker";
 import Command from "../Classes/Command";
 
-export interface responseResultsType extends Array<string | MessagePayload | InteractionReplyOptions>{};
+export type responseResultType = string | MessagePayload | InteractionReplyOptions;
+
+export type responseResultsType = responseResultType[];
 
 type RequireAtLeastOne<T, Keys extends keyof T = keyof T> =
     Pick<T, Exclude<keyof T, Keys>>
@@ -42,5 +44,5 @@ export type IArgsModel<IArgs = {[key: string]: any}> =
 export interface responseType {
     success: boolean;
     result: responseResultsType,
-    callback?: Function
+    callback?: (() => false|responseType|Promise<false|responseType>)
 }

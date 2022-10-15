@@ -25,7 +25,7 @@ export interface IXPData extends IModel {
     activeRoleId?: string;
     channelRoleId?: string;
 
-    welcomeMessage?: string;
+    presentationMessage?: string;
 
     XPByMessage: number;
     XPByFirstMessage: number;
@@ -65,7 +65,7 @@ const XPDataSchema: Schema = new Schema({
     activeRoleId: { type: String, required: false },
     channelRoleId: { type: String, required: false },
 
-    welcomeMessage: { type: String, required: false },
+    presentationMessage: { type: String, required: false },
 
     XPByMessage: { type: Number, required: false, default: 1 },
     XPByFirstMessage: { type: Number, required: false, default: 10 },

@@ -14,7 +14,7 @@ import {checkTypes} from "./TypeChecker";
 import {extractTypes} from "./TypeExtractor";
 import {getCustomType, getSlashTypeGetterName} from "../slashCommands";
 import CustomError from "../logging/CustomError";
-import {IArgsModel, responseResultsType, responseType} from "../interfaces/CommandInterfaces";
+import {IArgsModel, responseResultsType, responseResultType, responseType} from "../interfaces/CommandInterfaces";
 
 const validModelCommands = {};
 
@@ -60,7 +60,7 @@ export default class Command<IArgs = {[key: string]: any}> {
         return this.writtenCommand.split(" ")[0].toLowerCase() == config.command_prefix+this.commandName.toLowerCase();
     }
 
-    async executeCommand(bot, slashCommand = false): Promise<false| { result: Array<string | MessagePayload | InteractionReplyOptions>, callback?: Function }> {
+    async executeCommand(bot, slashCommand = false): Promise<false| Omit<responseType, "success">> {
         if (this.writtenCommand === null || await this.match()) {
 
             if (this.writtenCommand && !(await this.checkPermissions()))
@@ -90,7 +90,7 @@ export default class Command<IArgs = {[key: string]: any}> {
                     throw new CustomError(e, {commandArguments: args});
                 })
 
-            if (success && this.writtenCommand !== null)
+            if (success && this.commandOrigin === "custom")
                 this.saveHistory();
             return {result, callback};
         }
@@ -779,11 +779,11 @@ export default class Command<IArgs = {[key: string]: any}> {
         return {success: true, result: out};
     }
 
-    response(success: boolean, result: responseResultsType|string | MessagePayload | InteractionReplyOptions, callback: null|Function = null): responseType {
+    response(success: boolean, result: responseResultsType|responseResultType, callback: null|(() => false|responseType|Promise<false|responseType>) = null): responseType {
         return {
             success,
             result: result instanceof Array ? result : [result],
-            ...(callback ? {callback}: {})
+            ...(callback !== null ? {callback}: {})
         };
     }
 

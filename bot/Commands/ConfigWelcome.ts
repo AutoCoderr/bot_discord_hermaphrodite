@@ -60,32 +60,33 @@ export default class ConfigWelcome extends Command {
                 return this.response(true, "Veuillez rentrer le message, qui sera envoyé en MP aux nouveaux arrivants sur ce serveur :",
                     () => new Promise(resolve =>  {
                         const listener = async (response: Message) => {
-                            if (response.author.id == this.member.id) { // @ts-ignore
-                                let welcomeMessage: IWelcomeMessage = await WelcomeMessage.findOne({serverId: this.guild.id});
-                                let create = false;
-                                if (welcomeMessage == null) {
-                                    create = true;
-                                    welcomeMessage = {
-                                        enabled: true,
-                                        message: response.content, // @ts-ignore
-                                        serverId: this.guild.id
-                                    };
-                                    WelcomeMessage.create(welcomeMessage);
-                                } else {
-                                    welcomeMessage.message = response.content; // @ts-ignore
-                                    welcomeMessage.save();
-                                }
-                                bot.off('messageCreate', listener);
+                            if (response.author.id !== this.member.id)
+                                return;
 
-                                if (this.commandOrigin === 'slash')
-                                    response.delete();
+                            let welcomeMessage: IWelcomeMessage = await WelcomeMessage.findOne({serverId: (<Guild>this.guild).id});
+                            let create = false;
+                            if (welcomeMessage == null) {
+                                create = true;
+                                welcomeMessage = {
+                                    enabled: true,
+                                    message: response.content, // @ts-ignore
+                                    serverId: this.guild.id
+                                };
+                                WelcomeMessage.create(welcomeMessage);
+                            } else {
+                                welcomeMessage.message = response.content; // @ts-ignore
+                                welcomeMessage.save();
+                            }
+                            bot.off('messageCreate', listener);
 
-                                resolve(
-                                    this.response(true,
+                            if (this.commandOrigin === 'slash')
+                                await response.delete();
+
+                            resolve(
+                                this.response(true,
                                     "Votre message a été enregistré et sera envoyé en MP aux nouveaux arrivants de ce serveur"+
                                     (create ?  "\n(L'envoie de MP aux nouveaux a été activé)" : ""))
-                                );
-                            }
+                            );
                         };
                         bot.on('messageCreate', listener);
                     }));
