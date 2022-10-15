@@ -72,8 +72,8 @@ const XPDataSchema: Schema = new Schema({
     XPByVocal: { type: Number, required: false, default: 1 },
     XPByBump: { type: Number, required: false, default: 25 },
 
-    timeLimitMessage: { type: Number, required: false, default: 60 * 6000 },
-    timeLimitVocal: { type: Number, required: false, default: 5 * 60 * 6000 },
+    timeLimitMessage: { type: Number, required: false, default: 60 * 1000 },
+    timeLimitVocal: { type: Number, required: false, default: 5 * 60 * 1000 },
 
     firstMessageTime: { type: Number, required: false, default: 7 * 60 * 60 * 1000 },
 

@@ -16,7 +16,7 @@ import client from "../client";
 import {extractUTCTime, showTime} from "../Classes/DateTimeManager";
 
 interface IConfigXPArgs {
-    action: 'enable'|'disable'|'active_role'|'channel_role'|'presentation_message'|'first_message_time',
+    action: 'enable'|'disable'|'active_role'|'channel_role'|'presentation_message'|'first_message_time'|'show_xp_gain',
     setOrShowSubAction: 'set'|'show',
     role: Role,
     duration: number
@@ -44,7 +44,8 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                     enable: "Activer le système d'XP",
                     disable: "Désactiver le système d'XP",
                     presentation_message: "Visionner ou définir le message de bienvenue du système d'XP",
-                    first_message_time: "Visionner ou définir l'heure minimale du premier message de la journée"
+                    first_message_time: "Visionner ou définir l'heure minimale du premier message de la journée",
+                    show_xp_gain: "Afficher les gains d'xp par type"
                 }
             },
             setOrShowSubAction: {
@@ -167,6 +168,33 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                         name: "Vous avez configuré avec succès l'heure suivante :",
                         value: showTime(extractUTCTime(args.duration), 'fr')
                     })
+            ]
+        })
+    }
+
+    async actionShow_xp_gain(args: IConfigXPArgs, XPServerConfig: IXPData) {
+        return this.response(true, {
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle("Gains d'xp par type :")
+                    .setFields(
+                        {
+                            name: "Gain d'XP par message toutes les "+showTime(extractUTCTime(XPServerConfig.timeLimitMessage), 'fr'),
+                            value: XPServerConfig.XPByMessage+" XP"
+                        },
+                        {
+                            name: "Gain d'XP toutes les "+showTime(extractUTCTime(XPServerConfig.timeLimitVocal), 'fr')+" en vocal",
+                            value: XPServerConfig.XPByVocal+" XP"
+                        },
+                        {
+                            name: "Combien d'XP par bump",
+                            value: XPServerConfig.XPByBump+" XP"
+                        },
+                        {
+                            name: "Combien d'XP pour le premier message du jour",
+                            value: XPServerConfig.XPByFirstMessage+" XP"
+                        }
+                    )
             ]
         })
     }
