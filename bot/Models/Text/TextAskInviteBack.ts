@@ -5,6 +5,7 @@ const db = connect();
 
 export interface ITextAskInviteBack {
     buttonId: string;
+    messageId: null|string;
     requesterId: string;
     requestedId: string;
     channelsId: string[];
@@ -15,6 +16,7 @@ export interface ITextAskInviteBack {
 
 const TextAskInviteBackSchema: Schema = new Schema({
     buttonId: { type: String, required: true },
+    messageId: { type: String, required: false },
     requesterId: { type: String, required: true },
     requestedId: { type: String, required: true },
     channelsId: { type: Array, required: false },

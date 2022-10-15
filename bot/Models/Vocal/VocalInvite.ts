@@ -6,6 +6,7 @@ const db = connect();
 export interface IVocalInvite {
     inviteId: string;
     buttonId: string;
+    messageId: null|string;
     requesterId: string;
     requestedId: string;
     accept: boolean;
@@ -16,6 +17,7 @@ export interface IVocalInvite {
 const VocalInviteSchema: Schema = new Schema({
     inviteId: { type: String, required: true },
     buttonId: { type: String, required: true },
+    messageId: { type: String, required: false },
     requesterId: { type: String, required: true },
     requestedId: { type: String, required: true },
     accept: { type: Boolean, required: true },

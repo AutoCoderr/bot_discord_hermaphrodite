@@ -5,6 +5,7 @@ const db = connect();
 
 export interface IVocalAskInviteBack {
     buttonId: string;
+    messageId: null|string;
     requesterId: string;
     requestedId: string;
     timestamp: Date;
@@ -13,6 +14,7 @@ export interface IVocalAskInviteBack {
 
 const VocalAskInviteBackSchema: Schema = new Schema({
     buttonId: { type: String, required: true },
+    messageId: { type: String, required: false },
     requesterId: { type: String, required: true },
     requestedId: { type: String, required: true },
     timestamp: { type: Date, required: true },
