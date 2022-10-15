@@ -4,7 +4,7 @@ import {CommandInteractionOptionResolver, EmbedBuilder, Guild, GuildMember, Role
 import XPData, {IXPData} from "../Models/XP/XPData";
 
 interface IConfigXPArgs {
-    action: 'active_role',
+    action: 'enable'|'disable'|'active_role'|'channel_role',
     setOrShowSubAction: 'set'|'show',
     role: Role
 }
@@ -27,12 +27,13 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                 description: "Ce que vous souhaitez configurer",
                 choices: {
                     active_role: "Visionner ou configurer le rôle actif du système d'XP",
+                    channel_role: "Visionner ou configurer le rôle d'accès aux channels du système d'XP",
                     enable: "Activer le système d'XP",
                     disable: "Désactiver le système d'XP"
                 }
             },
             setOrShowSubAction: {
-                referToSubCommands: ['active_role'],
+                referToSubCommands: ['active_role','channel_role'],
                 isSubCommand: true,
                 required: true,
                 type: "string",
@@ -43,10 +44,10 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                 }
             },
             role: {
-                referToSubCommands: ['active_role.set'],
+                referToSubCommands: ['active_role.set', 'channel_role.set'],
                 type: "role",
                 required: (args, command, modelizeSlashCommand = false) =>
-                    modelizeSlashCommand || (args.action === "active_role" && args.setOrShowSubAction === "set"),
+                    modelizeSlashCommand || (["active_role","channel_role"].includes(args.action) && args.setOrShowSubAction === "set"),
                 description: "Quel rôle définir"
             }
         }
@@ -73,10 +74,10 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
             serverId: (<Guild>this.guild).id
         }));
 
-        return this[args.action](args, XPServerConfig);
+        return this["action"+args.action[0].toUpperCase()+args.action.substring(1)](args, XPServerConfig);
     }
 
-    async enable(args: IConfigXPArgs, XPServerConfig: IXPData) {
+    async actionEnable(args: IConfigXPArgs, XPServerConfig: IXPData) {
         if (XPServerConfig.activeRoleId === undefined)
             return this.response(true, {
                 embeds: [
@@ -84,7 +85,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                         .setTitle("Activer système d'XP")
                         .setFields({
                             name: "Activer système d'XP",
-                            value: "Vous devez d'abord définir le rôle actif via la commande /configxp activerole set"
+                            value: "Vous devez d'abord définir le rôle actif via la commande /configxp active_role set"
                         })
                 ]
             })
@@ -104,7 +105,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
         })
     }
 
-    async disable(args: IConfigXPArgs, XPServerConfig: IXPData) {
+    async actionDisable(args: IConfigXPArgs, XPServerConfig: IXPData) {
         XPServerConfig.enabled = false;
         await XPServerConfig.save();
 
@@ -120,30 +121,39 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
         })
     }
 
-    async active_role(args: IConfigXPArgs, XPServerConfig: IXPData) {
+    async actionActive_role(args: IConfigXPArgs, XPServerConfig: IXPData) {
+        return this.defineAndShowRole(args, XPServerConfig, 'activeRoleId')
+    }
+
+    async actionChannel_role(args: IConfigXPArgs, XPServerConfig: IXPData) {
+        return this.defineAndShowRole(args, XPServerConfig, 'channelRoleId')
+    }
+
+    async defineAndShowRole(args: IConfigXPArgs, XPServerConfig: IXPData, col: 'activeRoleId'|'channelRoleId') {
+        const typeName = col === "activeRoleId" ? "actif" : "d'accès";
         if (args.setOrShowSubAction === "show")
             return this.response(true, {
                 embeds: [
                     new EmbedBuilder()
-                        .setTitle("Rôle actif")
+                        .setTitle("Rôle "+typeName)
                         .setFields({
-                            name: "Rôle actif :",
-                            value: XPServerConfig.activeRoleId ?
-                                "<@&"+XPServerConfig.activeRoleId+">" :
+                            name: "Rôle "+typeName+" :",
+                            value: XPServerConfig[col] ?
+                                "<@&"+XPServerConfig[col]+">" :
                                 "Non défini"
                         })
                 ]
             })
-        XPServerConfig.activeRoleId = args.role.id;
+        XPServerConfig[col] = args.role.id;
         await XPServerConfig.save()
 
         return this.response(true, {
             embeds: [
                 new EmbedBuilder()
-                    .setTitle("Définir le rôle actif")
+                    .setTitle("Définir le rôle "+typeName)
                     .setFields({
-                        name: "Rôle définit avec succès !",
-                        value: "Rôle définit avec succès !"
+                        name: "Rôle défini avec succès !",
+                        value: "Rôle défini avec succès !"
                     })
             ]
         })
