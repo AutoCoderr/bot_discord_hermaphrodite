@@ -7,6 +7,8 @@ export const slashCommandsTypeDefinitions = {
     },
     number: {commandType: "slash", type: ApplicationCommandOptionType.Number},
     integer: {commandType: "slash", type: ApplicationCommandOptionType.Integer},
+    positiveInteger: {commandType: "slash", type: ApplicationCommandOptionType.Integer},
+    overZeroInteger: {commandType: "slash", type: ApplicationCommandOptionType.Integer},
     boolean: {commandType: "slash", type: ApplicationCommandOptionType.Boolean},
     message: {
         multi: {commandType: "custom", type: "messages"}

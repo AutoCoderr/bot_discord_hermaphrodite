@@ -27,6 +27,7 @@ export type IArgModel<IArgs = {[key: string]: any}> = RequireAtLeastOne<{
     displayExtractError?: boolean;
     multi?: boolean;
     valid?: (value: any, args: Partial<IArgs>, command: Command<IArgs>) => boolean|Promise<boolean>;
+    evenCheckForSlash?: boolean;
     errorMessage?: (value: any, args: Partial<IArgs>) => {name: string, value: string};
     default?: any;
     moreDatas?: (args: Partial<IArgs>, type: keyof typeof checkTypes, command: Command<IArgs>) => any

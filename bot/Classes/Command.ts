@@ -423,11 +423,12 @@ export default class Command<IArgs = {[key: string]: any}> {
                 }
             } else {
                 const customType = getCustomType(argModel);
-                if (customType) {
-                    if (checkTypes[customType](initialValue)) {
-                        if (extractTypes[customType]) {
-                            const moreDatas = typeof (argModel.moreDatas) == "function" ? await argModel.moreDatas(args, customType, this) : null
-                            const data = await extractTypes[customType](initialValue, this, moreDatas);
+                if (customType || argModel.evenCheckForSlash) {
+                    const type = customType ?? argModel.type
+                    if (checkTypes[type](initialValue)) {
+                        if (extractTypes[type]) {
+                            const moreDatas = typeof (argModel.moreDatas) == "function" ? await argModel.moreDatas(args, type, this) : null
+                            const data = await extractTypes[type](initialValue, this, moreDatas);
                             if (data === false) {
                                 failed = true;
                                 failsExtract.push({...argModel, field: attr, value: args[attr]});

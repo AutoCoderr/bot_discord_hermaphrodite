@@ -4,14 +4,14 @@ import IModel from "../../interfaces/IModel";
 
 const db = connect();
 
-interface ILevelTip {
+export interface ILevelTip {
     level: number;
     content: string;
     userApproves: string[];
     userUnapproves: string[];
 }
 
-interface IGrade {
+export interface IGrade {
     atLevel: number;
     requiredXP: number;
     XPByLevel: number;
@@ -24,8 +24,6 @@ export interface IXPData extends IModel {
     enabled: boolean;
     activeRoleId?: string;
     channelRoleId?: string;
-
-    presentationMessage?: string;
 
     XPByMessage: number;
     XPByFirstMessage: number;
@@ -64,8 +62,6 @@ const XPDataSchema: Schema = new Schema({
     enabled: { type: Boolean, required: false, default: false },
     activeRoleId: { type: String, required: false },
     channelRoleId: { type: String, required: false },
-
-    presentationMessage: { type: String, required: false },
 
     XPByMessage: { type: Number, required: false, default: 1 },
     XPByFirstMessage: { type: Number, required: false, default: 10 },

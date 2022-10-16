@@ -11,8 +11,9 @@ import {
     User
 } from "discord.js";
 import XPData, {IXPData} from "../Models/XP/XPData";
-import client from "../client";
 import {extractUTCTime, showTime} from "../Classes/DateTimeManager";
+import {findTipByLevel, setTipByLevel} from "../Classes/OtherFunctions";
+import client from "../client";
 
 interface IConfigXPArgs {
     action:
@@ -20,17 +21,19 @@ interface IConfigXPArgs {
         'disable'|
         'active_role'|
         'channel_role'|
-        'presentation_message'|
         'first_message_time'|
         'show_xp_gain'|
         'set_xp_gain'|
-        'set_limit_gain',
+        'set_limit_gain'|
+        'tips',
     setOrShowSubAction: 'set'|'show',
     XPActionTypes: 'vocal'|'message'|'first_message'|'bump',
     XPActionTypesToLimit: 'vocal'|'message',
+    tipsSubActions: 'list'|'show'|'set'|'delete'
     role: Role,
     duration: number,
-    XP: number
+    XP: number,
+    level: number
 }
 
 export default class ConfigXP extends Command<IConfigXPArgs> {
@@ -46,7 +49,6 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
         $argsByType: {
             action: {
                 isSubCommand: true,
-                required: true,
                 type: "string",
                 description: "Ce que vous souhaitez configurer",
                 choices: {
@@ -54,17 +56,16 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                     disable: "Désactiver le système d'XP",
                     active_role: "le rôle actif du système d'XP",
                     channel_role: "le rôle d'accès aux channels du système d'XP",
-                    presentation_message: "le message de bienvenue du système d'XP",
                     first_message_time: "l'heure minimale du premier message de la journée",
                     show_xp_gain: "Afficher les gains d'XP par type",
                     set_xp_gain: "Définir le taux d'XP",
-                    set_limit_gain: "Définir la limite de gain d'XP"
+                    set_limit_gain: "Définir la limite de gain d'XP",
+                    tips: null
                 }
             },
             setOrShowSubAction: {
-                referToSubCommands: ['active_role','channel_role', 'presentation_message', 'first_message_time'],
+                referToSubCommands: ['active_role','channel_role', 'first_message_time'],
                 isSubCommand: true,
-                required: true,
                 type: "string",
                 description: "Quelle type d'action effectuer ?",
                 choices: {
@@ -75,7 +76,6 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
             XPActionTypes: {
                 referToSubCommands: ['set_xp_gain'],
                 isSubCommand: true,
-                required: true,
                 type: "string",
                 description: "Quel type de gain d'XP ?",
                 choices: {
@@ -88,7 +88,6 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
             XPActionTypesToLimit: {
                 referToSubCommands: ['set_limit_gain'],
                 isSubCommand: true,
-                required: true,
                 type: "string",
                 description: "Quel type de gain d'XP ?",
                 choices: {
@@ -96,10 +95,37 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                     vocal: (_, parentDescription) => parentDescription+" pour le vocal",
                 }
             },
+            tipsSubActions: {
+                referToSubCommands: ['tips'],
+                isSubCommand: true,
+                type: "string",
+                description: "Quel type d'action sur les tips?",
+                choices: {
+                    show: "Afficher un tips",
+                    set: "Définir un tips",
+                    delete: "Supprimer un tips",
+                    list: "Lister les tips"
+                }
+            },
+            level: {
+                referToSubCommands: ['tips.show', 'tips.delete', 'tips.set'],
+                type: "overZeroInteger",
+                evenCheckForSlash: true,
+                description: "Rentrez une valeur",
+                errorMessage: () => ({
+                    name: "Donnée invalide",
+                    value: "Le niveau doit être un entier naturel (> 0)"
+                })
+            },
             XP: {
                 referToSubCommands: ['message', 'vocal', 'first_message', 'bump'].map(t => 'set_xp_gain.'+t),
-                type: "integer",
+                type: "overZeroInteger",
+                evenCheckForSlash: true,
                 description: "Rentrez une valeur",
+                errorMessage: () => ({
+                    name: "Donnée invalide",
+                    value: "Le nombre d'XP doit être un entier naturel (> 0)"
+                })
             },
             role: {
                 referToSubCommands: ['active_role.set', 'channel_role.set'],
@@ -177,6 +203,96 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                     .setFields({
                         name: "Désactiver système d'XP",
                         value: "Fonctionnalité désactivée avec succès !"
+                    })
+            ]
+        })
+    }
+
+    async action_tips(args: IConfigXPArgs, XPServerConfig: IXPData) {
+        return this["action_tips_"+args.tipsSubActions](args, XPServerConfig)
+    }
+
+    async action_tips_set(args: IConfigXPArgs, XPServerConfig: IXPData) {
+        return this.response(true, "Veuillez rentrer un message pour le tips :",
+            () => new Promise(resolve => {
+                let timeout;
+                const listener = async (response: Message) => {
+                    if (response.author.id !== this.member.id)
+                        return;
+
+                    client.off('messageCreate', listener);
+                    clearTimeout(timeout);
+
+                    XPServerConfig.tipsByLevel = setTipByLevel(args.level, response.content, XPServerConfig.tipsByLevel);
+                    await XPServerConfig.save();
+
+                    await response.delete();
+
+                    resolve(
+                        this.response(true, "Tips enregistré avec succès !")
+                    )
+                }
+
+                client.on('messageCreate', listener);
+
+                timeout = setTimeout(() => {
+                    client.off('messageCreate', listener);
+                    resolve(this.response(false, "Délai dépassé"));
+                }, 10 * 60 * 1000)
+            }))
+    }
+
+    async action_tips_delete(args: IConfigXPArgs, XPServerConfig: IXPData) {
+        const updatedTips = XPServerConfig.tipsByLevel.filter(tips => tips.level !== args.level);
+        if (updatedTips.length === XPServerConfig.tipsByLevel.length)
+            return this.response(false, {
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("Element introuvable")
+                        .setFields({
+                            name: "Element introuvable",
+                            value: "Aucun tips n'est défini pour le niveau "+args.level
+                        })
+                ]
+            })
+
+        XPServerConfig.tipsByLevel = updatedTips;
+        await XPServerConfig.save();
+
+        return this.response(true, {
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle("Element supprimé avec succès")
+                    .setFields({
+                        name: "Element supprimé avec succès",
+                        value: "Le tips associé au niveau "+args.level+" a été supprimé avec succès !"
+                    })
+            ]
+        })
+    }
+
+    async action_tips_show(args: IConfigXPArgs, XPServerConfig: IXPData) {
+        const tips = findTipByLevel(args.level, XPServerConfig.tipsByLevel);
+
+        if (tips === null)
+            return this.response(true, {
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("Element introuvable")
+                        .setFields({
+                            name: "Element introuvable",
+                            value: "Aucun tips n'est défini pour le niveau "+args.level
+                        })
+                ]
+            })
+
+        return this.response(true, {
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle("Tips numéro "+args.level)
+                    .setFields({
+                        name: "Voici le tips "+args.level,
+                        value: tips.content
                     })
             ]
         })
@@ -287,41 +403,6 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                     })
             ]
         })
-    }
-
-    async action_presentation_message(args: IConfigXPArgs, XPServerConfig: IXPData) {
-        if (args.setOrShowSubAction === "show")
-            return this.response(true, XPServerConfig.presentationMessage ?
-                "Voici le message de présentation du système d'XP : \n\n\n"+
-                XPServerConfig.presentationMessage
-            : "Vous n'avez configuré aucun message de présentation")
-
-
-        return this.response(true, "Veuillez rentrer un message :", () => new Promise(resolve => {
-            let timeout;
-            const listener = async (response: Message) => {
-                if (response.author.id !== this.member.id)
-                    return;
-
-                XPServerConfig.presentationMessage = response.content
-
-                clearTimeout(timeout);
-
-                await XPServerConfig.save();
-
-                await response.delete();
-
-                client.off('messageCreate', listener);
-
-                resolve(this.response(true, "Message envoyé avec succès ! Vous pouvez le revisionner avec /configxp presentation_message show"))
-            }
-            client.on('messageCreate', listener);
-
-            timeout = setTimeout(() => {
-                client.off('messageCreate', listener);
-                resolve(this.response(false, "Délai dépassé"));
-            }, 10 * 60 * 1000)
-        }))
     }
 
     async action_active_role(args: IConfigXPArgs, XPServerConfig: IXPData) {
