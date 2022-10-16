@@ -12,13 +12,15 @@ type RequireAtLeastOne<T, Keys extends keyof T = keyof T> =
     [K in Keys]-?: Required<Pick<T, K>> & Partial<Pick<T, Exclude<Keys, K>>>
 }[Keys];
 
-type IArg<IArgs = {[key: string]: any}> = RequireAtLeastOne<{
+export type IChoice = null|string|((args: IArgs, parentDescription: string) => string);
+
+export type IArg<IArgs = {[key: string]: any}> = RequireAtLeastOne<{
     type: keyof typeof checkTypes;
     types: (keyof typeof checkTypes)[];
     required?: boolean|((args: IArgs, command: null|Command, modelizeSlashCommand: boolean) => boolean);
     description: string;
     isSubCommand?: boolean;
-    choices?: {[action: string]: null|string|((args: IArgs, parentDescription: string) => string)}|string[];
+    choices?: {[action: string]: IChoice}|string[];
     referToSubCommands?: string[];
     displayValidError?: boolean;
     displayValidErrorEvenIfFound?: boolean;

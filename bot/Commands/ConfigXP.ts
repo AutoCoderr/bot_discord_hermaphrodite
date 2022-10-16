@@ -1,7 +1,6 @@
 import Command from "../Classes/Command";
-import { IArgsModel} from "../interfaces/CommandInterfaces";
+import {IArgsModel} from "../interfaces/CommandInterfaces";
 import {
-    bold,
     CommandInteractionOptionResolver,
     EmbedBuilder,
     Guild,
@@ -16,10 +15,20 @@ import client from "../client";
 import {extractUTCTime, showTime} from "../Classes/DateTimeManager";
 
 interface IConfigXPArgs {
-    action: 'enable'|'disable'|'active_role'|'channel_role'|'presentation_message'|'first_message_time'|'show_xp_gain',
+    action:
+        'enable'|
+        'disable'|
+        'active_role'|
+        'channel_role'|
+        'presentation_message'|
+        'first_message_time'|
+        'show_xp_gain'|
+        'set_xp_gain',
     setOrShowSubAction: 'set'|'show',
+    XPActionTypes: 'vocal'|'message'|'first_message'|'bump',
     role: Role,
-    duration: number
+    duration: number,
+    XP: number
 }
 
 export default class ConfigXP extends Command<IConfigXPArgs> {
@@ -46,6 +55,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                     channel_role: "le rôle d'accès aux channels du système d'XP",
                     presentation_message: "le message de bienvenue du système d'XP",
                     first_message_time: "l'heure minimale du premier message de la journée",
+                    set_xp_gain: "Définir le taux d'XP"
                 }
             },
             setOrShowSubAction: {
@@ -58,6 +68,25 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                     set: (_, parentDescription) => "Définir "+parentDescription,
                     show: (_, parentDescription) => "Visionner "+parentDescription
                 }
+            },
+            XPActionTypes: {
+                referToSubCommands: ['set_xp_gain'],
+                isSubCommand: true,
+                required: true,
+                type: "string",
+                description: "Quel type de gain d'XP ?",
+                choices: {
+                    message: (_, parentDescription) => parentDescription+" par message",
+                    vocal: (_, parentDescription) => parentDescription+" pour le vocal",
+                    first_message: (_, parentDescription) => parentDescription+" pour le premier message de la journée",
+                    bump: (_, parentDescription) => parentDescription+" par bump"
+                }
+            },
+            XP: {
+                referToSubCommands: ['message', 'vocal', 'first_message', 'bump'].map(t => 'set_xp_gain.'+t),
+                type: "number",
+                description: "Rentrez une valeur",
+                required: args => args.action === "set_xp_gain"
             },
             role: {
                 referToSubCommands: ['active_role.set', 'channel_role.set'],
@@ -187,14 +216,42 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                             value: XPServerConfig.XPByVocal+" XP"
                         },
                         {
-                            name: "Combien d'XP par bump",
-                            value: XPServerConfig.XPByBump+" XP"
-                        },
-                        {
                             name: "Combien d'XP pour le premier message du jour",
                             value: XPServerConfig.XPByFirstMessage+" XP"
+                        },
+                        {
+                            name: "Combien d'XP par bump",
+                            value: XPServerConfig.XPByBump+" XP"
                         }
                     )
+            ]
+        })
+    }
+
+    async action_set_xp_gain(args: IConfigXPArgs, XPServerConfig: IXPData) {
+        const col = {
+            message: 'XPByMessage',
+            vocal: 'XPByVocal',
+            first_message: 'XPByFirstMessage',
+            bump: 'XPByBump'
+        }[args.XPActionTypes];
+
+        XPServerConfig[col] = args.XP
+        await XPServerConfig.save();
+
+        return this.response(true, {
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle("Définir le taux d'XP "+{
+                        message: "par message",
+                        vocal: "pour le vocal",
+                        first_message: "pour le premier message de la journée",
+                        bump: "par bump"
+                    }[args.XPActionTypes])
+                    .setFields({
+                        name: "Vous avez défini la valeur suivante :",
+                        value: args.XP+" XP"
+                    })
             ]
         })
     }
