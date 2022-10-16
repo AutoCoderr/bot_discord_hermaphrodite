@@ -17,7 +17,7 @@ export type IChoice = null|string|((args: IArgs, parentDescription: string) => s
 export type IArgModel<IArgs = {[key: string]: any}> = RequireAtLeastOne<{
     type: keyof typeof checkTypes;
     types: (keyof typeof checkTypes)[];
-    required?: boolean|((args: IArgs, command: null|Command, modelizeSlashCommand: boolean) => boolean);
+    required?: boolean|((args: Partial<IArgs>, command: null|Command<IArgs>, modelizeSlashCommand: boolean) => boolean);
     description: string;
     isSubCommand?: boolean;
     choices?: {[action: string]: IChoice}|string[];
@@ -26,20 +26,20 @@ export type IArgModel<IArgs = {[key: string]: any}> = RequireAtLeastOne<{
     displayValidErrorEvenIfFound?: boolean;
     displayExtractError?: boolean;
     multi?: boolean;
-    valid?: (value: any, args: IArgs, command: Command) => boolean|Promise<boolean>;
-    errorMessage?: (value: any, args: IArgs) => {name: string, value: string};
+    valid?: (value: any, args: Partial<IArgs>, command: Command<IArgs>) => boolean|Promise<boolean>;
+    errorMessage?: (value: any, args: Partial<IArgs>) => {name: string, value: string};
     default?: any;
-    moreDatas?: (args: IArgs, type: keyof typeof checkTypes, command: Command) => any
+    moreDatas?: (args: Partial<IArgs>, type: keyof typeof checkTypes, command: Command<IArgs>) => any
 }, 'type' | 'types'>
 
 export type IArgsModel<IArgs = {[key: string]: any}> =
     RequireAtLeastOne<{
-        $argsByOrder: Array<IArg<IArgs>&{field: string}>,
+        $argsByOrder: Array<IArgModel<IArgs>&{field: string}>,
         $argsByType: {
-            [field: string]: IArg<IArgs>
+            [field: string]: IArgModel<IArgs>
         }
         $argsByName: {
-            [field: string]: IArg<IArgs>&{fields: string[]}
+            [field: string]: IArgModel<IArgs>&{fields: string[]}
         }
     }>
 

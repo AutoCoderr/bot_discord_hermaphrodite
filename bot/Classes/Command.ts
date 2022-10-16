@@ -365,7 +365,7 @@ export default class Command<IArgs = {[key: string]: any}> {
 
     async getArgsFromSlashOptions(): Promise<{ success: boolean, result: {[attr: string]: any}|responseResultsType }> {
         if (this.slashCommandOptions === null) return {success: false, result: {}};
-        let args: {[name: string]: any} = {};
+        let args: Partial<IArgs> = {};
         let fails: Array<any> = [];
         let failsExtract: Array<any> = [];
 
@@ -380,7 +380,7 @@ export default class Command<IArgs = {[key: string]: any}> {
                     await this.getSlashArgFromModel(argModel.field,argModel,args, fails, failsExtract, additionalParams);
                 }
             } else {
-                for (const [attr2,argModel] of <[string,IArgModel][]>Object.entries(this.argsModel[attr])) {
+                for (const [attr2,argModel] of <[string,IArgModel<IArgs>][]>Object.entries(this.argsModel[attr])) {
                     await this.getSlashArgFromModel(attr2,argModel,args, fails, failsExtract, additionalParams);
                 }
             }
@@ -391,7 +391,7 @@ export default class Command<IArgs = {[key: string]: any}> {
         return {success: true, result: args};
     }
 
-    async getSlashArgFromModel(attr: string, argModel: IArgModel, args: {[name: string]: any}, fails: Array<any>, failsExtract: Array<any>, additionalParams: {subCommand: null|string, subCommandGroup: null|string}) {
+    async getSlashArgFromModel(attr: string, argModel: IArgModel<IArgs>, args: Partial<IArgs>, fails: Array<any>, failsExtract: Array<any>, additionalParams: {subCommand: null|string, subCommandGroup: null|string}) {
         if (this.slashCommandOptions === null) return;
         if (!argModel.isSubCommand) {
 
@@ -816,7 +816,7 @@ export default class Command<IArgs = {[key: string]: any}> {
         return new EmbedBuilder();
     }
 
-    async action(args: any,bot): Promise<responseType> { // To be overloaded
+    async action(args: IArgs,bot): Promise<responseType> { // To be overloaded
         return this.response(true, 'Hello');
     }
 }

@@ -23,9 +23,11 @@ interface IConfigXPArgs {
         'presentation_message'|
         'first_message_time'|
         'show_xp_gain'|
-        'set_xp_gain',
+        'set_xp_gain'|
+        'set_limit_gain',
     setOrShowSubAction: 'set'|'show',
     XPActionTypes: 'vocal'|'message'|'first_message'|'bump',
+    XPActionTypesToLimit: 'vocal'|'message',
     role: Role,
     duration: number,
     XP: number
@@ -55,7 +57,8 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                     presentation_message: "le message de bienvenue du système d'XP",
                     first_message_time: "l'heure minimale du premier message de la journée",
                     show_xp_gain: "Afficher les gains d'XP par type",
-                    set_xp_gain: "Définir le taux d'XP"
+                    set_xp_gain: "Définir le taux d'XP",
+                    set_limit_gain: "Définir la limite de gain d'XP"
                 }
             },
             setOrShowSubAction: {
@@ -82,9 +85,20 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                     bump: (_, parentDescription) => parentDescription+" par bump"
                 }
             },
+            XPActionTypesToLimit: {
+                referToSubCommands: ['set_limit_gain'],
+                isSubCommand: true,
+                required: true,
+                type: "string",
+                description: "Quel type de gain d'XP ?",
+                choices: {
+                    message: (_, parentDescription) => parentDescription+" par message",
+                    vocal: (_, parentDescription) => parentDescription+" pour le vocal",
+                }
+            },
             XP: {
                 referToSubCommands: ['message', 'vocal', 'first_message', 'bump'].map(t => 'set_xp_gain.'+t),
-                type: "number",
+                type: "integer",
                 description: "Rentrez une valeur",
             },
             role: {
@@ -93,7 +107,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                 description: "Quel rôle définir"
             },
             duration: {
-                referToSubCommands: ['first_message_time.set'],
+                referToSubCommands: ['first_message_time.set','set_limit_gain.message','set_limit_gain.vocal'],
                 type: "duration",
                 description: "Donnez une durée (ex: 7h, 6h30, etc...)"
             }
@@ -203,22 +217,46 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                     .setTitle("Gains d'xp par type :")
                     .setFields(
                         {
-                            name: "Gain d'XP par message toutes les "+showTime(extractUTCTime(XPServerConfig.timeLimitMessage), 'fr'),
-                            value: XPServerConfig.XPByMessage+" XP"
+                            name: "Pour les messages",
+                            value: "Gain de "+XPServerConfig.XPByMessage+"XP par message toutes les "+showTime(extractUTCTime(XPServerConfig.timeLimitMessage), 'fr')
                         },
                         {
-                            name: "Gain d'XP toutes les "+showTime(extractUTCTime(XPServerConfig.timeLimitVocal), 'fr')+" en vocal",
-                            value: XPServerConfig.XPByVocal+" XP"
+                            name: "Pour le vocal",
+                            value: "Gain de "+XPServerConfig.XPByVocal+" XP toutes les "+showTime(extractUTCTime(XPServerConfig.timeLimitVocal), 'fr')+" en vocal"
                         },
                         {
-                            name: "Combien d'XP pour le premier message du jour",
+                            name: "Pour le premier message de la journée",
                             value: XPServerConfig.XPByFirstMessage+" XP"
                         },
                         {
-                            name: "Combien d'XP par bump",
+                            name: "Pour chaque bump",
                             value: XPServerConfig.XPByBump+" XP"
                         }
                     )
+            ]
+        })
+    }
+
+    async action_set_limit_gain(args: IConfigXPArgs, XPServerConfig: IXPData) {
+        const col = {
+            message: 'timeLimitMessage',
+            vocal: 'timeLimitVocal'
+        }[args.XPActionTypesToLimit]
+
+        XPServerConfig[col] = args.duration;
+        await XPServerConfig.save();
+
+        return this.response(true, {
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle("Définir la limite de gain d'XP "+{
+                        message: "par message",
+                        vocal: "pour le vocal",
+                    }[args.XPActionTypesToLimit])
+                    .setFields({
+                        name: "Vous avez défini la valeur suivante :",
+                        value: showTime(extractUTCTime(args.duration), 'fr')
+                    })
             ]
         })
     }
@@ -237,7 +275,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
         return this.response(true, {
             embeds: [
                 new EmbedBuilder()
-                    .setTitle("Définir le taux d'XP "+{
+                    .setTitle("Définir le gain d'XP "+{
                         message: "par message",
                         vocal: "pour le vocal",
                         first_message: "pour le premier message de la journée",

@@ -1,7 +1,8 @@
 import {durationUnits} from "./DateTimeManager";
 
 export const checkTypes = {
-    number: field => typeof(field) == "number",
+    number: field => typeof(field) === "number",
+    integer: field => checkTypes.number(field) && field%1 === 0,
     string: field => typeof(field) == "string",
     strings: field => typeof(field) == "string",
     boolean: field => typeof(field) == "boolean",
