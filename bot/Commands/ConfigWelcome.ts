@@ -60,10 +60,12 @@ export default class ConfigWelcome extends Command {
             case "set":
                 return this.response(true, "Veuillez rentrer le message, qui sera envoyé en MP aux nouveaux arrivants sur ce serveur :",
                     () => new Promise(resolve =>  {
+                        let timeout;
                         const listener = async (response: Message) => {
                             if (response.author.id !== this.member.id)
                                 return;
 
+                            clearTimeout(timeout);
                             let welcomeMessage: IWelcomeMessage = await WelcomeMessage.findOne({serverId: (<Guild>this.guild).id});
                             let create = false;
                             if (welcomeMessage == null) {
@@ -91,7 +93,7 @@ export default class ConfigWelcome extends Command {
                         };
                         bot.on('messageCreate', listener);
 
-                        setTimeout(() => {
+                        timeout = setTimeout(() => {
                             client.off('messageCreate', listener);
                             resolve(this.response(false, "Délai dépassé"));
                         }, 10 * 60 * 1000)

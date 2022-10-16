@@ -2,15 +2,14 @@ import client from "./client";
 import {
     ApplicationCommand, ApplicationCommandDataResolvable, CommandInteraction,
     Guild,
-    InteractionReplyOptions, MessagePayload,
+    MessagePayload,
     ApplicationCommandOptionType
 } from "discord.js";
 import Command from "./Classes/Command";
 import {existingCommands} from "./Classes/CommandsDescription";
 import {getterNameBySlashType, slashCommandsTypeDefinitions} from "./Classes/slashCommandsTypeDefinitions";
 import CustomError from "./logging/CustomError";
-import {responseType} from "./interfaces/CommandInterfaces";
-import {type} from "os";
+import {IArg, responseType} from "./interfaces/CommandInterfaces";
 
 interface optionCommandType {
     type?: ApplicationCommandOptionType.Boolean |
@@ -146,7 +145,7 @@ function sortRequiredAndNotRequiredArgumentsInSlashCommand(node: optionCommandTy
     }
 }
 
-function generateSlashOptionFromModel(attr: string, argModel: any, subCommands: { [attr: string]: any }, slashCommandModel: optionCommandType) {
+function generateSlashOptionFromModel(attr: string, argModel: IArg, subCommands: { [attr: string]: any }, slashCommandModel: optionCommandType) {
     const chooseSubCommands: any[] = [];
     if (argModel.referToSubCommands instanceof Array)
         for (const referedSubCommand of argModel.referToSubCommands) {
@@ -163,15 +162,28 @@ function generateSlashOptionFromModel(attr: string, argModel: any, subCommands: 
             if (chooseSubCommand.noSubCommandGroup)
                 throw new Error("You cannot blend normal arguments and sub commands in another sub command");
 
-            for (const [choice, description] of argModel.choices ? Object.entries(argModel.choices) : []) {
+            for (const choice of
+                argModel.choices instanceof Array ?
+                    argModel.choices :
+                        typeof(argModel.choices) === "object" ?
+                            Object.entries(argModel.choices) :
+                            []
+                ) {
+                const name = choice instanceof Array ? choice[0] : choice;
+                const description = choice instanceof Array ?
+                    typeof(choice[1]) === "function" ?
+                        choice[1](chooseSubCommand.args ?? {}, chooseSubCommand.description) :
+                        choice[1] :
+                    null;
+
                 const option: optionCommandType = {
-                    name: choice.toLowerCase(),
-                    description: <string>description,
+                    name,
+                    description: description ?? "Undefined description",
                     type: ApplicationCommandOptionType.Subcommand,
-                    args: {...(chooseSubCommand.args ?? {}), [attr]: choice}
+                    args: {...(chooseSubCommand.args ?? {}), [attr]: name}
                 };
                 chooseSubCommand.options.push(option);
-                subCommands[chooseSubCommandName === null ? choice : chooseSubCommandName + "." + choice] = option;
+                subCommands[chooseSubCommandName === null ? name : chooseSubCommandName + "." + name] = option;
             }
             if (chooseSubCommand.type == ApplicationCommandOptionType.Subcommand)
                 chooseSubCommand.type = ApplicationCommandOptionType.SubcommandGroup;

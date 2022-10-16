@@ -15,10 +15,10 @@ type RequireAtLeastOne<T, Keys extends keyof T = keyof T> =
 type IArg<IArgs = {[key: string]: any}> = RequireAtLeastOne<{
     type: keyof typeof checkTypes;
     types: (keyof typeof checkTypes)[];
-    required?: boolean|((args: IArgs, command: Command, modelizeSlashCommand: boolean) => boolean);
+    required?: boolean|((args: IArgs, command: null|Command, modelizeSlashCommand: boolean) => boolean);
     description: string;
     isSubCommand?: boolean;
-    choices?: {[action: string]: string};
+    choices?: {[action: string]: null|string|((args: IArgs, parentDescription: string) => string)}|string[];
     referToSubCommands?: string[];
     displayValidError?: boolean;
     displayValidErrorEvenIfFound?: boolean;

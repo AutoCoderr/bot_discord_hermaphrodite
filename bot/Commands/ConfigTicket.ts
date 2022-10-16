@@ -61,8 +61,8 @@ export default class ConfigTicket extends Command {
                     "show-moderator": "Afficher le role modérateur actuel",
                     disable: "Désactiver les tickets sur ce serveur",
                     enable: "Réactiver les tickets sur ce serveur",
-                    listen: "Créer une écoute de réaction sur un message pour la création de ticket",
-                    blacklist: "Manipuler la blacklist"
+                    listen: "écoute de réaction sur un message pour la création de ticket",
+                    blacklist: "la blacklist"
                 }
             },
             moderatorRole: {
@@ -84,9 +84,9 @@ export default class ConfigTicket extends Command {
                 type: "string",
                 description: "L'action à effectuer : add, remove ou show",
                 choices: {
-                    add: "Ajouter",
-                    remove: "Retirer",
-                    show: "Afficher"
+                    add: (args, parentDescription) => "Ajouter "+(args.action === "blacklist" ? "à" : "une")+" "+parentDescription,
+                    remove: (args, parentDescription) => "Retirer "+(args.action === "blacklist" ? "de" : "une")+" "+parentDescription,
+                    show: (_, parentDescription) => "Afficher "+parentDescription
                 }
             },
             user: {

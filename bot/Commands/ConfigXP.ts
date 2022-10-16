@@ -39,13 +39,13 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                 type: "string",
                 description: "Ce que vous souhaitez configurer",
                 choices: {
-                    active_role: "Visionner ou configurer le rôle actif du système d'XP",
-                    channel_role: "Visionner ou configurer le rôle d'accès aux channels du système d'XP",
                     enable: "Activer le système d'XP",
                     disable: "Désactiver le système d'XP",
-                    presentation_message: "Visionner ou définir le message de bienvenue du système d'XP",
-                    first_message_time: "Visionner ou définir l'heure minimale du premier message de la journée",
-                    show_xp_gain: "Afficher les gains d'xp par type"
+                    show_xp_gain: "Afficher les gains d'XP par type",
+                    active_role: "le rôle actif du système d'XP",
+                    channel_role: "le rôle d'accès aux channels du système d'XP",
+                    presentation_message: "le message de bienvenue du système d'XP",
+                    first_message_time: "l'heure minimale du premier message de la journée",
                 }
             },
             setOrShowSubAction: {
@@ -55,8 +55,8 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                 type: "string",
                 description: "Quelle type d'action effectuer ?",
                 choices: {
-                    set: "Définir",
-                    show: "Visionner"
+                    set: (_, parentDescription) => "Définir "+parentDescription,
+                    show: (_, parentDescription) => "Visionner "+parentDescription
                 }
             },
             role: {
@@ -97,10 +97,10 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
             serverId: (<Guild>this.guild).id
         }));
 
-        return this["action"+args.action[0].toUpperCase()+args.action.substring(1)](args, XPServerConfig);
+        return this["action_"+args.action](args, XPServerConfig);
     }
 
-    async actionEnable(args: IConfigXPArgs, XPServerConfig: IXPData) {
+    async action_enable(args: IConfigXPArgs, XPServerConfig: IXPData) {
         if (XPServerConfig.activeRoleId === undefined)
             return this.response(true, {
                 embeds: [
@@ -128,7 +128,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
         })
     }
 
-    async actionDisable(args: IConfigXPArgs, XPServerConfig: IXPData) {
+    async action_disable(args: IConfigXPArgs, XPServerConfig: IXPData) {
         XPServerConfig.enabled = false;
         await XPServerConfig.save();
 
@@ -144,7 +144,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
         })
     }
 
-    async actionFirst_message_time(args: IConfigXPArgs, XPServerConfig: IXPData) {
+    async action_first_message_time(args: IConfigXPArgs, XPServerConfig: IXPData) {
         if (args.setOrShowSubAction === "show")
             return this.response(true, {
                 embeds: [
@@ -172,7 +172,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
         })
     }
 
-    async actionShow_xp_gain(args: IConfigXPArgs, XPServerConfig: IXPData) {
+    async action_show_xp_gain(args: IConfigXPArgs, XPServerConfig: IXPData) {
         return this.response(true, {
             embeds: [
                 new EmbedBuilder()
@@ -199,7 +199,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
         })
     }
 
-    async actionPresentation_message(args: IConfigXPArgs, XPServerConfig: IXPData) {
+    async action_presentation_message(args: IConfigXPArgs, XPServerConfig: IXPData) {
         if (args.setOrShowSubAction === "show")
             return this.response(true, XPServerConfig.presentationMessage ?
                 "Voici le message de présentation du système d'XP : \n\n\n"+
@@ -208,11 +208,14 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
 
 
         return this.response(true, "Veuillez rentrer un message :", () => new Promise(resolve => {
+            let timeout;
             const listener = async (response: Message) => {
                 if (response.author.id !== this.member.id)
                     return;
 
                 XPServerConfig.presentationMessage = response.content
+
+                clearTimeout(timeout);
 
                 await XPServerConfig.save();
 
@@ -224,18 +227,18 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
             }
             client.on('messageCreate', listener);
 
-            setTimeout(() => {
+            timeout = setTimeout(() => {
                 client.off('messageCreate', listener);
                 resolve(this.response(false, "Délai dépassé"));
             }, 10 * 60 * 1000)
         }))
     }
 
-    async actionActive_role(args: IConfigXPArgs, XPServerConfig: IXPData) {
+    async action_active_role(args: IConfigXPArgs, XPServerConfig: IXPData) {
         return this.defineAndShowRole(args, XPServerConfig, 'activeRoleId')
     }
 
-    async actionChannel_role(args: IConfigXPArgs, XPServerConfig: IXPData) {
+    async action_channel_role(args: IConfigXPArgs, XPServerConfig: IXPData) {
         return this.defineAndShowRole(args, XPServerConfig, 'channelRoleId')
     }
 
