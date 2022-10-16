@@ -14,7 +14,7 @@ import {checkTypes} from "./TypeChecker";
 import {extractTypes} from "./TypeExtractor";
 import {getCustomType, getSlashTypeGetterName} from "../slashCommands";
 import CustomError from "../logging/CustomError";
-import {IArgsModel, responseResultsType, responseResultType, responseType} from "../interfaces/CommandInterfaces";
+import {IArgModel, IArgsModel, responseResultsType, responseResultType, responseType} from "../interfaces/CommandInterfaces";
 
 const validModelCommands = {};
 
@@ -370,7 +370,8 @@ export default class Command<IArgs = {[key: string]: any}> {
         let failsExtract: Array<any> = [];
 
         const additionalParams = {
-            subCommandGroupSet: false
+            subCommand: null,
+            subCommandGroup: null
         };
 
         for (const attr in this.argsModel) {
@@ -379,7 +380,7 @@ export default class Command<IArgs = {[key: string]: any}> {
                     await this.getSlashArgFromModel(argModel.field,argModel,args, fails, failsExtract, additionalParams);
                 }
             } else {
-                for (const [attr2,argModel] of Object.entries(this.argsModel[attr])) {
+                for (const [attr2,argModel] of <[string,IArgModel][]>Object.entries(this.argsModel[attr])) {
                     await this.getSlashArgFromModel(attr2,argModel,args, fails, failsExtract, additionalParams);
                 }
             }
@@ -390,7 +391,7 @@ export default class Command<IArgs = {[key: string]: any}> {
         return {success: true, result: args};
     }
 
-    async getSlashArgFromModel(attr: string, argModel: any, args: {[name: string]: any}, fails: Array<any>, failsExtract: Array<any>, additionalParams: {[key: string]: any}) {
+    async getSlashArgFromModel(attr: string, argModel: IArgModel, args: {[name: string]: any}, fails: Array<any>, failsExtract: Array<any>, additionalParams: {subCommand: null|string, subCommandGroup: null|string}) {
         if (this.slashCommandOptions === null) return;
         if (!argModel.isSubCommand) {
 
@@ -399,9 +400,16 @@ export default class Command<IArgs = {[key: string]: any}> {
             let failed = false;
 
             if (initialValue === null) {
-                const required = argModel.required == undefined ||
+                const actionPath = [additionalParams.subCommandGroup,additionalParams.subCommand].filter(v => v !== null).join(".");
+
+                const required = (
+                    (actionPath === '' && argModel.referToSubCommands === undefined) ||
+                    (actionPath !== '' && argModel.referToSubCommands && argModel.referToSubCommands.includes(actionPath))
+                ) && (
+                    argModel.required == undefined ||
                     (typeof (argModel.required) == "boolean" && argModel.required) ||
-                    (typeof (argModel.required) == "function" && await argModel.required(args, this));
+                    (typeof (argModel.required) == "function" && argModel.required(args, this, false))
+                );
 
                 if (required) {
                     fails.push({...argModel, field: attr});
@@ -443,10 +451,27 @@ export default class Command<IArgs = {[key: string]: any}> {
             const subCommand = this.slashCommandOptions.getSubcommand();
             const subCommandGroup = this.slashCommandOptions.getSubcommandGroup(false);
 
-            if ((subCommandGroup === null || additionalParams.subCommandGroupSet) && additionalParams.subCommand !== null && Object.keys(argModel.choices).includes(subCommand)) {
+            if (!argModel.choices)
+                return;
+
+            const choiceList = argModel.choices instanceof Array ? argModel.choices : Object.keys(argModel.choices);
+
+            if (
+                (
+                    subCommandGroup === null ||
+                    additionalParams.subCommandGroup !== null
+                ) &&
+                choiceList.includes(subCommand)
+            ) {
+                additionalParams.subCommand = subCommand;
                 args[attr] = subCommand;
-            } else if (subCommandGroup !== null && Object.keys(argModel.choices).includes(subCommandGroup)) {
-                additionalParams.subCommandGroupSet = true
+                return;
+            }
+
+
+            if (subCommandGroup !== null && choiceList.includes(subCommandGroup)
+            ) {
+                additionalParams.subCommandGroup = subCommandGroup;
                 args[attr] = subCommandGroup;
             }
         }

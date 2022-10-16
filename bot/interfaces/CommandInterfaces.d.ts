@@ -14,7 +14,7 @@ type RequireAtLeastOne<T, Keys extends keyof T = keyof T> =
 
 export type IChoice = null|string|((args: IArgs, parentDescription: string) => string);
 
-export type IArg<IArgs = {[key: string]: any}> = RequireAtLeastOne<{
+export type IArgModel<IArgs = {[key: string]: any}> = RequireAtLeastOne<{
     type: keyof typeof checkTypes;
     types: (keyof typeof checkTypes)[];
     required?: boolean|((args: IArgs, command: null|Command, modelizeSlashCommand: boolean) => boolean);

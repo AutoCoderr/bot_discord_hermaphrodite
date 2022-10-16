@@ -50,11 +50,11 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                 choices: {
                     enable: "Activer le système d'XP",
                     disable: "Désactiver le système d'XP",
-                    show_xp_gain: "Afficher les gains d'XP par type",
                     active_role: "le rôle actif du système d'XP",
                     channel_role: "le rôle d'accès aux channels du système d'XP",
                     presentation_message: "le message de bienvenue du système d'XP",
                     first_message_time: "l'heure minimale du premier message de la journée",
+                    show_xp_gain: "Afficher les gains d'XP par type",
                     set_xp_gain: "Définir le taux d'XP"
                 }
             },
@@ -86,20 +86,15 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                 referToSubCommands: ['message', 'vocal', 'first_message', 'bump'].map(t => 'set_xp_gain.'+t),
                 type: "number",
                 description: "Rentrez une valeur",
-                required: args => args.action === "set_xp_gain"
             },
             role: {
                 referToSubCommands: ['active_role.set', 'channel_role.set'],
                 type: "role",
-                required: args =>
-                    ["active_role","channel_role"].includes(args.action) && args.setOrShowSubAction === "set",
                 description: "Quel rôle définir"
             },
             duration: {
                 referToSubCommands: ['first_message_time.set'],
                 type: "duration",
-                required: args =>
-                    args.action == "first_message_time" && args.setOrShowSubAction === "set",
                 description: "Donnez une durée (ex: 7h, 6h30, etc...)"
             }
         }

@@ -9,7 +9,7 @@ import Command from "./Classes/Command";
 import {existingCommands} from "./Classes/CommandsDescription";
 import {getterNameBySlashType, slashCommandsTypeDefinitions} from "./Classes/slashCommandsTypeDefinitions";
 import CustomError from "./logging/CustomError";
-import {IArg, responseType} from "./interfaces/CommandInterfaces";
+import {IArgModel, responseType} from "./interfaces/CommandInterfaces";
 
 interface optionCommandType {
     type?: ApplicationCommandOptionType.Boolean |
@@ -145,7 +145,7 @@ function sortRequiredAndNotRequiredArgumentsInSlashCommand(node: optionCommandTy
     }
 }
 
-function generateSlashOptionFromModel(attr: string, argModel: IArg, subCommands: { [attr: string]: any }, slashCommandModel: optionCommandType) {
+function generateSlashOptionFromModel(attr: string, argModel: IArgModel, subCommands: { [attr: string]: any }, slashCommandModel: optionCommandType) {
     const chooseSubCommands: any[] = [];
     if (argModel.referToSubCommands instanceof Array)
         for (const referedSubCommand of argModel.referToSubCommands) {
