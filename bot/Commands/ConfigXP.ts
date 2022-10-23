@@ -22,9 +22,9 @@ interface IConfigXPArgs {
         'active_role'|
         'channel_role'|
         'first_message_time'|
-        'show_xp_gain'|
-        'set_xp_gain'|
-        'set_limit_gain'|
+        'xp_gain_show'|
+        'xp_gain_set'|
+        'limit_gain_set'|
         'tips',
     setOrShowSubAction: 'set'|'show',
     XPActionTypes: 'vocal'|'message'|'first_message'|'bump',
@@ -57,9 +57,9 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                     active_role: "le rôle actif du système d'XP",
                     channel_role: "le rôle d'accès aux channels du système d'XP",
                     first_message_time: "l'heure minimale du premier message de la journée",
-                    show_xp_gain: "Afficher les gains d'XP par type",
-                    set_xp_gain: "Définir le taux d'XP",
-                    set_limit_gain: "Définir la limite de gain d'XP",
+                    xp_gain_show: "Afficher les gains d'XP par type",
+                    xp_gain_set: "Définir le taux d'XP",
+                    limit_gain_set: "Définir la limite de gain d'XP",
                     tips: null
                 }
             },
@@ -74,7 +74,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                 }
             },
             XPActionTypes: {
-                referToSubCommands: ['set_xp_gain'],
+                referToSubCommands: ['xp_gain_set'],
                 isSubCommand: true,
                 type: "string",
                 description: "Quel type de gain d'XP ?",
@@ -86,7 +86,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                 }
             },
             XPActionTypesToLimit: {
-                referToSubCommands: ['set_limit_gain'],
+                referToSubCommands: ['limit_gain_set'],
                 isSubCommand: true,
                 type: "string",
                 description: "Quel type de gain d'XP ?",
@@ -118,7 +118,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                 })
             },
             XP: {
-                referToSubCommands: ['message', 'vocal', 'first_message', 'bump'].map(t => 'set_xp_gain.'+t),
+                referToSubCommands: ['message', 'vocal', 'first_message', 'bump'].map(t => 'xp_gain_set.'+t),
                 type: "overZeroInteger",
                 evenCheckForSlash: true,
                 description: "Rentrez une valeur",
@@ -133,7 +133,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                 description: "Quel rôle définir"
             },
             duration: {
-                referToSubCommands: ['first_message_time.set','set_limit_gain.message','set_limit_gain.vocal'],
+                referToSubCommands: ['first_message_time.set','limit_gain_set.message','limit_gain_set.vocal'],
                 type: "duration",
                 description: "Donnez une durée (ex: 7h, 6h30, etc...)"
             }
@@ -213,7 +213,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
     }
 
     async action_tips_set(args: IConfigXPArgs, XPServerConfig: IXPData) {
-        return this.response(true, "Veuillez rentrer un message pour le tips :",
+        return this.response(true, "Veuillez rentrer un message pour le tip (tapez 'CANCEL' pour annuler) :",
             () => new Promise(resolve => {
                 let timeout;
                 const listener = async (response: Message) => {
@@ -222,6 +222,12 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
 
                     client.off('messageCreate', listener);
                     clearTimeout(timeout);
+
+                    if (response.content === "CANCEL") {
+                        await response.delete();
+                        resolve(this.response(true, "Commande annulée"))
+                        return;
+                    }
 
                     XPServerConfig.tipsByLevel = setTipByLevel(args.level, response.content, XPServerConfig.tipsByLevel);
                     await XPServerConfig.save();
@@ -238,12 +244,12 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                 timeout = setTimeout(() => {
                     client.off('messageCreate', listener);
                     resolve(this.response(false, "Délai dépassé"));
-                }, 10 * 60 * 1000)
+                }, 15 * 60 * 1000)
             }))
     }
 
     async action_tips_delete(args: IConfigXPArgs, XPServerConfig: IXPData) {
-        const updatedTips = XPServerConfig.tipsByLevel.filter(tips => tips.level !== args.level);
+        const updatedTips = XPServerConfig.tipsByLevel.filter(tip => tip.level !== args.level);
         if (updatedTips.length === XPServerConfig.tipsByLevel.length)
             return this.response(false, {
                 embeds: [
@@ -251,7 +257,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                         .setTitle("Element introuvable")
                         .setFields({
                             name: "Element introuvable",
-                            value: "Aucun tips n'est défini pour le niveau "+args.level
+                            value: "Aucun tip n'est défini pour le niveau "+args.level
                         })
                 ]
             })
@@ -265,23 +271,23 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                     .setTitle("Element supprimé avec succès")
                     .setFields({
                         name: "Element supprimé avec succès",
-                        value: "Le tips associé au niveau "+args.level+" a été supprimé avec succès !"
+                        value: "Le tip associé au niveau "+args.level+" a été supprimé avec succès !"
                     })
             ]
         })
     }
 
     async action_tips_show(args: IConfigXPArgs, XPServerConfig: IXPData) {
-        const tips = findTipByLevel(args.level, XPServerConfig.tipsByLevel);
+        const tip = findTipByLevel(args.level, XPServerConfig.tipsByLevel);
 
-        if (tips === null)
+        if (tip === null)
             return this.response(true, {
                 embeds: [
                     new EmbedBuilder()
                         .setTitle("Element introuvable")
                         .setFields({
                             name: "Element introuvable",
-                            value: "Aucun tips n'est défini pour le niveau "+args.level
+                            value: "Aucun tip n'est défini pour le niveau "+args.level
                         })
                 ]
             })
@@ -289,11 +295,31 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
         return this.response(true, {
             embeds: [
                 new EmbedBuilder()
-                    .setTitle("Tips numéro "+args.level)
+                    .setTitle("Tip numéro "+args.level)
                     .setFields({
-                        name: "Voici le tips "+args.level,
-                        value: tips.content
+                        name: "Voici le tip "+args.level,
+                        value: tip.content
                     })
+            ]
+        })
+    }
+
+    async action_tips_list(args: IConfigXPArgs, XPServerConfig: IXPData) {
+        return this.response(true, {
+            embeds: [
+                XPServerConfig.tipsByLevel.length > 0 ?
+                    new EmbedBuilder()
+                        .setTitle(XPServerConfig.tipsByLevel.length+" tip(s) sont défini(s)")
+                        .setFields(XPServerConfig.tipsByLevel.map(tip => ({
+                            name: "Niveau "+tip.level,
+                            value: tip.content.substring(0, Math.min(10, tip.content.length)).replace(/\n/, "[br]")+(tip.content.length > 10 ? "..." : [])
+                        }))) :
+                    new EmbedBuilder()
+                        .setTitle("Aucun tips")
+                        .setFields({
+                            name: "Aucun tips",
+                            value: "Aucun tips n'a été trouvé, vous pouvez en définir un avec '/"+this.commandName+" tips set <level>'"
+                        })
             ]
         })
     }
@@ -326,7 +352,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
         })
     }
 
-    async action_show_xp_gain(args: IConfigXPArgs, XPServerConfig: IXPData) {
+    async action_xp_gain_show(args: IConfigXPArgs, XPServerConfig: IXPData) {
         return this.response(true, {
             embeds: [
                 new EmbedBuilder()
@@ -353,7 +379,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
         })
     }
 
-    async action_set_limit_gain(args: IConfigXPArgs, XPServerConfig: IXPData) {
+    async action_limit_gain_set(args: IConfigXPArgs, XPServerConfig: IXPData) {
         const col = {
             message: 'timeLimitMessage',
             vocal: 'timeLimitVocal'
@@ -377,7 +403,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
         })
     }
 
-    async action_set_xp_gain(args: IConfigXPArgs, XPServerConfig: IXPData) {
+    async action_xp_gain_set(args: IConfigXPArgs, XPServerConfig: IXPData) {
         const col = {
             message: 'XPByMessage',
             vocal: 'XPByVocal',
