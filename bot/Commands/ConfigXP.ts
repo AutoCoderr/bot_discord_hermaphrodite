@@ -12,7 +12,7 @@ import {
 } from "discord.js";
 import XPData, {IXPData} from "../Models/XP/XPData";
 import {extractUTCTime, showTime} from "../Classes/DateTimeManager";
-import {findTipByLevel, setTipByLevel} from "../Classes/OtherFunctions";
+import {findTipByLevel, round, setTipByLevel} from "../Classes/OtherFunctions";
 import client from "../client";
 
 interface IConfigXPArgs {
@@ -29,7 +29,7 @@ interface IConfigXPArgs {
     setOrShowSubAction: 'set'|'show',
     XPActionTypes: 'vocal'|'message'|'first_message'|'bump',
     XPActionTypesToLimit: 'vocal'|'message',
-    tipsSubActions: 'list'|'show'|'set'|'delete'
+    tipsSubActions: 'list'|'show'|'set'|'delete'|'show_approves'
     role: Role,
     duration: number,
     XP: number,
@@ -104,11 +104,12 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                     show: "Afficher un tips",
                     set: "Définir un tips",
                     delete: "Supprimer un tips",
-                    list: "Lister les tips"
+                    list: "Lister les tips",
+                    show_approves: "Afficher les avis utilisateurs sur un tip"
                 }
             },
             level: {
-                referToSubCommands: ['tips.show', 'tips.delete', 'tips.set'],
+                referToSubCommands: ['tips.show', 'tips.delete', 'tips.set','tips.show_approves'],
                 type: "overZeroInteger",
                 evenCheckForSlash: true,
                 description: "Rentrez une valeur",
@@ -212,6 +213,19 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
         return this["action_tips_"+args.tipsSubActions](args, XPServerConfig)
     }
 
+    async tipNotFoundEmbed(level: number) {
+        return this.response(false, {
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle("Element introuvable")
+                    .setFields({
+                        name: "Element introuvable",
+                        value: "Aucun tip n'est défini pour le niveau "+level
+                    })
+            ]
+        })
+    }
+
     async action_tips_set(args: IConfigXPArgs, XPServerConfig: IXPData) {
         return this.response(true, "Veuillez rentrer un message pour le tip (tapez 'CANCEL' pour annuler) :",
             () => new Promise(resolve => {
@@ -251,16 +265,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
     async action_tips_delete(args: IConfigXPArgs, XPServerConfig: IXPData) {
         const updatedTips = XPServerConfig.tipsByLevel.filter(tip => tip.level !== args.level);
         if (updatedTips.length === XPServerConfig.tipsByLevel.length)
-            return this.response(false, {
-                embeds: [
-                    new EmbedBuilder()
-                        .setTitle("Element introuvable")
-                        .setFields({
-                            name: "Element introuvable",
-                            value: "Aucun tip n'est défini pour le niveau "+args.level
-                        })
-                ]
-            })
+            return this.tipNotFoundEmbed(args.level);
 
         XPServerConfig.tipsByLevel = updatedTips;
         await XPServerConfig.save();
@@ -281,16 +286,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
         const tip = findTipByLevel(args.level, XPServerConfig.tipsByLevel);
 
         if (tip === null)
-            return this.response(true, {
-                embeds: [
-                    new EmbedBuilder()
-                        .setTitle("Element introuvable")
-                        .setFields({
-                            name: "Element introuvable",
-                            value: "Aucun tip n'est défini pour le niveau "+args.level
-                        })
-                ]
-            })
+            return this.tipNotFoundEmbed(args.level);
 
         return this.response(true, {
             embeds: [
@@ -320,6 +316,33 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                             name: "Aucun tips",
                             value: "Aucun tips n'a été trouvé, vous pouvez en définir un avec '/"+this.commandName+" tips set <level>'"
                         })
+            ]
+        })
+    }
+
+    async action_tips_show_approves(args: IConfigXPArgs, XPServerConfig: IXPData) {
+        const tip = findTipByLevel(args.level, XPServerConfig.tipsByLevel);
+        if (tip === null)
+            return this.tipNotFoundEmbed(args.level);
+
+        return this.response(true, {
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle("Avis utilisateurs sur le tip "+args.level)
+                    .setFields(
+                        {
+                            name: "Utilisateurs ayant trouvés ce tip utile :",
+                            value: tip.userApproves.length > 0 ?
+                                tip.userApproves.length+" ("+round(tip.userApproves.length / (tip.userApproves.length+tip.userUnapproves.length) * 100, 2)+"%)" :
+                                "0 (0%)"
+                        },
+                        {
+                            name: "Utilisateurs ayant trouvés ce tip inutile :",
+                            value: tip.userUnapproves.length ?
+                                tip.userUnapproves.length+" ("+round(tip.userUnapproves.length / (tip.userApproves.length+tip.userUnapproves.length) * 100, 2)+"%)" :
+                                "0 (0%)"
+                        }
+                    )
             ]
         })
     }

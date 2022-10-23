@@ -361,7 +361,7 @@ export function findTipByLevel(level: number, tips: ILevelTip[], a = 0, b = tips
     if (Math.abs(b-a) <= 1)
         return null
 
-    const m = (a+b)/2
+    const m = Math.floor((a+b)/2)
 
     if (tips[m].level === level)
         return tips[m];
@@ -370,4 +370,8 @@ export function findTipByLevel(level: number, tips: ILevelTip[], a = 0, b = tips
         return findTipByLevel(level, tips, a, m);
 
     return findTipByLevel(level, tips, m, b)
+}
+
+export function round(n, p) {
+    return Math.round(n * 10**p)/10**p
 }
