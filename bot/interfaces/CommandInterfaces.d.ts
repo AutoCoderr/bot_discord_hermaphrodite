@@ -14,33 +14,34 @@ type RequireAtLeastOne<T, Keys extends keyof T = keyof T> =
 
 export type IChoice = null|string|((args: IArgs, parentDescription: string) => string);
 
-export type IArgModel<IArgs = {[key: string]: any}> = RequireAtLeastOne<{
+type IErrorMessageRes = {name: string, value: string}|Array<{name: string, value: string}>
+
+export type IArgModel<IArgs = {[key: string]: any}, C extends Command = Command> = {
     type: keyof typeof checkTypes;
-    types: (keyof typeof checkTypes)[];
-    required?: boolean|((args: Partial<IArgs>, command: null|Command<IArgs>, modelizeSlashCommand: boolean) => boolean);
-    description: string;
+    required?: boolean|((args: Partial<IArgs>, command: null|C<IArgs>, modelizeSlashCommand: boolean) => boolean|Promise<boolean>);
+    description: string|((args: Partial<IArgs>, command: null|C<IArgs>, modelizeSlashCommand: boolean) => string);
     isSubCommand?: boolean;
     choices?: {[action: string]: IChoice}|string[];
     referToSubCommands?: string[];
-    displayValidError?: boolean;
-    displayValidErrorEvenIfFound?: boolean;
-    displayExtractError?: boolean;
+    displayValidError?: boolean|((args: Partial<IArgs>, command: C<IArgs>) => boolean);
+    displayValidErrorEvenIfFound?: boolean|((args: Partial<IArgs>, command: C<IArgs>) => boolean);
+    displayExtractError?: boolean|((args: Partial<IArgs>, command: C<IArgs>) => boolean);
     multi?: boolean;
-    valid?: (value: any, args: Partial<IArgs>, command: Command<IArgs>) => boolean|Promise<boolean>;
+    valid?: (value: any, args: Partial<IArgs>, command: C<IArgs>) => boolean|Promise<boolean>;
     evenCheckForSlash?: boolean;
-    errorMessage?: (value: any, args: Partial<IArgs>) => {name: string, value: string};
+    errorMessage?: (value: any, args: Partial<IArgs>, command: C<IArgs>) => IErrorMessageRes|Promise<IErrorMessageRes>;
     default?: any;
-    moreDatas?: (args: Partial<IArgs>, type: keyof typeof checkTypes, command: Command<IArgs>) => any
-}, 'type' | 'types'>
+    moreDatas?: (args: Partial<IArgs>, type: keyof typeof checkTypes, command: C<IArgs>) => any
+}
 
-export type IArgsModel<IArgs = {[key: string]: any}> =
+export type IArgsModel<IArgs = {[key: string]: any}, C extends Command = Command> =
     RequireAtLeastOne<{
-        $argsByOrder: Array<IArgModel<IArgs>&{field: string}>,
+        $argsByOrder: Array<IArgModel<IArgs,C>&{field: string}>,
         $argsByType: {
-            [field: string]: IArgModel<IArgs>
+            [field: string]: IArgModel<IArgs,C>
         }
         $argsByName: {
-            [field: string]: IArgModel<IArgs>&{fields: string[]}
+            [field: string]: IArgModel<IArgs,C>&{fields: string[]}
         }
     }>
 
@@ -49,3 +50,9 @@ export interface responseType {
     result: responseResultsType,
     callback?: (() => false|responseType|Promise<false|responseType>)
 }
+
+export type IFailList = Array<IArgModel<IArgs>&RequireAtLeastOne<{value?: any, field: string, fields: string[]}, 'field' | 'fields'>>;
+
+export type getCommandTypeArg<C extends null|Command> = C extends Command ? C : Command
+
+export type ISlashCommandsDefinition = {[name: string]: optionCommandType}

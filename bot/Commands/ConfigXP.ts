@@ -12,7 +12,7 @@ import {
 } from "discord.js";
 import XPData, {IXPData} from "../Models/XP/XPData";
 import {extractUTCTime, showTime} from "../Classes/DateTimeManager";
-import {findTipByLevel, round, setTipByLevel} from "../Classes/OtherFunctions";
+import {calculRequiredXPForNextGrade, findTipByLevel, round, setTipByLevel} from "../Classes/OtherFunctions";
 import client from "../client";
 
 interface IConfigXPArgs {
@@ -25,15 +25,19 @@ interface IConfigXPArgs {
         'xp_gain_show'|
         'xp_gain_set'|
         'limit_gain_set'|
-        'tips',
-    setOrShowSubAction: 'set'|'show',
-    XPActionTypes: 'vocal'|'message'|'first_message'|'bump',
-    XPActionTypesToLimit: 'vocal'|'message',
-    tipsSubActions: 'list'|'show'|'set'|'delete'|'show_approves'
-    role: Role,
-    duration: number,
-    XP: number,
-    level: number
+        'tips'|
+        'grades';
+    setOrShowSubAction: 'set'|'show';
+    XPActionTypes: 'vocal'|'message'|'first_message'|'bump';
+    XPActionTypesToLimit: 'vocal'|'message';
+    tipsSubActions: 'list'|'show'|'set'|'delete'|'show_approves';
+    gradesSubActions: 'add'
+    role: Role;
+    duration: number;
+    XP?: number;
+    XPByLevel: number;
+    level?: number;
+    name: string;
 }
 
 export default class ConfigXP extends Command<IConfigXPArgs> {
@@ -44,6 +48,21 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
     static customCommand = false
 
     static slashCommandIdByGuild: {[guildId: string]: string} = {};
+
+    XPServerConfig: null|IXPData = null;
+
+    async getXPServerConfig(): Promise<null|IXPData> {
+        if (this.guild === null)
+            return null;
+
+        if (this.XPServerConfig === null) {
+            this.XPServerConfig = await XPData.findOne({
+                serverId: this.guild.id
+            })
+        }
+
+        return this.XPServerConfig;
+    }
 
     static argsModel: IArgsModel<IConfigXPArgs> = {
         $argsByType: {
@@ -60,6 +79,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                     xp_gain_show: "Afficher les gains d'XP par type",
                     xp_gain_set: "Définir le taux d'XP",
                     limit_gain_set: "Définir la limite de gain d'XP",
+                    grades: null,
                     tips: null
                 }
             },
@@ -108,28 +128,140 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                     show_approves: "Afficher les avis utilisateurs sur un tip"
                 }
             },
+            gradesSubActions: {
+                referToSubCommands: ['grades'],
+                isSubCommand: true,
+                type: "string",
+                description: "Quel type d'action sur les grades",
+                choices: {
+                    add: "Ajouter un grade"
+                }
+            },
             level: {
-                referToSubCommands: ['tips.show', 'tips.delete', 'tips.set','tips.show_approves'],
+                referToSubCommands: ['tips.show', 'tips.delete', 'tips.set','tips.show_approves','grades.add'],
                 type: "overZeroInteger",
                 evenCheckForSlash: true,
                 description: "Rentrez une valeur",
-                errorMessage: () => ({
-                    name: "Donnée invalide",
-                    value: "Le niveau doit être un entier naturel (> 0)"
-                })
+                required: async (args, command: null|ConfigXP) => {
+                    if (args.action !== "grades" || args.gradesSubActions !== "add")
+                        return true;
+
+                    if (command === null)
+                        return false;
+
+                    const XPServerConfig = await command.getXPServerConfig();
+
+                    return XPServerConfig !== null && XPServerConfig.grades.length > 0
+                },
+                valid: async (value, args, command: ConfigXP) => {
+                    if (command.guild === null || args.action !== "grades" || args.gradesSubActions !== "add")
+                        return true;
+
+                    const XPServerConfig = await command.getXPServerConfig();
+
+                    return (
+                        ((XPServerConfig === null || XPServerConfig.grades.length === 0) && value === 1) ||
+                        (XPServerConfig !== null && XPServerConfig.grades.length > 0 && value > XPServerConfig.grades[XPServerConfig.grades.length-1].atLevel)
+                    )
+                },
+                errorMessage: async (value, args, command: ConfigXP) => {
+                    if (value === undefined)
+                        return {
+                            name: "Donnée manquante",
+                            value: "Vous devez spécifier le niveau"
+                        }
+
+                    if (args.action !== "grades" || args.gradesSubActions !== "add" || value <= 0)
+                        return {
+                            name: "Donnée invalide",
+                            value: "Le niveau doit être un entier naturel (> 0)"
+                        }
+
+                    const XPServerConfig = await command.getXPServerConfig();
+
+                    return {
+                        name: "Donnée invalide",
+                        value: ((XPServerConfig === null || XPServerConfig.grades.length === 0) && value !== 1) ?
+                            "Le premier niveau du premier grade doit forcément être le niveau 1" :
+                            "Le niveau mentionné doit être strictement supérieur au premier niveau du grade précedent"
+                    }
+                }
             },
             XP: {
-                referToSubCommands: ['message', 'vocal', 'first_message', 'bump'].map(t => 'xp_gain_set.'+t),
+                referToSubCommands: [...['message', 'vocal', 'first_message', 'bump'].map(t => 'xp_gain_set.'+t), 'grades.add'],
                 type: "overZeroInteger",
                 evenCheckForSlash: true,
-                description: "Rentrez une valeur",
-                errorMessage: () => ({
-                    name: "Donnée invalide",
-                    value: "Le nombre d'XP doit être un entier naturel (> 0)"
-                })
+                description: (args) => (args.action === "grades" && args.gradesSubActions === "add") ?
+                    "Le nombre d'XP nécessaire pour atteindre ce grade" :
+                    "Rentrez une valeur",
+                valid: async (value, args, command: ConfigXP) => {
+                    if (args.action !== "grades" ||
+                        args.gradesSubActions !== "add" ||
+                        command.guild === null
+                    )
+                        return true;
+
+                    const XPServerConfig = await command.getXPServerConfig();
+
+                    return XPServerConfig === null ||
+                        XPServerConfig.grades.length === 0 ||
+                        args.level === undefined ||
+                        args.level <= XPServerConfig.grades[XPServerConfig.grades.length-1].atLevel ||
+                        await calculRequiredXPForNextGrade(XPServerConfig, args.level) === value
+                },
+                required: async (args, command: null|ConfigXP) => {
+                    if (args.action !== "grades" ||
+                        args.gradesSubActions !== "add"
+                    )
+                        return true
+
+                    if (command === null || command.guild === null)
+                        return false;
+
+                    const XPServerConfig: null|IXPData = await command.getXPServerConfig();
+
+                    return XPServerConfig === null || XPServerConfig.grades.length === 0
+                },
+                errorMessage: (value, args) =>
+                    value === undefined ?
+                        {
+                            name: "Donnée manquante",
+                            value: "Vous devez spécifier des XPs"
+                        } :
+                        (args.action !== "grades" || args.gradesSubActions !== "add" || value <= 0) ?
+                            {
+                                name: "Donnée invalide",
+                                value: "Le nombre d'XP doit être un entier naturel (> 0)"
+                            } :
+                            {
+                                name: "Donnée invalide",
+                                value: "Il semblerait que le niveau d'XP mentionné nécessaire à ce grade ne corresponde pas à la configuration des grades précedents.\n"+
+                                    "Vous pouvez laisser ce champs vide, il sera automatiquement calculé"
+                            }
+            },
+            XPByLevel: {
+                referToSubCommands: ['grades.add'],
+                type: "overZeroInteger",
+                evenCheckForSlash: true,
+                description: "Le nombre d'XP nécessaire pour augmenter de niveau",
+                errorMessage: (value) =>
+                    value === undefined ?
+                        {
+                            name: "Donnée manquante",
+                            value: "Vous devez spécifier le nombre d'XP par niveau"
+                        } :
+                        {
+                            name: "Donnée invalide",
+                            value: "Le nombre d'XP doit être un entier naturel (> 0)"
+                        }
+            },
+            name: {
+                referToSubCommands: ['grades.add'],
+                type: "string",
+                description: "Nom du grade"
             },
             role: {
-                referToSubCommands: ['active_role.set', 'channel_role.set'],
+                referToSubCommands: ['active_role.set', 'channel_role.set', 'grades.add'],
                 type: "role",
                 description: "Quel rôle définir"
             },
@@ -146,7 +278,6 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
     }
 
     async action(args: IConfigXPArgs, bot) {
-
         if (this.guild === null) {
             return this.response(false,
                 this.sendErrors({
@@ -209,6 +340,41 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
         })
     }
 
+    async action_grades(args: IConfigXPArgs, XPServerConfig: IXPData) {
+        return this["action_grades_"+args.gradesSubActions](args,XPServerConfig)
+    }
+
+    async action_grades_add(args: IConfigXPArgs, XPServerConfig: IXPData) {
+        const [atLevel, roleId, name, requiredXP, XPByLevel] = [
+            args.level ?? 1,
+            args.role.id,
+            args.name,
+            args.XP ?? await <Promise<number>>calculRequiredXPForNextGrade(XPServerConfig, <number>args.level),
+            args.XPByLevel
+        ]
+
+        XPServerConfig.grades.push({
+            atLevel,
+            roleId,
+            name,
+            requiredXP,
+            XPByLevel
+        })
+
+        await XPServerConfig.save();
+
+        return this.response(true, {
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle("Grade créé")
+                    .setFields({
+                        name: "Grade créé avec succès!",
+                        value: "Le grade '"+name+"', à partir de "+requiredXP+"XP a été créé avec succès"
+                    })
+            ]
+        })
+    }
+
     async action_tips(args: IConfigXPArgs, XPServerConfig: IXPData) {
         return this["action_tips_"+args.tipsSubActions](args, XPServerConfig)
     }
@@ -243,7 +409,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                         return;
                     }
 
-                    XPServerConfig.tipsByLevel = setTipByLevel(args.level, response.content, XPServerConfig.tipsByLevel);
+                    XPServerConfig.tipsByLevel = setTipByLevel(<number>args.level, response.content, XPServerConfig.tipsByLevel);
                     await XPServerConfig.save();
 
                     await response.delete();
@@ -265,7 +431,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
     async action_tips_delete(args: IConfigXPArgs, XPServerConfig: IXPData) {
         const updatedTips = XPServerConfig.tipsByLevel.filter(tip => tip.level !== args.level);
         if (updatedTips.length === XPServerConfig.tipsByLevel.length)
-            return this.tipNotFoundEmbed(args.level);
+            return this.tipNotFoundEmbed(<number>args.level);
 
         XPServerConfig.tipsByLevel = updatedTips;
         await XPServerConfig.save();
@@ -283,10 +449,10 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
     }
 
     async action_tips_show(args: IConfigXPArgs, XPServerConfig: IXPData) {
-        const tip = findTipByLevel(args.level, XPServerConfig.tipsByLevel);
+        const tip = findTipByLevel(<number>args.level, XPServerConfig.tipsByLevel);
 
         if (tip === null)
-            return this.tipNotFoundEmbed(args.level);
+            return this.tipNotFoundEmbed(<number>args.level);
 
         return this.response(true, {
             embeds: [
@@ -321,9 +487,9 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
     }
 
     async action_tips_show_approves(args: IConfigXPArgs, XPServerConfig: IXPData) {
-        const tip = findTipByLevel(args.level, XPServerConfig.tipsByLevel);
+        const tip = findTipByLevel(<number>args.level, XPServerConfig.tipsByLevel);
         if (tip === null)
-            return this.tipNotFoundEmbed(args.level);
+            return this.tipNotFoundEmbed(<number>args.level);
 
         return this.response(true, {
             embeds: [

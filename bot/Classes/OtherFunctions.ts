@@ -15,7 +15,7 @@ import HistoryExec from "../Commands/HistoryExec";
 import HistoryCmd from "../Commands/HistoryCmd";
 import ListNotifyOnReact from "../Commands/ListNotifyOnReact";
 import {IArgsModel} from "../interfaces/CommandInterfaces";
-import {ILevelTip} from "../Models/XP/XPData";
+import {ILevelTip, IXPData} from "../Models/XP/XPData";
 
 export function addMissingZero(number, n = 2) {
     number = number.toString();
@@ -374,4 +374,12 @@ export function findTipByLevel(level: number, tips: ILevelTip[], a = 0, b = tips
 
 export function round(n, p) {
     return Math.round(n * 10**p)/10**p
+}
+
+export async function calculRequiredXPForNextGrade(XPServerConfig: IXPData, level: number): Promise<null|number> {
+    const lastGrade = XPServerConfig.grades[XPServerConfig.grades.length-1];
+    if (level <= lastGrade.atLevel)
+        return null;
+
+    return lastGrade.requiredXP + (level-lastGrade.atLevel)*lastGrade.XPByLevel
 }
