@@ -31,13 +31,14 @@ interface IConfigXPArgs {
     XPActionTypes: 'vocal'|'message'|'first_message'|'bump';
     XPActionTypesToLimit: 'vocal'|'message';
     tipsSubActions: 'list'|'show'|'set'|'delete'|'show_approves';
-    gradesSubActions: 'add'|'list'
+    gradesSubActions: 'add'|'list'|'delete'
     role: Role;
     duration: number;
     XP?: number;
     XPByLevel: number;
     level?: number;
     name: string;
+    gradeNumber: number;
 }
 
 export default class ConfigXP extends Command<IConfigXPArgs> {
@@ -135,7 +136,8 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                 description: "Quel type d'action sur les grades",
                 choices: {
                     add: "Ajouter un grade",
-                    list: "Lister les grades"
+                    list: "Lister les grades",
+                    delete: "Supprimer un grade"
                 }
             },
             level: {
@@ -239,6 +241,16 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                                 value: "Il semblerait que le niveau d'XP mentionné nécessaire à ce grade ne corresponde pas à la configuration des grades précedents.\n"+
                                     "Vous pouvez laisser ce champs vide, il sera automatiquement calculé"
                             }
+            },
+            gradeNumber: {
+                referToSubCommands: ['grades.delete'],
+                type: "overZeroInteger",
+                evenCheckForSlash: true,
+                description: "Le numéro du grade",
+                errorMessage: () => ({
+                    name: "Donnée invalide",
+                    value: "Le nombre d'XP doit être un entier naturel (> 0)"
+                })
             },
             name: {
                 referToSubCommands: ['grades.add'],
@@ -372,6 +384,47 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                     .setFields({
                         name: "Grade créé avec succès!",
                         value: "Le grade '"+name+"', à partir de "+requiredXP+"XP a été créé avec succès"
+                    })
+            ]
+        })
+    }
+
+    async action_grades_delete(args: IConfigXPArgs, XPServerConfig: IXPData) {
+        if (args.gradeNumber > XPServerConfig.grades.length)
+            return this.response(false, {
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("Grade introuvable")
+                        .setFields({
+                            name: "Grade introuvable",
+                            value: "Le grade "+args.gradeNumber+" n'existe pas"
+                        })
+                ]
+            })
+
+        const deletedGrade = XPServerConfig.grades[args.gradeNumber-1];
+
+        XPServerConfig.grades.splice(args.gradeNumber-1, 1);
+
+        for (let i=0;i<XPServerConfig.grades.length;i++) {
+            if (i === 0 && args.gradeNumber === 1) {
+                XPServerConfig.grades[i].atLevel = 1;
+                continue;
+            }
+            if (i > 0 && i >= args.gradeNumber-1) {
+                XPServerConfig.grades[i].requiredXP = await <Promise<number>>calculRequiredXPForNextGrade(XPServerConfig, XPServerConfig.grades[i].atLevel, i-1)
+            }
+        }
+
+        await XPServerConfig.save();
+
+        return this.response(true, {
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle("Grade supprimé")
+                    .setFields({
+                        name: "Grade supprimé avec succès",
+                        value: "Le grade '"+deletedGrade.name+"'a été supprimé avec succès"
                     })
             ]
         })
