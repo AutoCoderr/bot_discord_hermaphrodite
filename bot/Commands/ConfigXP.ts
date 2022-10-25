@@ -31,7 +31,7 @@ interface IConfigXPArgs {
     XPActionTypes: 'vocal'|'message'|'first_message'|'bump';
     XPActionTypesToLimit: 'vocal'|'message';
     tipsSubActions: 'list'|'show'|'set'|'delete'|'show_approves';
-    gradesSubActions: 'add'
+    gradesSubActions: 'add'|'list'
     role: Role;
     duration: number;
     XP?: number;
@@ -134,7 +134,8 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                 type: "string",
                 description: "Quel type d'action sur les grades",
                 choices: {
-                    add: "Ajouter un grade"
+                    add: "Ajouter un grade",
+                    list: "Lister les grades"
                 }
             },
             level: {
@@ -372,6 +373,43 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                         name: "Grade créé avec succès!",
                         value: "Le grade '"+name+"', à partir de "+requiredXP+"XP a été créé avec succès"
                     })
+            ]
+        })
+    }
+
+    async action_grades_list(args: IConfigXPArgs, XPServerConfig: IXPData) {
+        if (XPServerConfig.grades.length === 0)
+            return this.response(true, {
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("Les grades")
+                        .setFields({
+                            name: "Aucun grade",
+                            value: "Il n'y a aucun grade configuré"
+                        })
+                ]
+            })
+
+        return this.response(true, {
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle("Les grades")
+                    .setFields(
+                        XPServerConfig.grades.map(({atLevel, name, requiredXP, XPByLevel, roleId}, index) => ({
+                            name: (index+1)+" - "+name,
+                            value:
+                                "Niveau "+atLevel+(
+                                    index === XPServerConfig.grades.length - 1 ?
+                                        "+" :
+                                        XPServerConfig.grades[index+1].atLevel-atLevel > 1 ?
+                                            "-"+(XPServerConfig.grades[index+1].atLevel-1) :
+                                            ""
+                                )+"\n"+
+                                "XP total requis : "+requiredXP+"\n"+
+                                "XP/palier : "+XPByLevel+"\n"+
+                                "Role : <@&"+roleId+">"
+                        }))
+                    )
             ]
         })
     }
