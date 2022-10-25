@@ -239,6 +239,11 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                                     "Vous pouvez laisser ce champs vide, il sera automatiquement calculé"
                             }
             },
+            name: {
+                referToSubCommands: ['grades.add'],
+                type: "string",
+                description: "Nom du grade"
+            },
             XPByLevel: {
                 referToSubCommands: ['grades.add'],
                 type: "overZeroInteger",
@@ -254,11 +259,6 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                             name: "Donnée invalide",
                             value: "Le nombre d'XP doit être un entier naturel (> 0)"
                         }
-            },
-            name: {
-                referToSubCommands: ['grades.add'],
-                type: "string",
-                description: "Nom du grade"
             },
             role: {
                 referToSubCommands: ['active_role.set', 'channel_role.set', 'grades.add'],
@@ -287,11 +287,12 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
             );
         }
 
-        const XPServerConfig: IXPData = await XPData.findOne({
-            serverId: this.guild.id
-        }).then(XPServerConfig => XPServerConfig ?? XPData.create({
-            serverId: (<Guild>this.guild).id
-        }));
+        const XPServerConfig: IXPData = await this.getXPServerConfig()
+            .then(XPServerConfig => XPServerConfig ?? XPData.create({
+                serverId: (<Guild>this.guild).id
+            }))
+
+
 
         return this["action_"+args.action](args, XPServerConfig);
     }

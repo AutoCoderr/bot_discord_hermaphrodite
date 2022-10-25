@@ -8,7 +8,7 @@ import {
     Guild,
     GuildMember,
     TextChannel,
-    User, EmbedBuilder, EmbedField
+    User, EmbedBuilder, EmbedField, ApplicationCommandPermissions
 } from "discord.js";
 import {checkTypes} from "./TypeChecker";
 import {extractTypes} from "./TypeExtractor";
@@ -23,6 +23,7 @@ import {
     responseResultType,
     responseType
 } from "../interfaces/CommandInterfaces";
+import {ApplicationCommandPermissionType} from "discord.js"
 
 const validModelCommands = {};
 
@@ -290,9 +291,41 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
 
         const slashCommand: null|ApplicationCommand = await guild.commands.fetch(this.slashCommandIdByGuild[guild.id]).catch(() => null);
         if (slashCommand) {
-            const permissions = (await slashCommand.permissions.fetch({guild}).catch(() => null))??[];
+            const permissions = (await slashCommand.permissions.fetch({guild}).catch(() => null));
+            if (permissions === null)
+                return true;
+
+            const everyonePermission = <ApplicationCommandPermissions>permissions.find(({id}) => id === guild.roles.everyone.id);
+
             return guild.ownerId == member.id ||
-                member.roles.cache.some(role => permissions.some(({id, permission}) => permission && id === role.id))
+                (everyonePermission.permission ?
+                    !member.roles.cache.some(role =>
+                        permissions.some(({id, permission, type}) =>
+                            type === ApplicationCommandPermissionType.Role &&
+                            id !== everyonePermission.id &&
+                            !permission &&
+                            id === role.id
+                        )
+                    ) &&
+                    !permissions.some(({id, permission, type}) =>
+                        type === ApplicationCommandPermissionType.User &&
+                        !permission &&
+                        id === member.id
+                    ) :
+                        member.roles.cache.some(role =>
+                            permissions.some(({id, permission, type}) =>
+                                type === ApplicationCommandPermissionType.Role &&
+                                id !== everyonePermission.id &&
+                                permission &&
+                                id === role.id
+                            )
+                        ) ||
+                            permissions.some(({id, permission, type}) =>
+                                type === ApplicationCommandPermissionType.User &&
+                                permission &&
+                                id === member.id
+                            )
+                )
         }
         return false;
     }
