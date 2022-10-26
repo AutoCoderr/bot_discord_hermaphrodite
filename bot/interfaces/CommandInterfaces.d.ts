@@ -16,6 +16,8 @@ export type IChoice = null|string|((args: IArgs, parentDescription: string) => s
 
 type IErrorMessageRes = {name: string, value: string}|Array<{name: string, value: string}>
 
+export type IValidatedArgs<IArgs> = {[key in keyof IArgs]?: boolean}
+
 export type IArgModel<IArgs = {[key: string]: any}, C extends Command = Command> = {
     type: keyof typeof checkTypes;
     required?: boolean|((args: Partial<IArgs>, command: null|C<IArgs>, modelizeSlashCommand: boolean) => boolean|Promise<boolean>);
@@ -27,7 +29,7 @@ export type IArgModel<IArgs = {[key: string]: any}, C extends Command = Command>
     displayValidErrorEvenIfFound?: boolean|((args: Partial<IArgs>, command: C<IArgs>) => boolean);
     displayExtractError?: boolean|((args: Partial<IArgs>, command: C<IArgs>) => boolean);
     multi?: boolean;
-    valid?: (value: any, args: Partial<IArgs>, command: C<IArgs>) => boolean|Promise<boolean>;
+    valid?: (value: any, args: Partial<IArgs>, command: C<IArgs>, validatedArgs: IValidatedArgs<IArgs>) => boolean|Promise<boolean>;
     evenCheckForSlash?: boolean;
     errorMessage?: (value: any, args: Partial<IArgs>, command: C<IArgs>) => IErrorMessageRes|Promise<IErrorMessageRes>;
     default?: any;

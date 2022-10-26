@@ -31,7 +31,7 @@ interface IConfigXPArgs {
     XPActionTypes: 'vocal'|'message'|'first_message'|'bump';
     XPActionTypesToLimit: 'vocal'|'message';
     tipsSubActions: 'list'|'show'|'set'|'delete'|'show_approves';
-    gradesSubActions: 'add'|'list'|'delete'|'insert'|'set_level'|'set_name'|'set_xp'|'set_role';
+    gradesSubActions: 'add'|'list'|'delete'|'insert'|'set_level'|'set_name'|'set_xp'|'set_xp_by_level'|'set_role';
     role: Role;
     duration: number;
     XP?: number;
@@ -142,11 +142,12 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                     set_level: "Définir le premier niveau d'un grade existant",
                     set_name: "Définir le nom d'un grade existant",
                     set_xp: "Définir les XPs de départ d'un grade existant",
+                    set_xp_by_level: "Définir le nombre d'XP par palier, d'un grade existant",
                     set_role: "Définir le role d'un grade existant"
                 }
             },
             gradeNumber: {
-                referToSubCommands: ['delete','insert','set_level','set_name','set_xp','set_role'].map(t => 'grades.'+t),
+                referToSubCommands: ['delete','insert','set_level','set_name','set_xp','set_role','set_xp_by_level'].map(t => 'grades.'+t),
                 type: "overZeroInteger",
                 evenCheckForSlash: true,
                 description: "Le numéro du grade",
@@ -158,6 +159,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                     return value <= nbGrades + (args.gradesSubActions === "insert" ? 1 : 0) &&
                         (args.gradesSubActions !== "insert" || nbGrades === 0 || value > 1) &&
                         (
+                            !['set_level','set_xp'].includes(<string>args.gradesSubActions) ||
                             (args.gradesSubActions === "set_level" && value > 1) ||
                             (args.gradesSubActions === "set_xp" && value === 1)
                         )
@@ -225,12 +227,12 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                         )
                     );
                 },
-                valid: async (value, args, command: ConfigXP) => {
+                valid: async (value, args, command: ConfigXP, validatedArgs) => {
                     if (
                         command.guild === null ||
                         args.action !== "grades" ||
                         !["add","insert"].includes(<string>args.gradesSubActions) ||
-                        (args.gradesSubActions === "insert" && args.gradeNumber === undefined)
+                        (args.gradesSubActions === "insert" && !validatedArgs.gradeNumber)
                     )
                         return true;
 
@@ -240,15 +242,6 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                         (
                             args.gradesSubActions === "insert" &&
                             (
-                                (args.gradeNumber !== 1 && (XPServerConfig === null || XPServerConfig.grades.length === 0)) ||
-                                (
-                                    XPServerConfig !== null &&
-                                    XPServerConfig.grades.length > 0 &&
-                                    (
-                                        args.gradeNumber === 1 ||
-                                        (args.gradeNumber !== undefined && args.gradeNumber > XPServerConfig.grades.length+1)
-                                    )
-                                ) ||
                                 (args.gradeNumber === 1 && value === 1) ||
                                 (
                                     XPServerConfig !== null &&
@@ -275,14 +268,11 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                             args.gradesSubActions === "set_level" &&
                             (
                                 XPServerConfig === null ||
-                                args.gradeNumber === undefined ||
-                                args.gradeNumber === 1 ||
-                                args.gradeNumber > XPServerConfig.grades.length ||
                                 (
-                                    value > XPServerConfig.grades[args.gradeNumber-2] &&
+                                    value > XPServerConfig.grades[<number>args.gradeNumber-2].atLevel &&
                                     (
                                         args.gradeNumber === XPServerConfig.grades.length ||
-                                        value < XPServerConfig.grades[args.gradeNumber].atLevel
+                                        value < XPServerConfig.grades[<number>args.gradeNumber].atLevel
                                     )
                                 )
                             )
@@ -296,7 +286,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                             value: "Vous devez spécifier le niveau"
                         }
 
-                    if (value <= 0 || args.action !== "grades" || (args.gradesSubActions !== "add" && args.gradesSubActions !== "insert"))
+                    if (value <= 0 || args.action !== "grades" || !["add","insert","set_level"].includes(<string>args.gradesSubActions))
                         return {
                             name: "Donnée invalide",
                             value: "Le niveau doit être un entier naturel (> 0)"
@@ -325,26 +315,31 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                                 :
                             "Le niveau mentionné doit être strictement supérieur au premier niveau du grade précedent" + (
                                     (
-                                        args.gradesSubActions === "insert" &&
                                         args.gradeNumber !== undefined &&
                                         XPServerConfig !== null &&
-                                        args.gradeNumber <= XPServerConfig.grades.length
-                                    ) ? " et strictement inférieur au premier niveau du grade qui va être décalé" : ""
+                                        (
+                                            (args.gradesSubActions === "insert" && args.gradeNumber <= XPServerConfig.grades.length) ||
+                                            (args.gradesSubActions === "set_level" && args.gradeNumber < XPServerConfig.grades.length)
+                                        )
+                                    ) ? " et strictement inférieur au premier niveau du grade suivant" : ""
                             )
                     }
                 }
             },
             XP: {
-                referToSubCommands: [...['message', 'vocal', 'first_message', 'bump'].map(t => 'xp_gain_set.'+t), 'grades.add', 'grades.insert'],
+                referToSubCommands: [...['message', 'vocal', 'first_message', 'bump'].map(t => 'xp_gain_set.'+t), 'grades.add', 'grades.insert', 'grades.set_xp'],
                 type: "overZeroInteger",
                 evenCheckForSlash: true,
-                description: (args) => (args.action === "grades" && ["add","insert"].includes(<string>args.gradesSubActions)) ?
+                description: (args) => (args.action === "grades" && ["add","insert","set_xp"].includes(<string>args.gradesSubActions)) ?
                     "Le nombre d'XP nécessaire pour atteindre ce grade" :
                     "Rentrez une valeur",
-                valid: async (value, args, command: ConfigXP) => {
-                    if (args.action !== "grades" ||
+                valid: async (value, args, command: ConfigXP, validatedArgs) => {
+                    if (
+                        args.action !== "grades" ||
                         command.guild === null ||
-                        (args.gradesSubActions !== "add" && args.gradesSubActions !== "insert")
+                        !["insert","add"].includes(<string>args.gradesSubActions) ||
+                        !validatedArgs.level ||
+                        (args.gradesSubActions === "insert" && !validatedArgs.gradeNumber)
                     )
                         return true;
 
@@ -352,31 +347,14 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
 
                     return XPServerConfig === null ||
                         XPServerConfig.grades.length === 0 ||
-                        args.level === undefined ||
-
                         (
                             (
                                 args.gradesSubActions === "add" &&
-                                (
-                                    args.level <= XPServerConfig.grades[XPServerConfig.grades.length-1].atLevel ||
-                                    await calculRequiredXPForNextGrade(XPServerConfig, args.level) === value
-                                )
+                                await calculRequiredXPForNextGrade(XPServerConfig, <number>args.level) === value
                             ) ||
                             (
                                 args.gradesSubActions === "insert" &&
-                                (
-                                    args.gradeNumber === undefined ||
-                                    (args.gradeNumber === 1 && args.level !== 1) ||
-                                    (
-                                        args.gradeNumber > 1 &&
-                                        args.level <= XPServerConfig.grades[args.gradeNumber-2].atLevel
-                                    ) ||
-                                    (
-                                        args.gradeNumber <= XPServerConfig.grades.length &&
-                                        args.level >= XPServerConfig.grades[args.gradeNumber-1].atLevel
-                                    ) ||
-                                    await calculRequiredXPForNextGrade(XPServerConfig, args.level, args.gradeNumber-2) === value
-                                )
+                                await calculRequiredXPForNextGrade(XPServerConfig, <number>args.level, <number>args.gradeNumber-2) === value
                             )
                         )
                 },
@@ -420,12 +398,12 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                             }
             },
             name: {
-                referToSubCommands: ['grades.add','grades.insert'],
+                referToSubCommands: ['grades.add','grades.insert','grades.set_name'],
                 type: "string",
                 description: "Nom du grade"
             },
             XPByLevel: {
-                referToSubCommands: ['grades.add', 'grades.insert'],
+                referToSubCommands: ['grades.add', 'grades.insert','grades.set_xp_by_level'],
                 type: "overZeroInteger",
                 evenCheckForSlash: true,
                 description: "Le nombre d'XP nécessaire pour augmenter de niveau",
@@ -441,7 +419,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                         }
             },
             role: {
-                referToSubCommands: ['active_role.set', 'channel_role.set', 'grades.add','grades.insert'],
+                referToSubCommands: ['active_role.set', 'channel_role.set', 'grades.add','grades.insert','grades.set_role'],
                 type: "role",
                 description: "Quel rôle définir"
             },
@@ -580,6 +558,103 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                     .setFields({
                         name: "Grade supprimé avec succès",
                         value: "Le grade '"+deletedGrade.name+"' a été supprimé avec succès"
+                    })
+            ]
+        })
+    }
+
+    async action_grades_set_name(args: IConfigXPArgs, XPServerConfig: IXPData) {
+        XPServerConfig.grades[args.gradeNumber-1].name = args.name;
+
+        await XPServerConfig.save();
+
+        return this.response(true, {
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle("Nom modifié")
+                    .setFields({
+                        name: "Nom du grade "+args.gradeNumber+" modifié",
+                        value: "Le nom du grade "+args.gradeNumber+" a été modifié avec succès"
+                    })
+            ]
+        })
+    }
+
+    async action_grades_set_role(args: IConfigXPArgs, XPServerConfig: IXPData) {
+        XPServerConfig.grades[args.gradeNumber-1].roleId = args.role.id;
+
+        await XPServerConfig.save();
+
+        return this.response(true, {
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle("Role modifié")
+                    .setFields({
+                        name: "Role du grade "+args.gradeNumber+" modifié",
+                        value: "Le role du grade "+args.gradeNumber+" a été modifiés avec succès"
+                    })
+            ]
+        })
+    }
+
+    async action_grades_set_xp_by_level(args: IConfigXPArgs, XPServerConfig: IXPData) {
+        XPServerConfig.grades[args.gradeNumber-1].XPByLevel = args.XPByLevel;
+
+        for (let i=args.gradeNumber;i<XPServerConfig.grades.length;i++) {
+            XPServerConfig.grades[i].requiredXP = await <Promise<number>>calculRequiredXPForNextGrade(XPServerConfig, XPServerConfig.grades[i].atLevel, i-1)
+        }
+
+        await XPServerConfig.save();
+
+        return this.response(true, {
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle("XP par palier changé")
+                    .setFields({
+                        name: "XP par palier du grade "+args.gradeNumber+" modifié",
+                        value: "Le nombre d'XP requis par palier du grade "+args.gradeNumber+" été modifié avec succès"
+                    })
+            ]
+        })
+    }
+
+    async action_grades_set_xp(args: IConfigXPArgs, XPServerConfig: IXPData) {
+        XPServerConfig.grades[args.gradeNumber-1].requiredXP = <number>args.XP;
+
+        for (let i=args.gradeNumber;i<XPServerConfig.grades.length;i++) {
+            XPServerConfig.grades[i].requiredXP = await <Promise<number>>calculRequiredXPForNextGrade(XPServerConfig, XPServerConfig.grades[i].atLevel, i-1)
+        }
+
+        await XPServerConfig.save();
+
+        return this.response(true, {
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle("XP changé")
+                    .setFields({
+                        name: "XP du grade "+args.gradeNumber+" modifié",
+                        value: "Les XPs requis du grade "+args.gradeNumber+" ont été modifié avec succès"
+                    })
+            ]
+        })
+    }
+
+    async action_grades_set_level(args: IConfigXPArgs, XPServerConfig: IXPData) {
+        XPServerConfig.grades[args.gradeNumber-1].atLevel = <number>args.level;
+
+        for (let i=args.gradeNumber-1;i<XPServerConfig.grades.length;i++) {
+            XPServerConfig.grades[i].requiredXP = await <Promise<number>>calculRequiredXPForNextGrade(XPServerConfig, XPServerConfig.grades[i].atLevel, i-1)
+        }
+
+        await XPServerConfig.save();
+
+        return this.response(true, {
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle("Niveau changé")
+                    .setFields({
+                        name: "Premier niveau du grade "+args.gradeNumber+" modifié",
+                        value: "Le premier niveau du grade "+args.gradeNumber+" ont été modifié avec succès"
                     })
             ]
         })

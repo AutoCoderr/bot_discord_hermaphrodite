@@ -18,7 +18,7 @@ import {
     getCommandTypeArg,
     IArgModel,
     IArgsModel,
-    IFailList,
+    IFailList, IValidatedArgs,
     responseResultsType,
     responseResultType,
     responseType
@@ -409,6 +409,7 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
         let args: Partial<IArgs> = {};
         let fails: IFailList = [];
         let failsExtract: IFailList = [];
+        const validatedArgs: IValidatedArgs<IArgs> = {}
 
         const additionalParams = {
             subCommand: null,
@@ -418,11 +419,11 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
         for (const attr in this.argsModel) {
             if (attr == '$argsByOrder' && this.argsModel.$argsByOrder) {
                 for (const argModel of this.argsModel.$argsByOrder) {
-                    await this.getSlashArgFromModel(argModel.field,argModel,args, fails, failsExtract, additionalParams);
+                    await this.getSlashArgFromModel(argModel.field,argModel,args, fails, failsExtract, validatedArgs, additionalParams);
                 }
             } else {
                 for (const [attr2,argModel] of <[string,IArgModel<IArgs>][]>Object.entries(this.argsModel[attr])) {
-                    await this.getSlashArgFromModel(attr2,argModel,args, fails, failsExtract, additionalParams);
+                    await this.getSlashArgFromModel(attr2,argModel,args, fails, failsExtract, validatedArgs, additionalParams);
                 }
             }
         }
@@ -432,7 +433,7 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
         return {success: true, result: args};
     }
 
-    async getSlashArgFromModel(attr: string, argModel: IArgModel<IArgs>, args: Partial<IArgs>, fails: IFailList, failsExtract: IFailList, additionalParams: {subCommand: null|string, subCommandGroup: null|string}) {
+    async getSlashArgFromModel(attr: string, argModel: IArgModel<IArgs>, args: Partial<IArgs>, fails: IFailList, failsExtract: IFailList, validatedArgs: IValidatedArgs<IArgs>, additionalParams: {subCommand: null|string, subCommandGroup: null|string}) {
         if (this.slashCommandOptions === null) return;
         if (!argModel.isSubCommand) {
 
@@ -458,6 +459,7 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
                 }
                 const defaultValue = typeof (argModel.default) == "function" ? argModel.default(args, this) : argModel.default;
                 if (defaultValue !== undefined) {
+                    validatedArgs[attr] = true;
                     args[attr] = defaultValue;
                 } else if (argModel.multi) {
                     args[attr] = [];
@@ -487,8 +489,10 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
                 }
             }
 
-            if (!failed && args[attr] !== undefined && typeof(argModel.valid) == 'function' && !(await argModel.valid(args[attr],args,this))) {
+            if (!failed && args[attr] !== undefined && typeof(argModel.valid) == 'function' && !(await argModel.valid(args[attr],args,this,validatedArgs))) {
                 fails.push({...argModel, field: attr, value: args[attr]});
+            } else {
+                validatedArgs[attr] = true;
             }
         } else {
             const subCommand = this.slashCommandOptions.getSubcommand();
@@ -604,6 +608,7 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
         let out: Partial<IArgs> = {};
         let fails: IFailList = [];
         let failsExtract: IFailList = [];
+        const validatedArgs: IValidatedArgs<IArgs> = {}
 
 
         if (model.$argsByName !== undefined) {
@@ -625,9 +630,10 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
                             const moreDatas = typeof(arg.moreDatas) === "function" ? await arg.moreDatas(out,arg.type, this) : null
                             const data = await extractTypes[arg.type](args[field],this,moreDatas);
                             if (data !== false) {
-                                if (typeof(arg.valid) != "function" || await arg.valid(data,out, this))
+                                if (typeof(arg.valid) != "function" || await arg.valid(data,out, this, validatedArgs)) {
+                                    validatedArgs[attr] = true;
                                     out[attr] = data;
-                                else {
+                                } else {
                                     incorrectField = true;
                                     triedValue = args[field];
                                 }
@@ -635,9 +641,10 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
                                 extractFailed = true;
                                 triedValue = args[field];
                             }
-                        } else if (typeof(arg.valid) != "function" || await arg.valid(args[field],out, this))
+                        } else if (typeof(arg.valid) != "function" || await arg.valid(args[field],out, this, validatedArgs)) {
+                            validatedArgs[attr] = true;
                             out[attr] = arg.type === "string" ? args[field].toString() : args[field];
-                        else {
+                        } else {
                             incorrectField = true;
                             triedValue = args[field];
                         }
@@ -697,9 +704,10 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
                         }
 
                         if (!extractFailed &&
-                            (typeof(arg.valid) != "function" || await arg.valid(data,out, this)) &&
+                            (typeof(arg.valid) != "function" || await arg.valid(data,out, this, validatedArgs)) &&
                             (arg.choices === undefined || Object.keys(arg.choices).includes(data))
                         ) {
+                            validatedArgs[arg.field] = true;
                             if (arg.type === "boolean" && data === arg.field)
                                 data = true;
                             if (arg.multi)
@@ -796,8 +804,9 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
                             }
                         }
                         if (!extractFailed &&
-                            (typeof(arg.valid) != "function" || await arg.valid(data,out, this)) &&
+                            (typeof(arg.valid) != "function" || await arg.valid(data,out, this, validatedArgs)) &&
                             (arg.choices === undefined || Object.keys(arg.choices).includes(data)) ) {
+                            validatedArgs[attr] = true;
                             if (arg.type === "boolean" && data === attr)
                                 data = true
                             if (arg.multi)
