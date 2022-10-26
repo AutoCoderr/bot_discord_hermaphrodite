@@ -143,10 +143,10 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
                         const errors = await fail.errorMessage(fail.value, args, this)
                         if (errors instanceof Array){
                             for (const error of errors) {
-                                subFields.push({...error, inline: true});
+                                subFields.push({...error, inline: false});
                             }
                         } else {
-                            subFields.push({...errors, inline: true});
+                            subFields.push({...errors, inline: false});
                         }
                     }
                 }
@@ -165,10 +165,10 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
                         const errors = await failExtract.errorMessage(failExtract.value, args, this)
                         if (errors instanceof Array){
                             for (const error of errors) {
-                                subFields.push({...error, inline: true});
+                                subFields.push({...error, inline: false});
                             }
                         } else {
-                            subFields.push({...errors, inline: true});
+                            subFields.push({...errors, inline: false});
                         }
                     }
                 }

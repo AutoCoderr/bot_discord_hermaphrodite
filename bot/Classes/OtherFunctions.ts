@@ -379,11 +379,9 @@ export function round(n, p) {
 export async function calculRequiredXPForNextGrade(XPServerConfig: IXPData, level: number, lastGradeIndex: number = XPServerConfig.grades.length-1): Promise<null|number> {
     const lastGrade = XPServerConfig.grades[lastGradeIndex];
     const lastGradeLevel = lastGradeIndex === 0 ? 1 : lastGrade.atLevel;
-    console.log({level, lastGradeLevel, lastGradeXPByLevel: lastGrade.XPByLevel, lastGradeRequiredXP: lastGrade.requiredXP});
     if (level <= lastGrade.atLevel)
         return null;
 
-    const res = lastGrade.requiredXP + (level-lastGradeLevel)*lastGrade.XPByLevel;
-    console.log(lastGrade.requiredXP+" + ("+level+"-"+lastGradeLevel+")*"+lastGrade.XPByLevel+" = "+res)
-    return res
+
+    return lastGrade.requiredXP + (level-lastGradeLevel)*lastGrade.XPByLevel
 }
