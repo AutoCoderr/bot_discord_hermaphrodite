@@ -31,7 +31,7 @@ interface IConfigXPArgs {
     XPActionTypes: 'vocal'|'message'|'first_message'|'bump';
     XPActionTypesToLimit: 'vocal'|'message';
     tipsSubActions: 'list'|'show'|'set'|'delete'|'show_approves';
-    gradesSubActions: 'add'|'list'|'delete'|'insert';
+    gradesSubActions: 'add'|'list'|'delete'|'insert'|'set_level'|'set_name'|'set_xp'|'set_role';
     role: Role;
     duration: number;
     XP?: number;
@@ -138,11 +138,15 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                     add: "Ajouter un grade",
                     list: "Lister les grades",
                     delete: "Supprimer un grade",
-                    insert: "Insérer un nouveau grade"
+                    insert: "Insérer un nouveau grade",
+                    set_level: "Définir le premier niveau d'un grade existant",
+                    set_name: "Définir le nom d'un grade existant",
+                    set_xp: "Définir les XPs de départ d'un grade existant",
+                    set_role: "Définir le role d'un grade existant"
                 }
             },
             gradeNumber: {
-                referToSubCommands: ['grades.delete','grades.insert'],
+                referToSubCommands: ['delete','insert','set_level','set_name','set_xp','set_role'].map(t => 'grades.'+t),
                 type: "overZeroInteger",
                 evenCheckForSlash: true,
                 description: "Le numéro du grade",
@@ -152,28 +156,51 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                     const nbGrades = XPServerConfig === null ? 0 : XPServerConfig.grades.length;
 
                     return value <= nbGrades + (args.gradesSubActions === "insert" ? 1 : 0) &&
-                        (args.gradesSubActions === "delete" || nbGrades === 0 || value > 1)
+                        (args.gradesSubActions !== "insert" || nbGrades === 0 || value > 1) &&
+                        (
+                            (args.gradesSubActions === "set_level" && value > 1) ||
+                            (args.gradesSubActions === "set_xp" && value === 1)
+                        )
                 },
-                errorMessage: (value, args) =>
-                    value === undefined ?
-                        {
+                errorMessage: (value, args) => {
+                    if (value === undefined)
+                        return {
                             name: "Donnée manquante",
                             value: "Vous devez spécifier le numéro de grade"
-                        } :
-                        value <= 0 ? {
+                        }
+
+                    if (value <= 0)
+                        return {
                             name: "Donnée invalide",
                             value: "Le numéro de grade doit être un entier naturel (> 0)"
-                        } :
-                            args.gradesSubActions === "delete" ? {
-                            name: "Grade inexistant",
-                            value: "Le grade "+value+" n'existe pas"
-                        } : {
+                        }
+
+                    if (args.gradesSubActions === "insert")
+                        return {
                             name: "Position de grade inaccessible",
                             value: "Vous ne pouvez pas insérer de grade à la position "+value
                         }
+
+                    if (args.gradesSubActions === "set_level" && value === 1)
+                        return {
+                            name: "Redéfinition du niveau impossible",
+                            value: "Vous ne pouvez pas redéfinir le niveau du premier grade"
+                        }
+
+                    if (args.gradesSubActions === "set_xp" && value > 1)
+                        return {
+                            name: "Redéfinition des XP impossible",
+                            value: "Vous ne pouvez redéfinir que les XP du premier grade"
+                        }
+
+                    return {
+                        name: "Grade inexistant",
+                        value: "Le grade "+value+" n'existe pas"
+                    }
+                }
             },
             level: {
-                referToSubCommands: ['tips.show', 'tips.delete', 'tips.set','tips.show_approves','grades.add','grades.insert'],
+                referToSubCommands: ['tips.show', 'tips.delete', 'tips.set','tips.show_approves','grades.add','grades.insert','grades.set_level'],
                 type: "overZeroInteger",
                 evenCheckForSlash: true,
                 description: "Rentrez une valeur",
@@ -241,6 +268,23 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                             (
                                 ((XPServerConfig === null || XPServerConfig.grades.length === 0) && value === 1) ||
                                 (XPServerConfig !== null && XPServerConfig.grades.length > 0 && value > XPServerConfig.grades[XPServerConfig.grades.length-1].atLevel)
+                            )
+                        )
+                            ||
+                        (
+                            args.gradesSubActions === "set_level" &&
+                            (
+                                XPServerConfig === null ||
+                                args.gradeNumber === undefined ||
+                                args.gradeNumber === 1 ||
+                                args.gradeNumber > XPServerConfig.grades.length ||
+                                (
+                                    value > XPServerConfig.grades[args.gradeNumber-2] &&
+                                    (
+                                        args.gradeNumber === XPServerConfig.grades.length ||
+                                        value < XPServerConfig.grades[args.gradeNumber].atLevel
+                                    )
+                                )
                             )
                         )
                     )
