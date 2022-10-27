@@ -10,7 +10,7 @@ import {
     TextChannel,
     User
 } from "discord.js";
-import XPData, {IXPData} from "../Models/XP/XPData";
+import XPData, {ILevelTip, IXPData} from "../Models/XP/XPData";
 import {extractUTCTime, showTime} from "../Classes/DateTimeManager";
 import {calculRequiredXPForNextGrade, findTipByLevel, round, setTipByLevel} from "../Classes/OtherFunctions";
 import client from "../client";
@@ -207,7 +207,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                 evenCheckForSlash: true,
                 description: "Rentrez une valeur",
                 required: async (args, command: null|ConfigXP) => {
-                    if (args.action !== "grades" || !["add","insert"].includes(<string>args.gradesSubActions))
+                    if (args.action !== "grades" || args.gradesSubActions === "set_level")
                         return true;
 
                     if (command === null)
@@ -230,9 +230,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                 valid: async (value, args, command: ConfigXP, validatedArgs) => {
                     if (
                         command.guild === null ||
-                        args.action !== "grades" ||
-                        !["add","insert"].includes(<string>args.gradesSubActions) ||
-                        (args.gradesSubActions === "insert" && !validatedArgs.gradeNumber)
+                        (args.action === "grades" && ["insert","set_level"].includes(<string>args.gradesSubActions) && !validatedArgs.gradeNumber)
                     )
                         return true;
 
@@ -240,7 +238,18 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
 
                     return (
                         (
-                            args.gradesSubActions === "insert" &&
+                            args.action === "tips" &&
+                            (
+                                args.tipsSubActions === "set" ||
+                                (
+                                    XPServerConfig !== null &&
+                                    findTipByLevel(value, XPServerConfig.tipsByLevel) !== null
+                                )
+                            )
+                        )
+                            ||
+                        (
+                            args.action === "grades" && args.gradesSubActions === "insert" &&
                             (
                                 (args.gradeNumber === 1 && value === 1) ||
                                 (
@@ -257,7 +266,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                         )
                             ||
                         (
-                            args.gradesSubActions === "add" &&
+                            args.action === "grades" && args.gradesSubActions === "add" &&
                             (
                                 ((XPServerConfig === null || XPServerConfig.grades.length === 0) && value === 1) ||
                                 (XPServerConfig !== null && XPServerConfig.grades.length > 0 && value > XPServerConfig.grades[XPServerConfig.grades.length-1].atLevel)
@@ -265,7 +274,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                         )
                             ||
                         (
-                            args.gradesSubActions === "set_level" &&
+                            args.action === "grades" && args.gradesSubActions === "set_level" &&
                             (
                                 XPServerConfig === null ||
                                 (
@@ -286,10 +295,16 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                             value: "Vous devez spécifier le niveau"
                         }
 
-                    if (value <= 0 || args.action !== "grades" || !["add","insert","set_level"].includes(<string>args.gradesSubActions))
+                    if (value <= 0)
                         return {
                             name: "Donnée invalide",
                             value: "Le niveau doit être un entier naturel (> 0)"
+                        }
+
+                    if (args.action === "tips")
+                        return {
+                            name: "Tip introuvable",
+                            value: "Aucun tip associé au niveau "+value+" n'a été trouvé"
                         }
 
                     const XPServerConfig = await command.getXPServerConfig();
@@ -333,6 +348,28 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                 description: (args) => (args.action === "grades" && ["add","insert","set_xp"].includes(<string>args.gradesSubActions)) ?
                     "Le nombre d'XP nécessaire pour atteindre ce grade" :
                     "Rentrez une valeur",
+                required: async (args, command: null|ConfigXP) => {
+                    if (args.action !== "grades" ||
+                        (args.gradesSubActions !== "add" && args.gradesSubActions !== "insert")
+                    )
+                        return true
+
+                    if (command === null || command.guild === null)
+                        return false;
+
+                    const XPServerConfig: null|IXPData = await command.getXPServerConfig();
+
+                    return (
+                        (
+                            args.gradesSubActions === "add" &&
+                            (XPServerConfig === null || XPServerConfig.grades.length === 0)
+                        ) ||
+                        (
+                            args.gradesSubActions === "insert" &&
+                            args.gradeNumber === 1
+                        )
+                    )
+                },
                 valid: async (value, args, command: ConfigXP, validatedArgs) => {
                     if (
                         args.action !== "grades" ||
@@ -357,28 +394,6 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                                 await calculRequiredXPForNextGrade(XPServerConfig, <number>args.level, <number>args.gradeNumber-2) === value
                             )
                         )
-                },
-                required: async (args, command: null|ConfigXP) => {
-                    if (args.action !== "grades" ||
-                        (args.gradesSubActions !== "add" && args.gradesSubActions !== "insert")
-                    )
-                        return true
-
-                    if (command === null || command.guild === null)
-                        return false;
-
-                    const XPServerConfig: null|IXPData = await command.getXPServerConfig();
-
-                    return (
-                        (
-                            args.gradesSubActions === "add" &&
-                            (XPServerConfig === null || XPServerConfig.grades.length === 0)
-                        ) ||
-                        (
-                            args.gradesSubActions === "insert" &&
-                            args.gradeNumber === 1
-                        )
-                    )
                 },
                 errorMessage: (value, args) =>
                     value === undefined ?
@@ -732,19 +747,6 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
         return this["action_tips_"+args.tipsSubActions](args, XPServerConfig)
     }
 
-    async tipNotFoundEmbed(level: number) {
-        return this.response(false, {
-            embeds: [
-                new EmbedBuilder()
-                    .setTitle("Element introuvable")
-                    .setFields({
-                        name: "Element introuvable",
-                        value: "Aucun tip n'est défini pour le niveau "+level
-                    })
-            ]
-        })
-    }
-
     async action_tips_set(args: IConfigXPArgs, XPServerConfig: IXPData) {
         return this.response(true, "Veuillez rentrer un message pour le tip (tapez 'CANCEL' pour annuler) :",
             () => new Promise(resolve => {
@@ -782,11 +784,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
     }
 
     async action_tips_delete(args: IConfigXPArgs, XPServerConfig: IXPData) {
-        const updatedTips = XPServerConfig.tipsByLevel.filter(tip => tip.level !== args.level);
-        if (updatedTips.length === XPServerConfig.tipsByLevel.length)
-            return this.tipNotFoundEmbed(<number>args.level);
-
-        XPServerConfig.tipsByLevel = updatedTips;
+        XPServerConfig.tipsByLevel = XPServerConfig.tipsByLevel.filter(tip => tip.level !== args.level);
         await XPServerConfig.save();
 
         return this.response(true, {
@@ -802,10 +800,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
     }
 
     async action_tips_show(args: IConfigXPArgs, XPServerConfig: IXPData) {
-        const tip = findTipByLevel(<number>args.level, XPServerConfig.tipsByLevel);
-
-        if (tip === null)
-            return this.tipNotFoundEmbed(<number>args.level);
+        const tip = <ILevelTip>findTipByLevel(<number>args.level, XPServerConfig.tipsByLevel);
 
         return this.response(true, {
             embeds: [
@@ -840,9 +835,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
     }
 
     async action_tips_show_approves(args: IConfigXPArgs, XPServerConfig: IXPData) {
-        const tip = findTipByLevel(<number>args.level, XPServerConfig.tipsByLevel);
-        if (tip === null)
-            return this.tipNotFoundEmbed(<number>args.level);
+        const tip = <ILevelTip>findTipByLevel(<number>args.level, XPServerConfig.tipsByLevel);
 
         return this.response(true, {
             embeds: [
