@@ -8,7 +8,7 @@ import {
     Guild,
     GuildMember,
     TextChannel,
-    User, EmbedBuilder, EmbedField, ApplicationCommandPermissions
+    User, EmbedBuilder, EmbedField, ApplicationCommandPermissions, Message, Interaction, CommandInteraction
 } from "discord.js";
 import {checkTypes} from "./TypeChecker";
 import {extractTypes} from "./TypeExtractor";
@@ -42,26 +42,33 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
 
     commandOrigin: 'slash'|'custom';
 
-    commandName: null|string;
+    commandName: string;
     guild: null|Guild;
     channel: TextChannel;
-    member: User|GuildMember;
+    member: |GuildMember;
     argsModel: IArgsModel<IArgs, getCommandTypeArg<C>>;
+
+    interaction: null|CommandInteraction = null;
+    message: null|Message = null;
 
     writtenCommand: null|string = null; // If command called as a custom command, get the message typed by the user
     slashCommandOptions: null|CommandInteractionOptionResolver = null; // If command called as a slash command, get options
 
-    constructor(channel: TextChannel, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom', commandName: null|string, argsModel: IArgsModel<IArgs,getCommandTypeArg<C>>) {
+    constructor(messageOrInteraction: Message|CommandInteraction, commandOrigin: 'slash'|'custom', commandName: string, argsModel: IArgsModel<IArgs,getCommandTypeArg<C>>) {
+        const {guild, channel, member} = messageOrInteraction;
         this.guild = guild;
-        this.channel = channel;
-        this.member = member;
+        this.channel = <TextChannel>channel;
+        this.member = <GuildMember>member;
         this.commandName = commandName;
         this.argsModel = argsModel;
         this.commandOrigin = commandOrigin;
-        if (writtenCommandOrSlashCommandOptions instanceof CommandInteractionOptionResolver)
-            this.slashCommandOptions = writtenCommandOrSlashCommandOptions;
-        else
-            this.writtenCommand = writtenCommandOrSlashCommandOptions
+        if (messageOrInteraction instanceof Message) {
+            this.writtenCommand = messageOrInteraction.content;
+            this.message = messageOrInteraction;
+        } else {
+            this.slashCommandOptions = <CommandInteractionOptionResolver>messageOrInteraction.options;
+            this.interaction = messageOrInteraction;
+        }
     }
 
     async match() {

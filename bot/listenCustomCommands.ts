@@ -23,7 +23,7 @@ export async function listenCustomCommands(message: Message) {
         for (let commandName in existingCommands) {
             const commandClass = existingCommands[commandName];
             if (commandClass.customCommand) {
-                const command = <Command>(new commandClass(message.channel, message.member, message.guild, message.content, 'custom'));
+                const command = <Command>(new commandClass(message, 'custom'));
                 await command.executeCommand(client)
                     .then(response => getAndDisplayCustomCommandsResponse(message, <TResponse>response))
                     .catch(e => {

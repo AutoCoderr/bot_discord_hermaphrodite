@@ -2,6 +2,7 @@ import config from "../config";
 import Command from "../Classes/Command";
 import WelcomeMessage, {IWelcomeMessage} from "../Models/WelcomeMessage";
 import {
+    CommandInteraction,
     CommandInteractionOptionResolver, EmbedBuilder,
     Guild,
     GuildMember,
@@ -39,8 +40,8 @@ export default class ConfigWelcome extends Command {
         ]
     }
 
-    constructor(channel: TextChannel, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
-        super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, ConfigWelcome.commandName, ConfigWelcome.argsModel);
+    constructor(messageOrInteraction: Message|CommandInteraction, commandOrigin: 'slash'|'custom') {
+        super(messageOrInteraction, commandOrigin, ConfigWelcome.commandName, ConfigWelcome.argsModel);
     }
 
     async action(args: {action: string}, bot) {

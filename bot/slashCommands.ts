@@ -251,14 +251,14 @@ async function getAndDisplaySlashCommandsResponse(interaction: CommandInteractio
 }
 
 export async function listenSlashCommands(interaction: CommandInteraction) {
-    const {commandName, options} = interaction;
+    const {commandName} = interaction;
 
     for (const CommandClass of <any[]>Object.values(existingCommands)) {
         if (CommandClass.commandName.toLowerCase() === commandName) {
             await interaction.deferReply({
                 ephemeral: true
             });
-            const command = <Command>(new CommandClass(interaction.channel, interaction.member, interaction.guild, options, 'slash'));
+            const command = <Command>(new CommandClass(interaction, 'slash'));
             try {
                 const response = await command.executeCommand(client, true);
 

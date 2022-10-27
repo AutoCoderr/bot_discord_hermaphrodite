@@ -8,7 +8,7 @@ import {
     TextChannel,
     User, ChannelType, EmbedBuilder,
     PermissionFlagsBits, ActionRowBuilder, ButtonBuilder,
-    ButtonStyle
+    ButtonStyle, CommandInteraction
 } from "discord.js";
 import config from "../config";
 import TextConfig, {ITextConfig, minimumLimit} from "../Models/Text/TextConfig";
@@ -185,8 +185,8 @@ export default class Text extends Command {
     notFoundUser: Array<Snowflake> = [];
     usersBlockedOnChannels: { [channelId: Snowflake]: Snowflake[]} = {};
 
-    constructor(channel: TextChannel, member: User | GuildMember, guild: null | Guild = null, writtenCommandOrSlashCommandOptions: null | string | CommandInteractionOptionResolver = null, commandOrigin: 'slash' | 'custom') {
-        super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, Text.commandName, Text.argsModel);
+    constructor(messageOrInteraction: Message|CommandInteraction, commandOrigin: 'slash' | 'custom') {
+        super(messageOrInteraction, commandOrigin, Text.commandName, Text.argsModel);
     }
 
     async action(args: argsType) {

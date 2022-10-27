@@ -10,7 +10,7 @@ import Discord, {
     Message,
     Role, Snowflake,
     TextChannel, User, PermissionFlagsBits, PermissionResolvable,
-    ChannelType, EmbedBuilder, EmbedField
+    ChannelType, EmbedBuilder, EmbedField, CommandInteraction
 } from "discord.js";
 import {splitFieldsEmbed} from "../Classes/OtherFunctions";
 import client from "../client";
@@ -125,8 +125,8 @@ export default class ConfigTicket extends Command {
         },
     }
 
-    constructor(channel: TextChannel, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
-        super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, ConfigTicket.commandName, ConfigTicket.argsModel);
+    constructor(messageOrInteraction: Message|CommandInteraction, commandOrigin: 'slash'|'custom') {
+        super(messageOrInteraction, commandOrigin, ConfigTicket.commandName, ConfigTicket.argsModel);
     }
 
     async action(args: {action: string, category: CategoryChannel, subAction: string, user: GuildMember, channelListen: TextChannel, messageListen: Message, emoteListen: GuildEmoji|string, moderatorRole: Role}, bot) {

@@ -2,9 +2,10 @@ import Command from "../Classes/Command";
 import VocalAskInviteBack from "../Models/Vocal/VocalAskInviteBack";
 import VocalInvite from "../Models/Vocal/VocalInvite";
 import {
+    CommandInteraction,
     CommandInteractionOptionResolver,
     Guild,
-    GuildMember,
+    GuildMember, Message,
     TextChannel,
     User
 } from "discord.js";
@@ -35,8 +36,8 @@ export default class TextAndVocal extends Command {
 
     type: 'text'|'vocal'|null = null;
 
-    constructor(channel: TextChannel, member: User | GuildMember, guild: null | Guild = null, writtenCommandOrSlashCommandOptions: null | string | CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom', commandName: string, argsModel: any, type: 'vocal'|'text') {
-        super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, commandName, argsModel);
+    constructor(messageOrInteraction: Message|CommandInteraction, commandOrigin: 'slash'|'custom', commandName: string, argsModel: any, type: 'vocal'|'text') {
+        super(messageOrInteraction, commandOrigin, commandName, argsModel);
         this.type = type;
     }
 

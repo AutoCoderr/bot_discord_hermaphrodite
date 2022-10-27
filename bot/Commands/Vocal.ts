@@ -5,7 +5,7 @@ import {
     Guild,
     GuildMember,
     Role, StageChannel, TextChannel, User, VoiceChannel, VoiceState,
-    ButtonStyle, PermissionFlagsBits
+    ButtonStyle, PermissionFlagsBits, CommandInteraction, Message
 } from "discord.js";
 import config from "../config";
 import VocalSubscribe, {IVocalSubscribe} from "../Models/Vocal/VocalSubscribe";
@@ -127,8 +127,8 @@ export default class Vocal extends Command {
 
     static usersWhoAreOnVocal: { [id: string]: VoiceChannel|StageChannel } = {};
 
-    constructor(channel: TextChannel, member: User | GuildMember, guild: null | Guild = null, writtenCommandOrSlashCommandOptions: null | string | CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
-        super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, Vocal.commandName, Vocal.argsModel);
+    constructor(messageOrInteraction: Message|CommandInteraction, commandOrigin: 'slash'|'custom') {
+        super(messageOrInteraction, commandOrigin, Vocal.commandName, Vocal.argsModel);
     }
 
     async action(args: { action: string, subs: boolean, users: GuildMember[], roles: Role[], time: number }) {

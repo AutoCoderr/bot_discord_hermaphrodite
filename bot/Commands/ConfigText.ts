@@ -1,6 +1,7 @@
 import {
+    CommandInteraction,
     CommandInteractionOptionResolver, Guild,
-    GuildMember, TextChannel, User
+    GuildMember, Message, TextChannel, User
 } from "discord.js";
 import ConfigTextAndVocal from "./ConfigTextAndVocal";
 import {IArgsModel} from "../interfaces/CommandInterfaces";
@@ -16,7 +17,7 @@ export default class ConfigText extends ConfigTextAndVocal {
 
     static argsModel: IArgsModel = ConfigTextAndVocal.argsModelFunction('text')
 
-    constructor(channel: TextChannel, member: User | GuildMember, guild: null | Guild = null, writtenCommandOrSlashCommandOptions: null | string | CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
-        super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, ConfigText.commandName, ConfigText.argsModel, 'text');
+    constructor(messageOrInteraction: Message|CommandInteraction, commandOrigin: 'slash'|'custom') {
+        super(messageOrInteraction, commandOrigin, ConfigText.commandName, ConfigText.argsModel, 'text');
     }
 }

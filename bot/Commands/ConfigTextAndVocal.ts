@@ -7,7 +7,7 @@ import {
     TextChannel,
     ThreadChannel, User,
     VoiceChannel,
-    ChannelType, EmbedBuilder, EmbedField
+    ChannelType, EmbedBuilder, EmbedField, CommandInteraction, Message
 } from "discord.js";
 import {splitFieldsEmbed} from "../Classes/OtherFunctions";
 import TextConfig, {minimumLimit as textMinimumLimit} from "../Models/Text/TextConfig";
@@ -51,8 +51,8 @@ export default abstract class ConfigTextAndVocal extends Command {
         }
     }
 
-    protected constructor(channel: TextChannel, member: User | GuildMember, guild: null | Guild = null, writtenCommandOrSlashCommandOptions: null | string | CommandInteractionOptionResolver = null, commandOrigin: 'slash' | 'custom', commandName: string, argsModel: any, type: 'vocal' | 'text') {
-        super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, commandName, argsModel);
+    protected constructor(messageOrInteraction: Message|CommandInteraction, commandOrigin: 'slash' | 'custom', commandName: string, argsModel: any, type: 'vocal' | 'text') {
+        super(messageOrInteraction, commandOrigin, commandName, argsModel);
         this.type = type;
     }
 

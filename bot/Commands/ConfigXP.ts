@@ -1,11 +1,12 @@
 import Command from "../Classes/Command";
 import {IArgsModel} from "../interfaces/CommandInterfaces";
 import {
+    CommandInteraction,
     CommandInteractionOptionResolver,
     EmbedBuilder,
     Guild,
-    GuildMember,
-    Message,
+    GuildMember, Interaction,
+    Message, MessagePayload,
     Role,
     TextChannel,
     User
@@ -30,8 +31,18 @@ interface IConfigXPArgs {
     setOrShowSubAction: 'set'|'show';
     XPActionTypes: 'vocal'|'message'|'first_message'|'bump';
     XPActionTypesToLimit: 'vocal'|'message';
-    tipsSubActions: 'list'|'show'|'set'|'delete'|'show_approves';
-    gradesSubActions: 'add'|'list'|'delete'|'insert'|'set_level'|'set_name'|'set_xp'|'set_xp_by_level'|'set_role';
+    tipsSubActions: 'list'|'show'|'set'|'delete'|'show_approves'|'export';
+    gradesSubActions:
+        'add'|
+        'list'|
+        'delete'|
+        'insert'|
+        'set_level'|
+        'set_name'|
+        'set_xp'|
+        'set_xp_by_level'|
+        'set_role'|
+        'export';
     role: Role;
     duration: number;
     XP?: number;
@@ -126,7 +137,8 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                     set: "Définir un tips",
                     delete: "Supprimer un tips",
                     list: "Lister les tips",
-                    show_approves: "Afficher les avis utilisateurs sur un tip"
+                    show_approves: "Afficher les avis utilisateurs sur un tip",
+                    export: "Exporter les tips dans un fichier json"
                 }
             },
             gradesSubActions: {
@@ -143,7 +155,8 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                     set_name: "Définir le nom d'un grade existant",
                     set_xp: "Définir les XPs de départ d'un grade existant",
                     set_xp_by_level: "Définir le nombre d'XP par palier, d'un grade existant",
-                    set_role: "Définir le role d'un grade existant"
+                    set_role: "Définir le role d'un grade existant",
+                    export: "Exporter les grades dans un fichier json"
                 }
             },
             gradeNumber: {
@@ -446,8 +459,8 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
         }
     }
 
-    constructor(channel: TextChannel, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
-        super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, ConfigXP.commandName, ConfigXP.argsModel);
+    constructor(messageOrInteraction: Message|CommandInteraction, commandOrigin: 'slash'|'custom') {
+        super(messageOrInteraction, commandOrigin, ConfigXP.commandName, ConfigXP.argsModel);
     }
 
     async action(args: IConfigXPArgs, bot) {
@@ -516,6 +529,17 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
 
     async action_grades(args: IConfigXPArgs, XPServerConfig: IXPData) {
         return this["action_grades_"+args.gradesSubActions](args,XPServerConfig)
+    }
+
+    async action_grades_export(args: IConfigXPArgs, XPServerConfig: IXPData) {
+        const messagePayload = new MessagePayload(<Interaction|Message>(this.interaction??this.message), {
+            content: "Voici les grades exportés :"
+        });
+        messagePayload.files = [{
+            name: "grades.json",
+            data: JSON.stringify(XPServerConfig.grades.map(grade => ({...(<any>grade)._doc, _id: undefined})), null, "\t")
+        }]
+        return this.response(true, messagePayload)
     }
 
     async action_grades_add(args: IConfigXPArgs, XPServerConfig: IXPData) {
@@ -745,6 +769,17 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
 
     async action_tips(args: IConfigXPArgs, XPServerConfig: IXPData) {
         return this["action_tips_"+args.tipsSubActions](args, XPServerConfig)
+    }
+
+    async action_tips_export(args: IConfigXPArgs, XPServerConfig: IXPData) {
+        const messagePayload = new MessagePayload(<Interaction|Message>(this.interaction??this.message), {
+            content: "Voici les tips exportés :"
+        });
+        messagePayload.files = [{
+            name: "tips.json",
+            data: JSON.stringify(XPServerConfig.tipsByLevel.map(grade => ({...(<any>grade)._doc, _id: undefined, userApproves: undefined, userUnapproves: undefined})), null, "\t")
+        }]
+        return this.response(true, messagePayload)
     }
 
     async action_tips_set(args: IConfigXPArgs, XPServerConfig: IXPData) {
