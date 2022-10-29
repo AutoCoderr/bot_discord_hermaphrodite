@@ -7,6 +7,7 @@ import {listenInviteButtons, listenAskInviteBackButtons} from "./Classes/TextAnd
 import {listenCustomCommands} from "./listenCustomCommands";
 import CustomError from "./logging/CustomError";
 import reportError from "./logging/reportError";
+import {listenUserXPFirstMessages, listenUserXPMessages} from "./Classes/XPFunctions";
 
 export default function init(bot) {
     client.on('ready', () => {
@@ -88,14 +89,17 @@ export default function init(bot) {
 
             client.on("messageCreate", async message => {
                 try {
-                    await listenCustomCommands(message)
-
-                    //@ts-ignore
-                    await existingCommands.ConfigWelcome.listenJoinsToWelcome(message)
-
-                    //@ts-ignore
-                    await existingCommands.Text.listenTextMessages(message)
-
+                    await Promise.all([
+                        listenCustomCommands(message),
+                        //@ts-ignore
+                        existingCommands.ConfigWelcome.listenJoinsToWelcome(message),
+                        //@ts-ignore
+                        existingCommands.Text.listenTextMessages(message),
+                        (async () => {
+                            await listenUserXPMessages(message);
+                            await listenUserXPFirstMessages(message)
+                        })()
+                    ])
                 } catch(e) {
                     reportError(new CustomError(<Error|CustomError>e, {
                         from: (e instanceof CustomError && e.data && e.data.from) ? e.data.from : "messageCreate",

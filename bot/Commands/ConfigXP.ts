@@ -2,14 +2,10 @@ import Command from "../Classes/Command";
 import {IArgsModel} from "../interfaces/CommandInterfaces";
 import {
     CommandInteraction,
-    CommandInteractionOptionResolver,
     EmbedBuilder,
-    Guild,
-    GuildMember, Interaction,
+    Guild, Interaction,
     Message, MessagePayload,
-    Role,
-    TextChannel,
-    User
+    Role
 } from "discord.js";
 import XPData, {ILevelTip, IXPData} from "../Models/XP/XPData";
 import {extractUTCTime, showTime} from "../Classes/DateTimeManager";
@@ -17,11 +13,10 @@ import {
     calculRequiredXPForNextGrade,
     checkGradesListData, checkTipsListData,
     findTipByLevel,
-    round,
     setTipByLevel
-} from "../Classes/OtherFunctions";
+} from "../Classes/XPFunctions";
+import {round} from "../Classes/OtherFunctions";
 import client from "../client";
-import {checkTypes} from "../Classes/TypeChecker";
 
 interface IConfigXPArgs {
     action:
@@ -970,6 +965,8 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
     }
 
     async action_first_message_time(args: IConfigXPArgs, XPServerConfig: IXPData) {
+        const timezoneHourGap = 60*60*1000 * XPServerConfig.timezone;
+
         if (args.setOrShowSubAction === "show")
             return this.response(true, {
                 embeds: [
@@ -977,12 +974,12 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                         .setTitle("Heure minimale du premier message")
                         .setFields({
                             name: "Heure configurée :",
-                            value: showTime(extractUTCTime(XPServerConfig.firstMessageTime), 'fr')
+                            value: showTime(extractUTCTime(XPServerConfig.firstMessageTime+timezoneHourGap), 'fr')
                         })
                 ]
             })
 
-        XPServerConfig.firstMessageTime = args.duration;
+        XPServerConfig.firstMessageTime = args.duration-timezoneHourGap;
         await XPServerConfig.save();
 
         return this.response(true, {
