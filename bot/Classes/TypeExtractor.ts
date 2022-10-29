@@ -8,13 +8,14 @@ import {
     Role,
     ThreadChannel,
     VoiceChannel,
-    ChannelType
+    ChannelType, Attachment
 } from "discord.js";
 import client from "../client";
 import {existingCommands} from "./CommandsDescription";
 import Command from "./Command";
 import {isNumber, userHasChannelPermissions} from "./OtherFunctions";
 import {durationUnits,durationUnitsMult} from "./DateTimeManager";
+import request from "./request";
 
 export const extractTypes = {
     channel: (field, command: Command): GuildChannel|ThreadChannel|VoiceChannel|false => {
@@ -184,6 +185,20 @@ export const extractTypes = {
         }
 
         return ms;
+    },
+    jsonFile: async (attachment: Attachment) => {
+      const {status, body} = await request(attachment.url);
+
+      if (status !== 200)
+          return false;
+
+      let json;
+      try {
+          json = JSON.parse(body);
+      } catch(_) {
+          return false;
+      }
+      return json;
     },
     strings: (field) => {
         let quote = null;

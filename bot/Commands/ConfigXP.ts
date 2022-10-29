@@ -13,8 +13,15 @@ import {
 } from "discord.js";
 import XPData, {ILevelTip, IXPData} from "../Models/XP/XPData";
 import {extractUTCTime, showTime} from "../Classes/DateTimeManager";
-import {calculRequiredXPForNextGrade, findTipByLevel, round, setTipByLevel} from "../Classes/OtherFunctions";
+import {
+    calculRequiredXPForNextGrade,
+    checkGradesListData, checkTipsListData,
+    findTipByLevel,
+    round,
+    setTipByLevel
+} from "../Classes/OtherFunctions";
 import client from "../client";
+import {checkTypes} from "../Classes/TypeChecker";
 
 interface IConfigXPArgs {
     action:
@@ -31,7 +38,7 @@ interface IConfigXPArgs {
     setOrShowSubAction: 'set'|'show';
     XPActionTypes: 'vocal'|'message'|'first_message'|'bump';
     XPActionTypesToLimit: 'vocal'|'message';
-    tipsSubActions: 'list'|'show'|'set'|'delete'|'show_approves'|'export';
+    tipsSubActions: 'list'|'show'|'set'|'delete'|'show_approves'|'export'|'import';
     gradesSubActions:
         'add'|
         'list'|
@@ -42,7 +49,8 @@ interface IConfigXPArgs {
         'set_xp'|
         'set_xp_by_level'|
         'set_role'|
-        'export';
+        'export'|
+        'import';
     role: Role;
     duration: number;
     XP?: number;
@@ -50,6 +58,7 @@ interface IConfigXPArgs {
     level?: number;
     name: string;
     gradeNumber: number;
+    jsonFile: any;
 }
 
 export default class ConfigXP extends Command<IConfigXPArgs> {
@@ -138,7 +147,8 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                     delete: "Supprimer un tips",
                     list: "Lister les tips",
                     show_approves: "Afficher les avis utilisateurs sur un tip",
-                    export: "Exporter les tips dans un fichier json"
+                    export: "Exporter les tips dans un fichier json",
+                    import: "Importer les tips à partir d'un fichier json"
                 }
             },
             gradesSubActions: {
@@ -156,13 +166,14 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                     set_xp: "Définir les XPs de départ d'un grade existant",
                     set_xp_by_level: "Définir le nombre d'XP par palier, d'un grade existant",
                     set_role: "Définir le role d'un grade existant",
-                    export: "Exporter les grades dans un fichier json"
+                    export: "Exporter les grades dans un fichier json",
+                    import: "Importer les grades à partir d'un fichier json"
                 }
             },
             gradeNumber: {
                 referToSubCommands: ['delete','insert','set_level','set_name','set_xp','set_role','set_xp_by_level'].map(t => 'grades.'+t),
                 type: "overZeroInteger",
-                evenCheckForSlash: true,
+                evenCheckAndExtractForSlash: true,
                 description: "Le numéro du grade",
                 valid: async (value, args, command: ConfigXP) => {
                     const XPServerConfig = await command.getXPServerConfig();
@@ -217,7 +228,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
             level: {
                 referToSubCommands: ['tips.show', 'tips.delete', 'tips.set','tips.show_approves','grades.add','grades.insert','grades.set_level'],
                 type: "overZeroInteger",
-                evenCheckForSlash: true,
+                evenCheckAndExtractForSlash: true,
                 description: "Rentrez une valeur",
                 required: async (args, command: null|ConfigXP) => {
                     if (args.action !== "grades" || args.gradesSubActions === "set_level")
@@ -357,7 +368,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
             XP: {
                 referToSubCommands: [...['message', 'vocal', 'first_message', 'bump'].map(t => 'xp_gain_set.'+t), 'grades.add', 'grades.insert', 'grades.set_xp'],
                 type: "overZeroInteger",
-                evenCheckForSlash: true,
+                evenCheckAndExtractForSlash: true,
                 description: (args) => (args.action === "grades" && ["add","insert","set_xp"].includes(<string>args.gradesSubActions)) ?
                     "Le nombre d'XP nécessaire pour atteindre ce grade" :
                     "Rentrez une valeur",
@@ -400,11 +411,11 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                         (
                             (
                                 args.gradesSubActions === "add" &&
-                                await calculRequiredXPForNextGrade(XPServerConfig, <number>args.level) === value
+                                calculRequiredXPForNextGrade(XPServerConfig.grades, <number>args.level) === value
                             ) ||
                             (
                                 args.gradesSubActions === "insert" &&
-                                await calculRequiredXPForNextGrade(XPServerConfig, <number>args.level, <number>args.gradeNumber-2) === value
+                                calculRequiredXPForNextGrade(XPServerConfig.grades, <number>args.level, <number>args.gradeNumber-2) === value
                             )
                         )
                 },
@@ -433,7 +444,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
             XPByLevel: {
                 referToSubCommands: ['grades.add', 'grades.insert','grades.set_xp_by_level'],
                 type: "overZeroInteger",
-                evenCheckForSlash: true,
+                evenCheckAndExtractForSlash: true,
                 description: "Le nombre d'XP nécessaire pour augmenter de niveau",
                 errorMessage: (value) =>
                     value === undefined ?
@@ -455,6 +466,12 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                 referToSubCommands: ['first_message_time.set','limit_gain_set.message','limit_gain_set.vocal'],
                 type: "duration",
                 description: "Donnez une durée (ex: 7h, 6h30, etc...)"
+            },
+            jsonFile: {
+                referToSubCommands: ['grades.import','tips.import'],
+                type: "jsonFile",
+                description: "Le fichier json à importer",
+                evenCheckAndExtractForSlash: true
             }
         }
     }
@@ -542,12 +559,42 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
         return this.response(true, messagePayload)
     }
 
+    async action_grades_import(args: IConfigXPArgs, XPServerConfig: IXPData) {
+        if (!checkGradesListData(<Guild>this.guild, args.jsonFile))
+            return this.response(false, {
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("Importation échouée")
+                        .setFields({
+                            name: "Il est impossible d'importer ce fichier json pour les grades",
+                            value: "Êtes vous sur que le format soit correct ?\n"+
+                                "Il se peut aussi que les roleId mentionnés n'existent pas sur ce serveur, "+
+                                "si oui, il vous est possible de les éditer avec un id correspondant à un rôle existant"
+                        })
+                ]
+            })
+
+        XPServerConfig.grades = args.jsonFile;
+        await XPServerConfig.save();
+
+        return this.response(true, {
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle("Importation réussie")
+                    .setFields({
+                        name: "Importation réussie",
+                        value: "l'importation des grades à eu lieu avec succès"
+                    })
+            ]
+        })
+    }
+
     async action_grades_add(args: IConfigXPArgs, XPServerConfig: IXPData) {
         const [atLevel, roleId, name, requiredXP, XPByLevel] = [
             args.level ?? 1,
             args.role.id,
             args.name,
-            args.XP ?? await <Promise<number>>calculRequiredXPForNextGrade(XPServerConfig, <number>args.level),
+            args.XP ?? <number>calculRequiredXPForNextGrade(XPServerConfig.grades, <number>args.level),
             args.XPByLevel
         ]
 
@@ -584,7 +631,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                 continue;
             }
             if (i > 0 && i >= args.gradeNumber-1) {
-                XPServerConfig.grades[i].requiredXP = await <Promise<number>>calculRequiredXPForNextGrade(XPServerConfig, XPServerConfig.grades[i].atLevel, i-1)
+                XPServerConfig.grades[i].requiredXP = <number>calculRequiredXPForNextGrade(XPServerConfig.grades, XPServerConfig.grades[i].atLevel, i-1)
             }
         }
 
@@ -640,7 +687,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
         XPServerConfig.grades[args.gradeNumber-1].XPByLevel = args.XPByLevel;
 
         for (let i=args.gradeNumber;i<XPServerConfig.grades.length;i++) {
-            XPServerConfig.grades[i].requiredXP = await <Promise<number>>calculRequiredXPForNextGrade(XPServerConfig, XPServerConfig.grades[i].atLevel, i-1)
+            XPServerConfig.grades[i].requiredXP = <number>calculRequiredXPForNextGrade(XPServerConfig.grades, XPServerConfig.grades[i].atLevel, i-1)
         }
 
         await XPServerConfig.save();
@@ -661,7 +708,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
         XPServerConfig.grades[args.gradeNumber-1].requiredXP = <number>args.XP;
 
         for (let i=args.gradeNumber;i<XPServerConfig.grades.length;i++) {
-            XPServerConfig.grades[i].requiredXP = await <Promise<number>>calculRequiredXPForNextGrade(XPServerConfig, XPServerConfig.grades[i].atLevel, i-1)
+            XPServerConfig.grades[i].requiredXP = <number>calculRequiredXPForNextGrade(XPServerConfig.grades, XPServerConfig.grades[i].atLevel, i-1)
         }
 
         await XPServerConfig.save();
@@ -682,7 +729,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
         XPServerConfig.grades[args.gradeNumber-1].atLevel = <number>args.level;
 
         for (let i=args.gradeNumber-1;i<XPServerConfig.grades.length;i++) {
-            XPServerConfig.grades[i].requiredXP = await <Promise<number>>calculRequiredXPForNextGrade(XPServerConfig, XPServerConfig.grades[i].atLevel, i-1)
+            XPServerConfig.grades[i].requiredXP = <number>calculRequiredXPForNextGrade(XPServerConfig.grades, XPServerConfig.grades[i].atLevel, i-1)
         }
 
         await XPServerConfig.save();
@@ -704,7 +751,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
             args.level ?? 1,
             args.role.id,
             args.name,
-            args.XP ?? await <Promise<number>>calculRequiredXPForNextGrade(XPServerConfig, <number>args.level, args.gradeNumber-2),
+            args.XP ?? <number>calculRequiredXPForNextGrade(XPServerConfig.grades, <number>args.level, args.gradeNumber-2),
             args.XPByLevel
         ]
 
@@ -713,7 +760,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
         })
 
         for (let i=args.gradeNumber;i<XPServerConfig.grades.length;i++) {
-            XPServerConfig.grades[i].requiredXP = await <Promise<number>>calculRequiredXPForNextGrade(XPServerConfig, XPServerConfig.grades[i].atLevel, i-1)
+            XPServerConfig.grades[i].requiredXP = <number>calculRequiredXPForNextGrade(XPServerConfig.grades, XPServerConfig.grades[i].atLevel, i-1)
         }
 
         await XPServerConfig.save();
@@ -780,6 +827,34 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
             data: JSON.stringify(XPServerConfig.tipsByLevel.map(grade => ({...(<any>grade)._doc, _id: undefined, userApproves: undefined, userUnapproves: undefined})), null, "\t")
         }]
         return this.response(true, messagePayload)
+    }
+
+    async action_tips_import(args: IConfigXPArgs, XPServerConfig: IXPData) {
+        if (!checkTipsListData(args.jsonFile))
+            return this.response(false, {
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("Importation échouée")
+                        .setFields({
+                            name: "Il est impossible d'importer ce fichier json pour les tips",
+                            value: "Êtes vous sur que le format soit correct ?"
+                        })
+                ]
+            })
+
+        XPServerConfig.tipsByLevel = args.jsonFile;
+        await XPServerConfig.save();
+
+        return this.response(true, {
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle("Importation réussie")
+                    .setFields({
+                        name: "Importation réussie",
+                        value: "l'importation des tips à eu lieu avec succès"
+                    })
+            ]
+        })
     }
 
     async action_tips_set(args: IConfigXPArgs, XPServerConfig: IXPData) {

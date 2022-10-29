@@ -5,7 +5,7 @@ export const slashCommandsTypeDefinitions = {
         mono: {commandType: "slash", type: ApplicationCommandOptionType.String},
         multi: {commandType: "custom", type: "strings"}
     },
-    attachment: {commandType: "slash", type: ApplicationCommandOptionType.Attachment},
+    jsonFile: {commandType: "slash", type: ApplicationCommandOptionType.Attachment},
     number: {commandType: "slash", type: ApplicationCommandOptionType.Number},
     integer: {commandType: "slash", type: ApplicationCommandOptionType.Integer},
     positiveInteger: {commandType: "slash", type: ApplicationCommandOptionType.Integer},

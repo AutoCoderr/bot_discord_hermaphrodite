@@ -30,7 +30,7 @@ export type IArgModel<IArgs = {[key: string]: any}, C extends Command = Command>
     displayExtractError?: boolean|((args: Partial<IArgs>, command: C<IArgs>) => boolean);
     multi?: boolean;
     valid?: (value: any, args: Partial<IArgs>, command: C<IArgs>, validatedArgs: IValidatedArgs<IArgs>) => boolean|Promise<boolean>;
-    evenCheckForSlash?: boolean;
+    evenCheckAndExtractForSlash?: boolean;
     errorMessage?: (value: any, args: Partial<IArgs>, command: C<IArgs>) => IErrorMessageRes|Promise<IErrorMessageRes>;
     default?: any;
     moreDatas?: (args: Partial<IArgs>, type: keyof typeof checkTypes, command: C<IArgs>) => any

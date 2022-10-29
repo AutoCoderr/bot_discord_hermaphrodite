@@ -1,9 +1,11 @@
 import {durationUnits} from "./DateTimeManager";
+import {Attachment} from "discord.js";
 
 export const checkTypes = {
     number: field => typeof(field) === "number",
     integer: field => checkTypes.number(field) && field%1 === 0,
     positiveInteger: field => checkTypes.integer(field) && field >= 0,
+    jsonFile: field => field instanceof Attachment,
     overZeroInteger: field => checkTypes.integer(field) && field > 0,
     string: field => typeof(field) == "string",
     strings: field => typeof(field) == "string",

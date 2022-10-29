@@ -473,7 +473,7 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
                 }
             } else {
                 const customType = getCustomType(argModel);
-                if (customType || argModel.evenCheckForSlash) {
+                if (customType || argModel.evenCheckAndExtractForSlash) {
                     const type = customType ?? argModel.type
                     if (checkTypes[type](initialValue)) {
                         if (extractTypes[type]) {
