@@ -65,7 +65,7 @@ const XPDataSchema: Schema = new Schema({
     activeRoleId: { type: String, required: false },
     channelRoleId: { type: String, required: false },
 
-    timezone: { type: Number, required: true, default: 2 },
+    timezone: { type: Number, required: true, default: 1 },
 
     XPByMessage: { type: Number, required: false, default: 1 },
     XPByFirstMessage: { type: Number, required: false, default: 10 },
@@ -75,7 +75,7 @@ const XPDataSchema: Schema = new Schema({
     timeLimitMessage: { type: Number, required: false, default: 60 * 1000 },
     timeLimitVocal: { type: Number, required: false, default: 5 * 60 * 1000 },
 
-    firstMessageTime: { type: Number, required: false, default: 5 * 60 * 60 * 1000 },
+    firstMessageTime: { type: Number, required: false, default: 6 * 60 * 60 * 1000 },
 
     tipsByLevel: [LevelTipSchema],
 

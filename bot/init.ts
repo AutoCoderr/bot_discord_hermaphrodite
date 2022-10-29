@@ -7,7 +7,7 @@ import {listenInviteButtons, listenAskInviteBackButtons} from "./Classes/TextAnd
 import {listenCustomCommands} from "./listenCustomCommands";
 import CustomError from "./logging/CustomError";
 import reportError from "./logging/reportError";
-import {listenUserXPFirstMessages, listenUserXPMessages} from "./Classes/XPFunctions";
+import {listenUserXPFirstMessages, listenUserXPMessages, listenUserXPVocal} from "./Classes/XPFunctions";
 
 export default function init(bot) {
     client.on('ready', () => {
@@ -85,6 +85,7 @@ export default function init(bot) {
                             user: newState.member??undefined
                         }))
                     })
+                listenUserXPVocal(oldState, newState);
             })
 
             client.on("messageCreate", async message => {
