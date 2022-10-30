@@ -12,6 +12,8 @@ export interface ILevelTip {
 }
 
 export interface IGrade {
+    _id: string;
+
     atLevel: number;
     requiredXP: number;
     XPByLevel: number;

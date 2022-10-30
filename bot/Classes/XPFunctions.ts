@@ -139,6 +139,53 @@ export function checkTipsListData(tips: any) {
         ))
 }
 
+async function detectUpgrade(member: GuildMember, XPUserConfig: IXPUserData, XPServerConfig: IXPData): Promise<null|IGrade> {
+    const grade = <null|IGrade>XPServerConfig.grades.reverse().find(grade => XPUserConfig.XP >= grade.requiredXP) ?? null;
+
+    if (grade === null || grade._id === XPUserConfig.gradeId)
+        return grade;
+
+    let currentGrade: undefined|IGrade;
+    if (XPUserConfig.gradeId !== undefined && (currentGrade = XPServerConfig.grades.find(grade => grade._id == XPUserConfig.gradeId))) {
+        await member.roles.remove(currentGrade.roleId);
+    }
+
+    await member.roles.add(grade.roleId);
+
+    XPUserConfig.gradeId = grade._id;
+
+    return grade;
+}
+
+async function detectUplevel(member: GuildMember, XPUserConfig: IXPUserData, XPServerConfig: IXPData, grade: IGrade): Promise<void> {
+    XPUserConfig.currentLevel = grade.atLevel + Math.floor((XPUserConfig.XP - grade.requiredXP)/grade.XPByLevel);
+
+    if (!XPUserConfig.DMEnabled)
+        return;
+
+    for (let level=XPUserConfig.lastNotifiedLevel+1;level<=XPUserConfig.currentLevel;level++) {
+        const tip = findTipByLevel(level, XPServerConfig.tipsByLevel);
+        if (tip === null)
+            continue;
+
+        try {
+            await member.send(
+                "Vous avez atteint le niveau "+level+" !\n"+
+                       "Voici un nouveau tip :\n\n"+tip.content
+            )
+        } catch (_) {
+            return;
+        }
+    }
+}
+
+export async function detectUpgradeAndLevel(member: GuildMember, XPUserConfig: IXPUserData, XPServerConfig: IXPData) {
+    const grade: null|IGrade = await detectUpgrade(member, XPUserConfig, XPServerConfig);
+    if (grade !== null)
+        await detectUplevel(member, XPUserConfig, XPServerConfig, grade);
+    await XPUserConfig.save();
+}
+
 async function XPCanBeCount(guild: Guild, member: GuildMember, channel: GuildChannel, XPServerConfig: IXPData|null = null): Promise<null|IXPData> {
     XPServerConfig = XPServerConfig ?? await XPData.findOne({
         serverId: guild.id,
@@ -214,7 +261,7 @@ export async function listenUserXPFirstMessages(message: Message) {
     XPUserConfig.XP += XPServerConfig.XPByFirstMessage;
     XPUserConfig.todayXP += XPServerConfig.XPByFirstMessage;
 
-    await XPUserConfig.save();
+    await detectUpgradeAndLevel(member, XPUserConfig, XPServerConfig);
 }
 
 export async function listenUserXPMessages(message: Message) {
@@ -239,7 +286,7 @@ export async function listenUserXPMessages(message: Message) {
     XPUserConfig.XP += XPServerConfig.XPByMessage;
     XPUserConfig.todayXP += XPServerConfig.XPByMessage;
 
-    await XPUserConfig.save();
+    await detectUpgradeAndLevel(member, XPUserConfig, XPServerConfig);
 }
 
 
@@ -256,7 +303,7 @@ function abortMemberSubProcessVoiceCounter(member: GuildMember) {
         delete subProcessVoiceCounterByMemberId[member.id];
 }
 
-function createMemberSubProcessVoiceCounter(member: GuildMember, XPServerConfig: IXPData) {
+function createMemberSubProcessVoiceCounter(member: GuildMember) {
     if (subProcessVoiceCounterByMemberId[member.id] === undefined) {
         subProcessVoiceCounterByMemberId[member.id] = setTimeout(() => {
             const controller = new AbortController();
@@ -264,9 +311,7 @@ function createMemberSubProcessVoiceCounter(member: GuildMember, XPServerConfig:
             const process = spawn("node", [
                 "/bot/scripts/XPVoiceCounter.js",
                 member.guild.id,
-                member.id,
-                XPServerConfig.timeLimitVocal.toString(),
-                XPServerConfig.XPByVocal.toString()
+                member.id
             ], {signal});
             process.on("error", () => {})
             subProcessVoiceCounterByMemberId[member.id] = controller;
@@ -319,7 +364,7 @@ export async function listenUserXPVocal(oldState: VoiceState, newState: VoiceSta
     if (guild === null || channel === null)
         return;
 
-    let XPServerConfig: null|IXPData = await XPCanBeCount(guild, member, <GuildChannel>channel)
+    const XPServerConfig: null|IXPData = await XPCanBeCount(guild, member, <GuildChannel>channel)
 
     mutedMembersById[member.id] = false;
 
@@ -330,10 +375,10 @@ export async function listenUserXPVocal(oldState: VoiceState, newState: VoiceSta
 
     if (nbUnMutedMembers >= 1) {
         if (XPServerConfig)
-            createMemberSubProcessVoiceCounter(member, XPServerConfig);
+            createMemberSubProcessVoiceCounter(member);
 
-        if (nbUnMutedMembers === 1 && (XPServerConfig = await XPCanBeCount(guild, <GuildMember>lastUnMutedMember, <GuildChannel>channel, XPServerConfig)))
-            createMemberSubProcessVoiceCounter(<GuildMember>lastUnMutedMember, XPServerConfig);
+        if (nbUnMutedMembers === 1 && await XPCanBeCount(guild, <GuildMember>lastUnMutedMember, <GuildChannel>channel, XPServerConfig))
+            createMemberSubProcessVoiceCounter(<GuildMember>lastUnMutedMember);
     }
 
     if (oldState.channel !== null && oldState.channelId !== newState.channelId) {
