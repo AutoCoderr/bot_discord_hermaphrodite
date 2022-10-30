@@ -48,8 +48,12 @@ const formatByType = {
         }),
         username: member.nickname??member.user.username
     }),
-    [VoiceState.name]: (voiceState: VoiceState) => extractObjectData(voiceState, ['id','sessionId','channelId','channel'], {
-        channel: (channel) => channel !== null ? extractObjectData(channel, ['id', 'name', 'type']) : null
+    [VoiceState.name]: (voiceState: VoiceState) => extractObjectData(voiceState, ['id','sessionId','channelId','channel','guild','member'], {
+        channel: (channel) => channel !== null ? extractObjectData(channel, ['id', 'name', 'type']) : null,
+        guild: (guild) => extractObjectData(guild, ['id','name']),
+        member: (member) => member !== null ? extractObjectData(member, ['id','nickname','user'], {
+            user: (user) => extractObjectData(user, ['username'])
+        }) : null
     }),
     [Guild.name]: (guild: Guild) => extractObjectData(guild, ['id','name','description','memberCount','available']),
     [Message.name]: (message: Message) => extractObjectData(message, ['id','channelId','guildId','content','createdAt','editedAt','deletable','editable','tts','type','system']),

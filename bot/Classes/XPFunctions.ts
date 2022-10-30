@@ -325,13 +325,16 @@ export async function listenUserXPVocal(oldState: VoiceState, newState: VoiceSta
 
     const {nbUnMutedMembers, lastUnMutedMember} = countAndGetUnMutedMembers(newState.channel, member);
 
+    if (nbUnMutedMembers < 1 || !XPServerConfig || oldState.guild.id !== newState.guild.id)
+        abortMemberSubProcessVoiceCounter(member);
+
     if (nbUnMutedMembers >= 1) {
         if (XPServerConfig)
             createMemberSubProcessVoiceCounter(member, XPServerConfig);
+
         if (nbUnMutedMembers === 1 && (XPServerConfig = await XPCanBeCount(guild, <GuildMember>lastUnMutedMember, <GuildChannel>channel, XPServerConfig)))
             createMemberSubProcessVoiceCounter(<GuildMember>lastUnMutedMember, XPServerConfig);
-    } else
-        abortMemberSubProcessVoiceCounter(member)
+    }
 
     if (oldState.channel !== null && oldState.channelId !== newState.channelId) {
         const {nbUnMutedMembers, lastUnMutedMember} = countAndGetUnMutedMembers(oldState.channel, member);
