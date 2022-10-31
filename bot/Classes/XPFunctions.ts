@@ -1,17 +1,22 @@
 import XPData, {IGrade, ILevelTip, IXPData} from "../Models/XP/XPData";
 import {
-    ActionRowBuilder, ButtonBuilder, ButtonStyle,
-    CategoryChannel,
+    ActionRowBuilder, ButtonBuilder, ButtonInteraction, ButtonStyle,
+    CategoryChannel, EmbedBuilder,
     Guild,
     GuildChannel,
     GuildMember,
     Message, Role,
-    ThreadChannel, VoiceBasedChannel,
+    ThreadChannel, User, VoiceBasedChannel,
     VoiceState
 } from "discord.js";
 import XPUserData, {IXPUserData} from "../Models/XP/XPUserData";
 import {spawn} from "node:child_process";
-import XPNotificationAskButton from "../Models/XP/XPNotificationAskButton";
+import XPNotificationAskButton, {
+    IXPNotificationAskButton,
+    XPNotificationAskButtonTimeout
+} from "../Models/XP/XPNotificationAskButton";
+import client from "../client";
+import getToUpdateElements from "../scripts/cleanDatabase/getToUpdateElements";
 
 export function setTipByLevel(level: number, content: string, tips: ILevelTip[]): ILevelTip[] {
     return tips.length === 0 ?
@@ -140,6 +145,116 @@ export function checkTipsListData(tips: any) {
         ))
 }
 
+async function askForNotifications(user: User, serverId, content: string) {
+    const acceptButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "a";
+    const denyButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "d";
+
+    const message = await user.send({
+        content,
+        components: [ //@ts-ignore
+            new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId(acceptButtonId)
+                    .setLabel("Oui")
+                    .setStyle(ButtonStyle.Success),
+                new ButtonBuilder()
+                    .setCustomId(denyButtonId)
+                    .setLabel("Non")
+                    .setStyle(ButtonStyle.Danger),
+            )
+        ]
+    })
+    await Promise.all(
+        [
+            [acceptButtonId, true],
+            [denyButtonId, false]
+        ].map(([buttonId, toEnable]) =>
+            XPNotificationAskButton.create({
+                serverId,
+                userId: user.id,
+                toEnable,
+                buttonId,
+                messageId: message.id
+            })
+        )
+    )
+}
+
+export async function listenXPNotificationAskButtons(interaction: ButtonInteraction): Promise<boolean> {
+    const button: null|IXPNotificationAskButton = await XPNotificationAskButton.findOne({
+        userId: interaction.user.id,
+        buttonId: interaction.customId
+    });
+
+    if (button === null)
+        return false;
+
+
+    const dmChannel = interaction.user.dmChannel;
+    if (dmChannel === null)
+        return false;
+
+    const message: null|Message = await dmChannel.messages.fetch(button.messageId).catch(() => null)
+
+    if (message === null)
+        return false
+
+    const XPUserConfig: IXPUserData = await getXPUserConfig(button.serverId,button.userId);
+
+    await enableOrDisableUserNotification(interaction.user, XPUserConfig, button.toEnable)
+
+    await interaction.editReply("Notifications "+(button.toEnable ? "activées" : "désactivées")+" avec succès!")
+
+    await message.delete();
+
+    await XPNotificationAskButton.deleteMany({
+        messageId: button.messageId
+    });
+
+    return true;
+}
+
+export async function enableOrDisableUserNotification(user: User|GuildMember, XPUserConfig: IXPUserData, toEnable: boolean, XPServerConfig: IXPData|null = null): Promise<boolean> {
+    if (toEnable) {
+        XPServerConfig = XPServerConfig ?? await XPData.findOne({
+            serverId: XPUserConfig.serverId
+        })
+
+        try {
+            const unblockedTips = XPServerConfig !== null ?
+                XPServerConfig.tipsByLevel.filter(tip => tip.level > XPUserConfig.lastNotifiedLevel && tip.level <= XPUserConfig.currentLevel) :
+                []
+            await user.send({
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("Système d'XP activé")
+                        .setFields(
+                            unblockedTips.length > 0 ?
+                                {
+                                    name: "Vous avez débloqué les tips des niveaux suivants :",
+                                    value: unblockedTips.map(tip =>
+                                        "Niveau " + tip.level
+                                    ).join("\n")
+                                } :
+                                {
+                                    name: "Système d'XP activé",
+                                    value: "Vous avez activé les notifications pour le système d'XP"
+                                }
+                        )
+                    ]
+            })
+        } catch (e) {
+            return false;
+        }
+        XPUserConfig.lastNotifiedLevel = XPUserConfig.currentLevel;
+    }
+
+    XPUserConfig.DMEnabled = toEnable;
+    await XPUserConfig.save();
+
+    return true;
+}
+
 export function roleCanBeManaged(guild: Guild, roleOrRoleId: Role|string) {
     const role: Role|undefined = roleOrRoleId instanceof Role ? roleOrRoleId : guild.roles.cache.get(roleOrRoleId);
 
@@ -200,38 +315,7 @@ async function detectUplevel(member: GuildMember, XPUserConfig: IXPUserData, XPS
             if (level > 1)
                 await member.send(messageToSend);
             else {
-                const acceptButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "a";
-                const denyButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "d";
-
-                const message = await member.send({
-                    content: messageToSend+"\n\n\nSouhaitez vous activer les notifications ?",
-                    components: [ //@ts-ignore
-                        new ActionRowBuilder().addComponents(
-                            new ButtonBuilder()
-                                .setCustomId(acceptButtonId)
-                                .setLabel("Oui")
-                                .setStyle(ButtonStyle.Success),
-                            new ButtonBuilder()
-                                .setCustomId(denyButtonId)
-                                .setLabel("Non")
-                                .setStyle(ButtonStyle.Danger),
-                        )
-                    ]
-                })
-                await Promise.all(
-                    [
-                        [acceptButtonId, true],
-                        [denyButtonId, false]
-                    ].map(([buttonId, toEnable]) =>
-                        XPNotificationAskButton.create({
-                            serverId: member.guild.id,
-                            userId: member.id,
-                            toEnable,
-                            buttonId,
-                            messageId: message.id
-                        })
-                    )
-                )
+                await askForNotifications(member.user, member.guild.id, messageToSend+"\n\n\nSouhaitez vous activer les notifications ?")
             }
         } catch (_) {
             return;

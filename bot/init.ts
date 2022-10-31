@@ -7,7 +7,12 @@ import {listenInviteButtons, listenAskInviteBackButtons} from "./Classes/TextAnd
 import {listenCustomCommands} from "./listenCustomCommands";
 import CustomError from "./logging/CustomError";
 import reportError from "./logging/reportError";
-import {listenUserXPFirstMessages, listenUserXPMessages, listenUserXPVocal} from "./Classes/XPFunctions";
+import {
+    listenUserXPFirstMessages,
+    listenUserXPMessages,
+    listenUserXPVocal,
+    listenXPNotificationAskButtons
+} from "./Classes/XPFunctions";
 
 export default function init(bot) {
     client.on('ready', () => {
@@ -45,7 +50,8 @@ export default function init(bot) {
                             listenInviteButtons(interaction, 'text'),
                             listenInviteButtons(interaction, 'vocal'),
                             listenAskInviteBackButtons(interaction, 'text'),
-                            listenAskInviteBackButtons(interaction, 'vocal')
+                            listenAskInviteBackButtons(interaction, 'vocal'),
+                            listenXPNotificationAskButtons(interaction)
                         ]).then(responses => !responses.includes(true))) {
                             await interaction.editReply({content: "Bouton invalide"});
                         }

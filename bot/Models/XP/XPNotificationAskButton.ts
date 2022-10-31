@@ -1,9 +1,12 @@
 import { Schema } from 'mongoose';
 import { connect } from "../../Mongo";
+import IModel from "../../interfaces/IModel";
 
 const db = connect();
 
-export interface IXPNotificationAskButton {
+export const XPNotificationAskButtonTimeout = 7 * 24 * 60 * 60 * 1000
+
+export interface IXPNotificationAskButton extends IModel {
     serverId: string;
     userId: string;
     toEnable: boolean;
