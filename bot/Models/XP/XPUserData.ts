@@ -24,8 +24,8 @@ const XPUserDataSchema: Schema = new Schema({
     XP: { type: Number, required: false, default: 0 },
     todayXP: { type: Number, required: false, default: 0 },
     gradeId: { type: String, required: false },
-    lastNotifiedLevel: { type: String, required: false, default: 0 },
-    currentLevel: { type: String, required: false, default: 0 },
+    lastNotifiedLevel: { type: Number, required: false, default: 0 },
+    currentLevel: { type: Number, required: false, default: 0 },
     lastFirstDayMessageTimestamp: { type: Date, required: false },
     lastDayMessageTimestamp: { type: Date, required: false }
 });

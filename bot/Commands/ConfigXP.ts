@@ -2,17 +2,17 @@ import Command from "../Classes/Command";
 import {IArgsModel} from "../interfaces/CommandInterfaces";
 import {
     CommandInteraction,
-    EmbedBuilder,
-    Guild, Interaction,
+    EmbedBuilder, EmbedField,
+    Guild, GuildMember, Interaction,
     Message, MessagePayload,
     Role
 } from "discord.js";
-import XPData, {ILevelTip, IXPData} from "../Models/XP/XPData";
+import XPData, {IGrade, ILevelTip, IXPData} from "../Models/XP/XPData";
 import {extractUTCTime, showTime} from "../Classes/DateTimeManager";
 import {
     calculRequiredXPForNextGrade,
     checkGradesListData, checkTipsListData,
-    findTipByLevel,
+    findTipByLevel, roleCanBeManaged,
     setTipByLevel
 } from "../Classes/XPFunctions";
 import {round} from "../Classes/OtherFunctions";
@@ -543,6 +543,19 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
         return this["action_grades_"+args.gradesSubActions](args,XPServerConfig)
     }
 
+    warningRolesCantBeAssignedMessage(...roles: Role[]|[Role[]]): null|EmbedField {
+        roles = (roles.length > 0 && roles[0] instanceof Array) ? roles[0] : roles
+        if (this.guild === null || this.guild.members.me === null)
+            return null;
+        const cantBeAssignedRoles = (<Role[]>roles).filter(role => !roleCanBeManaged(<Guild>this.guild, role))
+        return cantBeAssignedRoles.length > 0 ?
+            {
+                name: "Attention, Herma Bot ne peux pas assigner les roles suivants car ils ont un rang plus élevé que le sien :",
+                value: cantBeAssignedRoles.map(role => " - <@&"+role.id+">").join("\n"),
+                inline: false
+            } : null;
+    }
+
     async action_grades_export(args: IConfigXPArgs, XPServerConfig: IXPData) {
         const messagePayload = new MessagePayload(<Interaction|Message>(this.interaction??this.message), {
             content: "Voici les grades exportés :"
@@ -572,15 +585,24 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
         XPServerConfig.grades = args.jsonFile;
         await XPServerConfig.save();
 
+        const embed = new EmbedBuilder()
+            .setTitle("Importation réussie")
+            .setFields({
+                name: "Importation réussie",
+                value: "l'importation des grades à eu lieu avec succès"
+            })
+
+        const warningNonAssignableRolesEmbed = this.warningRolesCantBeAssignedMessage(<Role[]>(<IGrade[]>args.jsonFile)
+            .filter(({roleId}, index) => !XPServerConfig.grades.slice(0,index).some(grade => grade.roleId === roleId))
+            .map(grade =>
+                (<Guild>this.guild).roles.cache.get(grade.roleId)
+            ))
+
+        if (warningNonAssignableRolesEmbed !== null)
+            embed.addFields(warningNonAssignableRolesEmbed)
+
         return this.response(true, {
-            embeds: [
-                new EmbedBuilder()
-                    .setTitle("Importation réussie")
-                    .setFields({
-                        name: "Importation réussie",
-                        value: "l'importation des grades à eu lieu avec succès"
-                    })
-            ]
+            embeds: [embed]
         })
     }
 
@@ -599,19 +621,24 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
             name,
             requiredXP,
             XPByLevel
-        })
+        });
 
         await XPServerConfig.save();
 
+        const embed = new EmbedBuilder()
+            .setTitle("Grade créé")
+            .setFields({
+                name: "Grade créé avec succès!",
+                value: "Le grade '"+name+"', à partir de "+requiredXP+"XP a été créé avec succès"
+            });
+
+        const warningNonAssignableRolesEmbed = this.warningRolesCantBeAssignedMessage(args.role);
+
+        if (warningNonAssignableRolesEmbed !== null)
+            embed.addFields(warningNonAssignableRolesEmbed)
+
         return this.response(true, {
-            embeds: [
-                new EmbedBuilder()
-                    .setTitle("Grade créé")
-                    .setFields({
-                        name: "Grade créé avec succès!",
-                        value: "Le grade '"+name+"', à partir de "+requiredXP+"XP a été créé avec succès"
-                    })
-            ]
+            embeds: [embed]
         })
     }
 
@@ -666,15 +693,20 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
 
         await XPServerConfig.save();
 
+        const embed = new EmbedBuilder()
+            .setTitle("Role modifié")
+            .setFields({
+                name: "Role du grade "+args.gradeNumber+" modifié",
+                value: "Le role du grade "+args.gradeNumber+" a été modifiés avec succès"
+            });
+
+        const warningNonAssignableRolesEmbed = this.warningRolesCantBeAssignedMessage(args.role);
+
+        if (warningNonAssignableRolesEmbed !== null)
+            embed.addFields(warningNonAssignableRolesEmbed)
+
         return this.response(true, {
-            embeds: [
-                new EmbedBuilder()
-                    .setTitle("Role modifié")
-                    .setFields({
-                        name: "Role du grade "+args.gradeNumber+" modifié",
-                        value: "Le role du grade "+args.gradeNumber+" a été modifiés avec succès"
-                    })
-            ]
+            embeds: [embed]
         })
     }
 
@@ -760,15 +792,20 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
 
         await XPServerConfig.save();
 
+        const embed = new EmbedBuilder()
+            .setTitle("Nouveau grade inséré")
+            .setFields({
+                name: "Nouveau grade inséré avec succès!",
+                value: "Le grade '"+name+"', à partir de "+requiredXP+"XP a été inséré à la position "+args.gradeNumber+" avec succès!"
+            });
+
+        const warningNonAssignableRolesEmbed = this.warningRolesCantBeAssignedMessage(args.role);
+
+        if (warningNonAssignableRolesEmbed !== null)
+            embed.addFields(warningNonAssignableRolesEmbed)
+
         return this.response(true, {
-            embeds: [
-                new EmbedBuilder()
-                    .setTitle("Nouveau grade inséré")
-                    .setFields({
-                        name: "Nouveau grade inséré avec succès!",
-                        value: "Le grade '"+name+"', à partir de "+requiredXP+"XP a été inséré à la position "+args.gradeNumber+" avec succès!"
-                    })
-            ]
+            embeds: [embed]
         })
     }
 
@@ -785,27 +822,36 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
                 ]
             })
 
+        const embed = new EmbedBuilder()
+            .setTitle("Les grades")
+            .setFields(
+                XPServerConfig.grades.map(({atLevel, name, requiredXP, XPByLevel, roleId}, index) => ({
+                    name: (index+1)+" - "+name,
+                    value:
+                        "Niveau "+atLevel+(
+                            index === XPServerConfig.grades.length - 1 ?
+                                "+" :
+                                XPServerConfig.grades[index+1].atLevel-atLevel > 1 ?
+                                    "-"+(XPServerConfig.grades[index+1].atLevel-1) :
+                                    ""
+                        )+"\n"+
+                        "XP total requis : "+requiredXP+"\n"+
+                        "XP/palier : "+XPByLevel+"\n"+
+                        "Role : <@&"+roleId+">"
+                }))
+            );
+
+        const warningNonAssignableRolesEmbed = this.warningRolesCantBeAssignedMessage(<Role[]>XPServerConfig.grades
+            .filter(({roleId}, index) => !XPServerConfig.grades.slice(0,index).some(grade => grade.roleId === roleId))
+            .map(grade => (<Guild>this.guild).roles.cache.get(grade.roleId))
+            .filter(role => role !== undefined)
+        );
+
+        if (warningNonAssignableRolesEmbed !== null)
+            embed.addFields(warningNonAssignableRolesEmbed)
+
         return this.response(true, {
-            embeds: [
-                new EmbedBuilder()
-                    .setTitle("Les grades")
-                    .setFields(
-                        XPServerConfig.grades.map(({atLevel, name, requiredXP, XPByLevel, roleId}, index) => ({
-                            name: (index+1)+" - "+name,
-                            value:
-                                "Niveau "+atLevel+(
-                                    index === XPServerConfig.grades.length - 1 ?
-                                        "+" :
-                                        XPServerConfig.grades[index+1].atLevel-atLevel > 1 ?
-                                            "-"+(XPServerConfig.grades[index+1].atLevel-1) :
-                                            ""
-                                )+"\n"+
-                                "XP total requis : "+requiredXP+"\n"+
-                                "XP/palier : "+XPByLevel+"\n"+
-                                "Role : <@&"+roleId+">"
-                        }))
-                    )
-            ]
+            embeds: [embed]
         })
     }
 

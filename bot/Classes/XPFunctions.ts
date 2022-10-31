@@ -1,16 +1,17 @@
 import XPData, {IGrade, ILevelTip, IXPData} from "../Models/XP/XPData";
 import {
+    ActionRowBuilder, ButtonBuilder, ButtonStyle,
     CategoryChannel,
     Guild,
     GuildChannel,
     GuildMember,
-    Message,
+    Message, Role,
     ThreadChannel, VoiceBasedChannel,
-    VoiceChannel,
     VoiceState
 } from "discord.js";
 import XPUserData, {IXPUserData} from "../Models/XP/XPUserData";
 import {spawn} from "node:child_process";
+import XPNotificationAskButton from "../Models/XP/XPNotificationAskButton";
 
 export function setTipByLevel(level: number, content: string, tips: ILevelTip[]): ILevelTip[] {
     return tips.length === 0 ?
@@ -139,18 +140,34 @@ export function checkTipsListData(tips: any) {
         ))
 }
 
+export function roleCanBeManaged(guild: Guild, roleOrRoleId: Role|string) {
+    const role: Role|undefined = roleOrRoleId instanceof Role ? roleOrRoleId : guild.roles.cache.get(roleOrRoleId);
+
+    return role !== undefined && role.position < (<GuildMember>guild.members.me).roles.highest.position
+}
+
 async function detectUpgrade(member: GuildMember, XPUserConfig: IXPUserData, XPServerConfig: IXPData): Promise<null|IGrade> {
     const grade = <null|IGrade>XPServerConfig.grades.reverse().find(grade => XPUserConfig.XP >= grade.requiredXP) ?? null;
 
-    if (grade === null || grade._id === XPUserConfig.gradeId)
+    if (grade === null || (<string>grade._id).toString() === XPUserConfig.gradeId)
         return grade;
 
-    let currentGrade: undefined|IGrade;
-    if (XPUserConfig.gradeId !== undefined && (currentGrade = XPServerConfig.grades.find(grade => grade._id == XPUserConfig.gradeId))) {
-        await member.roles.remove(currentGrade.roleId);
-    }
+    console.log("After");
+    console.log({
+        id1: grade._id ? grade._id.toString() : undefined,
+        id2: XPUserConfig.gradeId
+    })
 
-    await member.roles.add(grade.roleId);
+    let currentGrade: undefined|IGrade;
+    if (
+        XPUserConfig.gradeId !== undefined &&
+        (currentGrade = XPServerConfig.grades.find(grade => grade._id == XPUserConfig.gradeId)) &&
+        roleCanBeManaged(member.guild, currentGrade.roleId)
+    )
+        await member.roles.remove(currentGrade.roleId);
+
+    if (roleCanBeManaged(member.guild, grade.roleId))
+        await member.roles.add(grade.roleId);
 
     XPUserConfig.gradeId = grade._id;
 
@@ -160,22 +177,67 @@ async function detectUpgrade(member: GuildMember, XPUserConfig: IXPUserData, XPS
 async function detectUplevel(member: GuildMember, XPUserConfig: IXPUserData, XPServerConfig: IXPData, grade: IGrade): Promise<void> {
     XPUserConfig.currentLevel = grade.atLevel + Math.floor((XPUserConfig.XP - grade.requiredXP)/grade.XPByLevel);
 
-    if (!XPUserConfig.DMEnabled)
-        return;
 
     for (let level=XPUserConfig.lastNotifiedLevel+1;level<=XPUserConfig.currentLevel;level++) {
+        if (level > 1 && !XPUserConfig.DMEnabled)
+            return;
+
         const tip = findTipByLevel(level, XPServerConfig.tipsByLevel);
-        if (tip === null)
+        if (level > 1 && tip === null)
             continue;
 
         try {
             await member.send(
-                "Vous avez atteint le niveau "+level+" !\n"+
-                       "Voici un nouveau tip :\n\n"+tip.content
+                (
+                    level === 1 ?
+                        "Vous venez de débloquer le premier niveau du système d'XP de '"+member.guild.name+"' !\n" :
+                        "Vous avez atteint le niveau "+level+" du système d'XP de '"+member.guild.name+"'!\n") +
+                (
+                    tip !== null ?
+                        ( level === 1 ?
+                            "Voici le premier tip :" :
+                            "Voici un nouveau tip :" )+"\n\n"+tip.content :
+                        ""
+                )
             )
+            if (level === 1) {
+                const acceptButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "a";
+                const denyButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "d";
+
+                const message = await member.send({
+                    content: "Souhaitez vous activer les notifications ?",
+                    components: [ //@ts-ignore
+                        new ActionRowBuilder().addComponents(
+                            new ButtonBuilder()
+                                .setCustomId(acceptButtonId)
+                                .setLabel("Oui")
+                                .setStyle(ButtonStyle.Success),
+                            new ButtonBuilder()
+                                .setCustomId(denyButtonId)
+                                .setLabel("Non")
+                                .setStyle(ButtonStyle.Danger),
+                        )
+                    ]
+                })
+                await Promise.all(
+                    [
+                        [acceptButtonId, true],
+                        [denyButtonId, false]
+                    ].map(([buttonId, toEnable]) =>
+                        XPNotificationAskButton.create({
+                            serverId: member.guild.id,
+                            userId: member.id,
+                            toEnable,
+                            buttonId,
+                            messageId: message.id
+                        })
+                    )
+                )
+            }
         } catch (_) {
             return;
         }
+        XPUserConfig.lastNotifiedLevel = level;
     }
 }
 

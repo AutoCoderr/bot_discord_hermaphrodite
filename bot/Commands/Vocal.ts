@@ -1,10 +1,9 @@
 import Command from "../Classes/Command";
 import {
-    ActionRowBuilder, ButtonBuilder,
-    CommandInteractionOptionResolver, EmbedBuilder,
+    ActionRowBuilder, ButtonBuilder, EmbedBuilder,
     Guild,
     GuildMember,
-    Role, StageChannel, TextChannel, User, VoiceChannel, VoiceState,
+    Role, StageChannel, User, VoiceChannel, VoiceState,
     ButtonStyle, PermissionFlagsBits, CommandInteraction, Message
 } from "discord.js";
 import config from "../config";
@@ -22,7 +21,6 @@ import {
     showDate
 } from "../Classes/DateTimeManager";
 import {IArgsModel} from "../interfaces/CommandInterfaces";
-import reportDebug from "../logging/reportDebug";
 
 export default class Vocal extends Command {
     static display = true;

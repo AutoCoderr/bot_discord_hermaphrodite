@@ -12,7 +12,7 @@ export interface ILevelTip {
 }
 
 export interface IGrade {
-    _id: string;
+    _id?: string;
 
     atLevel: number;
     requiredXP: number;
