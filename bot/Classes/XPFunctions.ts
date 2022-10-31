@@ -152,21 +152,19 @@ async function detectUpgrade(member: GuildMember, XPUserConfig: IXPUserData, XPS
     if (grade === null || (<string>grade._id).toString() === XPUserConfig.gradeId)
         return grade;
 
-    console.log("After");
-    console.log({
-        id1: grade._id ? grade._id.toString() : undefined,
-        id2: XPUserConfig.gradeId
-    })
-
     let currentGrade: undefined|IGrade;
     if (
         XPUserConfig.gradeId !== undefined &&
         (currentGrade = XPServerConfig.grades.find(grade => grade._id == XPUserConfig.gradeId)) &&
+        currentGrade.roleId !== grade.roleId &&
         roleCanBeManaged(member.guild, currentGrade.roleId)
     )
         await member.roles.remove(currentGrade.roleId);
 
-    if (roleCanBeManaged(member.guild, grade.roleId))
+    if (
+        (currentGrade === undefined || currentGrade.roleId !== grade.roleId) &&
+        roleCanBeManaged(member.guild, grade.roleId)
+    )
         await member.roles.add(grade.roleId);
 
     XPUserConfig.gradeId = grade._id;
@@ -187,25 +185,26 @@ async function detectUplevel(member: GuildMember, XPUserConfig: IXPUserData, XPS
             continue;
 
         try {
-            await member.send(
-                (
+            const messageToSend = (
                     level === 1 ?
-                        "Vous venez de débloquer le premier niveau du système d'XP de '"+member.guild.name+"' !\n" :
-                        "Vous avez atteint le niveau "+level+" du système d'XP de '"+member.guild.name+"'!\n") +
+                        "Vous venez de débloquer le premier niveau du système d'XP de '"+member.guild.name+"' !" :
+                        "Vous avez atteint le niveau "+level+" du système d'XP de '"+member.guild.name+"'!") +
                 (
                     tip !== null ?
                         ( level === 1 ?
-                            "Voici le premier tip :" :
-                            "Voici un nouveau tip :" )+"\n\n"+tip.content :
+                            "\nVoici le premier tip :" :
+                            "\nVoici un nouveau tip :" )+"\n\n"+tip.content :
                         ""
-                )
-            )
-            if (level === 1) {
+                );
+
+            if (level > 1)
+                await member.send(messageToSend);
+            else {
                 const acceptButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "a";
                 const denyButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "d";
 
                 const message = await member.send({
-                    content: "Souhaitez vous activer les notifications ?",
+                    content: messageToSend+"\n\n\nSouhaitez vous activer les notifications ?",
                     components: [ //@ts-ignore
                         new ActionRowBuilder().addComponents(
                             new ButtonBuilder()

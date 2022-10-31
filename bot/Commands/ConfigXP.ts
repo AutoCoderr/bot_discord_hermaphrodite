@@ -550,7 +550,7 @@ export default class ConfigXP extends Command<IConfigXPArgs> {
         const cantBeAssignedRoles = (<Role[]>roles).filter(role => !roleCanBeManaged(<Guild>this.guild, role))
         return cantBeAssignedRoles.length > 0 ?
             {
-                name: "Attention, Herma Bot ne peux pas assigner les roles suivants car ils ont un rang plus élevé que le sien :",
+                name: "Attention, Herma Bot ne peut pas assigner les rôles suivants car ils ont un rang plus élevé que le sien :",
                 value: cantBeAssignedRoles.map(role => " - <@&"+role.id+">").join("\n"),
                 inline: false
             } : null;
