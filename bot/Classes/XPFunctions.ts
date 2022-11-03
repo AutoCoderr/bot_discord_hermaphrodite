@@ -12,11 +12,9 @@ import {
 import XPUserData, {IXPUserData} from "../Models/XP/XPUserData";
 import {spawn} from "node:child_process";
 import XPNotificationAskButton, {
-    IXPNotificationAskButton,
-    XPNotificationAskButtonTimeout
+    IXPNotificationAskButton
 } from "../Models/XP/XPNotificationAskButton";
-import client from "../client";
-import getToUpdateElements from "../scripts/cleanDatabase/getToUpdateElements";
+import XPTipsUsefulAskButton, {IXPTipsUsefulAskButton} from "../Models/XP/XPTipsUsefulAskButton";
 
 export function setTipByLevel(level: number, content: string, tips: ILevelTip[]): ILevelTip[] {
     return tips.length === 0 ?
@@ -146,8 +144,8 @@ export function checkTipsListData(tips: any) {
 }
 
 async function askForNotifications(user: User, serverId, content: string) {
-    const acceptButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "a";
-    const denyButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "d";
+    const acceptButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "na";
+    const denyButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "nd";
 
     const message = await user.send({
         content,
@@ -180,6 +178,114 @@ async function askForNotifications(user: User, serverId, content: string) {
     )
 }
 
+async function sendTip(member: GuildMember, level: number, tip: ILevelTip) {
+    const acceptButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "ta";
+    const denyButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "td";
+
+    await member.send((
+            level === 1 ?
+                "Vous venez de débloquer le premier niveau du système d'XP de '"+member.guild.name+"' !" :
+                "Vous avez atteint le niveau "+level+" du système d'XP de '"+member.guild.name+"'!") +
+        ( level === 1 ?
+            "\nVoici le premier tip :" :
+            "\nVoici un nouveau tip :" )
+        +"\n\n"+tip.content)
+
+    const message = await member.send({
+        content: "\n-------------------------------\n\nAvez vous trouvé ce tip utile ?",
+        components: [ //@ts-ignore
+            new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId(acceptButtonId)
+                    .setLabel("Oui")
+                    .setStyle(ButtonStyle.Success),
+                new ButtonBuilder()
+                    .setCustomId(denyButtonId)
+                    .setLabel("Non")
+                    .setStyle(ButtonStyle.Danger),
+            )
+        ]
+    })
+
+    await Promise.all(
+        [
+            [acceptButtonId, true],
+            [denyButtonId, false]
+        ].map(([buttonId, useful]) =>
+            XPTipsUsefulAskButton.create({
+                serverId: member.guild.id,
+                userId: member.id,
+                useful,
+                level,
+                buttonId,
+                messageId: message.id
+            })
+        )
+    )
+}
+
+async function deleteMP(user: User, messageId: string) {
+    const dmChannel = user.dmChannel;
+    if (dmChannel === null)
+        return;
+
+    const message: null|Message = await dmChannel.messages.fetch(messageId).catch(() => null);
+
+    if (message === null)
+        return;
+
+    await message.delete();
+}
+
+export function approveOrUnApproveTip(member: GuildMember|User, tips: ILevelTip[], level: number, toApprove: boolean, updatedTips: ILevelTip[] = []): ILevelTip[]|false {
+    if (tips.length === 0)
+        return false;
+
+    const tip = tips[0];
+
+    if (level !== tip.level)
+        return approveOrUnApproveTip(member, tips.slice(1), level, toApprove, [...updatedTips, tip]);
+
+    const col = toApprove ? 'userApproves' : 'userUnapproves';
+    const otherCol = toApprove ? 'userUnapproves' : 'userApproves';
+    tip[otherCol] = tip[otherCol].filter(userId => userId !== member.id);
+    if (!tip[col].some(userId => userId === member.id))
+        tip[col].push(member.id);
+
+    return [...updatedTips, tip, ...tips.slice(1)];
+}
+
+export async function listenXPTipsUseFulApproveButtons(interaction: ButtonInteraction): Promise<boolean> {
+    const button: null|IXPTipsUsefulAskButton = await XPTipsUsefulAskButton.findOne({
+        userId: interaction.user.id,
+        buttonId: interaction.customId
+    });
+
+    if (button === null)
+        return false;
+
+    const XPServerConfig: null|IXPData = await XPData.findOne({
+        serverId: button.serverId
+    });
+
+    let updatedTips: ILevelTip[]|false;
+    if (XPServerConfig !== null && (updatedTips = approveOrUnApproveTip(interaction.user, XPServerConfig.tipsByLevel, button.level, button.useful))) {
+        XPServerConfig.tipsByLevel = updatedTips;
+        await XPServerConfig.save();
+
+        await interaction.editReply("Vous avez trouvé ce tip "+(button.useful ? "utile" : "inutile"));
+    } else {
+        await interaction.editReply("Ce tip semble ne plus exister");
+    }
+
+    await deleteMP(interaction.user, button.messageId);
+    await XPTipsUsefulAskButton.deleteMany({
+        messageId: button.messageId
+    });
+
+    return true;
+}
+
 export async function listenXPNotificationAskButtons(interaction: ButtonInteraction): Promise<boolean> {
     const button: null|IXPNotificationAskButton = await XPNotificationAskButton.findOne({
         userId: interaction.user.id,
@@ -189,23 +295,13 @@ export async function listenXPNotificationAskButtons(interaction: ButtonInteract
     if (button === null)
         return false;
 
-
-    const dmChannel = interaction.user.dmChannel;
-    if (dmChannel === null)
-        return false;
-
-    const message: null|Message = await dmChannel.messages.fetch(button.messageId).catch(() => null)
-
-    if (message === null)
-        return false
-
     const XPUserConfig: IXPUserData = await getXPUserConfig(button.serverId,button.userId);
 
     await enableOrDisableUserNotification(interaction.user, XPUserConfig, button.toEnable)
 
     await interaction.editReply("Notifications "+(button.toEnable ? "activées" : "désactivées")+" avec succès!")
 
-    await message.delete();
+    await deleteMP(interaction.user, button.messageId);
 
     await XPNotificationAskButton.deleteMany({
         messageId: button.messageId
@@ -290,7 +386,6 @@ async function detectUpgrade(member: GuildMember, XPUserConfig: IXPUserData, XPS
 async function detectUplevel(member: GuildMember, XPUserConfig: IXPUserData, XPServerConfig: IXPData, grade: IGrade): Promise<void> {
     XPUserConfig.currentLevel = grade.atLevel + Math.floor((XPUserConfig.XP - grade.requiredXP)/grade.XPByLevel);
 
-
     for (let level=XPUserConfig.lastNotifiedLevel+1;level<=XPUserConfig.currentLevel;level++) {
         if (level > 1 && !XPUserConfig.DMEnabled)
             return;
@@ -300,23 +395,15 @@ async function detectUplevel(member: GuildMember, XPUserConfig: IXPUserData, XPS
             continue;
 
         try {
-            const messageToSend = (
-                    level === 1 ?
-                        "Vous venez de débloquer le premier niveau du système d'XP de '"+member.guild.name+"' !" :
-                        "Vous avez atteint le niveau "+level+" du système d'XP de '"+member.guild.name+"'!") +
-                (
-                    tip !== null ?
-                        ( level === 1 ?
-                            "\nVoici le premier tip :" :
-                            "\nVoici un nouveau tip :" )+"\n\n"+tip.content :
-                        ""
-                );
-
-            if (level > 1)
-                await member.send(messageToSend);
-            else {
-                await askForNotifications(member.user, member.guild.id, messageToSend+"\n\n\nSouhaitez vous activer les notifications ?")
-            }
+            if (tip !== null)
+                await sendTip(member, level, tip);
+            if (level === 1)
+                await askForNotifications(
+                    member.user,
+                    member.guild.id,
+                    (tip === null ? "Vous venez de débloquer le premier niveau du système d'XP de '"+member.guild.name+"' !\n" : "")+
+                    "Souhaitez vous activer les notifications ?"
+                )
         } catch (_) {
             return;
         }

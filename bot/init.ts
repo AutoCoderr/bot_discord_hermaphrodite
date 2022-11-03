@@ -11,7 +11,7 @@ import {
     listenUserXPFirstMessages,
     listenUserXPMessages,
     listenUserXPVocal,
-    listenXPNotificationAskButtons
+    listenXPNotificationAskButtons, listenXPTipsUseFulApproveButtons
 } from "./Classes/XPFunctions";
 
 export default function init(bot) {
@@ -51,7 +51,8 @@ export default function init(bot) {
                             listenInviteButtons(interaction, 'vocal'),
                             listenAskInviteBackButtons(interaction, 'text'),
                             listenAskInviteBackButtons(interaction, 'vocal'),
-                            listenXPNotificationAskButtons(interaction)
+                            listenXPNotificationAskButtons(interaction),
+                            listenXPTipsUseFulApproveButtons(interaction)
                         ]).then(responses => !responses.includes(true))) {
                             await interaction.editReply({content: "Bouton invalide"});
                         }
