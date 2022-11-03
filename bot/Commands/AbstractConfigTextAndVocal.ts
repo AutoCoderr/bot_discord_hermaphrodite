@@ -29,7 +29,7 @@ interface configTextAndVocalArgs {
     limit?: number
 }
 
-export default abstract class ConfigTextAndVocal extends Command {
+export default abstract class AbstractConfigTextAndVocal extends Command {
     type: null | 'vocal' | 'text' = null;
 
     static abstract = true;
@@ -126,8 +126,8 @@ export default abstract class ConfigTextAndVocal extends Command {
                 displayValidErrorEvenIfFound: true,
                 description: "Le ou les channels vocaux à supprimer ou ajouter",
                 valid: (channels: GuildChannel[] | GuildChannel) =>
-                    (channels instanceof Array && !channels.some(channel => !ConfigTextAndVocal.types[type].channelTypes.includes(channel.type))) ||
-                    (channels instanceof GuildChannel && ConfigTextAndVocal.types[type].channelTypes.includes(channels.type)),
+                    (channels instanceof Array && !channels.some(channel => !AbstractConfigTextAndVocal.types[type].channelTypes.includes(channel.type))) ||
+                    (channels instanceof GuildChannel && AbstractConfigTextAndVocal.types[type].channelTypes.includes(channels.type)),
                 errorMessage: (_) => ({
                     name: "Channels non ou mal renseigné",
                     value: "Ils ne peuvent être que des channels " + (type === "vocal" ? "vocaux" : "textuels")
@@ -138,11 +138,11 @@ export default abstract class ConfigTextAndVocal extends Command {
                 required: false,
                 type: 'duration',
                 description: "Re définir la limite par défaut",
-                valid: (value: number) => value >= ConfigTextAndVocal.types[type].minimumLimit,
+                valid: (value: number) => value >= AbstractConfigTextAndVocal.types[type].minimumLimit,
                 errorMessage: value => ({
                     name: "Vous avez mal rentrez la limite",
                     value: typeof (value) === "number" ?
-                        "Avez vous rentrez une valeur supérieure ou égale à " + showTime(extractUTCTime(ConfigTextAndVocal.types[type].minimumLimit), 'fr')+" ?" :
+                        "Avez vous rentrez une valeur supérieure ou égale à " + showTime(extractUTCTime(AbstractConfigTextAndVocal.types[type].minimumLimit), 'fr')+" ?" :
                         "Syntaxe incorrecte"
                 })
             }
@@ -152,7 +152,7 @@ export default abstract class ConfigTextAndVocal extends Command {
     async action(args: configTextAndVocalArgs) {
         const {action, subAction, blacklistType, users, roles, channels, limit} = args;
 
-        if (this.type === null || ConfigTextAndVocal.types[this.type] === undefined)
+        if (this.type === null || AbstractConfigTextAndVocal.types[this.type] === undefined)
             return this.response(false,
                 this.sendErrors({
                     name: "Bad type",
@@ -160,7 +160,7 @@ export default abstract class ConfigTextAndVocal extends Command {
                 })
             );
 
-        const {configModel, subscribeModel} = ConfigTextAndVocal.types[this.type];
+        const {configModel, subscribeModel} = AbstractConfigTextAndVocal.types[this.type];
 
         if (this.guild == null)
             return this.response(false,

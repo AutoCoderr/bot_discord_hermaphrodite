@@ -17,6 +17,7 @@ import {
 } from "../Classes/XPFunctions";
 import {round} from "../Classes/OtherFunctions";
 import client from "../client";
+import AbstractXP from "./AbstractXP";
 
 interface IConfigXPArgs {
     action:
@@ -56,29 +57,15 @@ interface IConfigXPArgs {
     jsonFile: any;
 }
 
-export default class ConfigXP extends Command<IConfigXPArgs> {
+export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
     static display = true;
+    static abstract = false;
     static description = "Configurer le système d'XP"
     static commandName = "configXP";
 
     static customCommand = false
 
     static slashCommandIdByGuild: {[guildId: string]: string} = {};
-
-    XPServerConfig: null|IXPData = null;
-
-    async getXPServerConfig(): Promise<null|IXPData> {
-        if (this.guild === null)
-            return null;
-
-        if (this.XPServerConfig === null) {
-            this.XPServerConfig = await XPData.findOne({
-                serverId: this.guild.id
-            })
-        }
-
-        return this.XPServerConfig;
-    }
 
     static argsModel: IArgsModel<IConfigXPArgs> = {
         $argsByType: {
