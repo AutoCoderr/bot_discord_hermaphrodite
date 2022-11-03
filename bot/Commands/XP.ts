@@ -112,7 +112,7 @@ export default class XP extends AbstractXP<IXPArgs> {
     async action_notif_enable(args: IXPArgs, XPServerConfig: IXPData) {
         const XPUserConfig = await <Promise<IXPUserData>>this.getXPUserConfig(this.member, true);
 
-        const success = await enableOrDisableUserNotification(this.member, XPUserConfig, true, XPServerConfig)
+        const success = await enableOrDisableUserNotification(this.member, XPUserConfig, true, XPServerConfig);
 
         return this.response(true, {
             embeds: [
@@ -134,10 +134,10 @@ export default class XP extends AbstractXP<IXPArgs> {
         return this.response(true, {
             embeds: [
                 new EmbedBuilder()
-                    .setTitle("Notification activées avec succès")
+                    .setTitle("Notification désactivées avec succès")
                     .setFields({
-                        name: "Notification activées avec succès",
-                        value: "Notification activées avec succès"
+                        name: "Notification désactivées avec succès",
+                        value: "Notification désactivées avec succès"
                     })
             ]
         })

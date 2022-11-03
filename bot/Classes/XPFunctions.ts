@@ -301,12 +301,6 @@ export async function listenXPNotificationAskButtons(interaction: ButtonInteract
 
     await interaction.editReply("Notifications "+(button.toEnable ? "activées" : "désactivées")+" avec succès!")
 
-    await deleteMP(interaction.user, button.messageId);
-
-    await XPNotificationAskButton.deleteMany({
-        messageId: button.messageId
-    });
-
     return true;
 }
 
@@ -323,7 +317,7 @@ export async function enableOrDisableUserNotification(user: User|GuildMember, XP
             await user.send({
                 embeds: [
                     new EmbedBuilder()
-                        .setTitle("Système d'XP activé")
+                        .setTitle("Notifications du système d'XP activées")
                         .setFields(
                             unblockedTips.length > 0 ?
                                 {
@@ -333,7 +327,7 @@ export async function enableOrDisableUserNotification(user: User|GuildMember, XP
                                     ).join("\n")
                                 } :
                                 {
-                                    name: "Système d'XP activé",
+                                    name: "Notifications du système d'XP activées",
                                     value: "Vous avez activé les notifications pour le système d'XP"
                                 }
                         )
@@ -343,6 +337,18 @@ export async function enableOrDisableUserNotification(user: User|GuildMember, XP
             return false;
         }
         XPUserConfig.lastNotifiedLevel = XPUserConfig.currentLevel;
+    }
+
+    const button: null|IXPNotificationAskButton = await XPNotificationAskButton.findOne({
+        serverId: XPUserConfig.serverId,
+        userId: user.id
+    })
+
+    if (button !== null) {
+        await deleteMP(user instanceof User ? user : user.user, button.messageId);
+        await XPNotificationAskButton.deleteMany({
+            messageId: button.messageId
+        });
     }
 
     XPUserConfig.DMEnabled = toEnable;
@@ -397,7 +403,7 @@ async function detectUplevel(member: GuildMember, XPUserConfig: IXPUserData, XPS
         try {
             if (tip !== null)
                 await sendTip(member, level, tip);
-            if (level === 1)
+            if (level === 1 && !XPUserConfig.DMEnabled)
                 await askForNotifications(
                     member.user,
                     member.guild.id,
