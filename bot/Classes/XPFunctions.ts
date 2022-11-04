@@ -15,6 +15,7 @@ import XPNotificationAskButton, {
     IXPNotificationAskButton
 } from "../Models/XP/XPNotificationAskButton";
 import XPTipsUsefulAskButton, {IXPTipsUsefulAskButton} from "../Models/XP/XPTipsUsefulAskButton";
+import ConfigXP from "../Commands/ConfigXP";
 
 export function setTipByLevel(level: number, content: string, tips: ILevelTip[]): ILevelTip[] {
     return tips.length === 0 ?
@@ -79,6 +80,38 @@ export function findTipByLevel(level: number, tips: ILevelTip[], a = 0, b = tips
         return findTipByLevel(level, tips, a, m);
 
     return findTipByLevel(level, tips, m, b)
+}
+
+export function embedTipsList(tips: ILevelTip[], XPUserConfig: null|IXPUserData = null) {
+    const filteredTips = XPUserConfig !== null ?
+        tips.filter(tip => tip.level <= XPUserConfig.currentLevel) :
+        tips;
+
+    return filteredTips.length > 0 ?
+        new EmbedBuilder()
+            .setTitle(XPUserConfig === null ? filteredTips.length + " tip(s) sont défini(s)" : "Voici les tips qui vous sont accessibles")
+            .setFields(filteredTips.map(tip => ({
+                name: "Niveau " + tip.level,
+                value: tip.content.substring(0, Math.min(10, tip.content.length)).replace(/\n/, "[br]") + (tip.content.length > 10 ? "..." : [])
+            }))) :
+        new EmbedBuilder()
+            .setTitle("Aucun tips")
+            .setFields({
+                name: "Aucun tips",
+                value: "Aucun tips n'a été trouvé" + (
+                    XPUserConfig === null ?
+                        ", vous pouvez en définir un avec '/" + ConfigXP.commandName + " tips set <level>'." : "."
+                )
+            })
+}
+
+export function embedTip(tip: ILevelTip) {
+     return new EmbedBuilder()
+        .setTitle("Tip numéro "+tip.level)
+        .setFields({
+            name: "Voici le tip "+tip.level,
+            value: tip.content
+        })
 }
 
 export function calculRequiredXPForNextGrade(grades: IGrade[], level: number, lastGradeIndex: number = grades.length-1): null|number {

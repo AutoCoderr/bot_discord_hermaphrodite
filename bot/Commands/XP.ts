@@ -1,14 +1,14 @@
-import {CommandInteraction, EmbedBuilder, GuildMember, Message} from "discord.js";
+import {CommandInteraction, EmbedBuilder, Guild, Message} from "discord.js";
 import {IArgsModel} from "../interfaces/CommandInterfaces";
 import AbstractXP from "./AbstractXP";
-import {enableOrDisableUserNotification, findTipByLevel} from "../Classes/XPFunctions";
-import {IXPData} from "../Models/XP/XPData";
+import {embedTip, embedTipsList, enableOrDisableUserNotification, findTipByLevel} from "../Classes/XPFunctions";
+import {ILevelTip, IXPData} from "../Models/XP/XPData";
 import XPUserData, {IXPUserData} from "../Models/XP/XPUserData";
 
 interface IXPArgs {
     action: 'notif'|'infos'|'tips'|'approve'|'un_approve',
     notifSubActions: 'show'|'enable'|'disable',
-    level: number;
+    level?: number;
 }
 
 export default class XP extends AbstractXP<IXPArgs> {
@@ -21,18 +21,16 @@ export default class XP extends AbstractXP<IXPArgs> {
 
     static slashCommandIdByGuild: {[guildId: string]: string} = {};
 
-    getXPUserConfig(member: GuildMember, create: boolean = false): Promise<null|IXPUserData> {
-        return XPUserData.findOne({
-            serverId: member.guild.id,
-            userId: member.id
-        }).then(XPUserConfig =>
-            (!create || XPUserConfig !== null) ?
-                XPUserConfig :
-                XPUserData.create({
-                    serverId: member.guild.id,
-                    userId: member.id,
-                })
-        )
+    XPUserConfig: IXPUserData|null = null;
+
+    async getXPUserConfig(): Promise<null|IXPUserData> {
+        if (this.XPUserConfig === null)
+            this.XPUserConfig = await XPUserData.findOne({
+                serverId: (<Guild>this.guild).id,
+                userId: this.member.id
+            })
+
+        return this.XPUserConfig;
     }
 
     static argsModel: IArgsModel<IXPArgs> = {
@@ -42,7 +40,7 @@ export default class XP extends AbstractXP<IXPArgs> {
                 choices: {
                     notif: null,
                     infos: "Voir les informations (XP, rang, etc...)",
-                    tips: "Voir les tips accessible, ou un tip donné",
+                    tips: "Voir les tips accessibles, ou un tip donné",
                     approve: "Marquer un tip comme utile",
                     un_approve: "Marquer un tip comme inutile"
                 },
@@ -68,8 +66,20 @@ export default class XP extends AbstractXP<IXPArgs> {
                 required: args => args.action !== "tips",
                 valid: async (value, _, command: XP) => {
                     const XPServerConfig = await command.getXPServerConfig();
+                    const XPUserConfig = await command.getXPUserConfig();
 
-                    return XPServerConfig === null || !XPServerConfig.enabled || findTipByLevel(value, XPServerConfig.tipsByLevel) !== null
+                    let tip: null|ILevelTip;
+
+                    return (
+                        XPServerConfig === null ||
+                        !XPServerConfig.enabled ||
+                        !command.member.roles.cache.some(role => role.id === XPServerConfig.activeRoleId) ||
+                        (
+                            XPUserConfig !== null &&
+                            (tip = findTipByLevel(value, XPServerConfig.tipsByLevel)) !== null &&
+                            tip.level <= XPUserConfig.currentLevel
+                        )
+                    )
                 },
                 errorMessage: value =>
                     value <= 0 ? {
@@ -90,45 +100,76 @@ export default class XP extends AbstractXP<IXPArgs> {
     async action(args: IXPArgs, bot) {
         const XPServerConfig = await this.getXPServerConfig();
 
-        if (XPServerConfig === null || !XPServerConfig.enabled)
+        if (XPServerConfig === null || !XPServerConfig.enabled || !this.member.roles.cache.some(role => role.id === XPServerConfig.activeRoleId))
             return this.response(false, {
                 embeds: [
                     new EmbedBuilder()
-                        .setTitle("Système d'XP désactivé")
+                        .setTitle("Système d'XP désactivé ou inaccessible")
                         .setFields({
-                            name: "Système d'XP désactivé",
-                            value: "Le système d'XP est désactivé sur ce serveur"
+                            name: "Système d'XP désactivé ou inaccessible",
+                            value: "Le système d'XP est désactivé sur ce serveur ou vous est inaccessible"
                         })
                 ]
             })
 
-        return this['action_'+args.action](args,XPServerConfig);
+        const XPUserConfig = await this.getXPUserConfig().then(XPUserConfig =>
+            XPUserConfig ?? XPUserData.create({
+                serverId: (<Guild>this.guild).id,
+                userId: this.member.id
+            })
+        )
+
+        return this['action_'+args.action](args,XPServerConfig,XPUserConfig);
     }
 
-    async action_notif(args: IXPArgs, XPServerConfig: IXPData) {
-        return this['action_notif_'+args.notifSubActions](args,XPServerConfig);
+    async action_tips(args: IXPArgs, XPServerConfig: IXPData, XPUserConfig: IXPUserData) {
+        if (args.level === undefined)
+            return this.response(true, {
+                embeds: [
+                    embedTipsList(XPServerConfig.tipsByLevel, XPUserConfig)
+                ]
+            })
+
+        const tip = <ILevelTip>findTipByLevel(args.level, XPServerConfig.tipsByLevel);
+
+        const [approved, unApproved] = [
+            tip.userApproves.some(id => id === this.member.id),
+            tip.userUnapproves.some(id => id === this.member.id)
+        ]
+
+        return this.response(true, {
+            embeds: [
+                embedTip(tip)
+                    .addFields({
+                        name: "Votre avis",
+                        value: (approved || unApproved) ?
+                            "Vous l'avez trouvé "+(approved ? "utile" : "inutile") :
+                            "Vous n'avez donné aucun avis"
+                    })
+            ]
+        })
     }
 
-    async action_notif_enable(args: IXPArgs, XPServerConfig: IXPData) {
-        const XPUserConfig = await <Promise<IXPUserData>>this.getXPUserConfig(this.member, true);
+    async action_notif(args: IXPArgs, XPServerConfig: IXPData, XPUserConfig: IXPUserData) {
+        return this['action_notif_'+args.notifSubActions](args,XPServerConfig, XPUserConfig);
+    }
 
+    async action_notif_enable(args: IXPArgs, XPServerConfig: IXPData, XPUserConfig: IXPUserData) {
         const success = await enableOrDisableUserNotification(this.member, XPUserConfig, true, XPServerConfig);
 
         return this.response(true, {
             embeds: [
                 new EmbedBuilder()
-                    .setTitle(success ? "Notification activées avec succès" : "Activation des notification échouée")
+                    .setTitle(success ? "Notification activées avec succès" : "Activation des notifications échouée")
                     .setFields({
-                        name: success ? "Notification activées avec succès" : "Activation des notification échouée",
+                        name: success ? "Notification activées avec succès" : "Activation des notifications échouée",
                         value: success ? "Notification activées avec succès" : "Êtes vous sur d'avoir autorisé les messages privés?"
                     })
             ]
         })
     }
 
-    async action_notif_disable() {
-        const XPUserConfig = await <Promise<IXPUserData>>this.getXPUserConfig(this.member, true);
-
+    async action_notif_disable(_, __, XPUserConfig: IXPUserData) {
         await enableOrDisableUserNotification(this.member, XPUserConfig, false)
 
         return this.response(true, {
@@ -143,16 +184,14 @@ export default class XP extends AbstractXP<IXPArgs> {
         })
     }
 
-    async action_notif_show(args: IXPArgs) {
-        const XPUserConfig = await this.getXPUserConfig(this.member);
-        const active = XPUserConfig !== null && XPUserConfig.DMEnabled;
+    async action_notif_show(_, __, XPUserConfig: IXPUserData) {
         return this.response(true, {
             embeds: [
                 new EmbedBuilder()
-                    .setTitle("Notifications "+(active ? "activées" : "désactivées"))
+                    .setTitle("Notifications "+(XPUserConfig.DMEnabled ? "activées" : "désactivées"))
                     .setFields({
-                        name: "Notifications "+(active ? "activées" : "désactivées"),
-                        value: "Les notifications sont "+(active ? "activées" : "désactivées")
+                        name: "Notifications "+(XPUserConfig.DMEnabled ? "activées" : "désactivées"),
+                        value: "Les notifications sont "+(XPUserConfig.DMEnabled ? "activées" : "désactivées")
                     })
             ]
         })

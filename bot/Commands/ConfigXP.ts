@@ -11,7 +11,7 @@ import XPData, {IGrade, ILevelTip, IXPData} from "../Models/XP/XPData";
 import {extractUTCTime, showTime} from "../Classes/DateTimeManager";
 import {
     calculRequiredXPForNextGrade,
-    checkGradesListData, checkTipsListData,
+    checkGradesListData, checkTipsListData, embedTip, embedTipsList,
     findTipByLevel, roleCanBeManaged,
     setTipByLevel
 } from "../Classes/XPFunctions";
@@ -942,12 +942,7 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
 
         return this.response(true, {
             embeds: [
-                new EmbedBuilder()
-                    .setTitle("Tip numéro "+args.level)
-                    .setFields({
-                        name: "Voici le tip "+args.level,
-                        value: tip.content
-                    })
+                embedTip(tip)
             ]
         })
     }
@@ -955,19 +950,7 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
     async action_tips_list(args: IConfigXPArgs, XPServerConfig: IXPData) {
         return this.response(true, {
             embeds: [
-                XPServerConfig.tipsByLevel.length > 0 ?
-                    new EmbedBuilder()
-                        .setTitle(XPServerConfig.tipsByLevel.length+" tip(s) sont défini(s)")
-                        .setFields(XPServerConfig.tipsByLevel.map(tip => ({
-                            name: "Niveau "+tip.level,
-                            value: tip.content.substring(0, Math.min(10, tip.content.length)).replace(/\n/, "[br]")+(tip.content.length > 10 ? "..." : [])
-                        }))) :
-                    new EmbedBuilder()
-                        .setTitle("Aucun tips")
-                        .setFields({
-                            name: "Aucun tips",
-                            value: "Aucun tips n'a été trouvé, vous pouvez en définir un avec '/"+this.commandName+" tips set <level>'"
-                        })
+                embedTipsList(XPServerConfig.tipsByLevel)
             ]
         })
     }
