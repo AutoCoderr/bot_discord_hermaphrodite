@@ -132,20 +132,9 @@ export default class XP extends AbstractXP<IXPArgs> {
 
         const tip = <ILevelTip>findTipByLevel(args.level, XPServerConfig.tipsByLevel);
 
-        const [approved, unApproved] = [
-            tip.userApproves.some(id => id === this.member.id),
-            tip.userUnapproves.some(id => id === this.member.id)
-        ]
-
         return this.response(true, {
             embeds: [
-                embedTip(tip)
-                    .addFields({
-                        name: "Votre avis",
-                        value: (approved || unApproved) ?
-                            "Vous l'avez trouvé "+(approved ? "utile" : "inutile") :
-                            "Vous n'avez donné aucun avis"
-                    })
+                embedTip(tip, this.member)
             ]
         })
     }

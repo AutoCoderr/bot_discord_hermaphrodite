@@ -1,7 +1,7 @@
 import XPData, {IGrade, ILevelTip, IXPData} from "../Models/XP/XPData";
 import {
     ActionRowBuilder, ButtonBuilder, ButtonInteraction, ButtonStyle,
-    CategoryChannel, EmbedBuilder,
+    CategoryChannel, CommandInteraction, EmbedBuilder,
     Guild,
     GuildChannel,
     GuildMember,
@@ -16,6 +16,7 @@ import XPNotificationAskButton, {
 } from "../Models/XP/XPNotificationAskButton";
 import XPTipsUsefulAskButton, {IXPTipsUsefulAskButton} from "../Models/XP/XPTipsUsefulAskButton";
 import ConfigXP from "../Commands/ConfigXP";
+import {responseResultType} from "../interfaces/CommandInterfaces";
 
 export function setTipByLevel(level: number, content: string, tips: ILevelTip[]): ILevelTip[] {
     return tips.length === 0 ?
@@ -82,36 +83,53 @@ export function findTipByLevel(level: number, tips: ILevelTip[], a = 0, b = tips
     return findTipByLevel(level, tips, m, b)
 }
 
-export function embedTipsList(tips: ILevelTip[], XPUserConfig: null|IXPUserData = null) {
+export function embedTipsList(tips: ILevelTip[], XPUserConfig: null|IXPUserData = null): responseResultType {
     const filteredTips = XPUserConfig !== null ?
         tips.filter(tip => tip.level <= XPUserConfig.currentLevel) :
         tips;
 
-    return filteredTips.length > 0 ?
-        new EmbedBuilder()
-            .setTitle(XPUserConfig === null ? filteredTips.length + " tip(s) sont défini(s)" : "Voici les tips qui vous sont accessibles")
-            .setFields(filteredTips.map(tip => ({
-                name: "Niveau " + tip.level,
-                value: tip.content.substring(0, Math.min(10, tip.content.length)).replace(/\n/, "[br]") + (tip.content.length > 10 ? "..." : [])
-            }))) :
-        new EmbedBuilder()
-            .setTitle("Aucun tips")
-            .setFields({
-                name: "Aucun tips",
-                value: "Aucun tips n'a été trouvé" + (
-                    XPUserConfig === null ?
-                        ", vous pouvez en définir un avec '/" + ConfigXP.commandName + " tips set <level>'." : "."
-                )
-            })
+    return {
+        embeds: [
+            filteredTips.length > 0 ?
+                new EmbedBuilder()
+                    .setTitle(XPUserConfig === null ? filteredTips.length + " tip(s) sont défini(s)" : "Voici les tips qui vous sont accessibles")
+                    .setFields(filteredTips.map(tip => ({
+                        name: "Niveau " + tip.level,
+                        value: tip.content.substring(0, Math.min(10, tip.content.length)).replace(/\n/, "[br]") + (tip.content.length > 10 ? "..." : [])
+                    }))) :
+                new EmbedBuilder()
+                    .setTitle("Aucun tips")
+                    .setFields({
+                        name: "Aucun tips",
+                        value: "Aucun tips n'a été trouvé" + (
+                            XPUserConfig === null ?
+                                ", vous pouvez en définir un avec '/" + ConfigXP.commandName + " tips set <level>'." : "."
+                        )
+                    })
+        ]
+    }
 }
 
-export function embedTip(tip: ILevelTip) {
-     return new EmbedBuilder()
+export function embedTip(tip: ILevelTip, interaction: CommandInteraction, member: GuildMember|null = null): responseResultType {
+      const embed = new EmbedBuilder()
         .setTitle("Tip numéro "+tip.level)
         .setFields({
             name: "Voici le tip "+tip.level,
             value: tip.content
-        })
+        });
+
+      if (member !== null) {
+          const [approved, unApproved] = [
+              tip.userApproves.some(id => id === member.id),
+              tip.userUnapproves.some(id => id === member.id)
+          ]
+          embed.addFields({
+              name: "Votre avis",
+              value: (approved || unApproved) ?
+                  "Vous l'avez trouvé "+(approved ? "utile" : "inutile") :
+                  "Vous n'avez donné aucun avis"
+          })
+      }
 }
 
 export function calculRequiredXPForNextGrade(grades: IGrade[], level: number, lastGradeIndex: number = grades.length-1): null|number {
@@ -286,6 +304,54 @@ export function approveOrUnApproveTip(member: GuildMember|User, tips: ILevelTip[
         tip[col].push(member.id);
 
     return [...updatedTips, tip, ...tips.slice(1)];
+}
+
+const arrowsTipsButtons: {[id: string]: {
+        level: number;
+        otherButtonId: string;
+        interaction: CommandInteraction;
+    }} = {}
+
+export async function listenXPArrowsTipsButtons(interaction: ButtonInteraction): Promise<boolean> {
+    if (arrowsTipsButtons[interaction.customId] === undefined || !(interaction.guild instanceof Guild) || !(interaction.member instanceof GuildMember))
+        return false;
+
+    const button = arrowsTipsButtons[interaction.customId];
+    delete arrowsTipsButtons[button.otherButtonId];
+    delete arrowsTipsButtons[interaction.customId];
+
+    const XPServerConfig: null|IXPData = await XPData.findOne({
+        serverId: interaction.guild.id,
+        enabled: true
+    });
+
+    if (XPServerConfig === null || !interaction.member.roles.cache.some(role => role.id === XPServerConfig.activeRoleId)) {
+        await button.interaction.editReply("Le système d'XP est soit inactif soit inaccessible");
+        return true;
+    }
+
+    const XPUserConfig: null|IXPUserData = await XPUserData.findOne({
+        serverId: interaction.guild.id,
+        userId: interaction.user.id
+    })
+
+    if (XPUserConfig === null || XPUserConfig.currentLevel > button.level) {
+        await button.interaction.editReply("Vous n'avez pas accès à ce bouton");
+        return true;
+    }
+
+    const tip: null|ILevelTip = findTipByLevel(button.level, XPServerConfig.tipsByLevel);
+
+    if (tip === null) {
+        await button.interaction.editReply("Le tip " + button.level + " n'existe pas");
+        return true;
+    }
+
+    await button.interaction.editReply({
+        embeds: [
+            embedTip(tip, interaction.member)
+        ]
+    })
 }
 
 export async function listenXPTipsUseFulApproveButtons(interaction: ButtonInteraction): Promise<boolean> {
