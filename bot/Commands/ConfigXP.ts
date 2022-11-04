@@ -1,9 +1,8 @@
-import Command from "../Classes/Command";
 import {IArgsModel} from "../interfaces/CommandInterfaces";
 import {
     CommandInteraction,
     EmbedBuilder, EmbedField,
-    Guild, GuildMember, Interaction,
+    Guild, Interaction,
     Message, MessagePayload,
     Role
 } from "discord.js";
@@ -11,9 +10,9 @@ import XPData, {IGrade, ILevelTip, IXPData} from "../Models/XP/XPData";
 import {extractUTCTime, showTime} from "../Classes/DateTimeManager";
 import {
     calculRequiredXPForNextGrade,
-    checkGradesListData, checkTipsListData, embedTip, embedTipsList,
+    checkGradesListData, checkTipsListData,
     findTipByLevel, roleCanBeManaged,
-    setTipByLevel
+    setTipByLevel, showTip, showTipsList
 } from "../Classes/XPFunctions";
 import {round} from "../Classes/OtherFunctions";
 import client from "../client";
@@ -938,21 +937,15 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
     }
 
     async action_tips_show(args: IConfigXPArgs, XPServerConfig: IXPData) {
+        if (this.commandOrigin !== 'slash')
+            return this.response(false, "Vous devez être en commande slash")
         const tip = <ILevelTip>findTipByLevel(<number>args.level, XPServerConfig.tipsByLevel);
 
-        return this.response(true, {
-            embeds: [
-                embedTip(tip)
-            ]
-        })
+        return this.response(true, showTip(XPServerConfig.tipsByLevel, tip, <CommandInteraction>this.interaction))
     }
 
     async action_tips_list(args: IConfigXPArgs, XPServerConfig: IXPData) {
-        return this.response(true, {
-            embeds: [
-                embedTipsList(XPServerConfig.tipsByLevel)
-            ]
-        })
+        return this.response(true, showTipsList(XPServerConfig.tipsByLevel))
     }
 
     async action_tips_show_approves(args: IConfigXPArgs, XPServerConfig: IXPData) {

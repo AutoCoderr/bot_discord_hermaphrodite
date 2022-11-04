@@ -4,8 +4,8 @@ import {
     CategoryChannel, CommandInteraction, EmbedBuilder,
     Guild,
     GuildChannel,
-    GuildMember,
-    Message, Role,
+    GuildMember, InteractionReplyOptions,
+    Message, MessageEditOptions, Role,
     ThreadChannel, User, VoiceBasedChannel,
     VoiceState
 } from "discord.js";
@@ -17,6 +17,7 @@ import XPNotificationAskButton, {
 import XPTipsUsefulAskButton, {IXPTipsUsefulAskButton} from "../Models/XP/XPTipsUsefulAskButton";
 import ConfigXP from "../Commands/ConfigXP";
 import {responseResultType} from "../interfaces/CommandInterfaces";
+import {round} from "./OtherFunctions";
 
 export function setTipByLevel(level: number, content: string, tips: ILevelTip[]): ILevelTip[] {
     return tips.length === 0 ?
@@ -83,7 +84,15 @@ export function findTipByLevel(level: number, tips: ILevelTip[], a = 0, b = tips
     return findTipByLevel(level, tips, m, b)
 }
 
-export function embedTipsList(tips: ILevelTip[], XPUserConfig: null|IXPUserData = null): responseResultType {
+function cleanTipButtons() {
+    const date = new Date();
+    for (const [id, {timestamps}] of Object.entries(arrowsTipsButtons)) {
+        if (date.getTime() - timestamps.getTime() > 5 * 60 * 1000)
+            delete arrowsTipsButtons[id];
+    }
+}
+
+export function showTipsList(tips: ILevelTip[], XPUserConfig: null|IXPUserData = null): responseResultType {
     const filteredTips = XPUserConfig !== null ?
         tips.filter(tip => tip.level <= XPUserConfig.currentLevel) :
         tips;
@@ -110,26 +119,104 @@ export function embedTipsList(tips: ILevelTip[], XPUserConfig: null|IXPUserData 
     }
 }
 
-export function embedTip(tip: ILevelTip, interaction: CommandInteraction, member: GuildMember|null = null): responseResultType {
-      const embed = new EmbedBuilder()
+export function showTip(allTips: ILevelTip[], tip: ILevelTip, interaction: CommandInteraction, XPUserConfig: null|IXPUserData = null): InteractionReplyOptions {
+    const embed = new EmbedBuilder()
         .setTitle("Tip numéro "+tip.level)
         .setFields({
             name: "Voici le tip "+tip.level,
             value: tip.content
         });
 
-      if (member !== null) {
-          const [approved, unApproved] = [
-              tip.userApproves.some(id => id === member.id),
-              tip.userUnapproves.some(id => id === member.id)
-          ]
-          embed.addFields({
-              name: "Votre avis",
-              value: (approved || unApproved) ?
-                  "Vous l'avez trouvé "+(approved ? "utile" : "inutile") :
-                  "Vous n'avez donné aucun avis"
-          })
-      }
+    if (XPUserConfig !== null) {
+        const [approved, unApproved] = [
+            tip.userApproves.some(id => id === XPUserConfig.userId),
+            tip.userUnapproves.some(id => id === XPUserConfig.userId)
+        ]
+        embed.addFields({
+            name: "Votre avis",
+            value: (approved || unApproved) ?
+                "Vous l'avez trouvé "+(approved ? "utile" : "inutile") :
+                "Vous n'avez donné aucun avis"
+        })
+    } else {
+        embed.addFields(
+            {
+                name: "Utilisateurs ayant trouvés ce tip utile :",
+                value: tip.userApproves.length > 0 ?
+                    tip.userApproves.length+" ("+round(tip.userApproves.length / (tip.userApproves.length+tip.userUnapproves.length) * 100, 2)+"%)" :
+                    "0 (0%)"
+            },
+            {
+                name: "Utilisateurs ayant trouvés ce tip inutile :",
+                value: tip.userUnapproves.length ?
+                    tip.userUnapproves.length+" ("+round(tip.userUnapproves.length / (tip.userApproves.length+tip.userUnapproves.length) * 100, 2)+"%)" :
+                    "0 (0%)"
+            })
+    }
+
+    cleanTipButtons();
+
+    const nextTip: undefined|ILevelTip = allTips.find(ATip =>  ATip.level > tip.level && (XPUserConfig === null || ATip.level <= XPUserConfig.currentLevel));
+
+    const nextButton: null|IArrowTipButton = nextTip !== undefined ? {
+        id: (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "nt",
+        level: nextTip.level,
+        interaction,
+        type: 'next',
+        isAdmin: XPUserConfig === null,
+        timestamps: new Date()
+    } : null
+
+    const prevTip: undefined|ILevelTip = allTips.reverse().find(ATip => ATip.level < tip.level);
+
+    const prevButton: null|IArrowTipButton = prevTip !== undefined ? {
+        id: (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "pt",
+        level: prevTip.level,
+        interaction,
+        type: 'prev',
+        isAdmin: XPUserConfig === null,
+        otherButtonId: nextButton ? nextButton.id : undefined,
+        timestamps: new Date()
+    } : null
+
+    if (nextButton && prevButton)
+        nextButton.otherButtonId = prevButton.id
+
+    if (prevButton)
+        arrowsTipsButtons[prevButton.id] = prevButton;
+    if (nextButton)
+        arrowsTipsButtons[nextButton.id] = nextButton;
+
+    //@ts-ignore
+    return {
+        embeds: [
+            embed
+        ],
+        ...(
+            (prevButton || nextButton) ? {
+                components: [
+                    new ActionRowBuilder().addComponents(
+                        (<IArrowTipButton[]>[prevButton,nextButton]
+                            .filter(b => b !== null))
+                            .map((b) =>
+                                new ButtonBuilder()
+                                    .setCustomId(b.id)
+                                    .setLabel(
+                                        (
+                                            b.type === "prev" ?
+                                                b.level === 1 ?
+                                                "Premier" :
+                                                    "Précedant" :
+                                                "Suivant"
+                                        )+" ("+b.level+")"
+                                    )
+                                    .setStyle(ButtonStyle.Primary),
+                            )
+                    )
+                ]
+            } : {}
+        )
+    }
 }
 
 export function calculRequiredXPForNextGrade(grades: IGrade[], level: number, lastGradeIndex: number = grades.length-1): null|number {
@@ -306,18 +393,27 @@ export function approveOrUnApproveTip(member: GuildMember|User, tips: ILevelTip[
     return [...updatedTips, tip, ...tips.slice(1)];
 }
 
-const arrowsTipsButtons: {[id: string]: {
-        level: number;
-        otherButtonId: string;
-        interaction: CommandInteraction;
-    }} = {}
+interface IArrowTipButton {
+    id: string;
+    level: number;
+    otherButtonId?: string;
+    type: 'prev'|'next';
+    isAdmin: boolean;
+    interaction: CommandInteraction;
+    timestamps: Date;
+}
+
+const arrowsTipsButtons: {[id: string]: IArrowTipButton} = {}
 
 export async function listenXPArrowsTipsButtons(interaction: ButtonInteraction): Promise<boolean> {
     if (arrowsTipsButtons[interaction.customId] === undefined || !(interaction.guild instanceof Guild) || !(interaction.member instanceof GuildMember))
         return false;
 
+    cleanTipButtons();
+
     const button = arrowsTipsButtons[interaction.customId];
-    delete arrowsTipsButtons[button.otherButtonId];
+    if (button.otherButtonId)
+        delete arrowsTipsButtons[button.otherButtonId];
     delete arrowsTipsButtons[interaction.customId];
 
     const XPServerConfig: null|IXPData = await XPData.findOne({
@@ -325,18 +421,23 @@ export async function listenXPArrowsTipsButtons(interaction: ButtonInteraction):
         enabled: true
     });
 
-    if (XPServerConfig === null || !interaction.member.roles.cache.some(role => role.id === XPServerConfig.activeRoleId)) {
-        await button.interaction.editReply("Le système d'XP est soit inactif soit inaccessible");
+    if (XPServerConfig === null ||
+        (
+            !button.isAdmin &&
+            !interaction.member.roles.cache.some(role => role.id === XPServerConfig.activeRoleId)
+        )
+    ) {
+        await button.interaction.editReply("Le système d'XP est soit inactif ou inaccessible");
         return true;
     }
 
-    const XPUserConfig: null|IXPUserData = await XPUserData.findOne({
+    const XPUserConfig: null|IXPUserData = !button.isAdmin ? await XPUserData.findOne({
         serverId: interaction.guild.id,
         userId: interaction.user.id
-    })
+    }) : null
 
-    if (XPUserConfig === null || XPUserConfig.currentLevel > button.level) {
-        await button.interaction.editReply("Vous n'avez pas accès à ce bouton");
+    if (!button.isAdmin && (XPUserConfig === null || button.level > XPUserConfig.currentLevel)) {
+        await button.interaction.editReply("Vous n'avez pas accès à ce tip");
         return true;
     }
 
@@ -347,11 +448,10 @@ export async function listenXPArrowsTipsButtons(interaction: ButtonInteraction):
         return true;
     }
 
-    await button.interaction.editReply({
-        embeds: [
-            embedTip(tip, interaction.member)
-        ]
-    })
+    await interaction.deleteReply();
+    await button.interaction.editReply(showTip(XPServerConfig.tipsByLevel, tip, button.interaction, XPUserConfig));
+
+    return true;
 }
 
 export async function listenXPTipsUseFulApproveButtons(interaction: ButtonInteraction): Promise<boolean> {

@@ -1,7 +1,7 @@
 import {CommandInteraction, EmbedBuilder, Guild, Message} from "discord.js";
 import {IArgsModel} from "../interfaces/CommandInterfaces";
 import AbstractXP from "./AbstractXP";
-import {embedTip, embedTipsList, enableOrDisableUserNotification, findTipByLevel} from "../Classes/XPFunctions";
+import {enableOrDisableUserNotification, findTipByLevel, showTip, showTipsList} from "../Classes/XPFunctions";
 import {ILevelTip, IXPData} from "../Models/XP/XPData";
 import XPUserData, {IXPUserData} from "../Models/XP/XPUserData";
 
@@ -123,20 +123,15 @@ export default class XP extends AbstractXP<IXPArgs> {
     }
 
     async action_tips(args: IXPArgs, XPServerConfig: IXPData, XPUserConfig: IXPUserData) {
+        if (this.commandOrigin !== 'slash')
+            return this.response(false, "Vous devez être en commande slash");
+
         if (args.level === undefined)
-            return this.response(true, {
-                embeds: [
-                    embedTipsList(XPServerConfig.tipsByLevel, XPUserConfig)
-                ]
-            })
+            return this.response(true, showTipsList(XPServerConfig.tipsByLevel, XPUserConfig))
 
         const tip = <ILevelTip>findTipByLevel(args.level, XPServerConfig.tipsByLevel);
 
-        return this.response(true, {
-            embeds: [
-                embedTip(tip, this.member)
-            ]
-        })
+        return this.response(true, showTip(XPServerConfig.tipsByLevel, tip, <CommandInteraction>this.interaction, XPUserConfig));
     }
 
     async action_notif(args: IXPArgs, XPServerConfig: IXPData, XPUserConfig: IXPUserData) {

@@ -10,7 +10,7 @@ import reportError from "./logging/reportError";
 import {
     listenUserXPFirstMessages,
     listenUserXPMessages,
-    listenUserXPVocal,
+    listenUserXPVocal, listenXPArrowsTipsButtons,
     listenXPNotificationAskButtons, listenXPTipsUseFulApproveButtons
 } from "./Classes/XPFunctions";
 
@@ -52,7 +52,8 @@ export default function init(bot) {
                             listenAskInviteBackButtons(interaction, 'text'),
                             listenAskInviteBackButtons(interaction, 'vocal'),
                             listenXPNotificationAskButtons(interaction),
-                            listenXPTipsUseFulApproveButtons(interaction)
+                            listenXPTipsUseFulApproveButtons(interaction),
+                            listenXPArrowsTipsButtons(interaction)
                         ]).then(responses => !responses.includes(true))) {
                             await interaction.editReply({content: "Bouton invalide"});
                         }
