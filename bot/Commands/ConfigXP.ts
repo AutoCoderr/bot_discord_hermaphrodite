@@ -33,7 +33,7 @@ interface IConfigXPArgs {
     setOrShowSubAction: 'set'|'show';
     XPActionTypes: 'vocal'|'message'|'first_message'|'bump';
     XPActionTypesToLimit: 'vocal'|'message';
-    tipsSubActions: 'list'|'show'|'set'|'delete'|'show_approves'|'export'|'import';
+    tipsSubActions: 'list'|'show'|'set'|'delete'|'export'|'import';
     gradesSubActions:
         'add'|
         'list'|
@@ -127,7 +127,6 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                     set: "Définir un tips",
                     delete: "Supprimer un tips",
                     list: "Lister les tips",
-                    show_approves: "Afficher les avis utilisateurs sur un tip",
                     export: "Exporter les tips dans un fichier json",
                     import: "Importer les tips à partir d'un fichier json"
                 }
@@ -207,7 +206,7 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                 }
             },
             level: {
-                referToSubCommands: ['tips.show', 'tips.delete', 'tips.set','tips.show_approves','grades.add','grades.insert','grades.set_level'],
+                referToSubCommands: ['tips.show', 'tips.delete', 'tips.set','grades.add','grades.insert','grades.set_level'],
                 type: "overZeroInteger",
                 evenCheckAndExtractForSlash: true,
                 description: "Rentrez une valeur",
@@ -946,31 +945,6 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
 
     async action_tips_list(args: IConfigXPArgs, XPServerConfig: IXPData) {
         return this.response(true, showTipsList(XPServerConfig.tipsByLevel))
-    }
-
-    async action_tips_show_approves(args: IConfigXPArgs, XPServerConfig: IXPData) {
-        const tip = <ILevelTip>findTipByLevel(<number>args.level, XPServerConfig.tipsByLevel);
-
-        return this.response(true, {
-            embeds: [
-                new EmbedBuilder()
-                    .setTitle("Avis utilisateurs sur le tip "+args.level)
-                    .setFields(
-                        {
-                            name: "Utilisateurs ayant trouvés ce tip utile :",
-                            value: tip.userApproves.length > 0 ?
-                                tip.userApproves.length+" ("+round(tip.userApproves.length / (tip.userApproves.length+tip.userUnapproves.length) * 100, 2)+"%)" :
-                                "0 (0%)"
-                        },
-                        {
-                            name: "Utilisateurs ayant trouvés ce tip inutile :",
-                            value: tip.userUnapproves.length ?
-                                tip.userUnapproves.length+" ("+round(tip.userUnapproves.length / (tip.userApproves.length+tip.userUnapproves.length) * 100, 2)+"%)" :
-                                "0 (0%)"
-                        }
-                    )
-            ]
-        })
     }
 
     async action_first_message_time(args: IConfigXPArgs, XPServerConfig: IXPData) {
