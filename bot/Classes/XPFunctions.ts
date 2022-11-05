@@ -206,7 +206,7 @@ export function showTip(allTips: ILevelTip[], tip: ILevelTip, interaction: Comma
                                             b.type === "prev" ?
                                                 b.level === 1 ?
                                                 "Premier" :
-                                                    "Précedant" :
+                                                    "Précédant" :
                                                 "Suivant"
                                         )+" ("+b.level+")"
                                     )
@@ -409,8 +409,6 @@ export async function listenXPArrowsTipsButtons(interaction: ButtonInteraction):
     if (arrowsTipsButtons[interaction.customId] === undefined || !(interaction.guild instanceof Guild) || !(interaction.member instanceof GuildMember))
         return false;
 
-    cleanTipButtons();
-
     const button = arrowsTipsButtons[interaction.customId];
     if (button.otherButtonId)
         delete arrowsTipsButtons[button.otherButtonId];
@@ -421,13 +419,19 @@ export async function listenXPArrowsTipsButtons(interaction: ButtonInteraction):
         enabled: true
     });
 
+    await interaction.deleteReply();
+
     if (XPServerConfig === null ||
         (
             !button.isAdmin &&
             !interaction.member.roles.cache.some(role => role.id === XPServerConfig.activeRoleId)
         )
     ) {
-        await button.interaction.editReply("Le système d'XP est soit inactif ou inaccessible");
+        await button.interaction.editReply({
+            content: "Le système d'XP est soit inactif ou inaccessible",
+            components: [],
+            embeds: []
+        });
         return true;
     }
 
@@ -437,18 +441,25 @@ export async function listenXPArrowsTipsButtons(interaction: ButtonInteraction):
     }) : null
 
     if (!button.isAdmin && (XPUserConfig === null || button.level > XPUserConfig.currentLevel)) {
-        await button.interaction.editReply("Vous n'avez pas accès à ce tip");
+        await button.interaction.editReply({
+            content: "Vous n'avez pas accès à ce tip",
+            components: [],
+            embeds: []
+        });
         return true;
     }
 
     const tip: null|ILevelTip = findTipByLevel(button.level, XPServerConfig.tipsByLevel);
 
     if (tip === null) {
-        await button.interaction.editReply("Le tip " + button.level + " n'existe pas");
+        await button.interaction.editReply({
+            content: "Le tip " + button.level + " n'existe pas",
+            components: [],
+            embeds: []
+        });
         return true;
     }
 
-    await interaction.deleteReply();
     await button.interaction.editReply(showTip(XPServerConfig.tipsByLevel, tip, button.interaction, XPUserConfig));
 
     return true;
