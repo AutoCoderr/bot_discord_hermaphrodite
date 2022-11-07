@@ -5,7 +5,7 @@ import {
     Guild,
     GuildChannel,
     GuildMember, InteractionReplyOptions,
-    Message, MessageEditOptions, Role,
+    Message, Role,
     ThreadChannel, User, VoiceBasedChannel,
     VoiceState
 } from "discord.js";

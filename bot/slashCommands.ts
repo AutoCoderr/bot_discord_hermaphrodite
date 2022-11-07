@@ -1,6 +1,6 @@
 import client from "./client";
 import {
-    ApplicationCommand, ApplicationCommandDataResolvable, CommandInteraction,
+    ApplicationCommand, CommandInteraction,
     Guild,
     MessagePayload,
     ApplicationCommandOptionType

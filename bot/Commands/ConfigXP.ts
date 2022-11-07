@@ -14,7 +14,6 @@ import {
     findTipByLevel, roleCanBeManaged,
     setTipByLevel, showTip, showTipsList
 } from "../Classes/XPFunctions";
-import {round} from "../Classes/OtherFunctions";
 import client from "../client";
 import AbstractXP from "./AbstractXP";
 

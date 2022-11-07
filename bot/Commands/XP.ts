@@ -2,11 +2,11 @@ import {CommandInteraction, EmbedBuilder, Guild, Message} from "discord.js";
 import {IArgsModel} from "../interfaces/CommandInterfaces";
 import AbstractXP from "./AbstractXP";
 import {enableOrDisableUserNotification, findTipByLevel, showTip, showTipsList} from "../Classes/XPFunctions";
-import {ILevelTip, IXPData} from "../Models/XP/XPData";
+import {IGrade, ILevelTip, IXPData} from "../Models/XP/XPData";
 import XPUserData, {IXPUserData} from "../Models/XP/XPUserData";
 
 interface IXPArgs {
-    action: 'notif'|'infos'|'tips'|'approve'|'un_approve',
+    action: 'notif'|'info'|'tips'|'approve'|'un_approve',
     notifSubActions: 'show'|'enable'|'disable',
     level?: number;
 }
@@ -39,7 +39,7 @@ export default class XP extends AbstractXP<IXPArgs> {
                 isSubCommand: true,
                 choices: {
                     notif: null,
-                    infos: "Voir les informations (XP, rang, etc...)",
+                    info: "Voir les informations (XP, rang, etc...)",
                     tips: "Voir les tips accessibles, ou un tip donné",
                     approve: "Marquer un tip comme utile",
                     un_approve: "Marquer un tip comme inutile"
@@ -120,6 +120,30 @@ export default class XP extends AbstractXP<IXPArgs> {
         )
 
         return this['action_'+args.action](args,XPServerConfig,XPUserConfig);
+    }
+
+    async action_info(args: IXPArgs, XPServerConfig: IXPData, XPUserConfig: IXPUserData) {
+        const grade: null|IGrade = XPServerConfig.grades.find(grade => (<string>grade._id).toString() === XPUserConfig.gradeId)??null
+        const allSortedXPUserConfigs: IXPUserData[] = await XPUserData.find({
+            serverId: XPUserConfig.serverId
+        }).then(allXPUserConfigs => allXPUserConfigs.sort((a,b) => b.XP - a.XP));
+        const rang: number = allSortedXPUserConfigs.findIndex(XPUserConfig => XPUserConfig.userId === this.member.id) + 1;
+
+        return this.response(true, {
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle("Toutes vos informations")
+                    .setFields({
+                        name: "Voici toutes vos informations :",
+                        value:
+                            "Vous avez "+XPUserConfig.XP+" XP total\n"+
+                            "Vous avez avez gagné "+XPUserConfig.todayXP+" XP aujourd'hui\n"+
+                            "Vous êtes au niveau "+XPUserConfig.currentLevel+"\n"+
+                            (grade ? "Vous êtes au grade '"+grade.name+"'" : "Vous n'êtes dans encore aucun grade")+"\n"+
+                            "Vous êtes numéro "+rang+"/"+allSortedXPUserConfigs.length+" dans le classement"
+                    })
+            ]
+        })
     }
 
     async action_tips(args: IXPArgs, XPServerConfig: IXPData, XPUserConfig: IXPUserData) {
