@@ -21,6 +21,7 @@ interface IConfigXPArgs {
     action:
         'enable'|
         'disable'|
+        'is_enabled'|
         'active_role'|
         'channel_role'|
         'first_message_time'|
@@ -72,6 +73,7 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                 type: "string",
                 description: "Ce que vous souhaitez configurer",
                 choices: {
+                    is_enabled: "Vérifier si le système d'XP est activé ou non sur ce serveur",
                     enable: "Activer le système d'XP",
                     disable: "Désactiver le système d'XP",
                     active_role: "le rôle actif du système d'XP",
@@ -477,6 +479,15 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
 
 
         return this["action_"+args.action](args, XPServerConfig);
+    }
+
+    async action_is_enabled(args: IConfigXPArgs, XPServerConfig: IXPData) {
+        return this.response(true, {
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle("Le système d'XP est "+(XPServerConfig.enabled ? "actif" : "inactif"))
+            ]
+        })
     }
 
     async action_enable(args: IConfigXPArgs, XPServerConfig: IXPData) {
