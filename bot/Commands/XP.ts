@@ -1,7 +1,13 @@
 import {CommandInteraction, EmbedBuilder, Guild, Message} from "discord.js";
 import {IArgsModel} from "../interfaces/CommandInterfaces";
 import AbstractXP from "./AbstractXP";
-import {enableOrDisableUserNotification, findTipByLevel, showTip, showTipsList} from "../Classes/XPFunctions";
+import {
+    approveOrUnApproveTip,
+    enableOrDisableUserNotification,
+    findTipByLevel,
+    showTip,
+    showTipsList
+} from "../Classes/XPFunctions";
 import {IGrade, ILevelTip, IXPData} from "../Models/XP/XPData";
 import XPUserData, {IXPUserData} from "../Models/XP/XPUserData";
 
@@ -59,7 +65,7 @@ export default class XP extends AbstractXP<IXPArgs> {
                 }
             },
             level: {
-                referToSubCommands: ['tips','approves','un_approve'],
+                referToSubCommands: ['tips','approve','un_approve'],
                 type: "overZeroInteger",
                 evenCheckAndExtractForSlash: true,
                 description: "Rentrer un niveau",
@@ -120,6 +126,40 @@ export default class XP extends AbstractXP<IXPArgs> {
         )
 
         return this['action_'+args.action](args,XPServerConfig,XPUserConfig);
+    }
+
+    async action_approve(args: IXPArgs, XPServerConfig: IXPData) {
+        XPServerConfig.tipsByLevel = <ILevelTip[]>approveOrUnApproveTip(this.member, XPServerConfig.tipsByLevel, <number>args.level, true)
+
+        await XPServerConfig.save();
+
+        return this.response(true, {
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle("Action effectuée")
+                    .setFields({
+                        name: "Tip marqué comme utile",
+                        value: "Vous avez marqué ce tip comme utile"
+                    })
+            ]
+        })
+    }
+
+    async action_un_approve(args: IXPArgs, XPServerConfig: IXPData) {
+        XPServerConfig.tipsByLevel = <ILevelTip[]>approveOrUnApproveTip(this.member, XPServerConfig.tipsByLevel, <number>args.level, false)
+
+        await XPServerConfig.save();
+
+        return this.response(true, {
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle("Action effectuée")
+                    .setFields({
+                        name: "Tip marqué comme inutile",
+                        value: "Vous avez marqué ce tip comme inutile"
+                    })
+            ]
+        })
     }
 
     async action_info(args: IXPArgs, XPServerConfig: IXPData, XPUserConfig: IXPUserData) {
