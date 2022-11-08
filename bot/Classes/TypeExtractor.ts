@@ -8,7 +8,7 @@ import {
     Role,
     ThreadChannel,
     VoiceChannel,
-    ChannelType, Attachment
+    ChannelType, Attachment, User
 } from "discord.js";
 import client from "../client";
 import {existingCommands} from "./CommandsDescription";
@@ -84,10 +84,17 @@ export const extractTypes = {
         const emote = client.emojis.cache.get(emoteId);
         return emote ? emote : false;
     },
-    user: async (field, command: Command): Promise<GuildMember|false> => {
+    user: async (field: string|User, command: Command): Promise<GuildMember|false> => {
         if (command.guild == null) return false;
-        let userId = field.split("<@")[1].split(">")[0];
-        if (userId[0] == "!") userId = userId.substring(1);
+
+        let userId;
+        if (field instanceof User) {
+            userId = field.id;
+        } else {
+            userId = field.split("<@")[1].split(">")[0];
+            if (userId[0] == "!") userId = userId.substring(1);
+        }
+
         try {
             return await command.guild.members.fetch(userId);
         } catch(e) {

@@ -1,4 +1,4 @@
-import {CommandInteraction, EmbedBuilder, Guild, Message} from "discord.js";
+import {CommandInteraction, EmbedBuilder, Guild, GuildMember, Message} from "discord.js";
 import {IArgsModel} from "../interfaces/CommandInterfaces";
 import AbstractXP from "./AbstractXP";
 import {
@@ -10,10 +10,12 @@ import {
 } from "../Classes/XPFunctions";
 import {IGrade, ILevelTip, IXPData} from "../Models/XP/XPData";
 import XPUserData, {IXPUserData} from "../Models/XP/XPUserData";
+import XPA from "./XPA";
 
 interface IXPArgs {
-    action: 'notif'|'info'|'tips'|'approve'|'un_approve',
-    notifSubActions: 'show'|'enable'|'disable',
+    action: 'notif'|'info'|'tips'|'approve'|'un_approve';
+    notifSubActions: 'show'|'enable'|'disable';
+    member?: GuildMember;
     level?: number;
 }
 
@@ -26,18 +28,6 @@ export default class XP extends AbstractXP<IXPArgs> {
     static customCommand = false
 
     static slashCommandIdByGuild: {[guildId: string]: string} = {};
-
-    XPUserConfig: IXPUserData|null = null;
-
-    async getXPUserConfig(): Promise<null|IXPUserData> {
-        if (this.XPUserConfig === null)
-            this.XPUserConfig = await XPUserData.findOne({
-                serverId: (<Guild>this.guild).id,
-                userId: this.member.id
-            })
-
-        return this.XPUserConfig;
-    }
 
     static argsModel: IArgsModel<IXPArgs> = {
         $argsByType: {
@@ -95,6 +85,39 @@ export default class XP extends AbstractXP<IXPArgs> {
                         name: "Tip introuvable",
                         value: "Aucun tip associé au niveau "+value+" n'a été trouvé"
                     }
+            },
+            member: {
+                referToSubCommands: ['info'],
+                type: "user",
+                required: false,
+                evenCheckAndExtractForSlash: true,
+                description: "Vous pouvez mentionner un membre (si vous êtes admin)",
+                valid: async (member: GuildMember, args, command: XP) => {
+                    if (!(await XPA.staticCheckPermissions(command.member, command.guild)))
+                        return false;
+
+                    const XPServerConfig = await command.getXPServerConfig();
+
+                    return (
+                        XPServerConfig === null ||
+                        !XPServerConfig.enabled ||
+                        member.roles.cache.some(role => role.id === XPServerConfig.activeRoleId)
+                    )
+                },
+                errorMessage: async (member: GuildMember, args, command: XP) => {
+                    const XPServerConfig = await <Promise<IXPData>>command.getXPServerConfig();
+
+                    if (!member.roles.cache.some(role => role.id === XPServerConfig.activeRoleId))
+                        return {
+                            name: "Utilisateur inaccessible",
+                            value: "Cet utilisateur semble ne pas avoir accès au système d'XP"
+                        }
+
+                    return {
+                        name: "Action impossible",
+                        value: "Vous devez être admin pour pouvoir visionner les informations d'un autre membre"
+                    }
+                }
             }
         }
     }
@@ -163,6 +186,16 @@ export default class XP extends AbstractXP<IXPArgs> {
     }
 
     async action_info(args: IXPArgs, XPServerConfig: IXPData, XPUserConfig: IXPUserData) {
+        XPUserConfig = (args.member !== undefined && args.member.id !== XPUserConfig.userId) ?
+            await this.getXPUserConfig(args.member)
+                .then(XPUserConfig =>
+                    XPUserConfig ?? XPUserData.create({
+                        serverId: (<Guild>this.guild).id,
+                        userId: (<GuildMember>args.member).id
+                    })
+                ) :
+            XPUserConfig
+
         const grade: null|IGrade = XPServerConfig.grades.find(grade => (<string>grade._id).toString() === XPUserConfig.gradeId)??null
         const allSortedXPUserConfigs: IXPUserData[] = await XPUserData.find({
             serverId: XPUserConfig.serverId
@@ -171,17 +204,30 @@ export default class XP extends AbstractXP<IXPArgs> {
 
         return this.response(true, {
             embeds: [
-                new EmbedBuilder()
-                    .setTitle("Toutes vos informations")
-                    .setFields({
-                        name: "Voici toutes vos informations :",
-                        value:
-                            "Vous avez "+XPUserConfig.XP+" XP total\n"+
-                            "Vous avez avez gagné "+XPUserConfig.todayXP+" XP aujourd'hui\n"+
-                            "Vous êtes au niveau "+XPUserConfig.currentLevel+"\n"+
-                            (grade ? "Vous êtes au grade '"+grade.name+"'" : "Vous n'êtes dans encore aucun grade")+"\n"+
-                            "Vous êtes numéro "+rang+"/"+allSortedXPUserConfigs.length+" dans le classement"
-                    })
+                (args.member && args.member.id !== this.member.id) ?
+                    new EmbedBuilder()
+                        .setTitle("Toutes les information de "+(args.member.nickname??args.member.user.username))
+                        .setFields({
+                            name: "Voici toutes les informations de "+(args.member.nickname??args.member.user.username)+":",
+                            value:
+                                "Il possède "+XPUserConfig.XP+" XP total\n"+
+                                "Il a gagné "+XPUserConfig.todayXP+" XP aujourd'hui\n"+
+                                "Il est au niveau "+XPUserConfig.currentLevel+"\n"+
+                                (grade ? "Il est au grade '"+grade.name+"'" : "Il n'est dans encore aucun grade")+"\n"+
+                                "Il est numéro "+rang+"/"+allSortedXPUserConfigs.length+" dans le classement"
+                        })
+                    :
+                    new EmbedBuilder()
+                        .setTitle("Toutes vos informations")
+                        .setFields({
+                            name: "Voici toutes vos informations :",
+                            value:
+                                "Vous avez "+XPUserConfig.XP+" XP total\n"+
+                                "Vous avez avez gagné "+XPUserConfig.todayXP+" XP aujourd'hui\n"+
+                                "Vous êtes au niveau "+XPUserConfig.currentLevel+"\n"+
+                                (grade ? "Vous êtes au grade '"+grade.name+"'" : "Vous n'êtes dans encore aucun grade")+"\n"+
+                                "Vous êtes numéro "+rang+"/"+allSortedXPUserConfigs.length+" dans le classement"
+                        })
             ]
         })
     }

@@ -1,5 +1,5 @@
 import {durationUnits} from "./DateTimeManager";
-import {Attachment} from "discord.js";
+import {Attachment, User} from "discord.js";
 
 export const checkTypes = {
     number: field => typeof(field) === "number",
@@ -19,7 +19,7 @@ export const checkTypes = {
     category: field => (checkTypes.number(field) || checkTypes.string(field)) && new RegExp("^( )*[0-9]{18,}( )*$").test(field.toString()),
     channel: field => checkTypes.string(field) && new RegExp("^( )*"+regex.channel+"( )*$").test(field),
     channels: field => checkTypes.string(field) && new RegExp("^( )*"+regex.channel+"( )*(\,?( )*"+regex.channel+"( )*)*$").test(field),
-    user: field => checkTypes.string(field) && new RegExp("^( )*"+regex.user+"( )*$").test(field),
+    user: field => field instanceof User || (checkTypes.string(field) && new RegExp("^( )*"+regex.user+"( )*$").test(field)),
     users: field => checkTypes.string(field) && new RegExp("^( )*"+regex.user+"( )*(\,?( )*"+regex.user+"( )*)*$").test(field),
     role: field => checkTypes.string(field) && new RegExp("^( )*"+regex.role+"( )*$").test(field),
     roles: field => checkTypes.string(field) && (new RegExp("^( )*"+regex.role+"( )*(\,?( )*"+regex.role+"( )*)*$").test(field) || field.trim() == ""),
