@@ -12,7 +12,7 @@ type RequireAtLeastOne<T, Keys extends keyof T = keyof T> =
     [K in Keys]-?: Required<Pick<T, K>> & Partial<Pick<T, Exclude<Keys, K>>>
 }[Keys];
 
-export type IChoice = null|string|((args: IArgs, parentDescription: string) => string);
+export type IChoice<IArgs> = null|string|((args: Partial<IArgs>, parentDescription: string) => string);
 
 type IErrorMessageRes = {name: string, value: string}|Array<{name: string, value: string}>
 
@@ -23,7 +23,7 @@ export type IArgModel<IArgs = {[key: string]: any}, C extends Command = Command>
     required?: boolean|((args: Partial<IArgs>, command: null|C<IArgs>, modelizeSlashCommand: boolean) => boolean|Promise<boolean>);
     description: string|((args: Partial<IArgs>, command: null|C<IArgs>, modelizeSlashCommand: boolean) => string);
     isSubCommand?: boolean;
-    choices?: {[action: string]: IChoice}|string[];
+    choices?: {[action: string]: IChoice<IArgs>}|string[];
     referToSubCommands?: string[];
     displayValidError?: boolean|((args: Partial<IArgs>, command: C<IArgs>) => boolean);
     displayValidErrorEvenIfFound?: boolean|((args: Partial<IArgs>, command: C<IArgs>) => boolean);

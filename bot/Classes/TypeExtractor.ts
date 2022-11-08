@@ -222,5 +222,8 @@ export const extractTypes = {
             strings.push(string);
 
         return strings;
+    },
+    timezone: (field) => {
+        return parseInt(field.match("(\\-|\\+)?(1[0-2]|[0-9])"));
     }
 };

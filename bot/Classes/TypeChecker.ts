@@ -10,6 +10,7 @@ export const checkTypes = {
     string: field => typeof(field) == "string",
     strings: field => typeof(field) == "string",
     boolean: field => typeof(field) == "boolean",
+    timezone: field => (checkTypes.string(field) || checkTypes.number(field)) && new RegExp("^(GMT|UTC|utc|gmt)?(\\-|\\+)?(1[0-2]|[0-9])$").test(field),
     unicode: field => checkTypes.string(field) && new RegExp("^[^\u0000-\u007F]+$").test(field),
     id: field => (checkTypes.number(field) || checkTypes.string(field)) && new RegExp("^( )*[0-9]{18,}( )*$").test(field.toString()),
     emote: field => checkTypes.string(field) && (new RegExp("^( )*\<(a)?\:[a-zA-Z0-9_-]{2,18}\:[0-9]{18,}\>( )*$").test(field) || checkTypes.unicode(field)),

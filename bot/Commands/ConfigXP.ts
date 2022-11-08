@@ -29,7 +29,8 @@ interface IConfigXPArgs {
         'xp_gain_set'|
         'limit_gain_set'|
         'tips'|
-        'grades';
+        'grades'|
+        'timezone';
     setOrShowSubAction: 'set'|'show';
     XPActionTypes: 'vocal'|'message'|'first_message'|'bump';
     XPActionTypesToLimit: 'vocal'|'message';
@@ -54,6 +55,7 @@ interface IConfigXPArgs {
     name: string;
     gradeNumber: number;
     jsonFile: any;
+    timezone: number;
 }
 
 export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
@@ -83,11 +85,12 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                     xp_gain_set: "Définir le taux d'XP",
                     limit_gain_set: "Définir la limite de gain d'XP",
                     grades: null,
-                    tips: null
+                    tips: null,
+                    timezone: "le créneau horaire"
                 }
             },
             setOrShowSubAction: {
-                referToSubCommands: ['active_role','channel_role', 'first_message_time'],
+                referToSubCommands: ['active_role','channel_role', 'first_message_time', 'timezone'],
                 isSubCommand: true,
                 type: "string",
                 description: "Quelle type d'action effectuer ?",
@@ -453,6 +456,12 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                 type: "jsonFile",
                 description: "Le fichier json à importer",
                 evenCheckAndExtractForSlash: true
+            },
+            timezone: {
+                referToSubCommands: ['timezone.set'],
+                type: "timezone",
+                description: "Le créneau horaire à renseigner (Ex: 1, UTC+1, 2, UTC+2, -3, UTC-3)",
+                evenCheckAndExtractForSlash: true
             }
         }
     }
@@ -529,6 +538,34 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                     .setFields({
                         name: "Désactiver système d'XP",
                         value: "Fonctionnalité désactivée avec succès !"
+                    })
+            ]
+        })
+    }
+
+    async action_timezone(args: IConfigXPArgs, XPServerConfig: IXPData) {
+        if (args.setOrShowSubAction === "show")
+            return this.response(true, {
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("Le créneau horaire")
+                        .setFields({
+                            name: "Le créneau horaire configuré est :",
+                            value: "UTC"+(XPServerConfig.timezone >= 0 ? "+" : "")+XPServerConfig.timezone
+                        })
+                ]
+            })
+
+        XPServerConfig.timezone = args.timezone;
+        await XPServerConfig.save();
+
+        return this.response(true, {
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle("Créneau horaire sauvegardé")
+                    .setFields({
+                        name: "Créneau horaire sauvegardé",
+                        value: "Le créneau horaire a été sauvegardé avec succès!"
                     })
             ]
         })
@@ -967,7 +1004,7 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                         .setTitle("Heure minimale du premier message")
                         .setFields({
                             name: "Heure configurée :",
-                            value: showTime(extractUTCTime(XPServerConfig.firstMessageTime+timezoneHourGap), 'fr')
+                            value: showTime(extractUTCTime(XPServerConfig.firstMessageTime + timezoneHourGap), 'fr')
                         })
                 ]
             })
