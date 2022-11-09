@@ -7,7 +7,7 @@ import XPUserData, {IXPUserData} from "../Models/XP/XPUserData";
 interface IXPAArgs {
     action: 'set'|'give'|'reset'|'show';
     XP_to_set: number;
-    XP: number;
+    XP_to_give: number;
     member: GuildMember;
 }
 
@@ -33,22 +33,11 @@ export default class XPA extends AbstractXP<IXPAArgs> {
                     reset: "Remettre les XP d'un membre à 0"
                 }
             },
-            XP_to_set: {
-                referToSubCommands: ['set'],
-                type: "positiveInteger",
-                evenCheckAndExtractForSlash: true,
-                description: "Rentrez des XP"
-            },
-            XP: {
-                referToSubCommands: ['give'],
-                type: "integer",
-                evenCheckAndExtractForSlash: true,
-                description: "Rentrez des XP"
-            },
             member: {
                 referToSubCommands: ['set','give','reset'],
                 type: "user",
                 description: "Mentionnez un membez",
+                evenCheckAndExtractForSlash: true,
                 valid: async (member: GuildMember, _, command: XPA) => {
                     const XPServerConfig = await command.getXPServerConfig({enabled: true});
 
@@ -60,6 +49,26 @@ export default class XPA extends AbstractXP<IXPAArgs> {
                 errorMessage: () => ({
                     name: "Utilisateur inaccessible",
                     value: "Cet utilisateur semble ne pas avoir accès au système d'XP"
+                })
+            },
+            XP_to_give: {
+                referToSubCommands: ['give'],
+                type: "integer",
+                evenCheckAndExtractForSlash: true,
+                description: "Rentrez des XP",
+                errorMessage: () => ({
+                    name: "Valeur incorrecte",
+                    value: "Vous devez rentrer un entier relatif"
+                })
+            },
+            XP_to_set: {
+                referToSubCommands: ['set'],
+                type: "positiveInteger",
+                evenCheckAndExtractForSlash: true,
+                description: "Rentrez des XP",
+                errorMessage: () => ({
+                    name: "Valeur incorrecte",
+                    value: "Vous devez rentrer un entier naturel"
                 })
             }
         },
@@ -79,7 +88,7 @@ export default class XPA extends AbstractXP<IXPAArgs> {
                         .setTitle("Fonctionalité désactivée")
                         .setFields({
                             name: "Système d'XP désactivé",
-                            value: "Vous ne pouvez pas utiliser cette commande avec le système d'XP désactiver"
+                            value: "Vous ne pouvez pas utiliser cette commande avec le système d'XP désactivé"
                         })
                 ]
             })
@@ -107,7 +116,7 @@ export default class XPA extends AbstractXP<IXPAArgs> {
     }
 
     async action_set(args: IXPAArgs, XPServerConfig: IXPData, XPUserConfig: IXPUserData) {
-        XPUserConfig.todayXP -= Math.max(0,XPUserConfig.XP - args.XP_to_set)
+        XPUserConfig.todayXP = Math.max(0, XPUserConfig.todayXP + (args.XP_to_set - XPUserConfig.XP))
         XPUserConfig.XP = args.XP_to_set;
 
         await XPUserConfig.save();
@@ -116,8 +125,10 @@ export default class XPA extends AbstractXP<IXPAArgs> {
     }
 
     async action_give(args: IXPAArgs, XPServerConfig: IXPData, XPUserConfig: IXPUserData) {
-        XPUserConfig.todayXP = Math.max(0, XPUserConfig.todayXP + args.XP);
-        XPUserConfig.XP = Math.max(0, XPUserConfig.XP + args.XP);
+        XPUserConfig.todayXP = Math.max(0, XPUserConfig.todayXP + args.XP_to_give);
+        XPUserConfig.XP = Math.max(0, XPUserConfig.XP + args.XP_to_give);
+
+        await XPUserConfig.save();
 
         return this.responseXPSet(XPUserConfig);
     }
@@ -125,6 +136,8 @@ export default class XPA extends AbstractXP<IXPAArgs> {
     async action_reset(args: IXPAArgs, XPServerConfig: IXPData, XPUserConfig: IXPUserData) {
         XPUserConfig.todayXP = 0;
         XPUserConfig.XP = 0;
+
+        await XPUserConfig.save();
 
         return this.responseXPSet(XPUserConfig);
     }

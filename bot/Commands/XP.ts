@@ -93,7 +93,7 @@ export default class XP extends AbstractXP<IXPArgs> {
                 evenCheckAndExtractForSlash: true,
                 description: "Vous pouvez mentionner un membre (si vous êtes admin)",
                 valid: async (member: GuildMember, args, command: XP) => {
-                    if (!(await XPA.staticCheckPermissions(command.member, command.guild)))
+                    if (member.id !== command.member.id && !(await XPA.staticCheckPermissions(command.member, command.guild)))
                         return false;
 
                     const XPServerConfig = await command.getXPServerConfig();
@@ -200,7 +200,7 @@ export default class XP extends AbstractXP<IXPArgs> {
         const allSortedXPUserConfigs: IXPUserData[] = await XPUserData.find({
             serverId: XPUserConfig.serverId
         }).then(allXPUserConfigs => allXPUserConfigs.sort((a,b) => b.XP - a.XP));
-        const rang: number = allSortedXPUserConfigs.findIndex(XPUserConfig => XPUserConfig.userId === this.member.id) + 1;
+        const rang: number = allSortedXPUserConfigs.findIndex(AXPUserConfig => AXPUserConfig.userId === XPUserConfig.userId) + 1;
 
         return this.response(true, {
             embeds: [

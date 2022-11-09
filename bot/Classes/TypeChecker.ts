@@ -3,7 +3,7 @@ import {Attachment, User} from "discord.js";
 
 export const checkTypes = {
     number: field => typeof(field) === "number",
-    integer: field => checkTypes.number(field) && field%1 === 0,
+    integer: field => checkTypes.number(field) && field % 1 === 0,
     positiveInteger: field => checkTypes.integer(field) && field >= 0,
     jsonFile: field => field instanceof Attachment,
     overZeroInteger: field => checkTypes.integer(field) && field > 0,

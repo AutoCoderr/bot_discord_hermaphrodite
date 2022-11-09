@@ -15,7 +15,6 @@ import HistoryExec from "../Commands/HistoryExec";
 import HistoryCmd from "../Commands/HistoryCmd";
 import ListNotifyOnReact from "../Commands/ListNotifyOnReact";
 import {IArgsModel} from "../interfaces/CommandInterfaces";
-import {IGrade, ILevelTip} from "../Models/XP/XPData";
 
 export function addMissingZero(number, n = 2) {
     number = number.toString();
