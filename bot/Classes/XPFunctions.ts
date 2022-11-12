@@ -576,17 +576,17 @@ export function roleCanBeManaged(guild: Guild, roleOrRoleId: Role|string) {
 async function detectUpgrade(member: GuildMember, XPUserConfig: IXPUserData, XPServerConfig: IXPData): Promise<null|IGrade> {
     const grade = <null|IGrade>XPServerConfig.grades.reverse().find(grade => XPUserConfig.XP >= grade.requiredXP) ?? null;
 
-    if (grade === null || (<string>grade._id).toString() === XPUserConfig.gradeId)
-        return grade;
-
     let currentGrade: undefined|IGrade;
     if (
         XPUserConfig.gradeId !== undefined &&
         (currentGrade = XPServerConfig.grades.find(grade => grade._id == XPUserConfig.gradeId)) &&
-        currentGrade.roleId !== grade.roleId &&
+        (grade === null || currentGrade.roleId !== grade.roleId) &&
         roleCanBeManaged(member.guild, currentGrade.roleId)
     )
         await member.roles.remove(currentGrade.roleId);
+
+    if (grade === null || (<string>grade._id).toString() === XPUserConfig.gradeId)
+        return grade;
 
     if (
         (currentGrade === undefined || currentGrade.roleId !== grade.roleId) &&
@@ -599,12 +599,33 @@ async function detectUpgrade(member: GuildMember, XPUserConfig: IXPUserData, XPS
     return grade;
 }
 
-async function detectUplevel(member: GuildMember, XPUserConfig: IXPUserData, XPServerConfig: IXPData, grade: IGrade): Promise<void> {
+async function detectUplevel(member: GuildMember, XPUserConfig: IXPUserData, XPServerConfig: IXPData, grade: IGrade, setByAdmin: boolean): Promise<void> {
+    const oldCurrentLevel = XPUserConfig.currentLevel;
     XPUserConfig.currentLevel = grade.atLevel + Math.floor((XPUserConfig.XP - grade.requiredXP)/grade.XPByLevel);
+    if (XPUserConfig.lastNotifiedLevel > XPUserConfig.currentLevel)
+        XPUserConfig.lastNotifiedLevel = XPUserConfig.currentLevel;
+
+    if (setByAdmin && XPUserConfig.currentLevel < oldCurrentLevel && XPUserConfig.DMEnabled) {
+        try {
+            await member.send({
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("XP réduits")
+                        .setFields({
+                            name: "XPs réduits par un administrateur",
+                            value: "Un administrateur a réduit vos XP sur le serveur '"+member.guild.name+"', vous êtes désormais au niveau "+XPUserConfig.currentLevel
+                        })
+                ]
+            })
+        } catch (_) {}
+    }
+
+    if (XPUserConfig.currentLevel <= oldCurrentLevel)
+        return;
 
     for (let level=XPUserConfig.lastNotifiedLevel+1;level<=XPUserConfig.currentLevel;level++) {
-        if (level > 1 && !XPUserConfig.DMEnabled)
-            return;
+        if (level > 1 && (!XPUserConfig.DMEnabled || setByAdmin))
+            break;
 
         const tip = findTipByLevel(level, XPServerConfig.tipsByLevel);
         if (level > 1 && tip === null)
@@ -625,12 +646,63 @@ async function detectUplevel(member: GuildMember, XPUserConfig: IXPUserData, XPS
         }
         XPUserConfig.lastNotifiedLevel = level;
     }
+
+    if (XPUserConfig.DMEnabled && setByAdmin && XPUserConfig.currentLevel > XPUserConfig.lastNotifiedLevel) {
+        const tipsToNotify: number[] = [];
+        for (let level=XPUserConfig.lastNotifiedLevel+1;level<=XPUserConfig.currentLevel;level++) {
+            if (findTipByLevel(level, XPServerConfig.tipsByLevel))
+                tipsToNotify.push(level);
+        }
+
+        XPUserConfig.lastNotifiedLevel = XPUserConfig.currentLevel;
+
+        try {
+            await member.send({
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("XPs ajoutés")
+                        .setFields([
+                            {
+                                name: "XPs ajoutés par un administrateur",
+                                value: "Un administrateur vous a ajouté des XPs sur le serveur '"+member.guild.name+"', vous êtes désormais au niveau "+XPUserConfig.currentLevel
+                            },
+                            ...(
+                                tipsToNotify.length > 0 ? [{
+                                    name: "Vous avez désormais accès aux tips des niveaux suivants :",
+                                    value: tipsToNotify.map(level => "Niveau "+level).join("\n")
+                                }] : []
+                            )
+                        ])
+                ]
+            })
+        } catch (_) {}
+    }
 }
 
-export async function detectUpgradeAndLevel(member: GuildMember, XPUserConfig: IXPUserData, XPServerConfig: IXPData) {
+export async function detectUpgradeAndLevel(member: GuildMember, XPUserConfig: IXPUserData, XPServerConfig: IXPData, setByAdmin = false) {
+    const oldGradeId = XPUserConfig.gradeId;
     const grade: null|IGrade = await detectUpgrade(member, XPUserConfig, XPServerConfig);
+    if (setByAdmin && grade === null && oldGradeId !== undefined) {
+        XPUserConfig.gradeId = undefined;
+        XPUserConfig.currentLevel = 0;
+        XPUserConfig.lastNotifiedLevel = 0;
+        if (XPUserConfig.DMEnabled) {
+            try {
+                await member.send({
+                    embeds: [
+                        new EmbedBuilder()
+                            .setTitle("XP réduits")
+                            .setFields({
+                                name: "XPs réduits par un administrateur",
+                                value: "Un administrateur a réduit vos XP sur le serveur '"+member.guild.name+"', vous êtes désormais au niveau 0"
+                            })
+                    ]
+                })
+            } catch (_) {}
+        }
+    }
     if (grade !== null)
-        await detectUplevel(member, XPUserConfig, XPServerConfig, grade);
+        await detectUplevel(member, XPUserConfig, XPServerConfig, grade, setByAdmin);
     await XPUserConfig.save();
 }
 

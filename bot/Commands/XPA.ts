@@ -3,6 +3,7 @@ import {CommandInteraction, EmbedBuilder, Guild, GuildMember, Message} from "dis
 import AbstractXP from "./AbstractXP";
 import {IXPData} from "../Models/XP/XPData";
 import XPUserData, {IXPUserData} from "../Models/XP/XPUserData";
+import {detectUpgradeAndLevel} from "../Classes/XPFunctions";
 
 interface IXPAArgs {
     action: 'set'|'give'|'reset'|'show';
@@ -119,7 +120,7 @@ export default class XPA extends AbstractXP<IXPAArgs> {
         XPUserConfig.todayXP = Math.max(0, XPUserConfig.todayXP + (args.XP_to_set - XPUserConfig.XP))
         XPUserConfig.XP = args.XP_to_set;
 
-        await XPUserConfig.save();
+        await detectUpgradeAndLevel(args.member, XPUserConfig, XPServerConfig, true);
 
         return this.responseXPSet(XPUserConfig);
     }
@@ -128,7 +129,7 @@ export default class XPA extends AbstractXP<IXPAArgs> {
         XPUserConfig.todayXP = Math.max(0, XPUserConfig.todayXP + args.XP_to_give);
         XPUserConfig.XP = Math.max(0, XPUserConfig.XP + args.XP_to_give);
 
-        await XPUserConfig.save();
+        await detectUpgradeAndLevel(args.member, XPUserConfig, XPServerConfig, true);
 
         return this.responseXPSet(XPUserConfig);
     }
@@ -137,7 +138,7 @@ export default class XPA extends AbstractXP<IXPAArgs> {
         XPUserConfig.todayXP = 0;
         XPUserConfig.XP = 0;
 
-        await XPUserConfig.save();
+        await detectUpgradeAndLevel(args.member, XPUserConfig, XPServerConfig, true);
 
         return this.responseXPSet(XPUserConfig);
     }
