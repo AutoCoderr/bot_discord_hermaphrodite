@@ -557,6 +557,13 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                 ]
             })
 
+        const msIn24h = 24 * 60 * 60 * 1000;
+
+
+        const newFirstMessageTime = XPServerConfig.firstMessageTime + -1 * (args.timezone-XPServerConfig.timezone) * 60*60*1000;
+        XPServerConfig.firstMessageTime = newFirstMessageTime < 0 ?
+            msIn24h + newFirstMessageTime :
+            newFirstMessageTime % msIn24h;
         XPServerConfig.timezone = args.timezone;
         await XPServerConfig.save();
 
@@ -999,19 +1006,24 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
     async action_first_message_time(args: IConfigXPArgs, XPServerConfig: IXPData) {
         const timezoneHourGap = 60*60*1000 * XPServerConfig.timezone;
 
-        if (args.setOrShowSubAction === "show")
+        const msIn24h = 24 * 60 * 60 * 1000;
+
+        if (args.setOrShowSubAction === "show") {
+            const timeToShow = XPServerConfig.firstMessageTime + timezoneHourGap;
             return this.response(true, {
                 embeds: [
                     new EmbedBuilder()
                         .setTitle("Heure minimale du premier message")
                         .setFields({
                             name: "Heure configurée :",
-                            value: showTime(extractUTCTime(XPServerConfig.firstMessageTime + timezoneHourGap), 'fr')
+                            value: showTime(extractUTCTime(timeToShow < 0 ? msIn24h + timeToShow : timeToShow%msIn24h), 'fr')
                         })
                 ]
             })
+        }
 
-        XPServerConfig.firstMessageTime = args.duration-timezoneHourGap;
+        const timeToSet = args.duration-timezoneHourGap;
+        XPServerConfig.firstMessageTime = timeToSet < 0 ? msIn24h + timeToSet : timeToSet%msIn24h;
         await XPServerConfig.save();
 
         return this.response(true, {
