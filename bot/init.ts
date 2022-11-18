@@ -12,9 +12,10 @@ import {
 } from "./libs/XP/XPOtherFunctions";
 import {listenXPTipsUseFulApproveButtons} from "./libs/XP/tips/tipsOtherFunctions";
 import {listenXPArrowsTipsButtons} from "./libs/XP/tips/tipsBrowsing";
-import {listenUserXPVocal} from "./libs/XP/XPCounting/countingVocalXPs";
-import {listenUserXPMessages} from "./libs/XP/XPCounting/countingMessagesXPs";
-import {listenUserXPFirstMessages} from "./libs/XP/XPCounting/countingFirstMessagesXPs";
+import countingVocalXPs from "./libs/XP/XPCounting/countingVocalXPs";
+import countingMessagesXPs from "./libs/XP/XPCounting/countingMessagesXPs";
+import countingFirstMessagesXPs from "./libs/XP/XPCounting/countingFirstMessagesXPs";
+import countingMidnightMessagesXPs from "./libs/XP/XPCounting/countingMidnightMessagesXPs";
 
 export default function init(bot) {
     client.on('ready', () => {
@@ -95,7 +96,7 @@ export default function init(bot) {
                             user: newState.member??undefined
                         }))
                     })
-                listenUserXPVocal(oldState, newState);
+                countingVocalXPs(oldState, newState);
             })
 
             client.on("messageCreate", async message => {
@@ -107,8 +108,9 @@ export default function init(bot) {
                         //@ts-ignore
                         existingCommands.Text.listenTextMessages(message),
                         (async () => {
-                            await listenUserXPMessages(message);
-                            await listenUserXPFirstMessages(message)
+                            await countingMessagesXPs(message);
+                            await countingFirstMessagesXPs(message);
+                            await countingMidnightMessagesXPs(message);
                         })()
                     ])
                 } catch(e) {

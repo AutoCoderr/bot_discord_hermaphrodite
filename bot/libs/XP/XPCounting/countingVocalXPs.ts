@@ -43,7 +43,7 @@ function countAndGetUnMutedMembers(channel: VoiceBasedChannel, currentMember: Gu
         }), <ICountAndGetUnMutedMembers>{nbUnMutedMembers: 0, lastUnMutedMember: null})
 }
 
-export async function listenUserXPVocal(oldState: VoiceState, newState: VoiceState) {
+export default async function countingVocalXPs(oldState: VoiceState, newState: VoiceState) {
     const member = newState.member;
 
     if (member === null)

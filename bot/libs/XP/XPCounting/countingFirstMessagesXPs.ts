@@ -3,7 +3,7 @@ import {IXPData} from "../../../Models/XP/XPData";
 import {IXPUserData} from "../../../Models/XP/XPUserData";
 import {detectUpgradeAndLevel, getXPUserConfig, XPCanBeCount} from "./countingOtherFunctions";
 
-export async function listenUserXPFirstMessages(message: Message) {
+export default async function countingFirstMessagesXPs(message: Message) {
     const {guild,member,channel} = message;
     if (guild === null || member === null || channel === null)
         return;
