@@ -21,11 +21,12 @@ export async function listenUserXPFirstMessages(message: Message) {
         const currentDateWithoutTime = new Date().getTime()-currentTime;
         const currentFirstDayMessageDate = currentDateWithoutTime + XPServerConfig.firstMessageTime;
 
-        if (
-            date.getTime() < currentFirstDayMessageDate ||
-            XPUserConfig.lastFirstDayMessageTimestamp.getTime() >= currentFirstDayMessageDate
-        )
-            return;
+        if (![currentFirstDayMessageDate-24*60*60*1000, currentFirstDayMessageDate]
+            .some(firstDayMessageDate =>
+                date.getTime() >= firstDayMessageDate &&
+                (<Date>XPUserConfig.lastFirstDayMessageTimestamp).getTime() < firstDayMessageDate
+            ))
+            return
     }
 
     XPUserConfig.lastFirstDayMessageTimestamp = date;

@@ -560,11 +560,13 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
         const msIn24h = 24 * 60 * 60 * 1000;
 
 
-        const newFirstMessageTime = XPServerConfig.firstMessageTime + -1 * (args.timezone-XPServerConfig.timezone) * 60*60*1000;
+        const newFirstMessageTime = XPServerConfig.firstMessageTime + (XPServerConfig.timezone-args.timezone) * 60*60*1000;
         XPServerConfig.firstMessageTime = newFirstMessageTime < 0 ?
             msIn24h + newFirstMessageTime :
             newFirstMessageTime % msIn24h;
+
         XPServerConfig.timezone = args.timezone;
+
         await XPServerConfig.save();
 
         return this.response(true, {
