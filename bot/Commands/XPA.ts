@@ -3,7 +3,7 @@ import {CommandInteraction, EmbedBuilder, Guild, GuildMember, Message} from "dis
 import AbstractXP from "./AbstractXP";
 import {IXPData} from "../Models/XP/XPData";
 import XPUserData, {IXPUserData} from "../Models/XP/XPUserData";
-import {detectUpgradeAndLevel} from "../Classes/XPFunctions";
+import {detectUpgradeAndLevel} from "../libs/XP/XPCounting/countingOtherFunctions";
 
 interface IXPAArgs {
     action: 'set'|'give'|'reset'|'show';

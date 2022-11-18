@@ -309,3 +309,16 @@ export function userHasChannelPermissions(user: GuildMember|User, channel: Guild
 export function round(n, p) {
     return Math.round(n * 10**p)/10**p
 }
+
+export async function deleteMP(user: User, messageId: string) {
+    const dmChannel = user.dmChannel;
+    if (dmChannel === null)
+        return;
+
+    const message: null|Message = await dmChannel.messages.fetch(messageId).catch(() => null);
+
+    if (message === null)
+        return;
+
+    await message.delete();
+}

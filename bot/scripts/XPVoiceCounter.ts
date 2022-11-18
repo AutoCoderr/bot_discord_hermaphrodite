@@ -1,8 +1,8 @@
 import {IXPUserData} from "../Models/XP/XPUserData";
-import {detectUpgradeAndLevel, getXPUserConfig} from "../Classes/XPFunctions";
 import XPData, {IXPData} from "../Models/XP/XPData";
 import client from "../client";
 import {Guild, GuildMember} from "discord.js";
+import {detectUpgradeAndLevel, getXPUserConfig} from "../libs/XP/XPCounting/countingOtherFunctions";
 
 async function countXP(member: GuildMember, XPUserConfig: IXPUserData, XPServerConfig: IXPData) {
     XPUserConfig.XP += XPServerConfig.XPByVocal;

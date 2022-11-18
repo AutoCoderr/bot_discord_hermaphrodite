@@ -2,15 +2,13 @@ import {CommandInteraction, EmbedBuilder, Guild, GuildMember, Message} from "dis
 import {IArgsModel} from "../interfaces/CommandInterfaces";
 import AbstractXP from "./AbstractXP";
 import {
-    approveOrUnApproveTip,
-    enableOrDisableUserNotification,
-    findTipByLevel,
-    showTip,
-    showTipsList
-} from "../Classes/XPFunctions";
+    enableOrDisableUserNotification
+} from "../libs/XP/XPOtherFunctions";
 import {IGrade, ILevelTip, IXPData} from "../Models/XP/XPData";
 import XPUserData, {IXPUserData} from "../Models/XP/XPUserData";
 import XPA from "./XPA";
+import {approveOrUnApproveTip, findTipByLevel} from "../libs/XP/tips/tipsManager";
+import {showTip, showTipsList} from "../libs/XP/tips/tipsBrowsing";
 
 interface IXPArgs {
     action: 'notif'|'info'|'tips'|'approve'|'un_approve';

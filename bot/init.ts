@@ -8,11 +8,13 @@ import {listenCustomCommands} from "./listenCustomCommands";
 import CustomError from "./logging/CustomError";
 import reportError from "./logging/reportError";
 import {
-    listenUserXPFirstMessages,
-    listenUserXPMessages,
-    listenUserXPVocal, listenXPArrowsTipsButtons,
-    listenXPNotificationAskButtons, listenXPTipsUseFulApproveButtons
-} from "./Classes/XPFunctions";
+    listenXPNotificationAskButtons
+} from "./libs/XP/XPOtherFunctions";
+import {listenXPTipsUseFulApproveButtons} from "./libs/XP/tips/tipsOtherFunctions";
+import {listenXPArrowsTipsButtons} from "./libs/XP/tips/tipsBrowsing";
+import {listenUserXPVocal} from "./libs/XP/XPCounting/countingVocalXPs";
+import {listenUserXPMessages} from "./libs/XP/XPCounting/countingMessagesXPs";
+import {listenUserXPFirstMessages} from "./libs/XP/XPCounting/countingFirstMessagesXPs";
 
 export default function init(bot) {
     client.on('ready', () => {

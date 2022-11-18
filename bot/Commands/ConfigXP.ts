@@ -10,12 +10,13 @@ import XPData, {IGrade, ILevelTip, IXPData} from "../Models/XP/XPData";
 import {extractUTCTime, showTime} from "../Classes/DateTimeManager";
 import {
     calculRequiredXPForNextGrade,
-    checkGradesListData, checkTipsListData,
-    findTipByLevel, roleCanBeManaged,
-    setTipByLevel, showTip, showTipsList
-} from "../Classes/XPFunctions";
+    checkGradesListData, roleCanBeManaged,
+} from "../libs/XP/XPOtherFunctions";
 import client from "../client";
 import AbstractXP from "./AbstractXP";
+import {findTipByLevel, setTipByLevel} from "../libs/XP/tips/tipsManager";
+import {checkTipsListData} from "../libs/XP/tips/tipsOtherFunctions";
+import {showTip, showTipsList} from "../libs/XP/tips/tipsBrowsing";
 
 interface IConfigXPArgs {
     action:
@@ -991,6 +992,7 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
     }
 
     async action_tips_list(args: IConfigXPArgs, XPServerConfig: IXPData) {
+        // @ts-ignore
         return this.response(true, showTipsList(XPServerConfig.tipsByLevel))
     }
 
