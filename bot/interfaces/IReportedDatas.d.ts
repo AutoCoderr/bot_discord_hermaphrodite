@@ -54,5 +54,7 @@ export default interface IReportedData {
     ticketConfig?: ITicketConfig,
     listening?: IMessageToListen
 
-    welcomeMessage?: IWelcomeMessage
+    welcomeMessage?: IWelcomeMessage,
+
+    givenStartGradeIndex?: number
 }

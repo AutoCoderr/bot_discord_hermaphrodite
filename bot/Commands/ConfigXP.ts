@@ -9,14 +9,20 @@ import {
 import XPData, {IGrade, ILevelTip, IXPData} from "../Models/XP/XPData";
 import {extractUTCTime, showTime} from "../Classes/DateTimeManager";
 import {
-    calculRequiredXPForNextGrade,
-    checkGradesListData, roleCanBeManaged,
+    roleCanBeManaged,
 } from "../libs/XP/XPOtherFunctions";
 import client from "../client";
 import AbstractXP from "./AbstractXP";
 import {findTipByLevel, setTipByLevel} from "../libs/XP/tips/tipsManager";
 import {checkTipsListData} from "../libs/XP/tips/tipsOtherFunctions";
 import {showTip, showTipsList} from "../libs/XP/tips/tipsBrowsing";
+import {
+    calculRequiredXPForNextGrade,
+    checkAllUsersInGrades,
+    checkGradesListData,
+    reDefineUsersGradeRole
+} from "../libs/XP/gradeCalculs";
+import XP from "./XP";
 
 interface IConfigXPArgs {
     action:
@@ -625,8 +631,15 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                 ]
             })
 
+        const gradesById = XPServerConfig.grades.reduce((acc,grade) => ({
+            ...acc,
+            [<string>grade._id]: grade
+        }), {});
+
         XPServerConfig.grades = args.jsonFile;
         await XPServerConfig.save();
+
+        await checkAllUsersInGrades(<Guild>this.guild, XPServerConfig, 0, gradesById);
 
         const embed = new EmbedBuilder()
             .setTitle("Importation réussie")
@@ -668,6 +681,8 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
 
         await XPServerConfig.save();
 
+        await checkAllUsersInGrades(<Guild>this.guild, XPServerConfig, XPServerConfig.grades.length-1);
+
         const embed = new EmbedBuilder()
             .setTitle("Grade créé")
             .setFields({
@@ -688,6 +703,11 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
     async action_grades_delete(args: IConfigXPArgs, XPServerConfig: IXPData) {
         const deletedGrade = XPServerConfig.grades[args.gradeNumber-1];
 
+        const gradesById = XPServerConfig.grades.reduce((acc,grade) => ({
+            ...acc,
+            [<string>grade._id]: grade
+        }), {})
+
         XPServerConfig.grades.splice(args.gradeNumber-1, 1);
 
         for (let i=0;i<XPServerConfig.grades.length;i++) {
@@ -701,6 +721,8 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
         }
 
         await XPServerConfig.save();
+
+        await checkAllUsersInGrades(<Guild>this.guild, XPServerConfig, Math.max(0,args.gradeNumber-2), gradesById);
 
         return this.response(true, {
             embeds: [
@@ -732,9 +754,14 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
     }
 
     async action_grades_set_role(args: IConfigXPArgs, XPServerConfig: IXPData) {
-        XPServerConfig.grades[args.gradeNumber-1].roleId = args.role.id;
+        if (args.role.id !== XPServerConfig.grades[args.gradeNumber-1].roleId) {
+            const oldRoleId = XPServerConfig.grades[args.gradeNumber - 1].roleId;
+            XPServerConfig.grades[args.gradeNumber - 1].roleId = args.role.id;
 
-        await XPServerConfig.save();
+            await XPServerConfig.save();
+
+            await reDefineUsersGradeRole(<Guild>this.guild, oldRoleId, XPServerConfig.grades[args.gradeNumber - 1]);
+        }
 
         const embed = new EmbedBuilder()
             .setTitle("Role modifié")
@@ -754,13 +781,26 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
     }
 
     async action_grades_set_xp_by_level(args: IConfigXPArgs, XPServerConfig: IXPData) {
-        XPServerConfig.grades[args.gradeNumber-1].XPByLevel = args.XPByLevel;
 
-        for (let i=args.gradeNumber;i<XPServerConfig.grades.length;i++) {
-            XPServerConfig.grades[i].requiredXP = <number>calculRequiredXPForNextGrade(XPServerConfig.grades, XPServerConfig.grades[i].atLevel, i-1)
+        if (args.XPByLevel !== XPServerConfig.grades[args.gradeNumber-1].XPByLevel) {
+            const oldXPByLevel = XPServerConfig.grades[args.gradeNumber - 1].XPByLevel;
+            XPServerConfig.grades[args.gradeNumber - 1].XPByLevel = args.XPByLevel;
+
+            for (let i = args.gradeNumber; i < XPServerConfig.grades.length; i++) {
+                XPServerConfig.grades[i].requiredXP = <number>calculRequiredXPForNextGrade(XPServerConfig.grades, XPServerConfig.grades[i].atLevel, i - 1)
+            }
+
+            await XPServerConfig.save();
+
+            if (oldXPByLevel < args.XPByLevel || args.gradeNumber < XPServerConfig.grades.length)
+                await checkAllUsersInGrades(
+                    <Guild>this.guild,
+                    XPServerConfig,
+                    oldXPByLevel < args.XPByLevel ?
+                        args.gradeNumber - 1 :
+                        args.gradeNumber
+                );
         }
-
-        await XPServerConfig.save();
 
         return this.response(true, {
             embeds: [
@@ -775,13 +815,17 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
     }
 
     async action_grades_set_xp(args: IConfigXPArgs, XPServerConfig: IXPData) {
-        XPServerConfig.grades[args.gradeNumber-1].requiredXP = <number>args.XP;
+        if (args.XP !== XPServerConfig.grades[args.gradeNumber-1].requiredXP) {
+            XPServerConfig.grades[args.gradeNumber - 1].requiredXP = <number>args.XP;
 
-        for (let i=args.gradeNumber;i<XPServerConfig.grades.length;i++) {
-            XPServerConfig.grades[i].requiredXP = <number>calculRequiredXPForNextGrade(XPServerConfig.grades, XPServerConfig.grades[i].atLevel, i-1)
+            for (let i = args.gradeNumber; i < XPServerConfig.grades.length; i++) {
+                XPServerConfig.grades[i].requiredXP = <number>calculRequiredXPForNextGrade(XPServerConfig.grades, XPServerConfig.grades[i].atLevel, i - 1)
+            }
+
+            await XPServerConfig.save();
+
+            await checkAllUsersInGrades(<Guild>this.guild, XPServerConfig);
         }
-
-        await XPServerConfig.save();
 
         return this.response(true, {
             embeds: [
@@ -796,13 +840,24 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
     }
 
     async action_grades_set_level(args: IConfigXPArgs, XPServerConfig: IXPData) {
-        XPServerConfig.grades[args.gradeNumber-1].atLevel = <number>args.level;
+        if (args.level !== XPServerConfig.grades[args.gradeNumber-1].atLevel) {
+            const oldLevel = XPServerConfig.grades[args.gradeNumber - 1].atLevel;
+            XPServerConfig.grades[args.gradeNumber - 1].atLevel = <number>args.level;
 
-        for (let i=args.gradeNumber-1;i<XPServerConfig.grades.length;i++) {
-            XPServerConfig.grades[i].requiredXP = <number>calculRequiredXPForNextGrade(XPServerConfig.grades, XPServerConfig.grades[i].atLevel, i-1)
+            for (let i = args.gradeNumber - 1; i < XPServerConfig.grades.length; i++) {
+                XPServerConfig.grades[i].requiredXP = <number>calculRequiredXPForNextGrade(XPServerConfig.grades, XPServerConfig.grades[i].atLevel, i - 1)
+            }
+
+            await XPServerConfig.save();
+
+            await checkAllUsersInGrades(
+                <Guild>this.guild,
+                XPServerConfig,
+                oldLevel > XPServerConfig.grades[args.gradeNumber - 1].atLevel ?
+                    args.gradeNumber - 1 :
+                    args.gradeNumber - 2
+            )
         }
-
-        await XPServerConfig.save();
 
         return this.response(true, {
             embeds: [
@@ -834,6 +889,8 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
         }
 
         await XPServerConfig.save();
+
+        await checkAllUsersInGrades(<Guild>this.guild, XPServerConfig, args.gradeNumber-1);
 
         const embed = new EmbedBuilder()
             .setTitle("Nouveau grade inséré")

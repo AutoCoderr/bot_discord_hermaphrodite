@@ -13,50 +13,6 @@ import XPNotificationAskButton, {
 import {deleteMP} from "../../Classes/OtherFunctions";
 import {getXPUserConfig} from "./XPCounting/countingOtherFunctions";
 
-export function calculRequiredXPForNextGrade(grades: IGrade[], level: number, lastGradeIndex: number = grades.length-1): null|number {
-    const lastGrade = grades[lastGradeIndex];
-    const lastGradeLevel = lastGradeIndex === 0 ? 1 : lastGrade.atLevel;
-    if (level <= lastGrade.atLevel)
-        return null;
-
-
-    return lastGrade.requiredXP + (level-lastGradeLevel)*lastGrade.XPByLevel
-}
-
-export function checkGradesListData(guild: Guild, grades: any) {
-    return grades instanceof Array &&
-        !grades.some((grade,index) => (
-            typeof(grade) !== "object" ||
-            grade === null ||
-            grade instanceof Array ||
-
-            typeof(grade.atLevel) !== "number" ||
-            grade.atLevel%1 !== 0 ||
-            grade.atLevel <= 0 ||
-
-            (index === 0 && grade.atLevel !== 1) ||
-            (index > 0 && grade.atLevel <= grades[index-1].atLevel) ||
-            (index < grades.length-1 && grade.atLevel >= grades[index+1].atLevel) ||
-
-            typeof(grade.requiredXP) !== "number" ||
-            grade.requiredXP%1 !== 0 ||
-            grade.requiredXP <= 0 ||
-
-            (index > 0 && grade.requiredXP !== calculRequiredXPForNextGrade(grades, grade.atLevel, index-1)) ||
-
-            typeof(grade.XPByLevel) !== "number" ||
-            grade.XPByLevel%1 !== 0 ||
-            grade.XPByLevel <= 0 ||
-
-            typeof(grade.name) !== "string" ||
-            typeof(grade.roleId) !== "string" ||
-
-            guild.roles.cache.get(grade.roleId) === undefined ||
-
-            Object.keys(grade).length > 5
-        ))
-}
-
 export async function listenXPNotificationAskButtons(interaction: ButtonInteraction): Promise<boolean> {
     const button: null|IXPNotificationAskButton = await XPNotificationAskButton.findOne({
         userId: interaction.user.id,
