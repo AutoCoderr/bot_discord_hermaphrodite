@@ -22,7 +22,7 @@ function createMemberSubProcessVoiceCounter(member: GuildMember) {
             const controller = new AbortController();
             const {signal} = controller;
             const process = spawn("node", [
-                "/bot/scripts/XPVoiceCounter.js",
+                "/bot/scripts/XP/XPVoiceCounter.js",
                 member.guild.id,
                 member.id
             ], {signal});

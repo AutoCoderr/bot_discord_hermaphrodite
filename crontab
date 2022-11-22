@@ -1,3 +1,4 @@
 # m h  dom mon dow   command
 0 1 * * 1 /cronjobs/clean_database.sh
+0 */1 * * * /cronjobs/XP/clean_today_xps.sh
 # end of file
