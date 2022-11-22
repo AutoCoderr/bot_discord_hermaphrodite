@@ -15,11 +15,19 @@ export default async function countingMidnightMessagesXPs(message: Message) {
     const lastMessage: null|Message= await channel.messages.fetch({ limit: 2 })
         .then(messages => messages.size >= 2 ? messages.at(1) : null);
 
+    const timezoneConvertedToMs = XPServerConfig.timezone * 60 * 60 * 1000;
+
+    const lastMessageDate = lastMessage !== null ?
+        new Date(lastMessage.createdAt.getTime() + timezoneConvertedToMs) :
+        null;
+
+    const currentMessageDate = new Date(message.createdAt.getTime() + timezoneConvertedToMs);
+
     if (
-        lastMessage !== null &&
-        lastMessage.createdAt.getDate() === message.createdAt.getDate() &&
-        lastMessage.createdAt.getMonth() === message.createdAt.getMonth() &&
-        lastMessage.createdAt.getFullYear() === message.createdAt.getFullYear()
+        lastMessageDate !== null &&
+        lastMessageDate.getUTCDate() === currentMessageDate.getUTCDate() &&
+        lastMessageDate.getUTCMonth() === currentMessageDate.getUTCMonth() &&
+        lastMessageDate.getUTCFullYear() === currentMessageDate.getUTCFullYear()
     )
         return;
 
