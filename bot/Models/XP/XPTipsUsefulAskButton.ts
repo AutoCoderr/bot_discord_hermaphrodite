@@ -1,9 +1,12 @@
 import { Schema } from 'mongoose';
+import IModel from '../../interfaces/IModel';
 import { connect } from "../../Mongo";
 
 const db = connect();
 
-export interface IXPTipsUsefulAskButton {
+export const XPTipsUsefulAskButtonTimeout = 7 * 24 * 60 * 60 * 1000;
+
+export interface IXPTipsUsefulAskButton extends IModel {
     serverId: string;
     userId: string;
     useful: boolean;

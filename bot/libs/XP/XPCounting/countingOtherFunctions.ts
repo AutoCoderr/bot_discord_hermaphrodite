@@ -15,7 +15,7 @@ import XPNotificationAskButton from "../../../Models/XP/XPNotificationAskButton"
 import {findTipByLevel} from "../tips/tipsManager";
 import {sendTip} from "../tips/tipsOtherFunctions";
 
-async function askForNotifications(user: User, serverId, content: string) {
+export async function askForNotifications(user: User, serverId, content: string) {
     const acceptButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "na";
     const denyButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "nd";
 

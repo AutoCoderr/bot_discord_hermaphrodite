@@ -4,7 +4,7 @@ import IModel from "../../interfaces/IModel";
 
 const db = connect();
 
-export const XPNotificationAskButtonTimeout = 7 * 24 * 60 * 60 * 1000
+export const XPNotificationAskButtonTimeout = 7 * 24 * 60 * 60 * 1000;
 
 export interface IXPNotificationAskButton extends IModel {
     serverId: string;

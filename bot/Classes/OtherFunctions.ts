@@ -311,7 +311,7 @@ export function round(n, p) {
 }
 
 export async function deleteMP(user: User, messageId: string) {
-    const dmChannel = user.dmChannel;
+    const dmChannel = user.dmChannel ?? await user.createDM().catch(() => null);
     if (dmChannel === null)
         return;
 
