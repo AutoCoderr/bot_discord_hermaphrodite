@@ -208,11 +208,11 @@ export default class XP extends AbstractXP<IXPArgs> {
                         .setFields({
                             name: "Voici toutes les informations de "+(args.member.nickname??args.member.user.username)+":",
                             value:
-                                "Il possède "+XPUserConfig.XP+" XP total\n"+
+                                "Il possède "+XPUserConfig.XP+" XP au total\n"+
                                 "Il a gagné "+XPUserConfig.todayXP+" XP aujourd'hui\n"+
                                 "Il est au niveau "+XPUserConfig.currentLevel+"\n"+
                                 (grade ? "Il est au grade '"+grade.name+"'" : "Il n'est dans encore aucun grade")+"\n"+
-                                "Il est numéro "+rang+"/"+allSortedXPUserConfigs.length+" dans le classement"
+                                "Il est au rang #"+rang
                         })
                     :
                     new EmbedBuilder()
@@ -220,11 +220,11 @@ export default class XP extends AbstractXP<IXPArgs> {
                         .setFields({
                             name: "Voici toutes vos informations :",
                             value:
-                                "Vous avez "+XPUserConfig.XP+" XP total\n"+
+                                "Vous avez "+XPUserConfig.XP+" XP au total\n"+
                                 "Vous avez avez gagné "+XPUserConfig.todayXP+" XP aujourd'hui\n"+
                                 "Vous êtes au niveau "+XPUserConfig.currentLevel+"\n"+
                                 (grade ? "Vous êtes au grade '"+grade.name+"'" : "Vous n'êtes dans encore aucun grade")+"\n"+
-                                "Vous êtes numéro "+rang+"/"+allSortedXPUserConfigs.length+" dans le classement"
+                                "Vous êtes au rang #"+rang
                         })
             ]
         })
