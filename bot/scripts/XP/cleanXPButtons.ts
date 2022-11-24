@@ -1,36 +1,9 @@
-import { Guild, GuildMember } from "discord.js";
 import { deleteMP } from "../../Classes/OtherFunctions";
 import client from "../../client";
+import { getMemberById, serverHasXPsEnabled } from "../../libs/cacheForScripts";
 import { askForNotifications } from "../../libs/XP/XPCounting/countingOtherFunctions";
-import XPData from "../../Models/XP/XPData";
 import XPNotificationAskButton, { IXPNotificationAskButton, XPNotificationAskButtonTimeout } from "../../Models/XP/XPNotificationAskButton"
 import XPTipsUsefulAskButton, { IXPTipsUsefulAskButton, XPTipsUsefulAskButtonTimeout } from "../../Models/XP/XPTipsUsefulAskButton";
-
-const enabledServersById: {[id: string]: boolean} = {};
-const guildsById: {[id: string]: null|Guild} = {};
-const membersById: {[id: string]: null|GuildMember} = {};
-
-async function serverHasXPsEnabled(serverId: string) {
-    if (enabledServersById[serverId] === undefined) {
-        enabledServersById[serverId] = await XPData.findOne({serverId, enabled: true}) !== null
-    }
-    return enabledServersById[serverId];
-}
-
-async function getGuildById(serverId: string) {
-    if (guildsById[serverId] === undefined) {
-        guildsById[serverId] = client.guilds.cache.get(serverId) ?? null
-    }
-    return guildsById[serverId];
-}
-
-async function getMemberById(serverId: string, memberId: string) {
-    if (membersById[memberId] === undefined) {
-        const guild = await getGuildById(serverId);
-        membersById[memberId] = guild !== null ? await guild.members.fetch(memberId).catch(() => null) : null
-    }
-    return membersById[memberId];
-}
 
 function getPromiseArrayFromButton(button: IXPNotificationAskButton|IXPTipsUsefulAskButton) {
     return [
@@ -56,8 +29,8 @@ client.on('ready', async () => {
         timestamps: {$lte: new Date(currentDate.getTime() - XPTipsUsefulAskButtonTimeout)}
     })
 
-    console.log(XPNotificationAskButtons.length+" ask notifications buttons cleaned")
-    console.log(XPTipsUsefulAskButtons.length+" ask tips buttons cleaned")
+    console.log(XPNotificationAskButtons.length+" ask notifications buttons cleaning")
+    console.log(XPTipsUsefulAskButtons.length+" ask tips buttons cleaning")
 
     await Promise.all([
         Promise.all(XPNotificationAskButtons.map(button => 
@@ -91,5 +64,8 @@ client.on('ready', async () => {
         console.log("ERROR -> ")
         console.log(e);
     })
+
+    if ([XPNotificationAskButtons,XPTipsUsefulAskButtons].reduce((acc,l) => acc+l.length, 0) > 0)
+        console.log("All cleaned");
     process.exit();
 })

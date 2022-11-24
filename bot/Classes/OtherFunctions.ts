@@ -320,5 +320,5 @@ export async function deleteMP(user: User, messageId: string) {
     if (message === null)
         return;
 
-    await message.delete();
+    await message.delete().catch(() => null);
 }

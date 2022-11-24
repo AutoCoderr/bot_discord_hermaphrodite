@@ -86,7 +86,7 @@ function checkExpiredFields(element: Array<any>, colsExpires, success = true) {
     )
 }
 
-export default function filterElementsToDelete(elements: Array<any>, colsTypes, colsExpires) {
+export default function filterElementsToDelete(elements: Array<any>, colsTypes, colsExpires, filtersForDelete: null|((ModelType) => boolean) = null) {
     const acc: {
         servers?: {[id: string]: string},
         members?: {[id: string]: string},
@@ -99,12 +99,14 @@ export default function filterElementsToDelete(elements: Array<any>, colsTypes, 
     } = {}
     //@ts-ignore
     return elements.promiseReduce(async ({toDelete, toKeep, ...datas},element) => {
-        const checkedDatas = await checkDatasByNeededFields(getNeededs(), colsTypes, datas, element);
-        const {datas: newDatas} = checkedDatas;
-        const success = checkedDatas.success && checkExpiredFields(element,colsExpires);
+        let checkedDatas;
+        const success = (filtersForDelete !== null && !filtersForDelete(element)) || (
+            (checkedDatas = await checkDatasByNeededFields(getNeededs(), colsTypes, datas, element)).success &&
+            checkExpiredFields(element,colsExpires)
+        )
 
         return {
-            ...newDatas,
+            ...(checkedDatas ? checkedDatas.datas : {}),
             toDelete: [...(toDelete??[]), ...(!success ? [element]: [])],
             toKeep: [...(toKeep??[]), ...(success ? [element]: [])]
         };

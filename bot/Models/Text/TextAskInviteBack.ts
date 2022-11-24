@@ -1,9 +1,13 @@
 import { Schema } from 'mongoose';
+import IModel from '../../interfaces/IModel';
 import { connect } from "../../Mongo";
 
 const db = connect();
 
-export interface ITextAskInviteBack {
+export const TextAskInviteBackTimeout = 8 * 60 * 60 * 1000;
+export const TextAskInviteBackTimeoutWithoutMessageId = 48 * 60 * 60 * 1000;
+
+export interface ITextAskInviteBack extends IModel {
     buttonId: string;
     messageId: null|string;
     requesterId: string;
@@ -16,7 +20,7 @@ export interface ITextAskInviteBack {
 
 const TextAskInviteBackSchema: Schema = new Schema({
     buttonId: { type: String, required: true },
-    messageId: { type: String, required: false },
+    messageId: { type: String, required: true },
     requesterId: { type: String, required: true },
     requestedId: { type: String, required: true },
     channelsId: { type: Array, required: false },

@@ -2,4 +2,5 @@
 0 1 * * 1 /cronjobs/clean_database.sh
 0 */1 * * * /cronjobs/XP/clean_today_xps.sh
 0 2 */1 * * /cronjobs/XP/clean_xp_buttons.sh
+0 */2 * * * /cronjobs/XP/clean_text_and_vocal_buttons.sh
 # end of file

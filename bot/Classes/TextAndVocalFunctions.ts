@@ -5,22 +5,22 @@ import {
     GuildChannel,
     GuildMember, Snowflake, TextChannel,
     ButtonStyle,
-    ThreadChannel, EmbedBuilder
+    ThreadChannel, EmbedBuilder, Message
 } from "discord.js";
-import TextInvite, {ITextInvite} from "../Models/Text/TextInvite";
-import TextAskInviteBack, {ITextAskInviteBack} from "../Models/Text/TextAskInviteBack";
+import TextInvite, {ITextInvite, TextInviteTimeoutWithoutMessageId} from "../Models/Text/TextInvite";
+import TextAskInviteBack, {ITextAskInviteBack, TextAskInviteBackTimeoutWithoutMessageId} from "../Models/Text/TextAskInviteBack";
 import client from "../client";
 import Vocal from "../Commands/Vocal";
 import VocalUserConfig, {IVocalUserConfig} from "../Models/Vocal/VocalUserConfig";
 import VocalSubscribe from "../Models/Vocal/VocalSubscribe";
-import VocalInvite from "../Models/Vocal/VocalInvite";
-import VocalAskInviteBack from "../Models/Vocal/VocalAskInviteBack";
+import VocalInvite, { VocalInviteTimeoutWithoutMessageId } from "../Models/Vocal/VocalInvite";
+import VocalAskInviteBack, { VocalAskInviteBackTimeoutWithoutMessageId } from "../Models/Vocal/VocalAskInviteBack";
 import Text from "../Commands/Text";
 import TextUserConfig, {ITextUserConfig} from "../Models/Text/TextUserConfig";
 import TextSubscribe from "../Models/Text/TextSubscribe";
 import VocalConfig from "../Models/Vocal/VocalConfig";
 import TextConfig from "../Models/Text/TextConfig";
-import {userHasChannelPermissions} from "./OtherFunctions";
+import {deleteMP, userHasChannelPermissions} from "./OtherFunctions";
 import CustomError from "../logging/CustomError";
 
 interface getDatasButtonFunctionResponse {
@@ -82,7 +82,9 @@ const classesBySubscribeType = {
         userConfigModel: VocalUserConfig,
         subscribeModel: VocalSubscribe,
         inviteModel: VocalInvite,
+        inviteTimeout: VocalInviteTimeoutWithoutMessageId,
         inviteBackModel: VocalAskInviteBack,
+        inviteBackTimeout: VocalAskInviteBackTimeoutWithoutMessageId,
         configModel: VocalConfig
     },
     text: {
@@ -90,17 +92,20 @@ const classesBySubscribeType = {
         userConfigModel: TextUserConfig,
         subscribeModel: TextSubscribe,
         inviteModel: TextInvite,
+        inviteTimeout: TextInviteTimeoutWithoutMessageId,
         inviteBackModel: TextAskInviteBack,
+        inviteBackTimeout: TextAskInviteBackTimeoutWithoutMessageId,
         configModel: TextConfig
     }
 }
 
 export async function listenAskInviteBackButtons(interaction: ButtonInteraction, type: 'text' | 'vocal'): Promise<boolean> {
-    const {command, inviteBackModel} = classesBySubscribeType[type]
+    const {command, inviteBackModel, inviteBackTimeout} = classesBySubscribeType[type]
 
     const currentDate = new Date();
     await inviteBackModel.deleteMany({
-        timestamp: {$lte: new Date(currentDate.getTime() - command.buttonsTimeout)}
+        messageId: {$exists: false},
+        timestamp: {$lte: new Date(currentDate.getTime() - inviteBackTimeout)}
     });
     const inviteBackButton = await inviteBackModel.findOne({
         buttonId: interaction.customId
@@ -118,9 +123,12 @@ export async function listenAskInviteBackButtons(interaction: ButtonInteraction,
 
         await command.sendInvite(requester, requested, server, channels ? channels.map(channel => (<GuildChannel>channel).id) : undefined, keywords ?? undefined);
 
+        if (inviteBackButton.messageId !== undefined)
+            await deleteMP(requester.user, inviteBackButton.messageId);
+
         await inviteBackButton.remove();
 
-        await interaction.editReply({content: "Invitation envoyée en retour"});
+        await interaction.editReply({content: "Invitation "+(type === 'text' ? "textuelle" : "vocale")+" envoyée en retour à "+(requested.nickname??requested.user.username)});
 
         return true;
     } catch (e) {
@@ -136,7 +144,7 @@ async function inviteBack(interaction: ButtonInteraction, requester: GuildMember
 
     const askBackButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "a";
 
-    await interaction.followUp({
+    const message: Message = await interaction.followUp({
         components: [ //@ts-ignore
             new ActionRowBuilder()
                 .addComponents(
@@ -150,6 +158,7 @@ async function inviteBack(interaction: ButtonInteraction, requester: GuildMember
 
     await inviteBackModel.create({
         buttonId: askBackButtonId,
+        messageId: message.id,
         requesterId: requested.id,
         requestedId: requester.id,
         timestamp: new Date(),
@@ -161,11 +170,12 @@ async function inviteBack(interaction: ButtonInteraction, requester: GuildMember
 
 export async function listenInviteButtons(interaction: ButtonInteraction, type: 'text' | 'vocal'): Promise<boolean> {
 
-    const {command, inviteModel, userConfigModel, subscribeModel, configModel} = classesBySubscribeType[type]
+    const {command, inviteModel, inviteTimeout, userConfigModel, subscribeModel, configModel} = classesBySubscribeType[type]
 
     const currentDate = new Date();
     await inviteModel.deleteMany({
-        timestamp: {$lte: new Date(currentDate.getTime() - command.buttonsTimeout)}
+        messageId: {$exists: false},
+        timestamp: {$lte: new Date(currentDate.getTime() - inviteTimeout)}
     });
 
     const invite = await inviteModel.findOne({
@@ -176,7 +186,7 @@ export async function listenInviteButtons(interaction: ButtonInteraction, type: 
         return false;
 
     if (invite.inviteId === undefined) {
-        invite.remove();
+        await invite.remove();
         return false;
     }
 
@@ -335,7 +345,7 @@ export async function listenInviteButtons(interaction: ButtonInteraction, type: 
                 })
             ]);
 
-            await interaction.editReply({content: "Invitation acceptée"});
+            await interaction.editReply({content: "Invitation "+(type === 'text' ? "textuelle" : "vocale")+" de "+(requester.nickname??requester.user.username)+" acceptée"});
 
             if (blackListedChannels.length > 0) {
                 await interaction.followUp({
@@ -395,8 +405,11 @@ export async function listenInviteButtons(interaction: ButtonInteraction, type: 
                 await requester.send((requested.nickname ?? requested.user.username) + " a refusé(e) votre invitation sur '" + server.name + "'");
             } catch (_) {
             }
-            await interaction.editReply({content: "Invitation refusée"});
+            await interaction.editReply({content: "Invitation "+((type === 'text' ? "textuelle" : "vocale"))+" de "+(requester.nickname??requester.user.username)+" refusée"});
         }
+
+        if (invite.messageId !== undefined)
+            await deleteMP(requested.user, invite.messageId);
 
         await inviteModel.deleteMany({
             inviteId: invite.inviteId
