@@ -17,6 +17,8 @@ import {IStoredNotifyOnReact} from "../Models/StoredNotifyOnReact";
 import {IMonitoringMessage} from "../Models/MonitoringMessage";
 import {IMessageToListen, ITicketConfig} from "../Models/TicketConfig";
 import {IWelcomeMessage} from "../Models/WelcomeMessage";
+import { IXPUserData } from "../Models/XP/XPUserData";
+import { IXPData } from "../Models/XP/XPData";
 
 export default interface IReportedData {
     from?: 'guildCreate'|
@@ -31,7 +33,8 @@ export default interface IReportedData {
         'voiceConnect'|
         'listeningNotifyOnReact'|
         'listeningMonitoring'|
-        'initTicketMessageListening',
+        'initTicketMessageListening'|
+        'XPVoiceCounter',
     guild?: Guild,
     message?: Message,
     user?: User|GuildMember,
@@ -52,9 +55,15 @@ export default interface IReportedData {
 
     idConfigTicket?: string,
     ticketConfig?: ITicketConfig,
-    listening?: IMessageToListen
+    listening?: IMessageToListen,
 
     welcomeMessage?: IWelcomeMessage,
 
-    givenStartGradeIndex?: number
+    givenStartGradeIndex?: number,
+
+    XPUserConfig?: IXPUserData|null,
+    XPServerConfig?: IXPData|null,
+
+    userId?: string,
+    serverId?: string
 }
