@@ -24,14 +24,19 @@ const timezones = {
 }[new Date().getHours()];
 
 (async () => {
-    console.log("Reset today XP of all users on timezone"+(timezones.length > 1 ? "s" : "")+" "+timezones.map(showTimezone).join(", "))
-    const XPServerIds = await XPData.find({
-        timezone: { $in: timezones }
-    }).then(XPServerConfigs => XPServerConfigs.map(XPServerConfig => XPServerConfig.serverId))
-    console.log(XPServerIds.length+" servers concerned");
+    try {
+        console.log("Reset today XP of all users on timezone"+(timezones.length > 1 ? "s" : "")+" "+timezones.map(showTimezone).join(", "))
+        const XPServerIds = await XPData.find({
+            timezone: { $in: timezones }
+        }).then(XPServerConfigs => XPServerConfigs.map(XPServerConfig => XPServerConfig.serverId))
+        console.log(XPServerIds.length+" servers concerned");
 
-    const {modifiedCount} = await XPUserData.updateMany({ serverId: {$in: XPServerIds} }, { $set: { todayXP: 0 } });
-    console.log(modifiedCount+" users had their todayXPs reset");
+        const {modifiedCount} = await XPUserData.updateMany({ serverId: {$in: XPServerIds} }, { $set: { todayXP: 0 } });
+        console.log(modifiedCount+" users had their todayXPs reset");
+    } catch (e) {
+        console.log("ERROR ->");
+        console.log(e);
+    }
     process.exit()
 })();
 

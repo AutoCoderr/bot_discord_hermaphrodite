@@ -175,7 +175,10 @@ async function cleanDatabase() {
         checkAndDeleteUselessEntries(WelcomeMessage, "welcomeMessage", {
             server: ['serverId'],
         })
-    ])
+    ]).catch(e => {
+        console.log("ERROR");
+        console.log(e)
+    })
 
     process.exit();
 }

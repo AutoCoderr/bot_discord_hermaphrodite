@@ -19,53 +19,56 @@ function getPromiseArrayFromButton(button: IXPNotificationAskButton|IXPTipsUsefu
 }
 
 client.on('ready', async () => {
-    const currentDate = new Date()
+    try  {
+        const currentDate = new Date()
 
-    const XPNotificationAskButtons: IXPNotificationAskButton[] = await XPNotificationAskButton.find({
-        timestamps: {$lte: new Date(currentDate.getTime() - XPNotificationAskButtonTimeout)}
-    })
+        const XPNotificationAskButtons: IXPNotificationAskButton[] = await XPNotificationAskButton.find({
+            timestamps: {$lte: new Date(currentDate.getTime() - XPNotificationAskButtonTimeout)}
+        })
 
-    const XPTipsUsefulAskButtons: IXPTipsUsefulAskButton[] = await XPTipsUsefulAskButton.find({
-        timestamps: {$lte: new Date(currentDate.getTime() - XPTipsUsefulAskButtonTimeout)}
-    })
+        const XPTipsUsefulAskButtons: IXPTipsUsefulAskButton[] = await XPTipsUsefulAskButton.find({
+            timestamps: {$lte: new Date(currentDate.getTime() - XPTipsUsefulAskButtonTimeout)}
+        })
 
-    console.log(XPNotificationAskButtons.length+" ask notifications buttons cleaning")
-    console.log(XPTipsUsefulAskButtons.length+" ask tips buttons cleaning")
+        console.log(XPNotificationAskButtons.length+" ask notifications buttons cleaning")
+        console.log(XPTipsUsefulAskButtons.length+" ask tips buttons cleaning")
 
-    await Promise.all([
-        Promise.all(XPNotificationAskButtons.map(button => 
-            Promise.all([
-                ...getPromiseArrayFromButton(button),
-                ...(
-                    button.toEnable ? [
-                        serverHasXPsEnabled(button.serverId)
-                            .then(async enabled => {
-                                if (!enabled)
-                                    return;
-                                const member = await getMemberById(button.serverId, button.userId);
-                                if (member === null)
-                                    return;
-                                
-                                return askForNotifications(
-                                    member.user, 
-                                    button.serverId, 
-                                    "Il semblerait que vous n'avez pas encore répondu.\n"+
-                                    "Voulez vous activer les notifications sur le serveur '"+member.guild.name+"'?"
-                                )
-                            })
-                    ] : []
-                )
-            ])
-        )),
-        Promise.all(XPTipsUsefulAskButtons.map(async button => 
-            Promise.all(getPromiseArrayFromButton(button))
-        ))
-    ]).catch(e => {
-        console.log("ERROR -> ")
+        await Promise.all([
+            Promise.all(XPNotificationAskButtons.map(button => 
+                Promise.all([
+                    ...getPromiseArrayFromButton(button),
+                    ...(
+                        button.toEnable ? [
+                            serverHasXPsEnabled(button.serverId)
+                                .then(async enabled => {
+                                    if (!enabled)
+                                        return;
+                                    const member = await getMemberById(button.serverId, button.userId);
+                                    if (member === null)
+                                        return;
+                                    
+                                    return askForNotifications(
+                                        member.user, 
+                                        button.serverId, 
+                                        "Il semblerait que vous n'avez pas encore répondu.\n"+
+                                        "Voulez vous activer les notifications sur le serveur '"+member.guild.name+"'?"
+                                    )
+                                })
+                        ] : []
+                    )
+                ])
+            )),
+            Promise.all(XPTipsUsefulAskButtons.map(async button => 
+                Promise.all(getPromiseArrayFromButton(button))
+            ))
+        ])
+
+        if ([XPNotificationAskButtons,XPTipsUsefulAskButtons].reduce((acc,l) => acc+l.length, 0) > 0)
+            console.log("All cleaned");
+
+    } catch(e) {
+        console.log("ERROR ->");
         console.log(e);
-    })
-
-    if ([XPNotificationAskButtons,XPTipsUsefulAskButtons].reduce((acc,l) => acc+l.length, 0) > 0)
-        console.log("All cleaned");
+    }
     process.exit();
 })
