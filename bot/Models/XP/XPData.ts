@@ -31,7 +31,6 @@ export interface IXPData extends IModel {
 
     XPByMessage: number;
     XPByFirstMessage: number;
-    XPByMidNightMessage: number;
     XPByVocal: number;
 
     timeLimitMessage: number;
@@ -71,7 +70,6 @@ const XPDataSchema: Schema = new Schema({
 
     XPByMessage: { type: Number, required: false, default: 1 },
     XPByFirstMessage: { type: Number, required: false, default: 10 },
-    XPByMidNightMessage: { type: Number, required: false, default: 20 },
     XPByVocal: { type: Number, required: false, default: 1 },
 
     timeLimitMessage: { type: Number, required: false, default: 60 * 1000 },
