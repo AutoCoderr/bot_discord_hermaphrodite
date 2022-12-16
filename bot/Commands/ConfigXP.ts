@@ -38,7 +38,7 @@ interface IConfigXPArgs {
         'grades'|
         'timezone';
     setOrShowSubAction: 'set'|'show';
-    XPActionTypes: 'vocal'|'message'|'first_message'|'mid_night_message';
+    XPActionTypes: 'vocal'|'message'|'first_message';
     XPActionTypesToLimit: 'vocal'|'message';
     tipsSubActions: 'list'|'show'|'set'|'delete'|'export'|'import';
     gradesSubActions:
@@ -113,8 +113,7 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                 choices: {
                     message: (_, parentDescription) => parentDescription+" par message",
                     vocal: (_, parentDescription) => parentDescription+" pour le vocal",
-                    first_message: (_, parentDescription) => parentDescription+" pour le premier message de la journée",
-                    mid_night_message: (_, parentDescription) => parentDescription+" pour le message de minuit"
+                    first_message: (_, parentDescription) => parentDescription+" pour le premier message de la journée"
                 }
             },
             XPActionTypesToLimit: {
@@ -356,7 +355,7 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                 }
             },
             XP: {
-                referToSubCommands: [...['message', 'vocal', 'first_message', 'mid_night_message'].map(t => 'xp_gain_set.'+t), 'grades.add', 'grades.insert', 'grades.set_xp'],
+                referToSubCommands: [...['message', 'vocal', 'first_message'].map(t => 'xp_gain_set.'+t), 'grades.add', 'grades.insert', 'grades.set_xp'],
                 type: "overZeroInteger",
                 evenCheckAndExtractForSlash: true,
                 description: (args) => (args.action === "grades" && ["add","insert","set_xp"].includes(<string>args.gradesSubActions)) ?
@@ -1141,10 +1140,6 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                         {
                             name: "Pour le premier message de la journée",
                             value: XPServerConfig.XPByFirstMessage+" XP"
-                        },
-                        {
-                            name: "Pour le message de minuit",
-                            value: XPServerConfig.XPByMidNightMessage+" XP"
                         }
                     )
             ]
@@ -1179,8 +1174,7 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
         const col = {
             message: 'XPByMessage',
             vocal: 'XPByVocal',
-            first_message: 'XPByFirstMessage',
-            mid_night_message: 'XPByMidNightMessage'
+            first_message: 'XPByFirstMessage'
         }[args.XPActionTypes];
 
         XPServerConfig[col] = args.XP
@@ -1192,8 +1186,7 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                     .setTitle("Définir le gain d'XP "+{
                         message: "par message",
                         vocal: "pour le vocal",
-                        first_message: "pour le premier message de la journée",
-                        mid_night_message: "pour le message de minuit"
+                        first_message: "pour le premier message de la journée"
                     }[args.XPActionTypes])
                     .setFields({
                         name: "Vous avez défini la valeur suivante :",
