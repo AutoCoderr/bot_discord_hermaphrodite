@@ -11,24 +11,27 @@ import {getterNameBySlashType, slashCommandsTypeDefinitions} from "./Classes/sla
 import CustomError from "./logging/CustomError";
 import {IArgModel, ISlashCommandsDefinition, responseType} from "./interfaces/CommandInterfaces";
 
-interface optionCommandType {
-    type?: ApplicationCommandOptionType.Boolean |
-        ApplicationCommandOptionType.Channel |
-        ApplicationCommandOptionType.Integer |
-        ApplicationCommandOptionType.Mentionable |
-        ApplicationCommandOptionType.Number |
-        ApplicationCommandOptionType.Role |
-        ApplicationCommandOptionType.String |
-        ApplicationCommandOptionType.Subcommand |
-        ApplicationCommandOptionType.SubcommandGroup |
-        ApplicationCommandOptionType.User;
+type IOptionCommandType = ApplicationCommandOptionType.Boolean |
+ApplicationCommandOptionType.Channel |
+ApplicationCommandOptionType.Integer |
+ApplicationCommandOptionType.Mentionable |
+ApplicationCommandOptionType.Number |
+ApplicationCommandOptionType.Role |
+ApplicationCommandOptionType.String |
+ApplicationCommandOptionType.Subcommand |
+ApplicationCommandOptionType.SubcommandGroup |
+ApplicationCommandOptionType.User
+
+interface IOptionCommand<> {
+    type?: IOptionCommandType;
     name: string;
     description: string;
     required?: boolean;
     noSubCommandGroup?: boolean;
     args?: { [attr: string]: string };
-    options?: optionCommandType[];
+    options?: IOptionCommand[];
     defaultPermission?: boolean;
+    choices?: {name: string, value: string|number}[]
 }
 
 
@@ -110,8 +113,8 @@ export async function initSlashCommandsOnGuild(guild: Guild, slashCommandsDefini
     ])
 }
 
-async function generateSlashCommandFromModel(command: typeof Command): Promise<optionCommandType> {
-    let slashCommandModel: optionCommandType = {
+async function generateSlashCommandFromModel(command: typeof Command): Promise<IOptionCommand> {
+    let slashCommandModel: IOptionCommand = {
         name: <string>command.commandName?.toLowerCase(),
         description: <string>command.description,
         defaultPermission: false
@@ -132,12 +135,12 @@ async function generateSlashCommandFromModel(command: typeof Command): Promise<o
     return slashCommandModel;
 }
 
-function sortRequiredAndNotRequiredArgumentsInSlashCommand(node: optionCommandType) {
+function sortRequiredAndNotRequiredArgumentsInSlashCommand(node: IOptionCommand) {
     if (node.options === undefined) return;
 
     let isSubCommandGroup = false;
-    const requireds: optionCommandType[] = [];
-    const notRequireds: optionCommandType[] = [];
+    const requireds: IOptionCommand[] = [];
+    const notRequireds: IOptionCommand[] = [];
 
     for (const option of node.options) {
         if (option.type == ApplicationCommandOptionType.Subcommand || option.type == ApplicationCommandOptionType.SubcommandGroup) {
@@ -156,7 +159,7 @@ function sortRequiredAndNotRequiredArgumentsInSlashCommand(node: optionCommandTy
     }
 }
 
-async function generateSlashOptionFromModel(attr: string, argModel: IArgModel, subCommands: { [attr: string]: any }, slashCommandModel: optionCommandType) {
+async function generateSlashOptionFromModel(attr: string, argModel: IArgModel, subCommands: { [attr: string]: any }, slashCommandModel: IOptionCommand) {
     const chooseSubCommands: any[] = [];
     if (argModel.referToSubCommands instanceof Array)
         for (const referedSubCommand of argModel.referToSubCommands) {
@@ -187,7 +190,7 @@ async function generateSlashOptionFromModel(attr: string, argModel: IArgModel, s
                         choice[1] :
                     null;
 
-                const option: optionCommandType = {
+                const option: IOptionCommand = {
                     name,
                     description: description ?? "Undefined description",
                     type: ApplicationCommandOptionType.Subcommand,
@@ -204,7 +207,7 @@ async function generateSlashOptionFromModel(attr: string, argModel: IArgModel, s
             if (chooseSubCommand.type == ApplicationCommandOptionType.Subcommand)
                 chooseSubCommand.noSubCommandGroup = true;
 
-            const option: optionCommandType = {
+            const option: IOptionCommand = {
                 name: attr.toLowerCase(),
                 description: typeof(argModel.description) === "string" ?
                     argModel.description :
@@ -218,7 +221,25 @@ async function generateSlashOptionFromModel(attr: string, argModel: IArgModel, s
                     ) || (
                         typeof (argModel.required) == "boolean" &&
                         argModel.required
-                    )
+                    ),
+                choices: (typeof(argModel.choices) === "object" && argModel.choices !== null) ? 
+                            (
+                                argModel.choices instanceof Array ? 
+                                    argModel.choices :
+                                    Object.entries(argModel.choices)
+                                )
+                            .map(choice => 
+                                choice instanceof Array ? 
+                                {
+                                    name: <string>choice[1],
+                                    value: <string|number>choice[0]
+                                } :
+                                {
+                                    name: <string>choice,
+                                    value: <string|number>choice
+                                }
+                            ) :
+                                undefined
             }
             chooseSubCommand.options.push(option);
         }

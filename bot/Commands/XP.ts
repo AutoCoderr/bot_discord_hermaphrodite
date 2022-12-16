@@ -11,8 +11,8 @@ import {approveOrUnApproveTip, findTipByLevel} from "../libs/XP/tips/tipsManager
 import {showTip, showTipsList} from "../libs/XP/tips/tipsBrowsing";
 
 interface IXPArgs {
-    action: 'notif'|'info'|'tips'|'approve'|'un_approve';
-    notifSubActions: 'show'|'enable'|'disable';
+    action: 'notifications'|'info'|'tips'|'approve'|'un_approve';
+    notif_action?: 'enable'|'disable';
     member?: GuildMember;
     level?: number;
 }
@@ -32,7 +32,7 @@ export default class XP extends AbstractXP<IXPArgs> {
             action: {
                 isSubCommand: true,
                 choices: {
-                    notif: null,
+                    notifications: "Configurer les notifications",
                     info: "Voir les informations (XP, rang, etc...)",
                     tips: "Voir les tips accessibles, ou un tip donné",
                     approve: "Marquer un tip comme utile",
@@ -41,15 +41,14 @@ export default class XP extends AbstractXP<IXPArgs> {
                 type: "string",
                 description: "Les différentes actions"
             },
-            notifSubActions: {
-                isSubCommand: true,
-                referToSubCommands: ['notif'],
+            notif_action: {
+                referToSubCommands: ['notifications'],
                 type: "string",
-                description: "Les sous actions des notifications",
+                required: false,
+                description: "Activer ou désactiver",
                 choices: {
-                    show: "Visionner l'état des notifications",
-                    enable: "Activer les notifications",
-                    disable: "Désactiver les notifications"
+                    enable: "Activer",
+                    disable: "Désactiver"
                 }
             },
             level: {
@@ -249,11 +248,23 @@ export default class XP extends AbstractXP<IXPArgs> {
         return this.response(true, showTip(XPServerConfig.tipsByLevel, tip, <CommandInteraction>this.interaction, XPUserConfig));
     }
 
-    async action_notif(args: IXPArgs, XPServerConfig: IXPData, XPUserConfig: IXPUserData) {
-        return this['action_notif_'+args.notifSubActions](args,XPServerConfig, XPUserConfig);
+    async action_notifications(args: IXPArgs, XPServerConfig: IXPData, XPUserConfig: IXPUserData) {
+        if (args.notif_action)
+            return this['action_notifications_'+args.notif_action](args,XPServerConfig, XPUserConfig);
+
+        return this.response(true, {
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle("Notifications "+(XPUserConfig.DMEnabled ? "activées" : "désactivées"))
+                    .setFields({
+                        name: "Notifications "+(XPUserConfig.DMEnabled ? "activées" : "désactivées"),
+                        value: "Les notifications sont "+(XPUserConfig.DMEnabled ? "activées" : "désactivées")
+                    })
+            ]
+        })
     }
 
-    async action_notif_enable(args: IXPArgs, XPServerConfig: IXPData, XPUserConfig: IXPUserData) {
+    async action_notifications_enable(args: IXPArgs, XPServerConfig: IXPData, XPUserConfig: IXPUserData) {
         const success = await enableOrDisableUserNotification(this.member, XPUserConfig, true, XPServerConfig);
 
         return this.response(true, {
@@ -268,7 +279,7 @@ export default class XP extends AbstractXP<IXPArgs> {
         })
     }
 
-    async action_notif_disable(_, __, XPUserConfig: IXPUserData) {
+    async action_notifications_disable(_, __, XPUserConfig: IXPUserData) {
         await enableOrDisableUserNotification(this.member, XPUserConfig, false)
 
         return this.response(true, {
@@ -278,19 +289,6 @@ export default class XP extends AbstractXP<IXPArgs> {
                     .setFields({
                         name: "Notification désactivées avec succès",
                         value: "Notification désactivées avec succès"
-                    })
-            ]
-        })
-    }
-
-    async action_notif_show(_, __, XPUserConfig: IXPUserData) {
-        return this.response(true, {
-            embeds: [
-                new EmbedBuilder()
-                    .setTitle("Notifications "+(XPUserConfig.DMEnabled ? "activées" : "désactivées"))
-                    .setFields({
-                        name: "Notifications "+(XPUserConfig.DMEnabled ? "activées" : "désactivées"),
-                        value: "Les notifications sont "+(XPUserConfig.DMEnabled ? "activées" : "désactivées")
                     })
             ]
         })
