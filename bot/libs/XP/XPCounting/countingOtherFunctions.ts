@@ -10,7 +10,7 @@ import {
 } from "discord.js";
 import XPUserData, {IXPUserData} from "../../../Models/XP/XPUserData";
 import XPData, {IGrade, IXPData} from "../../../Models/XP/XPData";
-import {roleCanBeManaged} from "../XPOtherFunctions";
+import {roleCanBeManaged, checkIfBotCanManageRoles} from "../XPOtherFunctions";
 import XPNotificationAskButton from "../../../Models/XP/XPNotificationAskButton";
 import {findTipByLevel} from "../tips/tipsManager";
 import {sendTip} from "../tips/tipsOtherFunctions";
@@ -53,8 +53,11 @@ export async function askForNotifications(user: User, serverId, content: string)
 async function detectUpgrade(member: GuildMember, XPUserConfig: IXPUserData, XPServerConfig: IXPData): Promise<null|IGrade> {
     const grade = <null|IGrade>XPServerConfig.grades.reverse().find(grade => XPUserConfig.XP >= grade.requiredXP) ?? null;
 
+    const botCanManageRoles = checkIfBotCanManageRoles(member.guild);
+
     let currentGrade: undefined|IGrade;
     if (
+        botCanManageRoles &&
         XPUserConfig.gradeId !== undefined &&
         (currentGrade = XPServerConfig.grades.find(grade => grade._id == XPUserConfig.gradeId)) &&
         (grade === null || currentGrade.roleId !== grade.roleId) &&
@@ -66,6 +69,7 @@ async function detectUpgrade(member: GuildMember, XPUserConfig: IXPUserData, XPS
         return grade;
 
     if (
+        botCanManageRoles &&
         (currentGrade === undefined || currentGrade.roleId !== grade.roleId) &&
         roleCanBeManaged(member.guild, grade.roleId)
     )

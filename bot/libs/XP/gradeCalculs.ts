@@ -1,7 +1,7 @@
 import {IGrade, IXPData} from "../../Models/XP/XPData";
 import {Guild, GuildMember} from "discord.js";
 import XPUserData, {IXPUserData} from "../../Models/XP/XPUserData";
-import {roleCanBeManaged} from "./XPOtherFunctions";
+import {roleCanBeManaged, checkIfBotCanManageRoles} from "./XPOtherFunctions";
 import CustomError from "../../logging/CustomError";
 
 export async function checkAllUsersInGrades(
@@ -32,6 +32,8 @@ export async function checkAllUsersInGrades(
 
     if (start !== 0 || remainingXPUserConfigs.length == 0)
         return;
+    
+    const botCanManageRoles = checkIfBotCanManageRoles(guild);
 
     await Promise.all(
         remainingXPUserConfigs.map(async XPUserConfig => {
@@ -41,6 +43,7 @@ export async function checkAllUsersInGrades(
             const oldGrade = gradesById[XPUserConfig.gradeId];
             const member = await getOrFetchMember(guild, XPUserConfig.userId, membersById);
             if (
+                botCanManageRoles &&
                 member &&
                 roleCanBeManaged(guild, oldGrade.roleId)
             )
@@ -90,6 +93,8 @@ async function checkAllUsersInGrade(
     XPUserConfigs: IXPUserData[],
     membersById: {[id: string]: GuildMember},
 ): Promise<IXPUserData[]> {
+    const botCanManageRoles = await checkIfBotCanManageRoles(guild);
+
     await Promise.all(
         XPUserConfigs
             .filter(XPUserConfig => XPUserConfig.XP >= grade.requiredXP)
@@ -98,6 +103,7 @@ async function checkAllUsersInGrade(
                 if (XPUserConfig.gradeId !== (<string>grade._id).toString()) {
                     let member: null | GuildMember = null;
                     if (
+                        botCanManageRoles &&
                         XPUserConfig.gradeId !== undefined &&
                         gradesById[XPUserConfig.gradeId] !== undefined &&
                         grade.roleId !== gradesById[XPUserConfig.gradeId].roleId &&
@@ -107,6 +113,7 @@ async function checkAllUsersInGrade(
                         await member.roles.remove(gradesById[XPUserConfig.gradeId].roleId);
 
                     if (
+                        botCanManageRoles &&
                         (
                             XPUserConfig.gradeId === undefined ||
                             gradesById[XPUserConfig.gradeId] === undefined ||
@@ -137,7 +144,7 @@ async function checkAllUsersInGrade(
 }
 
 export async function reDefineUsersGradeRole(guild: Guild, oldRoleId: string, grade: IGrade) {
-    if (oldRoleId === grade.roleId)
+    if (oldRoleId === grade.roleId || !checkIfBotCanManageRoles(guild))
         return;
     const XPUserConfigs: IXPUserData[] = await XPUserData.find({
         serverId: guild.id,

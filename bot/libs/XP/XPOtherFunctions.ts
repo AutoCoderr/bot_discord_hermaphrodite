@@ -1,10 +1,10 @@
 import XPData, {IGrade, IXPData} from "../../Models/XP/XPData";
 import {
-    ButtonInteraction, ButtonStyle,
+    ButtonInteraction,
     EmbedBuilder,
     Guild,
     GuildMember,
-    Role, User
+    Role, User, PermissionFlagsBits
 } from "discord.js";
 import XPUserData, {IXPUserData} from "../../Models/XP/XPUserData";
 import XPNotificationAskButton, {
@@ -88,4 +88,8 @@ export function roleCanBeManaged(guild: Guild, roleOrRoleId: Role|string) {
     const role: Role|undefined = roleOrRoleId instanceof Role ? roleOrRoleId : guild.roles.cache.get(roleOrRoleId);
 
     return role !== undefined && role.position < (<GuildMember>guild.members.me).roles.highest.position
+}
+
+export function checkIfBotCanManageRoles(guild: Guild) {
+    return guild.members.me?.permissions.has(PermissionFlagsBits.ManageRoles) ?? false
 }
