@@ -128,31 +128,33 @@ export function showTip(allTips: ILevelTip[], tip: ILevelTip, interaction: Comma
             value: tip.content
         });
 
-    if (XPUserConfig !== null) {
-        const [approved, unApproved] = [
-            tip.userApproves.some(id => id === XPUserConfig.userId),
-            tip.userUnapproves.some(id => id === XPUserConfig.userId)
-        ]
-        embed.addFields({
-            name: "Votre avis",
-            value: (approved || unApproved) ?
-                "Vous l'avez trouvé "+(approved ? "utile" : "inutile") :
-                "Vous n'avez donné aucun avis"
-        })
-    } else {
-        embed.addFields(
-            {
-                name: "Utilisateurs ayant trouvés ce tip utile :",
-                value: tip.userApproves.length > 0 ?
-                    tip.userApproves.length+" ("+round(tip.userApproves.length / (tip.userApproves.length+tip.userUnapproves.length) * 100, 2)+"%)" :
-                    "0 (0%)"
-            },
-            {
-                name: "Utilisateurs ayant trouvés ce tip inutile :",
-                value: tip.userUnapproves.length ?
-                    tip.userUnapproves.length+" ("+round(tip.userUnapproves.length / (tip.userApproves.length+tip.userUnapproves.length) * 100, 2)+"%)" :
-                    "0 (0%)"
+    if (tip.userApproves !== null && tip.userUnapproves !== null) {
+        if (XPUserConfig !== null) {
+            const [approved, unApproved] = [
+                tip.userApproves.some(id => id === XPUserConfig.userId),
+                tip.userUnapproves.some(id => id === XPUserConfig.userId)
+            ]
+            embed.addFields({
+                name: "Votre avis",
+                value: (approved || unApproved) ?
+                    "Vous l'avez trouvé "+(approved ? "utile" : "inutile") :
+                    "Vous n'avez donné aucun avis"
             })
+        } else {
+            embed.addFields(
+                {
+                    name: "Utilisateurs ayant trouvés ce tip utile :",
+                    value: tip.userApproves.length > 0 ?
+                        tip.userApproves.length+" ("+round(tip.userApproves.length / (tip.userApproves.length+tip.userUnapproves.length) * 100, 2)+"%)" :
+                        "0 (0%)"
+                },
+                {
+                    name: "Utilisateurs ayant trouvés ce tip inutile :",
+                    value: tip.userUnapproves.length ?
+                        tip.userUnapproves.length+" ("+round(tip.userUnapproves.length / (tip.userApproves.length+tip.userUnapproves.length) * 100, 2)+"%)" :
+                        "0 (0%)"
+                })
+        }
     }
 
     cleanTipButtons();

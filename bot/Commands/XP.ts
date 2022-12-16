@@ -58,7 +58,7 @@ export default class XP extends AbstractXP<IXPArgs> {
                 evenCheckAndExtractForSlash: true,
                 description: "Rentrer un niveau",
                 required: args => args.action !== "tips",
-                valid: async (value, _, command: XP) => {
+                valid: async (value, args, command: XP) => {
                     const XPServerConfig = await command.getXPServerConfig();
                     const XPUserConfig = await command.getXPUserConfig();
 
@@ -71,18 +71,25 @@ export default class XP extends AbstractXP<IXPArgs> {
                         (
                             XPUserConfig !== null &&
                             (tip = findTipByLevel(value, XPServerConfig.tipsByLevel)) !== null &&
-                            tip.level <= XPUserConfig.currentLevel
+                            tip.level <= XPUserConfig.currentLevel &&
+                            (args.action === "tips" || tip.level > 1)
                         )
                     )
                 },
-                errorMessage: value =>
+                errorMessage: (value, args) =>
                     value <= 0 ? {
                         name: "Donnée invalide",
                         value: "Le niveau doit être un entier naturel (> 0)"
-                    } : {
-                        name: "Tip introuvable",
-                        value: "Aucun tip associé au niveau "+value+" n'a été trouvé"
-                    }
+                    } : 
+                        (['approve','un_approve'].includes(<string>args.action) && value === 1) ?
+                        {
+                            name: "Action impossible",
+                            value: "Vous ne pouvez pas approuver ou désaprouver le premier tips"
+                        } : 
+                            {
+                                name: "Tip introuvable",
+                                value: "Aucun tip associé au niveau "+value+" n'a été trouvé"
+                            }
             },
             member: {
                 referToSubCommands: ['info'],
@@ -90,7 +97,7 @@ export default class XP extends AbstractXP<IXPArgs> {
                 required: false,
                 evenCheckAndExtractForSlash: true,
                 description: "Vous pouvez mentionner un membre (si vous êtes admin)",
-                valid: async (member: GuildMember, args, command: XP) => {
+                valid: async (member: GuildMember, _, command: XP) => {
                     if (member.id !== command.member.id && !(await XPA.staticCheckPermissions(command.member, command.guild)))
                         return false;
 
@@ -102,7 +109,7 @@ export default class XP extends AbstractXP<IXPArgs> {
                         member.roles.cache.some(role => role.id === XPServerConfig.activeRoleId)
                     )
                 },
-                errorMessage: async (member: GuildMember, args, command: XP) => {
+                errorMessage: async (member: GuildMember, _, command: XP) => {
                     const XPServerConfig = await <Promise<IXPData>>command.getXPServerConfig();
 
                     if (!member.roles.cache.some(role => role.id === XPServerConfig.activeRoleId))

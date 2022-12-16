@@ -12,20 +12,22 @@ export function approveOrUnApproveTip(member: GuildMember|User, tips: ILevelTip[
 
     const col = toApprove ? 'userApproves' : 'userUnapproves';
     const otherCol = toApprove ? 'userUnapproves' : 'userApproves';
-    tip[otherCol] = tip[otherCol].filter(userId => userId !== member.id);
-    if (!tip[col].some(userId => userId === member.id))
-        tip[col].push(member.id);
+    tip[otherCol] = (<string[]>tip[otherCol]).filter(userId => userId !== member.id);
+    if (!(<string[]>tip[col]).some(userId => userId === member.id))
+        (<string[]>tip[col]).push(member.id);
 
     return [...updatedTips, tip, ...tips.slice(1)];
 }
 
 export function setTipByLevel(level: number, content: string, tips: ILevelTip[]): ILevelTip[] {
+    const userApproves = level === 1 ? null : [];
+    const userUnapproves = level === 1 ? null : [];
     return tips.length === 0 ?
         [{
             level,
             content,
-            userApproves: [],
-            userUnapproves: []
+            userApproves,
+            userUnapproves
         }] :
         tips.reduce((acc,tip, index) => [
             ...acc,
@@ -40,8 +42,8 @@ export function setTipByLevel(level: number, content: string, tips: ILevelTip[])
                             {
                                 level,
                                 content,
-                                userApproves: [],
-                                userUnapproves: []
+                                userApproves,
+                                userUnapproves
                             },
                             tip
                         ] :
@@ -51,8 +53,8 @@ export function setTipByLevel(level: number, content: string, tips: ILevelTip[])
                                 {
                                     level,
                                     content,
-                                    userApproves: [],
-                                    userUnapproves: []
+                                    userApproves,
+                                    userUnapproves
                                 }
                             ] :
                             [tip]

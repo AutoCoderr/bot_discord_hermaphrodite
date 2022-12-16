@@ -7,8 +7,8 @@ const db = connect();
 export interface ILevelTip {
     level: number;
     content: string;
-    userApproves: string[];
-    userUnapproves: string[];
+    userApproves: null|string[];
+    userUnapproves: null|string[];
 }
 
 export interface IGrade {

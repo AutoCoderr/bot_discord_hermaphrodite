@@ -43,10 +43,13 @@ export async function sendTip(member: GuildMember, level: number, tip: ILevelTip
             level === 1 ?
                 "Vous venez de débloquer le premier niveau du système d'XP de '"+member.guild.name+"' !" :
                 "Vous avez atteint le niveau "+level+" du système d'XP de '"+member.guild.name+"'!") +
-        ( level === 1 ?
-            "\nVoici le premier tip :" :
-            "\nVoici un nouveau tip :" )
+        ( level > 1 ?
+            "\nVoici un nouveau tip :" :
+            "" )
         +"\n\n"+tip.content)
+
+    if (level === 1)
+        return;
 
     const message = await member.send({
         content: "\n-------------------------------\n\nAvez vous trouvé ce tip utile ?",
