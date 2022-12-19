@@ -176,11 +176,13 @@ async function generateSlashOptionFromModel(attr: string, argModel: IArgModel, s
             if (chooseSubCommand.noSubCommandGroup)
                 throw new Error("You cannot blend normal arguments and sub commands in another sub command");
 
+            const choices = typeof(argModel.choices) === "function" ? await argModel.choices() : argModel.choices;
+
             for (const choice of
-                argModel.choices instanceof Array ?
-                    argModel.choices :
-                        typeof(argModel.choices) === "object" ?
-                            Object.entries(argModel.choices) :
+                choices instanceof Array ?
+                    choices :
+                        typeof(choices) === "object" ?
+                            Object.entries(choices) :
                             []
                 ) {
                 const name = choice instanceof Array ? choice[0] : choice;
@@ -207,6 +209,8 @@ async function generateSlashOptionFromModel(attr: string, argModel: IArgModel, s
             if (chooseSubCommand.type == ApplicationCommandOptionType.Subcommand)
                 chooseSubCommand.noSubCommandGroup = true;
 
+            const choices = typeof(argModel.choices) === "function" ? await argModel.choices() : argModel.choices;
+
             const option: IOptionCommand = {
                 name: attr.toLowerCase(),
                 description: typeof(argModel.description) === "string" ?
@@ -222,11 +226,11 @@ async function generateSlashOptionFromModel(attr: string, argModel: IArgModel, s
                         typeof (argModel.required) == "boolean" &&
                         argModel.required
                     ),
-                choices: (typeof(argModel.choices) === "object" && argModel.choices !== null) ? 
+                choices: (typeof(choices) === "object" && choices !== null) ? 
                             (
-                                argModel.choices instanceof Array ? 
-                                    argModel.choices :
-                                    Object.entries(argModel.choices)
+                                choices instanceof Array ? 
+                                    choices :
+                                    Object.entries(choices)
                                 )
                             .map(choice => 
                                 choice instanceof Array ? 
@@ -286,7 +290,7 @@ export async function listenSlashCommands(interaction: CommandInteraction) {
                 await getAndDisplaySlashCommandsResponse(interaction, response);
                 return;
             } catch(e) {
-                throw new CustomError(<Error|CustomError>e, {commandRawArguments: command.getSlashRawArguments()??undefined})
+                throw new CustomError(<Error|CustomError>e, {commandRawArguments: (await command.getSlashRawArguments())??undefined})
             }
         }
     }

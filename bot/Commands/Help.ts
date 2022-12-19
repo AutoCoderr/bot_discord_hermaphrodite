@@ -1,14 +1,9 @@
 import Command from "../Classes/Command";
 import { existingCommands } from "../Classes/CommandsDescription";
-import * as Discord from "discord.js";
 import config from "../config";
 import {
     CommandInteraction,
-    CommandInteractionOptionResolver, EmbedBuilder,
-    Guild,
-    GuildMember, Message,
-    TextChannel,
-    User
+    EmbedBuilder,Message,
 } from "discord.js";
 
 export default class Help extends Command {

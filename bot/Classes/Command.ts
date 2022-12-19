@@ -354,7 +354,7 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
         let valid = true;
         if (this.commandName != null && validModelCommands[this.commandName] === false) valid = false;
 
-        if (valid && this.argsModel.$argsByType && this.argsModel.$argsByOrder) valid = false;
+        if (valid && this.argsModel !== undefined && Object.keys(this.argsModel).length !== 1) valid = false;
 
 
         if (this.commandName != null && !validModelCommands[this.commandName]) {
@@ -372,7 +372,7 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
         return true;
     }
 
-    getSlashRawArguments(): null|{[key: string]: any} {
+    async getSlashRawArguments(): Promise<null|{[key: string]: any}> {
         if (this.slashCommandOptions === null)
             return null;
         const rawArguments = {};
@@ -382,18 +382,18 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
         for (const attr in this.argsModel) {
             if (attr == '$argsByOrder' && this.argsModel.$argsByOrder) {
                 for (const argModel of this.argsModel.$argsByOrder) {
-                    this.getRawArgumentFromModel(argModel.field,argModel,additionalParams,rawArguments);
+                    await this.getRawArgumentFromModel(argModel.field,argModel,additionalParams,rawArguments);
                 }
             } else {
                 for (const [attr2,argModel] of Object.entries(this.argsModel[attr])) {
-                    this.getRawArgumentFromModel(attr2,argModel,additionalParams,rawArguments);
+                    await this.getRawArgumentFromModel(attr2,argModel,additionalParams,rawArguments);
                 }
             }
         }
         return rawArguments;
     }
 
-    getRawArgumentFromModel(attr, argModel,additionalParams,rawArguments) {
+    async getRawArgumentFromModel(attr, argModel,additionalParams,rawArguments) {
         if (this.slashCommandOptions === null)
             return null;
         if (!argModel.isSubCommand)
@@ -402,9 +402,12 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
             const subCommand = this.slashCommandOptions.getSubcommand();
             const subCommandGroup = this.slashCommandOptions.getSubcommandGroup(false);
 
-            if ((subCommandGroup === null || additionalParams.subCommandGroupSet) && additionalParams.subCommand !== null && Object.keys(argModel.choices).includes(subCommand)) {
+            const choices = typeof(argModel.choices) === "function" ? await argModel.choices() : argModel.choices;
+            const choiceList = choices instanceof Array ? choices : Object.keys(choices);
+
+            if ((subCommandGroup === null || additionalParams.subCommandGroupSet) && additionalParams.subCommand !== null && choiceList.includes(subCommand)) {
                 rawArguments[attr] = subCommand;
-            } else if (subCommandGroup !== null && Object.keys(argModel.choices).includes(subCommandGroup)) {
+            } else if (subCommandGroup !== null && choiceList.includes(subCommandGroup)) {
                 additionalParams.subCommandGroupSet = true
                 rawArguments[attr] = subCommandGroup;
             }
@@ -508,7 +511,8 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
             if (!argModel.choices)
                 return;
 
-            const choiceList = argModel.choices instanceof Array ? argModel.choices : Object.keys(argModel.choices);
+            const choices = typeof(argModel.choices) === "function" ? await argModel.choices() : argModel.choices;
+            const choiceList = choices instanceof Array ? choices : Object.keys(choices);
 
             if (
                 (
@@ -617,6 +621,9 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
         let failsExtract: IFailList = [];
         const validatedArgs: IValidatedArgs<IArgs> = {}
 
+        if (model === undefined)
+            return {success: true, result: out};
+
 
         if (model.$argsByName !== undefined) {
             for (const [attr,arg] of Object.entries(model.$argsByName)) {
@@ -636,8 +643,20 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
                         if (extractTypes[arg.type]) {
                             const moreDatas = typeof(arg.moreDatas) === "function" ? await arg.moreDatas(out,arg.type, this) : null
                             const data = await extractTypes[arg.type](args[field],this,moreDatas);
+
                             if (data !== false) {
-                                if (typeof(arg.valid) != "function" || await arg.valid(data,out, this, validatedArgs)) {
+                                let choices, choiceList;
+                                if (
+                                    (arg.valid === undefined || await arg.valid(data,out, this, validatedArgs)) &&
+                                    (
+                                        arg.choices === undefined ||
+                                        (
+                                            (choices = typeof(arg.choices) === "function" ? await arg.choices() : arg.choices) &&
+                                            (choiceList = choices instanceof Array ? choices : Object.keys(choices)) &&
+                                            choiceList.includes(data)
+                                        )
+                                    )
+                                ) {
                                     validatedArgs[attr] = true;
                                     out[attr] = data;
                                 } else {
@@ -697,7 +716,7 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
                 for (let i=currentIndex;args[i] !== undefined;i++) {
                     if (args[i] != undefined && (
                         typeof(arg.type) === "string" && (
-                            arg.type === "string" || await checkTypes[arg.type](args[i]) || (arg.type == "boolean" && args[i] === arg.field)
+                            arg.type === "string" || (arg.type == "boolean" && args[i] === arg.field) || await checkTypes[arg.type](args[i])
                         )
                     )) {
                         let data = arg.type == "string" ? args[i].toString() : args[i];
@@ -710,9 +729,17 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
                             }
                         }
 
+                        let choices, choiceList;
+
                         if (!extractFailed &&
                             (typeof(arg.valid) != "function" || await arg.valid(data,out, this, validatedArgs)) &&
-                            (arg.choices === undefined || Object.keys(arg.choices).includes(data))
+                            (
+                                arg.choices === undefined || (
+                                    (choices = typeof(arg.choices) === "function" ? await arg.choices() : arg.choices) &&
+                                    (choiceList = choices instanceof Array ? choices : Object.keys(choices)) &&
+                                    choiceList.includes(data)
+                                )
+                            )
                         ) {
                             validatedArgs[arg.field] = true;
                             if (arg.type === "boolean" && data === arg.field)
@@ -810,9 +837,18 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
                                 triedValue = args[i];
                             }
                         }
+                        let choices, choiceList;
                         if (!extractFailed &&
                             (typeof(arg.valid) != "function" || await arg.valid(data,out, this, validatedArgs)) &&
-                            (arg.choices === undefined || Object.keys(arg.choices).includes(data)) ) {
+                            (
+                                arg.choices === undefined ||
+                                (
+                                    (choices = typeof(arg.choices) === "function" ? await arg.choices() : arg.choices) &&
+                                    (choiceList = choices instanceof Array ? choices : Object.keys(choices)) &&
+                                    choiceList.includes(data)
+                                )
+                            ) 
+                            ) {
                             validatedArgs[attr] = true;
                             if (arg.type === "boolean" && data === attr)
                                 data = true

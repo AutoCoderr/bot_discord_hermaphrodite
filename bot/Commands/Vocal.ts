@@ -139,6 +139,7 @@ export default class Vocal extends Command {
             );
         }
 
+
         const vocalConfig: IVocalConfig = await VocalConfig.findOne({serverId: this.guild.id, enabled: true});
         if (vocalConfig == null) {
             return this.response(false,
