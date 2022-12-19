@@ -27,7 +27,7 @@ export interface IXPData extends IModel {
     activeRoleId?: string;
     channelRoleId?: string;
 
-    timezone: number;
+    timezone: string;
 
     XPByMessage: number;
     XPByFirstMessage: number;
@@ -66,7 +66,7 @@ const XPDataSchema: Schema = new Schema({
     activeRoleId: { type: String, required: false },
     channelRoleId: { type: String, required: false },
 
-    timezone: { type: Number, required: true, default: 1 },
+    timezone: { type: String, required: true, default: "Europe/Paris" },
 
     XPByMessage: { type: Number, required: false, default: 1 },
     XPByFirstMessage: { type: Number, required: false, default: 10 },

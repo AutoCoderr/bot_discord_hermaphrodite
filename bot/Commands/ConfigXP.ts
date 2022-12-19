@@ -22,6 +22,7 @@ import {
     checkGradesListData,
     reDefineUsersGradeRole
 } from "../libs/XP/gradeCalculs";
+import {getTimezoneDatas} from "../libs/timezones";
 
 interface IConfigXPArgs {
     action:
@@ -61,7 +62,7 @@ interface IConfigXPArgs {
     name: string;
     gradeNumber: number;
     jsonFile: any;
-    timezone: number;
+    timezone: string;
 }
 
 export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
@@ -464,9 +465,8 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
             },
             timezone: {
                 referToSubCommands: ['timezone.set'],
-                type: "timezone",
-                description: "Le créneau horaire à renseigner (Ex: 1, UTC+1, 2, UTC+2, -3, UTC-3)",
-                evenCheckAndExtractForSlash: true
+                type: "string",
+                description: "Rentrez le nom d'une ville"
             }
         }
     }
@@ -556,20 +556,43 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                         .setTitle("Le créneau horaire")
                         .setFields({
                             name: "Le créneau horaire configuré est :",
-                            value: "UTC"+(XPServerConfig.timezone >= 0 ? "+" : "")+XPServerConfig.timezone
+                            value: XPServerConfig.timezone
                         })
                 ]
             })
 
-        const msIn24h = 24 * 60 * 60 * 1000;
+        const {zones} = await getTimezoneDatas();
 
+        const foundZones = Object.keys(zones).filter(zone => zone.toLowerCase().replace(args.timezone, "") !== zone.toLowerCase())
 
-        const newFirstMessageTime = XPServerConfig.firstMessageTime + (XPServerConfig.timezone-args.timezone) * 60*60*1000;
-        XPServerConfig.firstMessageTime = newFirstMessageTime < 0 ?
-            msIn24h + newFirstMessageTime :
-            newFirstMessageTime % msIn24h;
+        if (foundZones.length === 0)
+            return this.response(false, {
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("Aucune zone n'a été trouvé")
+                        .setFields({
+                            name: "Aucune zone n'a été trouvé",
+                            value: "Veuillez essayer autre chose"
+                        })
+                ]
+            })
+        
+        if (foundZones.length > 1) {
+            return this.response(false, {
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("Des zones ont été trouvées")
+                        .setFields({
+                            name: "Les zones suivantes ont été trouvées :",
+                            value: foundZones.length <= 20 ?
+                                    foundZones.join("\n") :
+                                    foundZones.slice(0,20).join("\n")+"\n\n "+(foundZones.length-20)+" more..."
+                        })
+                ]
+            })
+        }
 
-        XPServerConfig.timezone = args.timezone;
+        XPServerConfig.timezone = foundZones[0];
 
         await XPServerConfig.save();
 
@@ -579,7 +602,7 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                     .setTitle("Créneau horaire sauvegardé")
                     .setFields({
                         name: "Créneau horaire sauvegardé",
-                        value: "Le créneau horaire a été sauvegardé avec succès!"
+                        value: "Le créneau horaire '"+foundZones[0]+"' a été sauvegardé avec succès!"
                     })
             ]
         })
@@ -1089,26 +1112,19 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
     }
 
     async action_first_message_time(args: IConfigXPArgs, XPServerConfig: IXPData) {
-        const timezoneHourGap = 60*60*1000 * XPServerConfig.timezone;
-
-        const msIn24h = 24 * 60 * 60 * 1000;
-
         if (args.setOrShowSubAction === "show") {
-            const timeToShow = XPServerConfig.firstMessageTime + timezoneHourGap;
             return this.response(true, {
                 embeds: [
                     new EmbedBuilder()
                         .setTitle("Heure minimale du premier message")
                         .setFields({
                             name: "Heure configurée :",
-                            value: showTime(extractUTCTime(timeToShow < 0 ? msIn24h + timeToShow : timeToShow%msIn24h), 'fr')
+                            value: showTime(extractUTCTime(XPServerConfig.firstMessageTime), "fr")
                         })
                 ]
             })
         }
-
-        const timeToSet = args.duration-timezoneHourGap;
-        XPServerConfig.firstMessageTime = timeToSet < 0 ? msIn24h + timeToSet : timeToSet%msIn24h;
+        XPServerConfig.firstMessageTime = args.duration;
         await XPServerConfig.save();
 
         return this.response(true, {
