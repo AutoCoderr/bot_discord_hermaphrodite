@@ -1,3 +1,5 @@
+import {addMissingZero} from "../Classes/OtherFunctions";
+
 const fs = require("fs/promises");
 const {constants: {F_OK}} = fs;
 
@@ -6,13 +8,6 @@ const file = __dirname+"/../node_modules/moment-timezone/data/meta/latest.json";
 interface ITimezoneData {
     zones: {
         [zone: string]: any
-    }, 
-    countries: {
-        [country: string]: {
-            name: string,
-            abbr: string,
-            zones: string[]
-        }
     }
 } 
 
@@ -37,10 +32,10 @@ export async function getTimezoneDatas(): Promise<ITimezoneData> {
 
 export function convertTimeNumberToMomentTimeZoneFormat(n: number) {
     const currentDate = new Date();
-    const currentDateNumber = currentDate.getDate() - 
+    const currentDateNumber = currentDate.getTime() - 
         currentDate.getHours()*60*60*1000 - 
-        currentDate.getMinutes()-60*1000 - 
-        currentDate.getSeconds()*1000
+        currentDate.getMinutes()*60*1000 - 
+        currentDate.getSeconds()*1000 -
         currentDate.getMilliseconds();
 
     return convertNumberToMomentTimeZoneFormat(currentDateNumber+n);
@@ -60,5 +55,5 @@ export function convertStringToTimeNumber(s: string) {
     return d.getHours()*60*60*1000 + d.getMinutes()*60*1000 + d.getSeconds()*1000
 }
 export function convertDateToMomentTimeZoneFormat(d: Date) {
-    return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate()+" "+d.getHours()+":"+d.getMinutes()+":"+d.getSeconds();
+    return d.getFullYear()+"-"+addMissingZero(d.getMonth()+1)+"-"+addMissingZero(d.getDate())+" "+addMissingZero(d.getHours())+":"+addMissingZero(d.getMinutes())+":"+addMissingZero(d.getSeconds());
 }

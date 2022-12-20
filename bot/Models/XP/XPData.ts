@@ -75,7 +75,7 @@ const XPDataSchema: Schema = new Schema({
     timeLimitMessage: { type: Number, required: false, default: 60 * 1000 },
     timeLimitVocal: { type: Number, required: false, default: 5 * 60 * 1000 },
 
-    firstMessageTime: { type: Number, required: false, default: 6 * 60 * 60 * 1000 },
+    firstMessageTime: { type: Number, required: false, default: 7 * 60 * 60 * 1000 },
 
     tipsByLevel: [LevelTipSchema],
 
