@@ -1,34 +1,46 @@
-import XPData, {IXPData} from "../../Models/XP/XPData";
+import XPData from "../../Models/XP/XPData";
 import XPUserData from "../../Models/XP/XPUserData";
+import {getTimezoneDatas} from "../../libs/timezones";
+import {addMissingZero} from "../../Classes/OtherFunctions";
+import moment from "moment-timezone";
 
-function aggregateFromRange(callback, a, b, acc) {
-    for (let n=a;n<=b;n++) {
-        acc = callback(acc,n);
-    }
-    return acc;
+const date = new Date();
+
+function getTimezonesOffset() {
+    if (date.getHours() === 12 && date.getMinutes() === 0)
+        return ["+12:00","-12:00"]
+
+    if (date.getHours() < 12)
+        return [`-${addMissingZero(date.getHours())}:${addMissingZero(date.getMinutes())}`];
+    
+    const gobalMinutes = 24*60 - date.getHours()*60 - date.getMinutes();
+
+    return [`+${addMissingZero(Math.floor(gobalMinutes/60))}:${addMissingZero(gobalMinutes%60)}`]   
 }
-
-const showTimezone = timezone => "UTC"+(timezone >= 0 ? "+" : "")+timezone
-
-const timezones = {
-    [0]: [0],
-    ...(aggregateFromRange((acc,n) => ({
-        ...acc,
-        [n]: [-1*n]
-    }), 1, 11, {})),
-    [12]: [-12,12],
-    ...(aggregateFromRange((acc,n) => ({
-        ...acc,
-        [n]: [24-n]
-    }), 13, 23, {}))
-}[new Date().getHours()];
 
 (async () => {
     try {
-        console.log("Reset today XP of all users on timezone"+(timezones.length > 1 ? "s" : "")+" "+timezones.map(showTimezone).join(", "))
+        const timezonesOffets = getTimezonesOffset();
+
+        
+        const {zones} = await getTimezoneDatas();
+        const timezones = Object.keys(zones)
+            .filter(zone => {
+                const zonedDate = moment.utc(date.toISOString()).tz(zone).format();
+                return timezonesOffets.some(timezoneOffset => zonedDate.substring(zonedDate.length-timezoneOffset.length) === timezoneOffset)
+            })
+
+        console.log("Concerned timezones offset :")
+        console.log(timezonesOffets);
+        console.log("Reset today XP of all users on bellow timezones :");
+        console.log(timezones);
         const XPServerIds = await XPData.find({
             timezone: { $in: timezones }
-        }).then(XPServerConfigs => XPServerConfigs.map(XPServerConfig => XPServerConfig.serverId))
+        })
+            .then(XPServerConfigs => 
+                XPServerConfigs
+                    .map(XPServerConfig => XPServerConfig.serverId)
+            )
         console.log(XPServerIds.length+" servers concerned");
 
         const {modifiedCount} = await XPUserData.updateMany({ serverId: {$in: XPServerIds} }, { $set: { todayXP: 0 } });
