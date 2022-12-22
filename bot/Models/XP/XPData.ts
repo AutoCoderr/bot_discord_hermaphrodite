@@ -60,22 +60,35 @@ const GradeSchema: Schema = new Schema({
     roleId: { type: String, required: true }
 })
 
+export const XPDataDefaultValues = {
+    enabled: false,
+    activeRoleId: undefined,
+    channelRoleId: undefined,
+    timezone: "Europe/Paris",
+    XPByMessage: 1,
+    XPByFirstMessage: 10,
+    XPByVocal: 1,
+    timeLimitMessage: 60 * 1000,
+    timeLimitVocal: 5 * 60 * 1000,
+    firstMessageTime: 7 * 60 * 60 * 1000
+}
+
 const XPDataSchema: Schema = new Schema({
     serverId: { type: String, required: true },
-    enabled: { type: Boolean, required: false, default: false },
+    enabled: { type: Boolean, required: false, default: XPDataDefaultValues.enabled },
     activeRoleId: { type: String, required: false },
     channelRoleId: { type: String, required: false },
 
-    timezone: { type: String, required: true, default: "Europe/Paris" },
+    timezone: { type: String, required: false, default: XPDataDefaultValues.timezone },
 
-    XPByMessage: { type: Number, required: false, default: 1 },
-    XPByFirstMessage: { type: Number, required: false, default: 10 },
-    XPByVocal: { type: Number, required: false, default: 1 },
+    XPByMessage: { type: Number, required: false, default: XPDataDefaultValues.XPByMessage },
+    XPByFirstMessage: { type: Number, required: false, default: XPDataDefaultValues.XPByFirstMessage },
+    XPByVocal: { type: Number, required: false, default: XPDataDefaultValues.XPByVocal },
 
-    timeLimitMessage: { type: Number, required: false, default: 60 * 1000 },
-    timeLimitVocal: { type: Number, required: false, default: 5 * 60 * 1000 },
+    timeLimitMessage: { type: Number, required: false, default: XPDataDefaultValues.timeLimitMessage },
+    timeLimitVocal: { type: Number, required: false, default: XPDataDefaultValues.timeLimitVocal },
 
-    firstMessageTime: { type: Number, required: false, default: 7 * 60 * 60 * 1000 },
+    firstMessageTime: { type: Number, required: false, default: XPDataDefaultValues.firstMessageTime },
 
     tipsByLevel: [LevelTipSchema],
 

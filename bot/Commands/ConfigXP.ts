@@ -6,7 +6,7 @@ import {
     Message, MessagePayload,
     Role
 } from "discord.js";
-import XPData, {IGrade, ILevelTip, IXPData} from "../Models/XP/XPData";
+import XPData, {IGrade, ILevelTip, IXPData, XPDataDefaultValues} from "../Models/XP/XPData";
 import {extractUTCTime, showTime} from "../Classes/DateTimeManager";
 import {
     roleCanBeManaged, checkIfBotCanManageRoles
@@ -37,7 +37,8 @@ interface IConfigXPArgs {
         'limit_gain_set'|
         'tips'|
         'grades'|
-        'timezone';
+        'timezone'|
+        'reset';
     setOrShowSubAction: 'set'|'show';
     XPActionTypes: 'vocal'|'message'|'first_message';
     XPActionTypesToLimit: 'vocal'|'message';
@@ -93,7 +94,8 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                     limit_gain_set: "Définir la limite de gain d'XP",
                     grades: null,
                     tips: null,
-                    timezone: "le créneau horaire"
+                    timezone: "le créneau horaire",
+                    reset: "Réinitialiser les paramètres du système d'XP sur ce serveur"
                 }
             },
             setOrShowSubAction: {
@@ -493,6 +495,24 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
 
 
         return this["action_"+args.action](args, XPServerConfig);
+    }
+
+    async action_reset(_: IConfigXPArgs, XPServerConfig: IXPData) {
+        for (const [key,value] of Object.entries(XPDataDefaultValues)) {
+            XPServerConfig[key] = value;
+        }
+        await XPServerConfig.save();
+
+        return this.response(true, {
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle("Données réinitialisées")
+                    .setFields({
+                        name: "Données réinitialisées avec succès",
+                        value: "Les données de configurations du système d'XP ont été réinitialisées avec succès !"
+                    })
+            ]
+        })
     }
 
     async action_is_enabled(args: IConfigXPArgs, XPServerConfig: IXPData) {
