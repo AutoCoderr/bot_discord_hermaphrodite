@@ -9,7 +9,7 @@ import {
 import XPData, {IGrade, ILevelTip, IXPData, XPDataDefaultValues} from "../Models/XP/XPData";
 import {extractUTCTime, showTime} from "../Classes/DateTimeManager";
 import {
-    warningNothingRoleCanBeAssignedMessage, warningSpecificRolesCantBeAssignedMessage, resetUsers
+    warningNothingRoleCanBeAssignedMessage, warningSpecificRolesCantBeAssignedMessage, resetUsers, checkParametersData
 } from "../libs/XP/XPOtherFunctions";
 import client from "../client";
 import AbstractXP from "./AbstractXP";
@@ -39,7 +39,9 @@ interface IConfigXPArgs {
         'tips'|
         'grades'|
         'timezone'|
-        'reset';
+        'reset'|
+        'import'|
+        'export';
     setOrShowSubAction: 'set'|'show';
     XPActionTypes: 'vocal'|'message'|'first_message';
     XPActionTypesToLimit: 'vocal'|'message';
@@ -97,7 +99,9 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                     grades: null,
                     tips: null,
                     timezone: "le créneau horaire",
-                    reset: "Réinitialiser les paramètres du système d'XP sur ce serveur"
+                    reset: "Réinitialiser les paramètres du système d'XP sur ce serveur",
+                    import: "Importer les paramètres du système d'XP depuis un fichier JSON",
+                    export: "Exporter les paramètres du système d'XP dans un fichier JSON"
                 }
             },
             setOrShowSubAction: {
@@ -464,7 +468,7 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                 description: "Donnez une durée (ex: 7h, 6h30, etc...)"
             },
             jsonFile: {
-                referToSubCommands: ['grades.import','tips.import'],
+                referToSubCommands: ['grades.import','tips.import','import'],
                 type: "jsonFile",
                 description: "Le fichier json à importer",
                 evenCheckAndExtractForSlash: true
@@ -567,6 +571,75 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                     .setFields({
                         name: "Désactiver système d'XP",
                         value: "Fonctionnalité désactivée avec succès !"
+                    })
+            ]
+        })
+    }
+
+    async action_export(_: IConfigXPArgs, XPServerConfig: IXPData) {
+        const messagePayload = new MessagePayload(<Interaction|Message>(this.interaction??this.message), {
+            content: "Voici les paramètres exportés :"
+        });
+        messagePayload.files = [{
+            name: "config.json",
+            data: JSON.stringify(
+                [
+                    'activeRoleId',
+                    'channelRoleId',
+                    'timezone',
+                    'XPByMessage',
+                    'XPByFirstMessage',
+                    'XPByVocal',
+                    'timeLimitMessage',
+                    'timeLimitVocal',
+                    'firstMessageTime'
+                ].reduce((acc,field) => ({
+                    ...acc,
+                    [field]: XPServerConfig[field]
+                }), {})
+            , null, '\t')
+        }]
+        return this.response(true, messagePayload)
+    }
+
+    async action_import(args: IConfigXPArgs, XPServerConfig: IXPData) {
+        if (!(await checkParametersData(<Guild>this.guild, XPServerConfig, args.jsonFile)))
+            return this.response(false, {
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("Importation échouée")
+                        .setFields({
+                            name: "Il est impossible d'importer ce fichier json pour les paramètres",
+                            value: "Êtes vous sur que le format soit correct? Les types de données doivent correspondre à ce qui est attendu.\n"+
+                                "Si vous avez le activeRoleId non définit, le système d'XP de ce serveur doit être désactivé.\n"+
+                                "Le timezone doit également correspondre à un timezone existant.\n"+
+                                "Vérifiez aussi que les ids des roles correspondent à des rôles existants"
+                        })
+                ]
+            })
+
+        for (const field of [
+            'activeRoleId',
+            'channelRoleId',
+            'timezone',
+            'XPByMessage',
+            'XPByFirstMessage',
+            'XPByVocal',
+            'timeLimitMessage',
+            'timeLimitVocal',
+            'firstMessageTime'
+        ])
+            XPServerConfig[field] = args.jsonFile[field];
+
+        await XPServerConfig.save();
+
+        return this.response(true, {
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle("Importation réussie !")
+                    .setFields({
+                        name: "Importation réussie !",
+                        value: "Les paramètres on été importés avec succès !"
                     })
             ]
         })

@@ -12,6 +12,7 @@ import XPNotificationAskButton, {
 } from "../../Models/XP/XPNotificationAskButton";
 import {deleteMP} from "../../Classes/OtherFunctions";
 import {getXPUserConfig} from "./XPCounting/countingOtherFunctions";
+import {getTimezoneDatas} from "../timezones";
 
 export async function listenXPNotificationAskButtons(interaction: ButtonInteraction): Promise<boolean> {
     const button: null|IXPNotificationAskButton = await XPNotificationAskButton.findOne({
@@ -157,4 +158,22 @@ export function warningSpecificRolesCantBeAssignedMessage(guild: Guild, ...roles
         } : null,
         cantBeAssignedRoles
     }
+}
+
+export function checkParametersData(guild: Guild, XPServerConfig: IXPData, params: any): Promise<boolean> {
+    //const merde: [string[], string, ((v: any) => boolean|Promise<boolean>)] = 
+    return Promise.all(
+        (<[string[], string, ((v) => boolean|Promise<boolean>)][]>[
+            [['string','undefined'], 'activeRoleId', (v) => (!v && !XPServerConfig.enabled) || guild.roles.cache.get(v)],
+            [['string','undefined'], 'channelRoleId', (v) => !v || guild.roles.cache.get(v)],
+            [['string'], 'timezone', (v) => getTimezoneDatas().then(({zones}) => zones[v] !== undefined)],
+            [['number'], 'XPByMessage', (v) => v%1 === 0 && v > 0],
+            [['number'], 'XPByFirstMessage', (v) => v%1 === 0 && v > 0],
+            [['number'], 'XPByVocal', (v) => v%1 === 0 && v > 0],
+            [['number'], 'timeLimitMessage', (v) => v%1 === 0 && v >= 0],
+            [['number'], 'timeLimitVocal', (v) => v%1 === 0 && v >= 0],
+            [['number'], 'firstMessageTime', (v) => v%1 === 0 && v >= 0]
+        ])
+            .map(async ([types, field, check]) => types.includes(typeof(params[field])) && await check(params[field]))
+    ).then(checkedFields => !checkedFields.some(c => !c))
 }
