@@ -3,10 +3,10 @@ import {
     ButtonInteraction,
     EmbedBuilder,
     Guild,
-    GuildMember,
+    GuildMember, EmbedField,
     Role, User, PermissionFlagsBits
 } from "discord.js";
-import XPUserData, {IXPUserData} from "../../Models/XP/XPUserData";
+import {IXPUserData} from "../../Models/XP/XPUserData";
 import XPNotificationAskButton, {
     IXPNotificationAskButton
 } from "../../Models/XP/XPNotificationAskButton";
@@ -92,4 +92,69 @@ export function roleCanBeManaged(guild: Guild, roleOrRoleId: Role|string) {
 
 export function checkIfBotCanManageRoles(guild: Guild) {
     return guild.members.me?.permissions.has(PermissionFlagsBits.ManageRoles) ?? false
+}
+
+export function resetUsers(
+    guild: Guild,
+    XPUsersConfig: IXPUserData[],
+    gradesById: {[gradeId: string]: IGrade}, 
+    rolesCanBeManaged: boolean, 
+    nonManageableRoles: {[roleId: string]: false},
+    resetXPs: boolean = false
+) {
+    return Promise.all(
+        XPUsersConfig.map(async XPUserConfig => {
+            const grade: undefined|IGrade = XPUserConfig.gradeId ? gradesById[XPUserConfig.gradeId] : undefined;
+
+            if (resetXPs) {
+                XPUserConfig.XP = 0;
+                XPUserConfig.todayXP = 0;
+            }
+
+            XPUserConfig.gradeId = undefined;
+            XPUserConfig.currentLevel = 0;
+            XPUserConfig.lastNotifiedLevel = 0;
+
+            await XPUserConfig.save();
+
+            if (
+                !grade || 
+                !rolesCanBeManaged || 
+                nonManageableRoles[grade.roleId] === false
+            )
+                return;
+
+            const member = await guild.members.fetch(XPUserConfig.userId).catch(() => null);
+
+            if (!member)
+                return;
+
+            await member.roles.remove(grade.roleId);
+        })
+    )
+}
+
+export function warningNothingRoleCanBeAssignedMessage(guild: Guild): null|EmbedField {
+    return checkIfBotCanManageRoles(guild) ?
+        null :
+        {
+            name: "Attention, Herma Bot n'a pas la permission d'assigner les rôles de manière générale !",
+            value: "Vous devez lui donner la permission",
+            inline: false
+        }
+}
+
+export function warningSpecificRolesCantBeAssignedMessage(guild: Guild, ...roles: Role[]|[Role[]]): {field: null|EmbedField, cantBeAssignedRoles: Role[]} {
+    roles = (roles.length > 0 && roles[0] instanceof Array) ? roles[0] : roles
+    if (guild.members.me === null)
+        return {field: null, cantBeAssignedRoles: []};
+    const cantBeAssignedRoles = (<Role[]>roles).filter(role => !roleCanBeManaged(guild, role))
+    return {
+        field: cantBeAssignedRoles.length > 0 ?{
+            name: "Attention, Herma Bot ne peut pas assigner les rôles suivants car ils ont un rang plus élevé que le sien :",
+            value: cantBeAssignedRoles.map(role => " - <@&"+role.id+">").join("\n"),
+            inline: false
+        } : null,
+        cantBeAssignedRoles
+    }
 }

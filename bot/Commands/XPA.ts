@@ -1,12 +1,13 @@
 import {IArgsModel} from "../interfaces/CommandInterfaces";
-import {CommandInteraction, EmbedBuilder, Guild, GuildMember, Message} from "discord.js";
+import {CommandInteraction, EmbedBuilder, Guild, GuildMember, Message, Role} from "discord.js";
 import AbstractXP from "./AbstractXP";
 import {IXPData} from "../Models/XP/XPData";
 import XPUserData, {IXPUserData} from "../Models/XP/XPUserData";
 import {detectUpgradeAndLevel} from "../libs/XP/XPCounting/countingOtherFunctions";
+import {resetUsers, warningNothingRoleCanBeAssignedMessage, warningSpecificRolesCantBeAssignedMessage} from "../libs/XP/XPOtherFunctions";
 
 interface IXPAArgs {
-    action: 'set'|'give'|'reset'|'show';
+    action: 'set'|'give'|'reset'|'reset_all'|'show';
     XP_to_set: number;
     XP_to_give: number;
     member: GuildMember;
@@ -31,13 +32,14 @@ export default class XPA extends AbstractXP<IXPAArgs> {
                 choices: {
                     set: "Définir les XP d'un membre",
                     give: "Donner (ou retirer avec une valeur < 0) des XP à un membre",
-                    reset: "Remettre les XP d'un membre à 0"
+                    reset: "Remettre les XP d'un membre à 0",
+                    reset_all: "Réinitialiser les XP de tout les membres"
                 }
             },
             member: {
                 referToSubCommands: ['set','give','reset'],
                 type: "user",
-                description: "Mentionnez un membez",
+                description: "Mentionnez un membe",
                 evenCheckAndExtractForSlash: true,
                 valid: async (member: GuildMember, _, command: XPA) => {
                     const XPServerConfig = await command.getXPServerConfig({enabled: true});
@@ -141,5 +143,53 @@ export default class XPA extends AbstractXP<IXPAArgs> {
         await detectUpgradeAndLevel(args.member, XPUserConfig, XPServerConfig, true);
 
         return this.responseXPSet(XPUserConfig);
+    }
+
+    async action_reset_all(_: IXPAArgs, XPServerConfig: IXPData) {
+        const gradesById = XPServerConfig.grades.reduce((acc,grade) => ({
+            ...acc,
+            [<string>grade._id]: grade
+        }), {})
+
+        const warningNothingRoleCanBeAssignedEmbed = warningNothingRoleCanBeAssignedMessage(<Guild>this.guild)
+
+        const {field: warningNonAssignableRolesEmbed, cantBeAssignedRoles} = warningNothingRoleCanBeAssignedEmbed === null ? 
+            warningSpecificRolesCantBeAssignedMessage(<Guild>this.guild,
+                <Role[]>XPServerConfig.grades
+                    .map(({roleId}) => (<Guild>this.guild).roles.cache.get(roleId))
+                    .filter(role => role !== undefined) 
+            ) : 
+            {field: null, cantBeAssignedRoles: []};
+
+        const nonManageableRoles: {[roleId: string]: false} = warningNothingRoleCanBeAssignedEmbed === null ? 
+            cantBeAssignedRoles.reduce((acc,role) => ({
+                ...acc,
+                [role.id]: false
+            }), {}) : 
+            {};
+
+        const XPUsersConfig: IXPUserData[] = await XPUserData.find({
+            serverId: XPServerConfig.serverId,
+        })
+
+        await resetUsers(<Guild>this.guild, XPUsersConfig, gradesById, warningNothingRoleCanBeAssignedEmbed === null, nonManageableRoles, true);
+
+        const embed = new EmbedBuilder()
+                .setTitle("Utilisateurs réinitialisés")
+                .setFields({
+                    name: "Utilisateurs réinitialisés",
+                    value: "Tout les utilisaters ont été réinitialisés avec succès!"
+                })
+        
+        if (warningNonAssignableRolesEmbed)
+            embed.addFields(warningNonAssignableRolesEmbed)
+        if (warningNothingRoleCanBeAssignedEmbed)
+            embed.addFields(warningNothingRoleCanBeAssignedEmbed)
+        
+        return this.response(true, {
+            embeds: [
+                embed        
+            ]
+        })
     }
 }
