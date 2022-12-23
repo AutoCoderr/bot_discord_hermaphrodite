@@ -43,7 +43,7 @@ interface IConfigXPArgs {
     setOrShowSubAction: 'set'|'show';
     XPActionTypes: 'vocal'|'message'|'first_message';
     XPActionTypesToLimit: 'vocal'|'message';
-    tipsSubActions: 'list'|'show'|'set'|'delete'|'export'|'import';
+    tipsSubActions: 'list'|'show'|'set'|'delete'|'export'|'import'|'reset';
     gradesSubActions:
         'add'|
         'list'|
@@ -142,7 +142,8 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                     delete: "Supprimer un tips",
                     list: "Lister les tips",
                     export: "Exporter les tips dans un fichier json",
-                    import: "Importer les tips à partir d'un fichier json"
+                    import: "Importer les tips à partir d'un fichier json",
+                    reset: "Réinitialiser les tips du système d'XP du serveur"
                 }
             },
             gradesSubActions: {
@@ -1106,6 +1107,23 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
 
     async action_tips(args: IConfigXPArgs, XPServerConfig: IXPData) {
         return this["action_tips_"+args.tipsSubActions](args, XPServerConfig)
+    }
+
+    async action_tips_reset(_: IConfigXPArgs, XPServerConfig: IXPData) {
+        XPServerConfig.tipsByLevel = [];
+
+        await XPServerConfig.save();
+
+        return this.response(true, {
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle("Tips réinitialisés")
+                    .setFields({
+                        name: "Tips réinitialisés",
+                        value: "Tout les tips ont été réinitialisés avec succès !"
+                    })
+            ]
+        })
     }
 
     async action_tips_export(args: IConfigXPArgs, XPServerConfig: IXPData) {
