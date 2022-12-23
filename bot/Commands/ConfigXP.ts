@@ -23,6 +23,7 @@ import {
     reDefineUsersGradeRole
 } from "../libs/XP/gradeCalculs";
 import {getTimezoneDatas} from "../libs/timezones";
+import XPUserData, { IXPUserData } from "../Models/XP/XPUserData";
 
 interface IConfigXPArgs {
     action:
@@ -54,7 +55,8 @@ interface IConfigXPArgs {
         'set_xp_by_level'|
         'set_role'|
         'export'|
-        'import';
+        'import'|
+        'reset';
     role: Role;
     duration: number;
     XP?: number;
@@ -159,7 +161,8 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                     set_xp_by_level: "Définir le nombre d'XP par palier, d'un grade existant",
                     set_role: "Définir le role d'un grade existant",
                     export: "Exporter les grades dans un fichier json",
-                    import: "Importer les grades à partir d'un fichier json"
+                    import: "Importer les grades à partir d'un fichier json",
+                    reset: "Réinitialiser les grades du système d'XP du serveur"
                 }
             },
             gradeNumber: {
@@ -642,17 +645,95 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
             }
     }
 
-    warningSpecificRolesCantBeAssignedMessage(...roles: Role[]|[Role[]]): null|EmbedField {
+    warningSpecificRolesCantBeAssignedMessage(...roles: Role[]|[Role[]]): {field: null|EmbedField, cantBeAssignedRoles: Role[]} {
         roles = (roles.length > 0 && roles[0] instanceof Array) ? roles[0] : roles
         if (this.guild === null || this.guild.members.me === null)
-            return null;
+            return {field: null, cantBeAssignedRoles: []};
         const cantBeAssignedRoles = (<Role[]>roles).filter(role => !roleCanBeManaged(<Guild>this.guild, role))
-        return cantBeAssignedRoles.length > 0 ?
-            {
+        return {
+            field: cantBeAssignedRoles.length > 0 ?{
                 name: "Attention, Herma Bot ne peut pas assigner les rôles suivants car ils ont un rang plus élevé que le sien :",
                 value: cantBeAssignedRoles.map(role => " - <@&"+role.id+">").join("\n"),
                 inline: false
-            } : null;
+            } : null,
+            cantBeAssignedRoles
+        }
+    }
+
+    async action_grades_reset(_: IConfigXPArgs, XPServerConfig: IXPData) {
+        const gradesById = XPServerConfig.grades.reduce((acc,grade) => ({
+            ...acc,
+            [<string>grade._id]: grade
+        }), {})
+
+        const warningNothingRoleCanBeAssignedEmbed = this.warningNothingRoleCanBeAssignedMessage()
+
+        const {field: warningNonAssignableRolesEmbed, cantBeAssignedRoles} = warningNothingRoleCanBeAssignedEmbed === null ? 
+            this.warningSpecificRolesCantBeAssignedMessage(
+                <Role[]>XPServerConfig.grades
+                    .map(({roleId}) => (<Guild>this.guild).roles.cache.get(roleId))
+                    .filter(role => role !== undefined) 
+            ) : 
+            {field: null, cantBeAssignedRoles: []};
+
+        const nonManageableRoles: {[roleId: string]: false} = warningNothingRoleCanBeAssignedEmbed === null ? 
+            cantBeAssignedRoles.reduce((acc,role) => ({
+                ...acc,
+                [role.id]: false
+            }), {}) : 
+            {};
+
+        const XPUsersConfig: IXPUserData[] = await XPUserData.find({
+            serverId: XPServerConfig.serverId,
+            currentLevel: {$ne: 0}
+        })
+
+        await Promise.all(
+            XPUsersConfig.map(async XPUserConfig => {
+                const grade: undefined|IGrade = gradesById[<string>XPUserConfig.gradeId];
+
+                XPUserConfig.gradeId = undefined;
+                XPUserConfig.currentLevel = 0;
+                XPUserConfig.lastNotifiedLevel = 0;
+    
+                await XPUserConfig.save();
+    
+                if (
+                    !grade || 
+                    warningNothingRoleCanBeAssignedEmbed !== null || 
+                    nonManageableRoles[grade.roleId] === false
+                )
+                    return;
+    
+                const member = await (<Guild>this.guild).members.fetch(XPUserConfig.userId).catch(() => null);
+    
+                if (!member)
+                    return;
+
+                await member.roles.remove(grade.roleId);
+            })
+        )
+
+        XPServerConfig.grades = [];
+        await XPServerConfig.save();
+
+        const embed = new EmbedBuilder()
+                .setTitle("Grades réinitialisés")
+                .setFields({
+                    name: "Grades réinitialisés",
+                    value: "Les grades ont été réinitialisés avec succès!"
+                })
+        
+        if (warningNonAssignableRolesEmbed)
+            embed.addFields(warningNonAssignableRolesEmbed)
+        if (warningNothingRoleCanBeAssignedEmbed)
+            embed.addFields(warningNothingRoleCanBeAssignedEmbed)
+        
+        return this.response(true, {
+            embeds: [
+                embed        
+            ]
+        })
     }
 
     async action_grades_export(args: IConfigXPArgs, XPServerConfig: IXPData) {
@@ -702,7 +783,7 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
         if (warningNothingRoleCanBeAssignedEmbed !== null)
             embed.addFields(warningNothingRoleCanBeAssignedEmbed)    
 
-        const warningNonAssignableRolesEmbed = this.warningSpecificRolesCantBeAssignedMessage(<Role[]>(<IGrade[]>args.jsonFile)
+        const {field: warningNonAssignableRolesEmbed} = this.warningSpecificRolesCantBeAssignedMessage(<Role[]>(<IGrade[]>args.jsonFile)
             .filter(({roleId}, index) => !XPServerConfig.grades.slice(0,index).some(grade => grade.roleId === roleId))
             .map(grade =>
                 (<Guild>this.guild).roles.cache.get(grade.roleId)
@@ -747,7 +828,7 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
         if (warningNothingRoleCanBeAssignedEmbed !== null)
             embed.addFields(warningNothingRoleCanBeAssignedEmbed)    
 
-        const warningNonAssignableRolesEmbed = this.warningSpecificRolesCantBeAssignedMessage(args.role);
+        const {field: warningNonAssignableRolesEmbed} = this.warningSpecificRolesCantBeAssignedMessage(args.role);
         if (warningNonAssignableRolesEmbed !== null)
             embed.addFields(warningNonAssignableRolesEmbed)
 
@@ -832,7 +913,7 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
         if (warningNothingRoleCanBeAssignedEmbed !== null)
             embed.addFields(warningNothingRoleCanBeAssignedEmbed)    
 
-        const warningNonAssignableRolesEmbed = this.warningSpecificRolesCantBeAssignedMessage(args.role);
+        const {field: warningNonAssignableRolesEmbed} = this.warningSpecificRolesCantBeAssignedMessage(args.role);
         if (warningNonAssignableRolesEmbed !== null)
             embed.addFields(warningNonAssignableRolesEmbed)
 
@@ -964,7 +1045,7 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
         if (warningNothingRoleCanBeAssignedEmbed !== null)
             embed.addFields(warningNothingRoleCanBeAssignedEmbed)    
 
-        const warningNonAssignableRolesEmbed = this.warningSpecificRolesCantBeAssignedMessage(args.role);
+        const {field: warningNonAssignableRolesEmbed} = this.warningSpecificRolesCantBeAssignedMessage(args.role);
         if (warningNonAssignableRolesEmbed !== null)
             embed.addFields(warningNonAssignableRolesEmbed)
 
@@ -1010,7 +1091,7 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
         if (warningNothingRoleCanBeAssignedEmbed !== null)
             embed.addFields(warningNothingRoleCanBeAssignedEmbed)    
 
-        const warningNonAssignableRolesEmbed = this.warningSpecificRolesCantBeAssignedMessage(<Role[]>XPServerConfig.grades
+        const {field: warningNonAssignableRolesEmbed} = this.warningSpecificRolesCantBeAssignedMessage(<Role[]>XPServerConfig.grades
             .filter(({roleId}, index) => !XPServerConfig.grades.slice(0,index).some(grade => grade.roleId === roleId))
             .map(grade => (<Guild>this.guild).roles.cache.get(grade.roleId))
             .filter(role => role !== undefined)
