@@ -465,7 +465,18 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
             duration: {
                 referToSubCommands: ['first_message_time.set','limit_gain_set.message','limit_gain_set.vocal'],
                 type: "duration",
-                description: "Donnez une durée (ex: 7h, 6h30, etc...)"
+                description: "Donnez une durée (ex: 7h, 6h30, etc...)",
+                valid: (value, args) => args.XPActionTypesToLimit !== "vocal" || value >= 10*1000,
+                errorMessage: (value, args) =>
+                    (value < 10*1000 && args.XPActionTypesToLimit === "vocal") ?
+                    {
+                        name: "Valeur incorrecte",
+                        value: "Dans le cas du vocal, vous ne pouvez pas mettre de limite de moins de 10 secondes"
+                    } :
+                    {
+                        name: "Valeur incorrecte",
+                        value: "Avez-vous correctement respecter la syntaxe des durées ?"
+                    }
             },
             jsonFile: {
                 referToSubCommands: ['grades.import','tips.import','import'],
@@ -1292,7 +1303,7 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                     .setFields(
                         {
                             name: "Pour les messages",
-                            value: "Gain de "+XPServerConfig.XPByMessage+"XP par message toutes les "+showTime(extractUTCTime(XPServerConfig.timeLimitMessage), 'fr')
+                            value: "Gain de "+XPServerConfig.XPByMessage+"XP par message"+(XPServerConfig.timeLimitMessage > 0 ? " toutes les "+showTime(extractUTCTime(XPServerConfig.timeLimitMessage), 'fr') : "")
                         },
                         {
                             name: "Pour le vocal",
