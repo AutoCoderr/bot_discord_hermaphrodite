@@ -1,4 +1,5 @@
 import XPData, {IGrade, IXPData} from "../../Models/XP/XPData";
+import XPUserData from "../../Models/XP/XPUserData";
 import {
     ButtonInteraction,
     EmbedBuilder,
@@ -53,9 +54,9 @@ export async function enableOrDisableUserNotification(user: User|GuildMember, XP
                         .setFields(
                             (toEnable && unblockedTips.length > 0) ?
                                 {
-                                    name: "Vous avez débloqué les tips des niveaux suivants :",
+                                    name: "Vous avez débloqué les tips des paliers suivants :",
                                     value: unblockedTips.map(tip =>
-                                        "Niveau " + tip.level
+                                        "palier " + tip.level
                                     ).join("\n")
                                 } :
                                 {
@@ -184,4 +185,20 @@ export function checkParametersData(guild: Guild, XPServerConfig: IXPData, param
         ])
             .map(async ([types, field, check]) => types.includes(typeof(params[field])) && await check(params[field]))
     ).then(checkedFields => !checkedFields.some(c => !c))
+}
+
+export async function getUserInfos(XPServerConfig: IXPData, XPUserConfig: IXPUserData) {
+    const grade: null|IGrade = XPServerConfig.grades.find(grade => (<string>grade._id).toString() === XPUserConfig.gradeId)??null
+    const allSortedXPUserConfigs: IXPUserData[] = await XPUserData.find({
+        serverId: XPUserConfig.serverId
+    }).then(allXPUserConfigs => allXPUserConfigs.sort((a,b) => b.XP - a.XP));
+    const rang: number = allSortedXPUserConfigs.findIndex(AXPUserConfig => AXPUserConfig.userId === XPUserConfig.userId) + 1;
+
+    return {
+        grade, 
+        rang,
+        XP: XPUserConfig.XP,
+        todayXP: XPUserConfig.todayXP,
+        currentLevel: XPUserConfig.currentLevel
+    }
 }

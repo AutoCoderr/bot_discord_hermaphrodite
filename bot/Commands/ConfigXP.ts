@@ -160,7 +160,7 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                     list: "Lister les grades",
                     delete: "Supprimer un grade",
                     insert: "Insérer un nouveau grade",
-                    set_level: "Définir le premier niveau d'un grade existant",
+                    set_level: "Définir le premier palier d'un grade existant",
                     set_name: "Définir le nom d'un grade existant",
                     set_xp: "Définir les XPs de départ d'un grade existant",
                     set_xp_by_level: "Définir le nombre d'XP par palier, d'un grade existant",
@@ -209,8 +209,8 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
 
                     if (args.gradesSubActions === "set_level" && value === 1)
                         return {
-                            name: "Redéfinition du niveau impossible",
-                            value: "Vous ne pouvez pas redéfinir le niveau du premier grade"
+                            name: "Redéfinition du palier impossible",
+                            value: "Vous ne pouvez pas redéfinir le palier du premier grade"
                         }
 
                     if (args.gradesSubActions === "set_xp" && value > 1)
@@ -316,19 +316,19 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                     if (value === undefined)
                         return {
                             name: "Donnée manquante",
-                            value: "Vous devez spécifier le niveau"
+                            value: "Vous devez spécifier le palier"
                         }
 
                     if (value <= 0)
                         return {
                             name: "Donnée invalide",
-                            value: "Le niveau doit être un entier naturel (> 0)"
+                            value: "Le palier doit être un entier naturel (> 0)"
                         }
 
                     if (args.action === "tips")
                         return {
                             name: "Tip introuvable",
-                            value: "Aucun tip associé au niveau "+value+" n'a été trouvé"
+                            value: "Aucun tip associé au palier "+value+" n'a été trouvé"
                         }
 
                     const XPServerConfig = await command.getXPServerConfig();
@@ -350,9 +350,9 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                                 )
                             ) ?
 
-                            "Le premier niveau du premier grade doit forcément être le niveau 1"
+                            "Le premier palier du premier grade doit forcément être le palier 1"
                                 :
-                            "Le niveau mentionné doit être strictement supérieur au premier niveau du grade précedent" + (
+                            "Le palier mentionné doit être strictement supérieur au premier palier du grade précedent" + (
                                     (
                                         args.gradeNumber !== undefined &&
                                         XPServerConfig !== null &&
@@ -360,7 +360,7 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                                             (args.gradesSubActions === "insert" && args.gradeNumber <= XPServerConfig.grades.length) ||
                                             (args.gradesSubActions === "set_level" && args.gradeNumber < XPServerConfig.grades.length)
                                         )
-                                    ) ? " et strictement inférieur au premier niveau du grade suivant" : ""
+                                    ) ? " et strictement inférieur au premier palier du grade suivant" : ""
                             )
                     }
                 }
@@ -445,12 +445,12 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                 referToSubCommands: ['grades.add', 'grades.insert','grades.set_xp_by_level'],
                 type: "overZeroInteger",
                 evenCheckAndExtractForSlash: true,
-                description: "Le nombre d'XP nécessaire pour augmenter de niveau",
+                description: "Le nombre d'XP nécessaire pour augmenter de palier",
                 errorMessage: (value) =>
                     value === undefined ?
                         {
                             name: "Donnée manquante",
-                            value: "Vous devez spécifier le nombre d'XP par niveau"
+                            value: "Vous devez spécifier le nombre d'XP par palier"
                         } :
                         {
                             name: "Donnée invalide",
@@ -1041,10 +1041,10 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
         return this.response(true, {
             embeds: [
                 new EmbedBuilder()
-                    .setTitle("Niveau changé")
+                    .setTitle("palier changé")
                     .setFields({
-                        name: "Premier niveau du grade "+args.gradeNumber+" modifié",
-                        value: "Le premier niveau du grade "+args.gradeNumber+" ont été modifié avec succès"
+                        name: "Premier palier du grade "+args.gradeNumber+" modifié",
+                        value: "Le premier palier du grade "+args.gradeNumber+" ont été modifié avec succès"
                     })
             ]
         })
@@ -1110,7 +1110,7 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                 XPServerConfig.grades.map(({atLevel, name, requiredXP, XPByLevel, roleId}, index) => ({
                     name: (index+1)+" - "+name,
                     value:
-                        "Niveau "+atLevel+(
+                        "Palier "+atLevel+(
                             index === XPServerConfig.grades.length - 1 ?
                                 "+" :
                                 XPServerConfig.grades[index+1].atLevel-atLevel > 1 ?
@@ -1248,7 +1248,7 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                     .setTitle("Element supprimé avec succès")
                     .setFields({
                         name: "Element supprimé avec succès",
-                        value: "Le tip associé au niveau "+args.level+" a été supprimé avec succès !"
+                        value: "Le tip associé au palier "+args.level+" a été supprimé avec succès !"
                     })
             ]
         })

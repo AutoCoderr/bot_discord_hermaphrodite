@@ -104,7 +104,7 @@ export function showTipsList(tips: ILevelTip[], XPUserConfig: null|IXPUserData =
                 new EmbedBuilder()
                     .setTitle(XPUserConfig === null ? filteredTips.length + " tip(s) sont défini(s)" : "Voici les tips qui vous sont accessibles")
                     .setFields(filteredTips.map(tip => ({
-                        name: "Niveau " + tip.level,
+                        name: "Palier " + tip.level,
                         value: tip.content.substring(0, Math.min(10, tip.content.length)).replace(/\n/, "[br]") + (tip.content.length > 10 ? "..." : [])
                     }))) :
                 new EmbedBuilder()

@@ -4,10 +4,10 @@ import AbstractXP from "./AbstractXP";
 import {IXPData} from "../Models/XP/XPData";
 import XPUserData, {IXPUserData} from "../Models/XP/XPUserData";
 import {detectUpgradeAndLevel} from "../libs/XP/XPCounting/countingOtherFunctions";
-import {resetUsers, warningNothingRoleCanBeAssignedMessage, warningSpecificRolesCantBeAssignedMessage} from "../libs/XP/XPOtherFunctions";
+import {resetUsers, warningNothingRoleCanBeAssignedMessage, warningSpecificRolesCantBeAssignedMessage, getUserInfos} from "../libs/XP/XPOtherFunctions";
 
 interface IXPAArgs {
-    action: 'set'|'give'|'reset'|'reset_all'|'show';
+    action: 'set'|'give'|'reset'|'reset_all'|'info';
     XP_to_set: number;
     XP_to_give: number;
     member: GuildMember;
@@ -33,13 +33,14 @@ export default class XPA extends AbstractXP<IXPAArgs> {
                     set: "Définir les XP d'un membre",
                     give: "Donner (ou retirer avec une valeur < 0) des XP à un membre",
                     reset: "Remettre les XP d'un membre à 0",
-                    reset_all: "Réinitialiser les XP de tout les membres"
+                    reset_all: "Réinitialiser les XP de tout les membres",
+                    info: "Voir les informations d'un utilisateur"
                 }
             },
             member: {
-                referToSubCommands: ['set','give','reset'],
+                referToSubCommands: ['set','give','reset','info'],
                 type: "user",
-                description: "Mentionnez un membe",
+                description: "Mentionnez un membre",
                 evenCheckAndExtractForSlash: true,
                 valid: async (member: GuildMember, _, command: XPA) => {
                     const XPServerConfig = await command.getXPServerConfig({enabled: true});
@@ -189,6 +190,26 @@ export default class XPA extends AbstractXP<IXPAArgs> {
         return this.response(true, {
             embeds: [
                 embed        
+            ]
+        })
+    }
+
+    async action_info(args: IXPAArgs, XPServerConfig: IXPData, XPUserConfig: IXPUserData) {
+        const {XP, todayXP, currentLevel, grade, rang} = await getUserInfos(XPServerConfig, XPUserConfig);
+
+        return this.response(true, {
+            embeds: [
+                    new EmbedBuilder()
+                        .setTitle("Toutes les informations de "+(args.member.nickname??args.member.user.username))
+                        .setFields({
+                            name: "Voici toutes les informations "+(args.member.nickname??args.member.user.username)+" :",
+                            value:
+                                "Il/elle a "+XP+" XP au total\n"+
+                                "Il/elle a gagné(e) "+todayXP+" XP aujourd'hui\n"+
+                                "Il/elle est au palier "+currentLevel+"\n"+
+                                (grade ? "Il/elle est au grade '"+grade.name+"'" : "Il/elle n'est dans encore aucun grade")+"\n"+
+                                "Il/elle est au rang #"+rang
+                        })
             ]
         })
     }

@@ -39,13 +39,9 @@ export async function sendTip(member: GuildMember, level: number, tip: ILevelTip
     const acceptButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "ta";
     const denyButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "td";
 
-    await member.send((
-            level === 1 ?
-                "Vous venez de débloquer le premier niveau du système d'XP de '"+member.guild.name+"' !" :
-                "Vous avez atteint le niveau "+level+" du système d'XP de '"+member.guild.name+"'!") +
-        ( level > 1 ?
+    await member.send(( level > 1 ?
             "\nVoici un nouveau tip :" :
-            "" )
+            "\nVoici le premier tip :" )
         +"\n\n"+tip.content)
 
     if (level === 1)

@@ -94,7 +94,7 @@ async function detectUplevel(member: GuildMember, XPUserConfig: IXPUserData, XPS
                         .setTitle("XP réduits")
                         .setFields({
                             name: "XPs réduits par un administrateur",
-                            value: "Un administrateur a réduit vos XP sur le serveur '"+member.guild.name+"', vous êtes désormais au niveau "+XPUserConfig.currentLevel
+                            value: "Un administrateur a réduit vos XP sur le serveur '"+member.guild.name+"', vous êtes désormais au palier "+XPUserConfig.currentLevel
                         })
                 ]
             })
@@ -119,8 +119,8 @@ async function detectUplevel(member: GuildMember, XPUserConfig: IXPUserData, XPS
                 await askForNotifications(
                     member.user,
                     member.guild.id,
-                    (tip === null ? "Vous venez de débloquer le premier niveau du système d'XP de '"+member.guild.name+"' !\n" : "")+
-                    "Souhaitez vous avoir les notifications actives?"
+                    (tip === null ? "Vous venez de débloquer le premier palier du système d'XP de '"+member.guild.name+"' !\n" : "")+
+                    "Souhaitez vous avoir les notifications activées?"
                 )
         } catch (_) {
             return;
@@ -149,8 +149,8 @@ async function detectUplevel(member: GuildMember, XPUserConfig: IXPUserData, XPS
                             },
                             ...(
                                 tipsToNotify.length > 0 ? [{
-                                    name: "Vous avez désormais accès aux tips des niveaux suivants :",
-                                    value: tipsToNotify.map(level => "Niveau "+level).join("\n")
+                                    name: "Vous avez désormais accès aux tips des paliers suivants :",
+                                    value: tipsToNotify.map(level => "Palier "+level).join("\n")
                                 }] : []
                             )
                         ])
@@ -175,7 +175,7 @@ export async function detectUpgradeAndLevel(member: GuildMember, XPUserConfig: I
                             .setTitle("XP réduits")
                             .setFields({
                                 name: "XPs réduits par un administrateur",
-                                value: "Un administrateur a réduit vos XP sur le serveur '"+member.guild.name+"', vous êtes désormais au niveau 0"
+                                value: "Un administrateur a réduit vos XP sur le serveur '"+member.guild.name+"', vous êtes désormais au palier 0"
                             })
                     ]
                 })
