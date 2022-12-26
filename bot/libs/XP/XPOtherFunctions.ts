@@ -32,11 +32,15 @@ export async function listenXPNotificationAskButtons(interaction: ButtonInteract
     return true;
 }
 
-export async function enableOrDisableUserNotification(user: User|GuildMember, XPUserConfig: IXPUserData, toEnable: boolean, XPServerConfig: IXPData|null = null): Promise<boolean> {
-    if (toEnable) {
-        XPServerConfig = XPServerConfig ?? await XPData.findOne({
-            serverId: XPUserConfig.serverId
-        })
+export async function enableOrDisableUserNotification(user: User|GuildMember, XPUserConfig: IXPUserData, toEnable: boolean, XPServerConfig: IXPData|null = null, sendMp = true): Promise<boolean> {
+    if (sendMp) {
+        XPServerConfig = XPServerConfig ?? (
+                        toEnable ?
+                            await XPData.findOne({
+                                serverId: XPUserConfig.serverId
+                            }) :
+                            null
+        )
 
         try {
             const unblockedTips = XPServerConfig !== null ?
@@ -45,9 +49,9 @@ export async function enableOrDisableUserNotification(user: User|GuildMember, XP
             await user.send({
                 embeds: [
                     new EmbedBuilder()
-                        .setTitle("Notifications du système d'XP activées")
+                        .setTitle("Notifications du système d'XP "+(toEnable ? "activées" : "désactivées"))
                         .setFields(
-                            unblockedTips.length > 0 ?
+                            (toEnable && unblockedTips.length > 0) ?
                                 {
                                     name: "Vous avez débloqué les tips des niveaux suivants :",
                                     value: unblockedTips.map(tip =>
@@ -55,8 +59,8 @@ export async function enableOrDisableUserNotification(user: User|GuildMember, XP
                                     ).join("\n")
                                 } :
                                 {
-                                    name: "Notifications du système d'XP activées",
-                                    value: "Vous avez activé les notifications pour le système d'XP"
+                                    name: "Notifications du système d'XP "+(toEnable ? "activées" : "désactivées"),
+                                    value: "Vous avez "+(toEnable ? "activé" : "désactivé")+" les notifications pour le système d'XP"
                                 }
                         )
                     ]
@@ -64,8 +68,12 @@ export async function enableOrDisableUserNotification(user: User|GuildMember, XP
         } catch (e) {
             return false;
         }
-        XPUserConfig.lastNotifiedLevel = XPUserConfig.currentLevel;
+
     }
+
+    if (toEnable)
+        XPUserConfig.lastNotifiedLevel = XPUserConfig.currentLevel;
+
 
     const button: null|IXPNotificationAskButton = await XPNotificationAskButton.findOne({
         serverId: XPUserConfig.serverId,

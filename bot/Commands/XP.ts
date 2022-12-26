@@ -280,7 +280,7 @@ export default class XP extends AbstractXP<IXPArgs> {
     }
 
     async action_notifications_disable(_, __, XPUserConfig: IXPUserData) {
-        await enableOrDisableUserNotification(this.member, XPUserConfig, false)
+        await enableOrDisableUserNotification(this.member, XPUserConfig, false, null, false)
 
         return this.response(true, {
             embeds: [

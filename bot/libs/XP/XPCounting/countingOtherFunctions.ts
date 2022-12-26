@@ -115,12 +115,12 @@ async function detectUplevel(member: GuildMember, XPUserConfig: IXPUserData, XPS
         try {
             if (tip !== null)
                 await sendTip(member, level, tip);
-            if (level === 1 && !XPUserConfig.DMEnabled)
+            if (level === 1)
                 await askForNotifications(
                     member.user,
                     member.guild.id,
                     (tip === null ? "Vous venez de débloquer le premier niveau du système d'XP de '"+member.guild.name+"' !\n" : "")+
-                    "Souhaitez vous activer les notifications ?"
+                    "Souhaitez vous avoir les notifications actives?"
                 )
         } catch (_) {
             return;
