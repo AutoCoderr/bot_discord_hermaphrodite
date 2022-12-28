@@ -7,10 +7,7 @@ import CustomError from "../../logging/CustomError";
 import reportError from "../../logging/reportError";
 
 async function countXP(member: GuildMember, XPUserConfig: IXPUserData, XPServerConfig: IXPData) {
-    XPUserConfig.XP += XPServerConfig.XPByVocal;
-    XPUserConfig.todayXP += XPServerConfig.XPByVocal;
-
-    await detectUpgradeAndLevel(member, XPUserConfig, XPServerConfig);
+    return detectUpgradeAndLevel(member, XPUserConfig, XPServerConfig, XPUserConfig.XP+XPServerConfig.XPByVocal);
 }
 
 function reportXPVoiceCounterError(e: Error, guild: Guild, member: GuildMember, XPServerConfig: IXPData, XPUserConfig: IXPUserData) {

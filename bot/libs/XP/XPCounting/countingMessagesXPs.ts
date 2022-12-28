@@ -22,8 +22,5 @@ export default async function countingMessagesXPs(message: Message) {
 
     XPUserConfig.lastDayMessageTimestamp = new Date();
 
-    XPUserConfig.XP += XPServerConfig.XPByMessage;
-    XPUserConfig.todayXP += XPServerConfig.XPByMessage;
-
-    await detectUpgradeAndLevel(member, XPUserConfig, XPServerConfig);
+    await detectUpgradeAndLevel(member, XPUserConfig, XPServerConfig, XPUserConfig.XP+XPServerConfig.XPByMessage);
 }

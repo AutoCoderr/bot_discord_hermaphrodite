@@ -56,7 +56,7 @@ export async function enableOrDisableUserNotification(user: User|GuildMember, XP
                                 {
                                     name: "Vous avez débloqué les tips des paliers suivants :",
                                     value: unblockedTips.map(tip =>
-                                        "palier " + tip.level
+                                        "Palier " + tip.level
                                     ).join("\n")
                                 } :
                                 {
@@ -76,17 +76,15 @@ export async function enableOrDisableUserNotification(user: User|GuildMember, XP
         XPUserConfig.lastNotifiedLevel = XPUserConfig.currentLevel;
 
 
-    const button: null|IXPNotificationAskButton = await XPNotificationAskButton.findOne({
+    const buttons: IXPNotificationAskButton[] = await XPNotificationAskButton.find({
         serverId: XPUserConfig.serverId,
         userId: user.id
     })
 
-    if (button !== null) {
+    await Promise.all(buttons.map(async button => {
         await deleteMP(user instanceof User ? user : user.user, button.messageId);
-        await XPNotificationAskButton.deleteMany({
-            messageId: button.messageId
-        });
-    }
+        await button.remove()
+    }))
 
     XPUserConfig.DMEnabled = toEnable;
     await XPUserConfig.save();
@@ -170,7 +168,6 @@ export function warningSpecificRolesCantBeAssignedMessage(guild: Guild, ...roles
 }
 
 export function checkParametersData(guild: Guild, XPServerConfig: IXPData, params: any): Promise<boolean> {
-    //const merde: [string[], string, ((v: any) => boolean|Promise<boolean>)] = 
     return Promise.all(
         (<[string[], string, ((v) => boolean|Promise<boolean>)][]>[
             [['string','undefined'], 'activeRoleId', (v) => (!v && !XPServerConfig.enabled) || guild.roles.cache.get(v)],

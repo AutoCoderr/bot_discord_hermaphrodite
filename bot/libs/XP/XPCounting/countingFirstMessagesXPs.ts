@@ -46,8 +46,5 @@ export default async function countingFirstMessagesXPs(message: Message) {
 
     XPUserConfig.lastFirstDayMessageTimestamp = date;
 
-    XPUserConfig.XP += XPServerConfig.XPByFirstMessage;
-    XPUserConfig.todayXP += XPServerConfig.XPByFirstMessage;
-
-    await detectUpgradeAndLevel(member, XPUserConfig, XPServerConfig);
+    await detectUpgradeAndLevel(member, XPUserConfig, XPServerConfig, XPUserConfig.XP+XPServerConfig.XPByFirstMessage);
 }

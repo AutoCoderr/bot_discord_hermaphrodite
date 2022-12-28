@@ -80,29 +80,16 @@ async function detectUpgrade(member: GuildMember, XPUserConfig: IXPUserData, XPS
     return grade;
 }
 
-async function detectUplevel(member: GuildMember, XPUserConfig: IXPUserData, XPServerConfig: IXPData, grade: IGrade, setByAdmin: boolean): Promise<void> {
+async function detectUplevel(member: GuildMember, XPUserConfig: IXPUserData, XPServerConfig: IXPData, grade: IGrade, oldXP: number, setByAdmin: boolean): Promise<void> {
     const oldCurrentLevel = XPUserConfig.currentLevel;
     XPUserConfig.currentLevel = grade.atLevel + Math.floor((XPUserConfig.XP - grade.requiredXP)/grade.XPByLevel);
     if (XPUserConfig.lastNotifiedLevel > XPUserConfig.currentLevel)
         XPUserConfig.lastNotifiedLevel = XPUserConfig.currentLevel;
 
-    if (setByAdmin && XPUserConfig.currentLevel < oldCurrentLevel && XPUserConfig.DMEnabled) {
-        try {
-            await member.send({
-                embeds: [
-                    new EmbedBuilder()
-                        .setTitle("XP réduits")
-                        .setFields({
-                            name: "XPs réduits par un administrateur",
-                            value: "Un administrateur a réduit vos XP sur le serveur '"+member.guild.name+"', vous êtes désormais au palier "+XPUserConfig.currentLevel
-                        })
-                ]
-            })
-        } catch (_) {}
+    if (setByAdmin && (XPUserConfig.DMEnabled || oldCurrentLevel === 0)) {
+        await reportXPAndLevelVariation(XPServerConfig, XPUserConfig, member, oldCurrentLevel, oldXP)
     }
 
-    if (XPUserConfig.currentLevel <= oldCurrentLevel)
-        return;
 
     for (let level=XPUserConfig.lastNotifiedLevel+1;level<=XPUserConfig.currentLevel;level++) {
         if (level > 1 && (!XPUserConfig.DMEnabled || setByAdmin))
@@ -125,65 +112,85 @@ async function detectUplevel(member: GuildMember, XPUserConfig: IXPUserData, XPS
         } catch (_) {
             return;
         }
-        XPUserConfig.lastNotifiedLevel = level;
     }
 
-    if (XPUserConfig.DMEnabled && setByAdmin && XPUserConfig.currentLevel > XPUserConfig.lastNotifiedLevel) {
-        const tipsToNotify: number[] = [];
-        for (let level=XPUserConfig.lastNotifiedLevel+1;level<=XPUserConfig.currentLevel;level++) {
-            if (findTipByLevel(level, XPServerConfig.tipsByLevel))
-                tipsToNotify.push(level);
-        }
+    if (XPUserConfig.DMEnabled || oldCurrentLevel === 0)
+        XPUserConfig.lastNotifiedLevel = (XPUserConfig.DMEnabled || setByAdmin) ? XPUserConfig.currentLevel : 1;
+}
 
-        XPUserConfig.lastNotifiedLevel = XPUserConfig.currentLevel;
-
+export async function reportXPAndLevelVariation(XPServerConfig: IXPData, XPUserConfig: IXPUserData, member: GuildMember, oldCurrentLevel: number, oldXP: number) {
+    if (XPUserConfig.XP < oldXP) {
         try {
             await member.send({
                 embeds: [
                     new EmbedBuilder()
-                        .setTitle("XPs ajoutés")
-                        .setFields([
+                        .setTitle("XP réduits")
+                        .setFields({
+                            name: "XPs réduits par un administrateur",
+                            value: "Un administrateur a réduit vos XP sur le serveur '"+member.guild.name+"'.\n"+
+                                   "Vous avez désormais "+XPUserConfig.XP+" XP, "+
+                                   (XPUserConfig.currentLevel < oldCurrentLevel ? "et êtes" : "mais êtes toujours")+" au palier "+XPUserConfig.currentLevel
+                        })
+                ]
+            })
+        } catch (_) {}
+        return;
+    }
+
+    if (XPUserConfig.XP > oldXP) {
+        const tipsToNotify: null|number[] = XPUserConfig.currentLevel > XPUserConfig.lastNotifiedLevel ? [] : null;
+        if (tipsToNotify !== null)
+            for (let level=Math.max(2, XPUserConfig.lastNotifiedLevel+1);level<=XPUserConfig.currentLevel;level++) {
+                if (findTipByLevel(level, XPServerConfig.tipsByLevel))
+                    tipsToNotify.push(level);
+            }
+        try {
+            await member.send({
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("XP ajoutés")
+                        .setFields(
                             {
                                 name: "XPs ajoutés par un administrateur",
-                                value: "Un administrateur vous a ajouté des XPs sur le serveur '"+member.guild.name+"', vous êtes désormais au niveau "+XPUserConfig.currentLevel
+                                value: "Un administrateur vous a ajouté des XPs sur le serveur '"+member.guild.name+"'.\n"+
+                                    "Vous avez désormais "+XPUserConfig.XP+" XP, "+
+                                    (XPUserConfig.currentLevel > oldCurrentLevel ? "et êtes" : "mais êtes toujours")+" au palier "+XPUserConfig.currentLevel
                             },
                             ...(
-                                tipsToNotify.length > 0 ? [{
+                                (tipsToNotify && tipsToNotify.length > 0) ? [{
                                     name: "Vous avez désormais accès aux tips des paliers suivants :",
                                     value: tipsToNotify.map(level => "Palier "+level).join("\n")
                                 }] : []
                             )
-                        ])
+                        )
                 ]
             })
         } catch (_) {}
     }
 }
 
-export async function detectUpgradeAndLevel(member: GuildMember, XPUserConfig: IXPUserData, XPServerConfig: IXPData, setByAdmin = false) {
-    const oldGradeId = XPUserConfig.gradeId;
+export async function detectUpgradeAndLevel(member: GuildMember, XPUserConfig: IXPUserData, XPServerConfig: IXPData, XP: number, setByAdmin = false) {
+    if (XP < 0)
+        throw new Error("XPs can't be set less than 0");
+
+    const addedXPs = XP-XPUserConfig.XP;
+    const oldXP = XPUserConfig.XP;
+    XPUserConfig.XP = XP;
+    XPUserConfig.todayXP = Math.max(0,XPUserConfig.todayXP+addedXPs);
+
     const grade: null|IGrade = await detectUpgrade(member, XPUserConfig, XPServerConfig);
-    if (setByAdmin && grade === null && oldGradeId !== undefined) {
-        XPUserConfig.gradeId = undefined;
+
+    if (setByAdmin && grade === null) {
+        const oldCurrentLevel = XPUserConfig.currentLevel;
         XPUserConfig.currentLevel = 0;
         XPUserConfig.lastNotifiedLevel = 0;
-        if (XPUserConfig.DMEnabled) {
-            try {
-                await member.send({
-                    embeds: [
-                        new EmbedBuilder()
-                            .setTitle("XP réduits")
-                            .setFields({
-                                name: "XPs réduits par un administrateur",
-                                value: "Un administrateur a réduit vos XP sur le serveur '"+member.guild.name+"', vous êtes désormais au palier 0"
-                            })
-                    ]
-                })
-            } catch (_) {}
-        }
+        XPUserConfig.gradeId = undefined;
+        if (XPUserConfig.DMEnabled)
+            await reportXPAndLevelVariation(XPServerConfig, XPUserConfig, member, oldCurrentLevel, oldXP)
+    } else if (grade !== null) {
+        await detectUplevel(member, XPUserConfig, XPServerConfig, grade, oldXP, setByAdmin);
     }
-    if (grade !== null)
-        await detectUplevel(member, XPUserConfig, XPServerConfig, grade, setByAdmin);
+        
     await XPUserConfig.save();
 }
 

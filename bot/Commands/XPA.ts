@@ -120,28 +120,21 @@ export default class XPA extends AbstractXP<IXPAArgs> {
     }
 
     async action_set(args: IXPAArgs, XPServerConfig: IXPData, XPUserConfig: IXPUserData) {
-        XPUserConfig.todayXP = Math.max(0, XPUserConfig.todayXP + (args.XP_to_set - XPUserConfig.XP))
-        XPUserConfig.XP = args.XP_to_set;
-
-        await detectUpgradeAndLevel(args.member, XPUserConfig, XPServerConfig, true);
+        await detectUpgradeAndLevel(args.member, XPUserConfig, XPServerConfig, args.XP_to_set, true);
 
         return this.responseXPSet(XPUserConfig);
     }
 
     async action_give(args: IXPAArgs, XPServerConfig: IXPData, XPUserConfig: IXPUserData) {
-        XPUserConfig.todayXP = Math.max(0, XPUserConfig.todayXP + args.XP_to_give);
-        XPUserConfig.XP = Math.max(0, XPUserConfig.XP + args.XP_to_give);
+        const XPToSet = Math.max(0, XPUserConfig.XP + args.XP_to_give)
 
-        await detectUpgradeAndLevel(args.member, XPUserConfig, XPServerConfig, true);
+        await detectUpgradeAndLevel(args.member, XPUserConfig, XPServerConfig, XPToSet, true);
 
         return this.responseXPSet(XPUserConfig);
     }
 
     async action_reset(args: IXPAArgs, XPServerConfig: IXPData, XPUserConfig: IXPUserData) {
-        XPUserConfig.todayXP = 0;
-        XPUserConfig.XP = 0;
-
-        await detectUpgradeAndLevel(args.member, XPUserConfig, XPServerConfig, true);
+        await detectUpgradeAndLevel(args.member, XPUserConfig, XPServerConfig, 0, true);
 
         return this.responseXPSet(XPUserConfig);
     }
