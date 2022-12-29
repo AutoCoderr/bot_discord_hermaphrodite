@@ -14,6 +14,7 @@ import {
 import CustomError from "../logging/CustomError";
 import {IArgsModel} from "../interfaces/CommandInterfaces";
 import client from "../client";
+import errorCatcher from "../logging/errorCatcher";
 
 export default class ConfigWelcome extends Command {
     static display = true;
@@ -62,43 +63,58 @@ export default class ConfigWelcome extends Command {
                 return this.response(true, "Veuillez rentrer le message, qui sera envoyé en MP aux nouveaux arrivants sur ce serveur (tapez 'CANCEL' pour annuler) :",
                     () => new Promise(resolve =>  {
                         let timeout;
-                        const listener = async (response: Message) => {
-                            if (response.author.id !== this.member.id)
-                                return;
+                        const listener = errorCatcher(async (fnArgs: [Message]) => {
+                            const [response] = fnArgs
+                            try {
+                                if (response.author.id !== this.member.id)
+                                    return;
 
+                                clearTimeout(timeout);
+                                bot.off('messageCreate', listener);
+
+                                if (response.content === "CANCEL") {
+                                    await response.delete();
+                                    resolve(this.response(true, "Commande annulée"))
+                                    return
+                                }
+
+                                let welcomeMessage: IWelcomeMessage = await WelcomeMessage.findOne({serverId: (<Guild>this.guild).id});
+                                let create = false;
+                                if (welcomeMessage == null) {
+                                    create = true;
+                                    welcomeMessage = {
+                                        enabled: true,
+                                        message: response.content, // @ts-ignore
+                                        serverId: this.guild.id
+                                    };
+                                    WelcomeMessage.create(welcomeMessage);
+                                } else {
+                                    welcomeMessage.message = response.content; // @ts-ignore
+                                    welcomeMessage.save();
+                                }
+
+                                if (this.commandOrigin === 'slash')
+                                    await response.delete();
+
+                                resolve(
+                                    this.response(true,
+                                        "Votre message a été enregistré et sera envoyé en MP aux nouveaux arrivants de ce serveur"+
+                                        (create ?  "\n(L'envoie de MP aux nouveaux a été activé)" : ""))
+                                );
+                            } catch (e) {
+                                throw new CustomError(<Error>e, {
+                                    from: "welcomeMessageSetListener",
+                                    guild: <Guild>this.guild,
+                                    user: this.member,
+                                    message: response
+                                })
+                            }
+                        }, () => {
                             clearTimeout(timeout);
-                            bot.off('messageCreate', listener);
+                            resolve(this.response(false, "Une erreur est survenue"));
+                        });
 
-                            if (response.content === "CANCEL") {
-                                await response.delete();
-                                resolve(this.response(true, "Commande annulée"))
-                                return
-                            }
 
-                            let welcomeMessage: IWelcomeMessage = await WelcomeMessage.findOne({serverId: (<Guild>this.guild).id});
-                            let create = false;
-                            if (welcomeMessage == null) {
-                                create = true;
-                                welcomeMessage = {
-                                    enabled: true,
-                                    message: response.content, // @ts-ignore
-                                    serverId: this.guild.id
-                                };
-                                WelcomeMessage.create(welcomeMessage);
-                            } else {
-                                welcomeMessage.message = response.content; // @ts-ignore
-                                welcomeMessage.save();
-                            }
-
-                            if (this.commandOrigin === 'slash')
-                                await response.delete();
-
-                            resolve(
-                                this.response(true,
-                                    "Votre message a été enregistré et sera envoyé en MP aux nouveaux arrivants de ce serveur"+
-                                    (create ?  "\n(L'envoie de MP aux nouveaux a été activé)" : ""))
-                            );
-                        };
                         bot.on('messageCreate', listener);
 
                         timeout = setTimeout(() => {

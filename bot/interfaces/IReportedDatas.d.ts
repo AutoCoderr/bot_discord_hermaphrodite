@@ -34,7 +34,9 @@ export default interface IReportedData {
         'listeningNotifyOnReact'|
         'listeningMonitoring'|
         'initTicketMessageListening'|
-        'XPVoiceCounter',
+        'XPVoiceCounter'|
+        'tipsSetListener'|
+        'welcomeMessageSetListener',
     guild?: Guild,
     message?: Message,
     user?: User|GuildMember,

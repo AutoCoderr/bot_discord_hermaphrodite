@@ -24,6 +24,8 @@ import {
 } from "../libs/XP/gradeCalculs";
 import {getTimezoneDatas} from "../libs/timezones";
 import XPUserData, { IXPUserData } from "../Models/XP/XPUserData";
+import errorCatcher from "../logging/errorCatcher";
+import CustomError from "../logging/CustomError";
 
 interface IConfigXPArgs {
     action:
@@ -1206,28 +1208,41 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
         return this.response(true, "Veuillez rentrer un message pour le tip (tapez 'CANCEL' pour annuler) :",
             () => new Promise(resolve => {
                 let timeout;
-                const listener = async (response: Message) => {
-                    if (response.author.id !== this.member.id)
-                        return;
+                const listener = errorCatcher(async (fnArgs: [Message]) => {
+                    const [response] = fnArgs;
+                    try {
+                        if (response.author.id !== this.member.id)
+                            return;
 
-                    client.off('messageCreate', listener);
-                    clearTimeout(timeout);
+                        client.off('messageCreate', listener);
+                        clearTimeout(timeout);
 
-                    if (response.content === "CANCEL") {
+                        if (response.content === "CANCEL") {
+                            await response.delete();
+                            resolve(this.response(true, "Commande annulée"))
+                            return;
+                        }
+
+                        XPServerConfig.tipsByLevel = setTipByLevel(<number>args.level, response.content, XPServerConfig.tipsByLevel);
+                        await XPServerConfig.save();
+
                         await response.delete();
-                        resolve(this.response(true, "Commande annulée"))
-                        return;
+
+                        resolve(
+                            this.response(true, "Tips enregistré avec succès !")
+                        )
+                    } catch (e) {
+                        throw new CustomError(<Error>e, {
+                            from: "tipsSetListener",
+                            guild: <Guild>this.guild,
+                            user: this.member,
+                            message: response
+                        })
                     }
-
-                    XPServerConfig.tipsByLevel = setTipByLevel(<number>args.level, response.content, XPServerConfig.tipsByLevel);
-                    await XPServerConfig.save();
-
-                    await response.delete();
-
-                    resolve(
-                        this.response(true, "Tips enregistré avec succès !")
-                    )
-                }
+                }, (_) => {
+                    clearTimeout(timeout);
+                    resolve(this.response(false, "Une erreur est survenue"))
+                })
 
                 client.on('messageCreate', listener);
 
