@@ -3,14 +3,14 @@ import Command from "../Classes/Command";
 import WelcomeMessage, {IWelcomeMessage} from "../Models/WelcomeMessage";
 import {
     CommandInteraction,
-    CommandInteractionOptionResolver, EmbedBuilder,
+    EmbedBuilder,
     Guild,
     GuildMember,
     Message,
     MessageType,
-    TextChannel,
-    User
+    PermissionFlagsBits
 } from "discord.js";
+import {userHasChannelPermissions} from "../Classes/OtherFunctions";
 import CustomError from "../logging/CustomError";
 import {IArgsModel} from "../interfaces/CommandInterfaces";
 import client from "../client";
@@ -72,9 +72,17 @@ export default class ConfigWelcome extends Command {
                                 clearTimeout(timeout);
                                 bot.off('messageCreate', listener);
 
+                                const messageCanBeDeleted = userHasChannelPermissions(<GuildMember>(<Guild>this.guild).members.me, this.channel, PermissionFlagsBits.ManageMessages)
+
+                                const messageCanBeDeletedMessage = 
+                                    !messageCanBeDeleted ?
+                                    "(Attention : Herma bot ne dispose pas de la permission pour supprimer automatiquement votre message)\n\n" :
+                                    ""
+
                                 if (response.content === "CANCEL") {
-                                    await response.delete();
-                                    resolve(this.response(true, "Commande annulée"))
+                                    if (messageCanBeDeleted)
+                                        await response.delete();
+                                    resolve(this.response(true, messageCanBeDeletedMessage+"Commande annulée"))
                                     return
                                 }
 
@@ -93,12 +101,12 @@ export default class ConfigWelcome extends Command {
                                     welcomeMessage.save();
                                 }
 
-                                if (this.commandOrigin === 'slash')
+                                if (messageCanBeDeleted)
                                     await response.delete();
 
                                 resolve(
                                     this.response(true,
-                                        "Votre message a été enregistré et sera envoyé en MP aux nouveaux arrivants de ce serveur"+
+                                        messageCanBeDeletedMessage+"Votre message a été enregistré et sera envoyé en MP aux nouveaux arrivants de ce serveur"+
                                         (create ?  "\n(L'envoie de MP aux nouveaux a été activé)" : ""))
                                 );
                             } catch (e) {

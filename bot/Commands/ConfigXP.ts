@@ -4,7 +4,9 @@ import {
     EmbedBuilder,
     Guild, Interaction,
     Message, MessagePayload,
-    Role
+    Role,
+    PermissionFlagsBits,
+    GuildMember
 } from "discord.js";
 import XPData, {IGrade, ILevelTip, IXPData, XPDataDefaultValues} from "../Models/XP/XPData";
 import {extractUTCTime, showTime} from "../Classes/DateTimeManager";
@@ -26,6 +28,7 @@ import {getTimezoneDatas} from "../libs/timezones";
 import XPUserData, { IXPUserData } from "../Models/XP/XPUserData";
 import errorCatcher from "../logging/errorCatcher";
 import CustomError from "../logging/CustomError";
+import {userHasChannelPermissions} from "../Classes/OtherFunctions";
 
 interface IConfigXPArgs {
     action:
@@ -1217,19 +1220,29 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                         client.off('messageCreate', listener);
                         clearTimeout(timeout);
 
+                        const messageCanBeDeleted = userHasChannelPermissions(<GuildMember>(<Guild>this.guild).members.me, this.channel, PermissionFlagsBits.ManageMessages)
+
+                        const messageCanBeDeletedMessage = 
+                            !messageCanBeDeleted ?
+                            "(Attention : Herma bot ne dispose pas de la permission pour supprimer automatiquement votre message)\n\n" :
+                            ""
+
                         if (response.content === "CANCEL") {
-                            await response.delete();
-                            resolve(this.response(true, "Commande annulée"))
+                            if (messageCanBeDeleted)
+                                await response.delete();
+
+                            resolve(this.response(true, messageCanBeDeletedMessage+"Commande annulée"))
                             return;
                         }
 
                         XPServerConfig.tipsByLevel = setTipByLevel(<number>args.level, response.content, XPServerConfig.tipsByLevel);
                         await XPServerConfig.save();
-
-                        await response.delete();
+                        
+                        if (messageCanBeDeleted)
+                            await response.delete();
 
                         resolve(
-                            this.response(true, "Tips enregistré avec succès !")
+                            this.response(true, messageCanBeDeletedMessage+"Tips enregistré avec succès !")
                         )
                     } catch (e) {
                         throw new CustomError(<Error>e, {
