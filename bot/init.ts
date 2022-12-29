@@ -15,6 +15,7 @@ import {listenXPArrowsTipsButtons} from "./libs/XP/tips/tipsBrowsing";
 import countingVocalXPs from "./libs/XP/XPCounting/countingVocalXPs";
 import countingMessagesXPs from "./libs/XP/XPCounting/countingMessagesXPs";
 import countingFirstMessagesXPs from "./libs/XP/XPCounting/countingFirstMessagesXPs";
+import {findAndExecCallbackButton} from "./libs/callbackButtons";
 
 export default function init(bot) {
     client.on('ready', () => {
@@ -55,7 +56,8 @@ export default function init(bot) {
                             listenAskInviteBackButtons(interaction, 'vocal'),
                             listenXPNotificationAskButtons(interaction),
                             listenXPTipsUseFulApproveButtons(interaction),
-                            listenXPArrowsTipsButtons(interaction)
+                            listenXPArrowsTipsButtons(interaction),
+                            findAndExecCallbackButton(interaction)
                         ]).then(responses => !responses.includes(true))) {
                             await interaction.editReply({content: "Bouton invalide"});
                         }

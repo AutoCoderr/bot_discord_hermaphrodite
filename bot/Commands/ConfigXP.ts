@@ -6,7 +6,10 @@ import {
     Message, MessagePayload,
     Role,
     PermissionFlagsBits,
-    GuildMember
+    GuildMember,
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle
 } from "discord.js";
 import XPData, {IGrade, ILevelTip, IXPData, XPDataDefaultValues} from "../Models/XP/XPData";
 import {extractUTCTime, showTime} from "../Classes/DateTimeManager";
@@ -29,6 +32,7 @@ import XPUserData, { IXPUserData } from "../Models/XP/XPUserData";
 import errorCatcher from "../logging/errorCatcher";
 import CustomError from "../logging/CustomError";
 import {userHasChannelPermissions} from "../Classes/OtherFunctions";
+import { addCallbackButton } from "../libs/callbackButtons";
 
 interface IConfigXPArgs {
     action:
@@ -521,20 +525,48 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
         return this["action_"+args.action](args, XPServerConfig);
     }
 
-    async action_reset(_: IConfigXPArgs, XPServerConfig: IXPData) {
-        for (const [key,value] of Object.entries(XPDataDefaultValues)) {
-            XPServerConfig[key] = value;
-        }
-        await XPServerConfig.save();
+    async action_reset(args: IConfigXPArgs, XPServerConfig: IXPData) {
+        const acceptButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "reset_params_accept";
+        const denyButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "reset_params_deny";
 
+        addCallbackButton(acceptButtonId, async () => {
+            for (const [key,value] of Object.entries(XPDataDefaultValues)) {
+                XPServerConfig[key] = value;
+            }
+            await XPServerConfig.save();
+    
+            return this.response(true, {
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("Données réinitialisées")
+                        .setFields({
+                            name: "Données réinitialisées avec succès",
+                            value: "Les données de configurations du système d'XP ont été réinitialisées avec succès !"
+                        })
+                ]
+            })
+        }, [denyButtonId], {command: this.commandName, commandArguments: args});
+
+        addCallbackButton(denyButtonId, () => {
+            return this.response(true, "Opération annulée");
+        }, [acceptButtonId]);
+
+        //@ts-ignore
         return this.response(true, {
-            embeds: [
-                new EmbedBuilder()
-                    .setTitle("Données réinitialisées")
-                    .setFields({
-                        name: "Données réinitialisées avec succès",
-                        value: "Les données de configurations du système d'XP ont été réinitialisées avec succès !"
-                    })
+            content: "Voulez vous vraiment réinitialiser les paramètres du système d'XP ?",
+            components: [
+                new ActionRowBuilder()
+                    .addComponents(
+                        (<[string,boolean][]>[
+                            [acceptButtonId, true],
+                            [denyButtonId, false]
+                        ]).map(([buttonId, accept]) =>
+                            new ButtonBuilder()
+                                .setCustomId(buttonId)
+                                .setLabel(accept ? "Oui" : "Non")
+                                .setStyle(accept ? ButtonStyle.Danger : ButtonStyle.Success)
+                        )
+                    )
             ]
         })
     }
@@ -725,54 +757,83 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
         return this["action_grades_"+args.gradesSubActions](args,XPServerConfig)
     }
 
-    async action_grades_reset(_: IConfigXPArgs, XPServerConfig: IXPData) {
-        const gradesById = XPServerConfig.grades.reduce((acc,grade) => ({
-            ...acc,
-            [<string>grade._id]: grade
-        }), {})
+    async action_grades_reset(args: IConfigXPArgs, XPServerConfig: IXPData) {
 
-        const warningNothingRoleCanBeAssignedEmbed = warningNothingRoleCanBeAssignedMessage(<Guild>this.guild)
+        const acceptButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "reset_grades_accept";
+        const denyButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "reset_grades_deny";
 
-        const {field: warningNonAssignableRolesEmbed, cantBeAssignedRoles} = warningNothingRoleCanBeAssignedEmbed === null ? 
-            warningSpecificRolesCantBeAssignedMessage(<Guild>this.guild,
-                <Role[]>XPServerConfig.grades
-                    .map(({roleId}) => (<Guild>this.guild).roles.cache.get(roleId))
-                    .filter(role => role !== undefined) 
-            ) : 
-            {field: null, cantBeAssignedRoles: []};
-
-        const nonManageableRoles: {[roleId: string]: false} = warningNothingRoleCanBeAssignedEmbed === null ? 
-            cantBeAssignedRoles.reduce((acc,role) => ({
+        addCallbackButton(acceptButtonId, async () => {
+            const gradesById = XPServerConfig.grades.reduce((acc,grade) => ({
                 ...acc,
-                [role.id]: false
-            }), {}) : 
-            {};
+                [<string>grade._id]: grade
+            }), {})
+    
+            const warningNothingRoleCanBeAssignedEmbed = warningNothingRoleCanBeAssignedMessage(<Guild>this.guild)
+    
+            const {field: warningNonAssignableRolesEmbed, cantBeAssignedRoles} = warningNothingRoleCanBeAssignedEmbed === null ? 
+                warningSpecificRolesCantBeAssignedMessage(<Guild>this.guild,
+                    <Role[]>XPServerConfig.grades
+                        .map(({roleId}) => (<Guild>this.guild).roles.cache.get(roleId))
+                        .filter(role => role !== undefined) 
+                ) : 
+                {field: null, cantBeAssignedRoles: []};
+    
+            const nonManageableRoles: {[roleId: string]: false} = warningNothingRoleCanBeAssignedEmbed === null ? 
+                cantBeAssignedRoles.reduce((acc,role) => ({
+                    ...acc,
+                    [role.id]: false
+                }), {}) : 
+                {};
+    
+            const XPUsersConfig: IXPUserData[] = await XPUserData.find({
+                serverId: XPServerConfig.serverId,
+                currentLevel: {$ne: 0}
+            })
+    
+            await resetUsers(<Guild>this.guild, XPUsersConfig, gradesById, warningNothingRoleCanBeAssignedEmbed === null, nonManageableRoles)
+    
+            XPServerConfig.grades = [];
+            await XPServerConfig.save();
+    
+            const embed = new EmbedBuilder()
+                    .setTitle("Grades réinitialisés")
+                    .setFields({
+                        name: "Grades réinitialisés",
+                        value: "Les grades ont été réinitialisés avec succès!"
+                    })
+            
+            if (warningNonAssignableRolesEmbed)
+                embed.addFields(warningNonAssignableRolesEmbed)
+            if (warningNothingRoleCanBeAssignedEmbed)
+                embed.addFields(warningNothingRoleCanBeAssignedEmbed)
+            
+            return this.response(true, {
+                embeds: [
+                    embed        
+                ]
+            })
+        }, [denyButtonId], {command: this.commandName, commandArguments: args})
 
-        const XPUsersConfig: IXPUserData[] = await XPUserData.find({
-            serverId: XPServerConfig.serverId,
-            currentLevel: {$ne: 0}
-        })
+        addCallbackButton(denyButtonId, () => {
+            return this.response(true, "Opération annulée")
+        }, [acceptButtonId])
 
-        await resetUsers(<Guild>this.guild, XPUsersConfig, gradesById, warningNothingRoleCanBeAssignedEmbed === null, nonManageableRoles)
-
-        XPServerConfig.grades = [];
-        await XPServerConfig.save();
-
-        const embed = new EmbedBuilder()
-                .setTitle("Grades réinitialisés")
-                .setFields({
-                    name: "Grades réinitialisés",
-                    value: "Les grades ont été réinitialisés avec succès!"
-                })
-        
-        if (warningNonAssignableRolesEmbed)
-            embed.addFields(warningNonAssignableRolesEmbed)
-        if (warningNothingRoleCanBeAssignedEmbed)
-            embed.addFields(warningNothingRoleCanBeAssignedEmbed)
-        
+        //@ts-ignore
         return this.response(true, {
-            embeds: [
-                embed        
+            content: "Voulez vous vraiment réinitialiser tout les grades ?",
+            components: [
+                new ActionRowBuilder()
+                    .addComponents(
+                        (<[string,boolean][]>[
+                            [acceptButtonId, true],
+                            [denyButtonId, false]
+                        ]).map(([buttonId, accept]) =>
+                            new ButtonBuilder()
+                                .setCustomId(buttonId)
+                                .setLabel(accept ? "Oui" : "Non")
+                                .setStyle(accept ? ButtonStyle.Danger : ButtonStyle.Success)
+                        )
+                    )
             ]
         })
     }
@@ -1151,19 +1212,47 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
         return this["action_tips_"+args.tipsSubActions](args, XPServerConfig)
     }
 
-    async action_tips_reset(_: IConfigXPArgs, XPServerConfig: IXPData) {
-        XPServerConfig.tipsByLevel = [];
+    async action_tips_reset(args: IConfigXPArgs, XPServerConfig: IXPData) {
+        const acceptButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "reset_tips_accept";
+        const denyButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "reset_tips_deny";
 
-        await XPServerConfig.save();
+        addCallbackButton(acceptButtonId, async () => {
+            XPServerConfig.tipsByLevel = [];
 
+            await XPServerConfig.save();
+    
+            return this.response(true, {
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("Tips réinitialisés")
+                        .setFields({
+                            name: "Tips réinitialisés",
+                            value: "Tout les tips ont été réinitialisés avec succès !"
+                        })
+                ]
+            })
+        }, [denyButtonId], {command: this.commandName, commandArguments: args});
+
+        addCallbackButton(denyButtonId, () => {
+            return this.response(true, "Opération annulée")
+        }, [acceptButtonId]);
+
+        //@ts-ignore
         return this.response(true, {
-            embeds: [
-                new EmbedBuilder()
-                    .setTitle("Tips réinitialisés")
-                    .setFields({
-                        name: "Tips réinitialisés",
-                        value: "Tout les tips ont été réinitialisés avec succès !"
-                    })
+            content: "Voulez vous vraiment réinitialiser tout les tips ?",
+            components: [
+                new ActionRowBuilder()
+                    .addComponents(
+                        (<[string,boolean][]>[
+                            [acceptButtonId, true],
+                            [denyButtonId, false]
+                        ]).map(([buttonId, accept]) =>
+                            new ButtonBuilder()
+                                .setCustomId(buttonId)
+                                .setLabel(accept ? "Oui" : "Non")
+                                .setStyle(accept ? ButtonStyle.Danger : ButtonStyle.Success)
+                        )
+                    )
             ]
         })
     }

@@ -36,7 +36,8 @@ export default interface IReportedData {
         'initTicketMessageListening'|
         'XPVoiceCounter'|
         'tipsSetListener'|
-        'welcomeMessageSetListener',
+        'welcomeMessageSetListener'|
+        'callbackButton',
     guild?: Guild,
     message?: Message,
     user?: User|GuildMember,

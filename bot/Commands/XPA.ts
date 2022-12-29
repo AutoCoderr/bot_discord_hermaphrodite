@@ -1,10 +1,11 @@
 import {IArgsModel} from "../interfaces/CommandInterfaces";
-import {CommandInteraction, EmbedBuilder, Guild, GuildMember, Message, Role} from "discord.js";
+import {ActionRowBuilder, CommandInteraction, EmbedBuilder, Guild, GuildMember, Message, Role, ButtonBuilder, ButtonStyle} from "discord.js";
 import AbstractXP from "./AbstractXP";
 import {IXPData} from "../Models/XP/XPData";
 import XPUserData, {IXPUserData} from "../Models/XP/XPUserData";
 import {detectUpgradeAndLevel} from "../libs/XP/XPCounting/countingOtherFunctions";
 import {resetUsers, warningNothingRoleCanBeAssignedMessage, warningSpecificRolesCantBeAssignedMessage, getUserInfos} from "../libs/XP/XPOtherFunctions";
+import { addCallbackButton } from "../libs/callbackButtons";
 
 interface IXPAArgs {
     action: 'set'|'give'|'reset'|'reset_all'|'info';
@@ -139,50 +140,79 @@ export default class XPA extends AbstractXP<IXPAArgs> {
         return this.responseXPSet(XPUserConfig);
     }
 
-    async action_reset_all(_: IXPAArgs, XPServerConfig: IXPData) {
-        const gradesById = XPServerConfig.grades.reduce((acc,grade) => ({
-            ...acc,
-            [<string>grade._id]: grade
-        }), {})
+    async action_reset_all(args: IXPAArgs, XPServerConfig: IXPData) {
 
-        const warningNothingRoleCanBeAssignedEmbed = warningNothingRoleCanBeAssignedMessage(<Guild>this.guild)
+        const acceptButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "reset_all_XPs_accept";
+        const denyButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "reset_all_XPs_deny";
 
-        const {field: warningNonAssignableRolesEmbed, cantBeAssignedRoles} = warningNothingRoleCanBeAssignedEmbed === null ? 
-            warningSpecificRolesCantBeAssignedMessage(<Guild>this.guild,
-                <Role[]>XPServerConfig.grades
-                    .map(({roleId}) => (<Guild>this.guild).roles.cache.get(roleId))
-                    .filter(role => role !== undefined) 
-            ) : 
-            {field: null, cantBeAssignedRoles: []};
-
-        const nonManageableRoles: {[roleId: string]: false} = warningNothingRoleCanBeAssignedEmbed === null ? 
-            cantBeAssignedRoles.reduce((acc,role) => ({
+        addCallbackButton(acceptButtonId, async () => {
+            const gradesById = XPServerConfig.grades.reduce((acc,grade) => ({
                 ...acc,
-                [role.id]: false
-            }), {}) : 
-            {};
+                [<string>grade._id]: grade
+            }), {})
+    
+            const warningNothingRoleCanBeAssignedEmbed = warningNothingRoleCanBeAssignedMessage(<Guild>this.guild)
+    
+            const {field: warningNonAssignableRolesEmbed, cantBeAssignedRoles} = warningNothingRoleCanBeAssignedEmbed === null ? 
+                warningSpecificRolesCantBeAssignedMessage(<Guild>this.guild,
+                    <Role[]>XPServerConfig.grades
+                        .map(({roleId}) => (<Guild>this.guild).roles.cache.get(roleId))
+                        .filter(role => role !== undefined) 
+                ) : 
+                {field: null, cantBeAssignedRoles: []};
+    
+            const nonManageableRoles: {[roleId: string]: false} = warningNothingRoleCanBeAssignedEmbed === null ? 
+                cantBeAssignedRoles.reduce((acc,role) => ({
+                    ...acc,
+                    [role.id]: false
+                }), {}) : 
+                {};
+    
+            const XPUsersConfig: IXPUserData[] = await XPUserData.find({
+                serverId: XPServerConfig.serverId,
+            })
+    
+            await resetUsers(<Guild>this.guild, XPUsersConfig, gradesById, warningNothingRoleCanBeAssignedEmbed === null, nonManageableRoles, true);
+    
+            const embed = new EmbedBuilder()
+                    .setTitle("Utilisateurs réinitialisés")
+                    .setFields({
+                        name: "Utilisateurs réinitialisés",
+                        value: "Tout les utilisaters ont été réinitialisés avec succès!"
+                    })
+            
+            if (warningNonAssignableRolesEmbed)
+                embed.addFields(warningNonAssignableRolesEmbed)
+            if (warningNothingRoleCanBeAssignedEmbed)
+                embed.addFields(warningNothingRoleCanBeAssignedEmbed)
+            
+            return this.response(true, {
+                embeds: [
+                    embed        
+                ]
+            })
+        }, [denyButtonId], {command: this.commandName, commandArguments: args});
 
-        const XPUsersConfig: IXPUserData[] = await XPUserData.find({
-            serverId: XPServerConfig.serverId,
-        })
+        addCallbackButton(denyButtonId, () => {
+            return this.response(true, "Opération annulée")
+        }, [acceptButtonId]);
 
-        await resetUsers(<Guild>this.guild, XPUsersConfig, gradesById, warningNothingRoleCanBeAssignedEmbed === null, nonManageableRoles, true);
-
-        const embed = new EmbedBuilder()
-                .setTitle("Utilisateurs réinitialisés")
-                .setFields({
-                    name: "Utilisateurs réinitialisés",
-                    value: "Tout les utilisaters ont été réinitialisés avec succès!"
-                })
-        
-        if (warningNonAssignableRolesEmbed)
-            embed.addFields(warningNonAssignableRolesEmbed)
-        if (warningNothingRoleCanBeAssignedEmbed)
-            embed.addFields(warningNothingRoleCanBeAssignedEmbed)
-        
+        //@ts-ignore
         return this.response(true, {
-            embeds: [
-                embed        
+            content: "Voulez vous vraiment réinitialiser les XPs de tout les utilisateurs ?",
+            components: [
+                new ActionRowBuilder()
+                    .addComponents(
+                        (<[string,boolean][]>[
+                            [acceptButtonId, true],
+                            [denyButtonId, false]
+                        ]).map(([buttonId, accept]) =>
+                            new ButtonBuilder()
+                                .setCustomId(buttonId)
+                                .setLabel(accept ? "Oui" : "Non")
+                                .setStyle(accept ? ButtonStyle.Danger : ButtonStyle.Success)
+                        )
+                    )
             ]
         })
     }
