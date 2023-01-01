@@ -107,14 +107,24 @@ export default class XPA extends AbstractXP<IXPAArgs> {
         return this['action_'+args.action](args, XPServerConfig, XPUserConfig)
     }
 
-    responseXPSet(XPUserConfig: IXPUserData) {
+    responseXPSet(XPUserConfig: IXPUserData, type: 'set'|'give'|'reset', given: null|number = null) {
+        const verb = {
+            set: "redéfinis",
+            give: <number>given > 0 ? "ajoutés" : "retirés",
+            reset: "réinitialisés"
+        }[type]
+        const sentence = {
+            set: "Vous avez rédifinis les XPs de <@"+XPUserConfig.userId+">",
+            give: "Vous avez "+(<number>given > 0 ? "ajoutés" : "retirés")+" "+Math.abs(<number>given)+" XPs à <@"+XPUserConfig.userId+">",
+            reset: "Vous avez réinitialisé les XPs de <@"+XPUserConfig.userId+">"
+        }[type]
         return this.response(true, {
             embeds: [
                 new EmbedBuilder()
-                    .setTitle("XP défini")
+                    .setTitle("XPs "+verb)
                     .setFields({
-                        name: "XP défini",
-                        value: "Les XP de <@"+XPUserConfig.userId+"> ont été défini à "+XPUserConfig.XP
+                        name: "XP "+verb,
+                        value: sentence+".\nIl lui en reste désormais "+XPUserConfig.XP
                     })
             ]
         })
@@ -123,7 +133,7 @@ export default class XPA extends AbstractXP<IXPAArgs> {
     async action_set(args: IXPAArgs, XPServerConfig: IXPData, XPUserConfig: IXPUserData) {
         await detectUpgradeAndLevel(args.member, XPUserConfig, XPServerConfig, args.XP_to_set, true);
 
-        return this.responseXPSet(XPUserConfig);
+        return this.responseXPSet(XPUserConfig, 'set');
     }
 
     async action_give(args: IXPAArgs, XPServerConfig: IXPData, XPUserConfig: IXPUserData) {
@@ -131,13 +141,13 @@ export default class XPA extends AbstractXP<IXPAArgs> {
 
         await detectUpgradeAndLevel(args.member, XPUserConfig, XPServerConfig, XPToSet, true);
 
-        return this.responseXPSet(XPUserConfig);
+        return this.responseXPSet(XPUserConfig, 'give', args.XP_to_give);
     }
 
     async action_reset(args: IXPAArgs, XPServerConfig: IXPData, XPUserConfig: IXPUserData) {
         await detectUpgradeAndLevel(args.member, XPUserConfig, XPServerConfig, 0, true);
 
-        return this.responseXPSet(XPUserConfig);
+        return this.responseXPSet(XPUserConfig, 'reset');
     }
 
     async action_reset_all(args: IXPAArgs, XPServerConfig: IXPData) {
