@@ -124,7 +124,7 @@ export default class XPA extends AbstractXP<IXPAArgs> {
                     .setTitle("XPs "+verb)
                     .setFields({
                         name: "XP "+verb,
-                        value: sentence+".\nIl lui en reste désormais "+XPUserConfig.XP
+                        value: sentence+".\nIl/elle en a désormais "+XPUserConfig.XP
                     })
             ]
         })

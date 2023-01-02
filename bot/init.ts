@@ -48,7 +48,7 @@ export default function init(bot) {
             client.on('interactionCreate', async (interaction: Interaction) => {
                 try {
                     if (interaction.isButton()) {
-                        await interaction.deferReply();
+                        await interaction.deferReply({ephemeral: true});
                         if (await Promise.all([
                             listenInviteButtons(interaction, 'text'),
                             listenInviteButtons(interaction, 'vocal'),
