@@ -50,7 +50,8 @@ interface IConfigXPArgs {
         'timezone'|
         'reset'|
         'import'|
-        'export';
+        'export'|
+        'roles_reassign';
     setOrShowSubAction: 'set'|'show';
     XPActionTypes: 'vocal'|'message'|'first_message';
     XPActionTypesToLimit: 'vocal'|'message';
@@ -110,7 +111,8 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                     timezone: "le créneau horaire",
                     reset: "Réinitialiser les paramètres du système d'XP sur ce serveur",
                     import: "Importer les paramètres du système d'XP depuis un fichier JSON",
-                    export: "Exporter les paramètres du système d'XP dans un fichier JSON"
+                    export: "Exporter les paramètres du système d'XP dans un fichier JSON",
+                    roles_reassign: "Réassigner les rôles associés aux grades pour tout les utilisateurs"
                 }
             },
             setOrShowSubAction: {
@@ -523,6 +525,106 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
 
 
         return this["action_"+args.action](args, XPServerConfig);
+    }
+
+    async action_roles_reassign(_: IConfigXPArgs, XPServerConfig: IXPData) {
+        const warningNothingRoleCanBeAssignedEmbed = warningNothingRoleCanBeAssignedMessage(<Guild>this.guild);
+
+        if (warningNothingRoleCanBeAssignedEmbed !== null)
+            return this.response(true, {
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("Attention !")
+                        .setFields(warningNothingRoleCanBeAssignedEmbed)
+                ]
+            })
+
+        const gradesById = XPServerConfig.grades.reduce((acc,grade) => ({
+            ...acc,
+            [<string>grade._id]: grade
+        }), {})
+    
+        const rolesById: Role[] = <Role[]>XPServerConfig.grades
+                            .reduce((acc,{roleId}) => ({
+                                ...acc,
+                                [roleId]: acc[roleId] ?? (<Guild>this.guild).roles.cache.get(roleId)
+                            }), {})
+
+        const {field: warningNonAssignableRolesEmbed, cantBeAssignedRoles} = warningNothingRoleCanBeAssignedEmbed === null ? 
+            warningSpecificRolesCantBeAssignedMessage(<Guild>this.guild, Object.values(rolesById)) : 
+            {field: null, cantBeAssignedRoles: []};
+    
+        const nonManageableRoles: {[roleId: string]: false} = warningNothingRoleCanBeAssignedEmbed === null ? 
+            cantBeAssignedRoles.reduce((acc,role) => ({
+                ...acc,
+                [role.id]: false
+            }), {}) : 
+            {};
+
+        
+        for (const grade of XPServerConfig.grades) {
+            if (nonManageableRoles[grade.roleId] === false)
+                continue;
+            
+            await Promise.all(
+                await (<Promise<Array<GuildMember|null>>>Promise.all(
+                    await XPUserData.find({
+                        serverId: (<Guild>this.guild).id,
+                        gradeId: (<string>grade._id).toString()
+                    })
+                    .then(XPUserDatas =>
+                        XPUserDatas.map(XPUserData => 
+                            (<Guild>this.guild).members.fetch(XPUserData.userId).catch(() => null)
+                        )    
+                    )
+                ))
+                .then(members => 
+                    members.filter(member => 
+                        member !== null &&
+                        !member.roles.cache.some(role => role.id === grade.roleId)
+                    )
+                )
+                .then(members => members.map(member => (<GuildMember>member).roles.add(rolesById[grade.roleId])))
+            )
+
+            await Promise.all(
+                await (<Promise<Array<GuildMember|null>>>Promise.all(
+                    await XPUserData.find({
+                        serverId: (<Guild>this.guild).id,
+                        gradeId: {$ne: (<string>grade._id).toString()}
+                    })
+                    .then(XPUserDatas => 
+                        XPUserDatas.filter(XPUserData =>
+                            gradesById[XPUserData.gradeId].roleId !== grade.roleId   
+                        )
+                    )
+                    .then(XPUserDatas =>
+                        XPUserDatas.map(XPUserData => 
+                                (<Guild>this.guild).members.fetch(XPUserData.userId).catch(() => null)
+                        )    
+                    )
+                ))
+                .then(members => 
+                    members.filter((member) => 
+                        member !== null &&
+                        member.roles.cache.some(role => role.id === grade.roleId)
+                    )
+                )
+                .then(members => members.map(member => (<GuildMember>member).roles.remove(rolesById[grade.roleId])))
+            )
+        }
+
+        const embed = new EmbedBuilder()
+            .setTitle("Rôles réassignés")
+            .setFields({
+                name: "Rôles réassignés avec succès!",
+                value: "Les rôles de tout les grades on été réassignés avec succès!"
+            });
+
+        if (warningNonAssignableRolesEmbed !== null)
+            embed.addFields(warningNonAssignableRolesEmbed);
+
+        return this.response(true, {embeds: [embed]});
     }
 
     async action_reset(args: IConfigXPArgs, XPServerConfig: IXPData) {
