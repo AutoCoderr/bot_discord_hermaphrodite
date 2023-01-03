@@ -204,7 +204,7 @@ export default class XP extends AbstractXP<IXPArgs> {
     }
 
     async action_notifications_enable(args: IXPArgs, XPServerConfig: IXPData, XPUserConfig: IXPUserData) {
-        const success = await enableOrDisableUserNotification(this.member, XPUserConfig, true, XPServerConfig);
+        const success = await enableOrDisableUserNotification(<Guild>this.guild, this.member, XPUserConfig, true, XPServerConfig);
 
         return this.response(true, {
             embeds: [
@@ -219,7 +219,7 @@ export default class XP extends AbstractXP<IXPArgs> {
     }
 
     async action_notifications_disable(_, __, XPUserConfig: IXPUserData) {
-        await enableOrDisableUserNotification(this.member, XPUserConfig, false, null, false)
+        await enableOrDisableUserNotification(<Guild>this.guild, this.member, XPUserConfig, false, null, false)
 
         return this.response(true, {
             embeds: [

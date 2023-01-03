@@ -14,6 +14,19 @@ import XPNotificationAskButton, {
 import {deleteMP} from "../../Classes/OtherFunctions";
 import {getXPUserConfig} from "./XPCounting/countingOtherFunctions";
 import {getTimezoneDatas} from "../timezones";
+import client from "../../client";
+
+async function deleteNotificationButtons(serverId: string, user: User|GuildMember) {
+    const buttons: IXPNotificationAskButton[] = await XPNotificationAskButton.find({
+        serverId: serverId,
+        userId: user.id
+    })
+
+    await Promise.all(buttons.map(async button => {
+        await deleteMP(user instanceof User ? user : user.user, button.messageId);
+        await button.remove();
+    }))
+}
 
 export async function listenXPNotificationAskButtons(interaction: ButtonInteraction): Promise<boolean> {
     const button: null|IXPNotificationAskButton = await XPNotificationAskButton.findOne({
@@ -24,16 +37,21 @@ export async function listenXPNotificationAskButtons(interaction: ButtonInteract
     if (button === null)
         return false;
 
+    const guild: undefined|Guild = client.guilds.cache.get(button.serverId);
+
+    if (guild === undefined)
+        return !deleteNotificationButtons(button.serverId, interaction.user) && false;
+
     const XPUserConfig: IXPUserData = await getXPUserConfig(button.serverId,button.userId);
 
-    await enableOrDisableUserNotification(interaction.user, XPUserConfig, button.toEnable)
+    await enableOrDisableUserNotification(guild, interaction.user, XPUserConfig, button.toEnable)
 
     await interaction.editReply("Notifications "+(button.toEnable ? "activées" : "désactivées")+" avec succès!")
 
     return true;
 }
 
-export async function enableOrDisableUserNotification(user: User|GuildMember, XPUserConfig: IXPUserData, toEnable: boolean, XPServerConfig: IXPData|null = null, sendMp = true): Promise<boolean> {
+export async function enableOrDisableUserNotification(guild: Guild, user: User|GuildMember, XPUserConfig: IXPUserData, toEnable: boolean, XPServerConfig: IXPData|null = null, sendMp = true): Promise<boolean> {
     if (sendMp) {
         XPServerConfig = XPServerConfig ?? (
                         toEnable ?
@@ -54,13 +72,13 @@ export async function enableOrDisableUserNotification(user: User|GuildMember, XP
                         .setFields(
                             (toEnable && unblockedTips.length > 0) ?
                                 {
-                                    name: "Vous avez débloqué les tips des paliers suivants :",
+                                    name: "Vous avez débloqué les tips des paliers suivants sur le serveur '"+guild.name+"':",
                                     value: unblockedTips.map(tip =>
                                         "Palier " + tip.level
                                     ).join("\n")
                                 } :
                                 {
-                                    name: "Notifications du système d'XP "+(toEnable ? "activées" : "désactivées"),
+                                    name: "Notifications du système d'XP "+(toEnable ? "activées" : "désactivées")+" sur le serveur '"+guild.name+"'",
                                     value: "Vous avez "+(toEnable ? "activé" : "désactivé")+" les notifications pour le système d'XP"
                                 }
                         )
@@ -75,16 +93,7 @@ export async function enableOrDisableUserNotification(user: User|GuildMember, XP
     if (toEnable)
         XPUserConfig.lastNotifiedLevel = XPUserConfig.currentLevel;
 
-
-    const buttons: IXPNotificationAskButton[] = await XPNotificationAskButton.find({
-        serverId: XPUserConfig.serverId,
-        userId: user.id
-    })
-
-    await Promise.all(buttons.map(async button => {
-        await deleteMP(user instanceof User ? user : user.user, button.messageId);
-        await button.remove()
-    }))
+    await deleteNotificationButtons(guild.id, user);
 
     XPUserConfig.DMEnabled = toEnable;
     await XPUserConfig.save();

@@ -40,8 +40,8 @@ export async function sendTip(member: GuildMember, level: number, tip: ILevelTip
     const denyButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "td";
 
     await member.send(( level > 1 ?
-            "\nVoici un nouveau tip :" :
-            "\nVoici le premier tip :" )
+            "\nVoici un nouveau tip sur le" :
+            "\nVoici le premier tip du" )+" serveur "+member.guild.name
         +"\n\n"+tip.content)
 
     if (level === 1)
