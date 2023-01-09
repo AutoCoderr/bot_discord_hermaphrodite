@@ -121,14 +121,10 @@ export function showTipsList(tips: ILevelTip[], XPUserConfig: null|IXPUserData =
 }
 
 export function showTip(allTips: ILevelTip[], tip: ILevelTip, interaction: CommandInteraction, XPUserConfig: null|IXPUserData = null): InteractionReplyOptions {
-    const embed = new EmbedBuilder()
-        .setTitle("Tip numéro "+tip.level)
-        .setFields({
-            name: "Voici le tip "+tip.level,
-            value: tip.content
-        });
+    
+    const embed: EmbedBuilder|null = tip.userApproves !== null && tip.userUnapproves !== null ? new EmbedBuilder() : null;
 
-    if (tip.userApproves !== null && tip.userUnapproves !== null) {
+    if (embed !== null && tip.userApproves !== null && tip.userUnapproves !== null) {
         if (XPUserConfig !== null) {
             const [approved, unApproved] = [
                 tip.userApproves.some(id => id === XPUserConfig.userId),
@@ -192,9 +188,8 @@ export function showTip(allTips: ILevelTip[], tip: ILevelTip, interaction: Comma
 
     //@ts-ignore
     return {
-        embeds: [
-            embed
-        ],
+        content: "**Voici le tips du level "+tip.level+" : **\n\n"+tip.content,
+        embeds: embed ? [embed] : undefined,
         ...(
             (prevButton || nextButton) ? {
                 components: [
