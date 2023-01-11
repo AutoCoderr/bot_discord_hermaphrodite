@@ -55,7 +55,7 @@ interface IConfigXPArgs {
     setOrShowSubAction: 'set'|'show';
     XPActionTypes: 'vocal'|'message'|'first_message';
     XPActionTypesToLimit: 'vocal'|'message';
-    tipsSubActions: 'list'|'show'|'set'|'delete'|'export'|'import'|'reset';
+    tipsSubActions: 'list'|'show'|'set'|'delete'|'export'|'import'|'reset'|'reset_approves';
     gradesSubActions:
         'add'|
         'list'|
@@ -158,7 +158,8 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                     list: "Lister les tips",
                     export: "Exporter les tips dans un fichier json",
                     import: "Importer les tips à partir d'un fichier json",
-                    reset: "Réinitialiser les tips du système d'XP du serveur"
+                    reset: "Réinitialiser les tips du système d'XP du serveur",
+                    reset_approves: "Réinitialiser les votes d'un tips"
                 }
             },
             gradesSubActions: {
@@ -237,12 +238,16 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                 }
             },
             level: {
-                referToSubCommands: ['tips.show', 'tips.delete', 'tips.set','grades.add','grades.insert','grades.set_level'],
+                referToSubCommands: ['tips.show', 'tips.delete', 'tips.set','grades.add','grades.insert','grades.set_level','tips.reset_approves'],
                 type: "overZeroInteger",
                 evenCheckAndExtractForSlash: true,
                 description: "Rentrez une valeur",
                 required: async (args, command: null|ConfigXP) => {
-                    if (args.action !== "grades" || args.gradesSubActions === "set_level")
+                    if (
+                        !["grades","tips"].includes(<string>args.action) ||
+                        (args.action === "grades" && args.gradesSubActions === "set_level") ||
+                        (args.action === "tips" && args.tipsSubActions !== "reset_approves")
+                    )
                         return true;
 
                     if (command === null)
@@ -278,6 +283,7 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                                 args.tipsSubActions === "set" ||
                                 (
                                     XPServerConfig !== null &&
+                                    (args.tipsSubActions !== "reset_approves" || value > 1) &&
                                     findTipByLevel(value, XPServerConfig.tipsByLevel) !== null
                                 )
                             )
@@ -337,7 +343,10 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                         }
 
                     if (args.action === "tips")
-                        return {
+                        return (args.tipsSubActions === "reset_approves" && value === 1) ? {
+                            name: "Donnée invalide",
+                            value: "Vous ne pouvez pas réinitialiser les votes du tip 1 car celui ci n'a pas de système de vote"
+                        } : {
                             name: "Tip introuvable",
                             value: "Aucun tip associé au palier "+value+" n'a été trouvé"
                         }
@@ -1314,6 +1323,60 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
         return this["action_tips_"+args.tipsSubActions](args, XPServerConfig)
     }
 
+    async action_tips_reset_approves(args: IConfigXPArgs, XPServerConfig: IXPData) {
+        const acceptButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "action_reset_approves";
+        const denyButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "action_reset_approves";
+
+        const sentence = args.level ? "du tips "+args.level : "de tout les tips";
+
+        addCallbackButton(acceptButtonId, async () => {
+            XPServerConfig.tipsByLevel = XPServerConfig.tipsByLevel.map(tip =>
+                (tip.level > 1 && (args.level === undefined || tip.level === args.level)) ?
+                    {
+                        ...tip,
+                        userApproves: [],
+                        userUnapproves: []
+                    } : tip
+            )
+
+            await XPServerConfig.save();
+
+            return this.response(true, {
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("Votes "+sentence+" réinitialisées")
+                        .setFields({
+                            name: "Votes réinitialisées avec succès",
+                            value: "Les votes "+sentence+" ont été réinitialisés avec succès!"
+                        })
+                ]
+            })
+        }, [denyButtonId], {command: this.commandName, commandArguments: args});
+
+        addCallbackButton(denyButtonId, () => {
+            return this.response(true, "Opération annulée");
+        }, [acceptButtonId]);
+
+        //@ts-ignore
+        return this.response(true, {
+            content: "Voulez vous vraiment réinitialiser les votes "+sentence+" ?",
+            components: [
+                new ActionRowBuilder()
+                    .addComponents(
+                        (<[string,boolean][]>[
+                            [acceptButtonId, true],
+                            [denyButtonId, false]
+                        ]).map(([buttonId, accept]) =>
+                            new ButtonBuilder()
+                                .setCustomId(buttonId)
+                                .setLabel(accept ? "Oui" : "Non")
+                                .setStyle(accept ? ButtonStyle.Danger : ButtonStyle.Success)
+                        )
+                    )
+            ]
+        })
+    }
+
     async action_tips_reset(args: IConfigXPArgs, XPServerConfig: IXPData) {
         const acceptButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "reset_tips_accept";
         const denyButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "reset_tips_deny";
@@ -1383,7 +1446,14 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                 ]
             })
 
-        XPServerConfig.tipsByLevel = args.jsonFile;
+        XPServerConfig.tipsByLevel = args.jsonFile.map(tip => 
+                                                tip.level > 1 ? 
+                                                    tip : 
+                                                    {
+                                                        ...tip, 
+                                                        userApproves: null,
+                                                        userUnapproves: null
+                                                    });
         await XPServerConfig.save();
 
         return this.response(true, {
