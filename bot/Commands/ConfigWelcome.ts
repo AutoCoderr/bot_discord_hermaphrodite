@@ -51,15 +51,11 @@ export default class ConfigWelcome extends Command {
             const listener = errorCatcher(async (fnArgs: [Message]) => {
                 const [response] = fnArgs
                 try {
-                    if (response.author.id !== this.member.id)
+                    if (response.author.id !== this.member.id || response.channelId !== this.channel.id)
                         return;
 
                     clearTimeout(timeout);
                     client.off('messageCreate', listener);
-
-                    if (response.content.length > 1950) {
-                        return resolve(this.response(true, "Vous ne pouvez pas dépasser les 1950 caractères. Vous en avez rentré "+response.content.length+"\nRéessayez :", this.getMessageSettingCallback()));
-                    }
 
                     const messageCanBeDeleted = userHasChannelPermissions(<GuildMember>(<Guild>this.guild).members.me, this.channel, PermissionFlagsBits.ManageMessages)
 
@@ -72,7 +68,13 @@ export default class ConfigWelcome extends Command {
                         if (messageCanBeDeleted)
                             await response.delete();
                         resolve(this.response(true, messageCanBeDeletedMessage+"Commande annulée"))
-                        return
+                        return;
+                    }
+
+                    if (response.content.length > 1945) {
+                        if (messageCanBeDeleted)
+                            await response.delete();
+                        return resolve(this.response(true, messageCanBeDeletedMessage+"Vous ne pouvez pas dépasser 1945 caractères. Vous en avez rentré "+response.content.length+"\nRéessayez :", this.getMessageSettingCallback()));
                     }
 
                     let welcomeMessage: IWelcomeMessage = await WelcomeMessage.findOne({serverId: (<Guild>this.guild).id});

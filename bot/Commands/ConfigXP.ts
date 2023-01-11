@@ -1400,19 +1400,16 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
 
     getTipsSettingCallback(level: number, XPServerConfig: IXPData): (() => Promise<responseType>) {
         return () => new Promise(resolve => {
+            const limitMessage = Math.min(1950, 2000 - 32-level.toString().length)
             let timeout;
             const listener = errorCatcher(async (fnArgs: [Message]) => {
                 const [response] = fnArgs;
                 try {
-                    if (response.author.id !== this.member.id)
+                    if (response.author.id !== this.member.id || response.channelId !== this.channel.id)
                         return;
 
                     client.off('messageCreate', listener);
                     clearTimeout(timeout);
-
-                    if (response.content.length > 1950) {
-                        return resolve(this.response(true, "Vous ne pouvez pas dépasser les 1950 caractères. Vous en avez rentré "+response.content.length+"\nRéessayez :", this.getTipsSettingCallback(level, XPServerConfig)));
-                    }
 
                     const messageCanBeDeleted = userHasChannelPermissions(<GuildMember>(<Guild>this.guild).members.me, this.channel, PermissionFlagsBits.ManageMessages)
 
@@ -1427,6 +1424,12 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
 
                         resolve(this.response(true, messageCanBeDeletedMessage+"Commande annulée"))
                         return;
+                    }
+
+                    if (response.content.length > limitMessage) {
+                        if (messageCanBeDeleted)
+                            await response.delete();
+                        return resolve(this.response(true, messageCanBeDeletedMessage+"Vous ne pouvez pas dépasser "+limitMessage+" caractères. Vous en avez rentré "+response.content.length+"\nRéessayez :", this.getTipsSettingCallback(level, XPServerConfig)));
                     }
 
                     XPServerConfig.tipsByLevel = setTipByLevel(level, response.content, XPServerConfig.tipsByLevel);
