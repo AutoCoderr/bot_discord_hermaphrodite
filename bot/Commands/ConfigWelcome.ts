@@ -12,7 +12,7 @@ import {
 } from "discord.js";
 import {userHasChannelPermissions} from "../Classes/OtherFunctions";
 import CustomError from "../logging/CustomError";
-import {IArgsModel} from "../interfaces/CommandInterfaces";
+import {IArgsModel,responseType} from "../interfaces/CommandInterfaces";
 import client from "../client";
 import errorCatcher from "../logging/errorCatcher";
 
@@ -45,6 +45,82 @@ export default class ConfigWelcome extends Command {
         super(messageOrInteraction, commandOrigin, ConfigWelcome.commandName, ConfigWelcome.argsModel);
     }
 
+    getMessageSettingCallback(): (() => Promise<responseType>) {
+        return  () => new Promise(resolve =>  {
+            let timeout;
+            const listener = errorCatcher(async (fnArgs: [Message]) => {
+                const [response] = fnArgs
+                try {
+                    if (response.author.id !== this.member.id)
+                        return;
+
+                    clearTimeout(timeout);
+                    client.off('messageCreate', listener);
+
+                    if (response.content.length > 1950) {
+                        return resolve(this.response(true, "Vous ne pouvez pas dépasser les 1950 caractères. Vous en avez rentré "+response.content.length+"\nRéessayez :", this.getMessageSettingCallback()));
+                    }
+
+                    const messageCanBeDeleted = userHasChannelPermissions(<GuildMember>(<Guild>this.guild).members.me, this.channel, PermissionFlagsBits.ManageMessages)
+
+                    const messageCanBeDeletedMessage = 
+                        !messageCanBeDeleted ?
+                        "(Attention : Herma bot ne dispose pas de la permission pour supprimer automatiquement votre message)\n\n" :
+                        ""
+
+                    if (response.content === "CANCEL") {
+                        if (messageCanBeDeleted)
+                            await response.delete();
+                        resolve(this.response(true, messageCanBeDeletedMessage+"Commande annulée"))
+                        return
+                    }
+
+                    let welcomeMessage: IWelcomeMessage = await WelcomeMessage.findOne({serverId: (<Guild>this.guild).id});
+                    let create = false;
+                    if (welcomeMessage == null) {
+                        create = true;
+                        welcomeMessage = {
+                            enabled: true,
+                            message: response.content, // @ts-ignore
+                            serverId: this.guild.id
+                        };
+                        WelcomeMessage.create(welcomeMessage);
+                    } else {
+                        welcomeMessage.message = response.content; // @ts-ignore
+                        welcomeMessage.save();
+                    }
+
+                    if (messageCanBeDeleted)
+                        await response.delete();
+
+                    resolve(
+                        this.response(true,
+                            messageCanBeDeletedMessage+"Votre message a été enregistré et sera envoyé en MP aux nouveaux arrivants de ce serveur"+
+                            (create ?  "\n(L'envoie de MP aux nouveaux a été activé)" : ""))
+                    );
+                } catch (e) {
+                    throw new CustomError(<Error>e, {
+                        from: "welcomeMessageSetListener",
+                        guild: <Guild>this.guild,
+                        user: this.member,
+                        message: response
+                    })
+                }
+            }, () => {
+                clearTimeout(timeout);
+                resolve(this.response(false, "Une erreur est survenue"));
+            });
+
+
+            client.on('messageCreate', listener);
+
+            timeout = setTimeout(() => {
+                client.off('messageCreate', listener);
+                resolve(this.response(false, "Délai dépassé"));
+            }, 15 * 60 * 1000)
+        })
+    }
+
     async action(args: {action: string}, bot) {
         const {action} = args;
 
@@ -60,76 +136,7 @@ export default class ConfigWelcome extends Command {
         let welcomeMessage: IWelcomeMessage;
         switch(action) {
             case "set":
-                return this.response(true, "Veuillez rentrer le message, qui sera envoyé en MP aux nouveaux arrivants sur ce serveur (tapez 'CANCEL' pour annuler) :",
-                    () => new Promise(resolve =>  {
-                        let timeout;
-                        const listener = errorCatcher(async (fnArgs: [Message]) => {
-                            const [response] = fnArgs
-                            try {
-                                if (response.author.id !== this.member.id)
-                                    return;
-
-                                clearTimeout(timeout);
-                                bot.off('messageCreate', listener);
-
-                                const messageCanBeDeleted = userHasChannelPermissions(<GuildMember>(<Guild>this.guild).members.me, this.channel, PermissionFlagsBits.ManageMessages)
-
-                                const messageCanBeDeletedMessage = 
-                                    !messageCanBeDeleted ?
-                                    "(Attention : Herma bot ne dispose pas de la permission pour supprimer automatiquement votre message)\n\n" :
-                                    ""
-
-                                if (response.content === "CANCEL") {
-                                    if (messageCanBeDeleted)
-                                        await response.delete();
-                                    resolve(this.response(true, messageCanBeDeletedMessage+"Commande annulée"))
-                                    return
-                                }
-
-                                let welcomeMessage: IWelcomeMessage = await WelcomeMessage.findOne({serverId: (<Guild>this.guild).id});
-                                let create = false;
-                                if (welcomeMessage == null) {
-                                    create = true;
-                                    welcomeMessage = {
-                                        enabled: true,
-                                        message: response.content, // @ts-ignore
-                                        serverId: this.guild.id
-                                    };
-                                    WelcomeMessage.create(welcomeMessage);
-                                } else {
-                                    welcomeMessage.message = response.content; // @ts-ignore
-                                    welcomeMessage.save();
-                                }
-
-                                if (messageCanBeDeleted)
-                                    await response.delete();
-
-                                resolve(
-                                    this.response(true,
-                                        messageCanBeDeletedMessage+"Votre message a été enregistré et sera envoyé en MP aux nouveaux arrivants de ce serveur"+
-                                        (create ?  "\n(L'envoie de MP aux nouveaux a été activé)" : ""))
-                                );
-                            } catch (e) {
-                                throw new CustomError(<Error>e, {
-                                    from: "welcomeMessageSetListener",
-                                    guild: <Guild>this.guild,
-                                    user: this.member,
-                                    message: response
-                                })
-                            }
-                        }, () => {
-                            clearTimeout(timeout);
-                            resolve(this.response(false, "Une erreur est survenue"));
-                        });
-
-
-                        bot.on('messageCreate', listener);
-
-                        timeout = setTimeout(() => {
-                            client.off('messageCreate', listener);
-                            resolve(this.response(false, "Délai dépassé"));
-                        }, 15 * 60 * 1000)
-                    }));
+                return this.response(true, "Veuillez rentrer le message, qui sera envoyé en MP aux nouveaux arrivants sur ce serveur (tapez 'CANCEL' pour annuler) :", this.getMessageSettingCallback());
             case "show":
                 welcomeMessage = await WelcomeMessage.findOne({serverId: this.guild.id});
                 if (welcomeMessage == null) {

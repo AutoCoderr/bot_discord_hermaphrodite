@@ -1,4 +1,4 @@
-import {IArgsModel} from "../interfaces/CommandInterfaces";
+import {IArgsModel,responseType} from "../interfaces/CommandInterfaces";
 import {
     CommandInteraction,
     EmbedBuilder,
@@ -1398,63 +1398,70 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
         })
     }
 
-    async action_tips_set(args: IConfigXPArgs, XPServerConfig: IXPData) {
-        return this.response(true, "Veuillez rentrer un message pour le tip (tapez 'CANCEL' pour annuler) :",
-            () => new Promise(resolve => {
-                let timeout;
-                const listener = errorCatcher(async (fnArgs: [Message]) => {
-                    const [response] = fnArgs;
-                    try {
-                        if (response.author.id !== this.member.id)
-                            return;
+    getTipsSettingCallback(level: number, XPServerConfig: IXPData): (() => Promise<responseType>) {
+        return () => new Promise(resolve => {
+            let timeout;
+            const listener = errorCatcher(async (fnArgs: [Message]) => {
+                const [response] = fnArgs;
+                try {
+                    if (response.author.id !== this.member.id)
+                        return;
 
-                        client.off('messageCreate', listener);
-                        clearTimeout(timeout);
+                    client.off('messageCreate', listener);
+                    clearTimeout(timeout);
 
-                        const messageCanBeDeleted = userHasChannelPermissions(<GuildMember>(<Guild>this.guild).members.me, this.channel, PermissionFlagsBits.ManageMessages)
+                    if (response.content.length > 1950) {
+                        return resolve(this.response(true, "Vous ne pouvez pas dépasser les 1950 caractères. Vous en avez rentré "+response.content.length+"\nRéessayez :", this.getTipsSettingCallback(level, XPServerConfig)));
+                    }
 
-                        const messageCanBeDeletedMessage = 
-                            !messageCanBeDeleted ?
-                            "(Attention : Herma bot ne dispose pas de la permission pour supprimer automatiquement votre message)\n\n" :
-                            ""
+                    const messageCanBeDeleted = userHasChannelPermissions(<GuildMember>(<Guild>this.guild).members.me, this.channel, PermissionFlagsBits.ManageMessages)
 
-                        if (response.content === "CANCEL") {
-                            if (messageCanBeDeleted)
-                                await response.delete();
+                    const messageCanBeDeletedMessage = 
+                        !messageCanBeDeleted ?
+                        "(Attention : Herma bot ne dispose pas de la permission pour supprimer automatiquement votre message)\n\n" :
+                        ""
 
-                            resolve(this.response(true, messageCanBeDeletedMessage+"Commande annulée"))
-                            return;
-                        }
-
-                        XPServerConfig.tipsByLevel = setTipByLevel(<number>args.level, response.content, XPServerConfig.tipsByLevel);
-                        await XPServerConfig.save();
-                        
+                    if (response.content === "CANCEL") {
                         if (messageCanBeDeleted)
                             await response.delete();
 
-                        resolve(
-                            this.response(true, messageCanBeDeletedMessage+"Tips enregistré avec succès !")
-                        )
-                    } catch (e) {
-                        throw new CustomError(<Error>e, {
-                            from: "tipsSetListener",
-                            guild: <Guild>this.guild,
-                            user: this.member,
-                            message: response
-                        })
+                        resolve(this.response(true, messageCanBeDeletedMessage+"Commande annulée"))
+                        return;
                     }
-                }, (_) => {
-                    clearTimeout(timeout);
-                    resolve(this.response(false, "Une erreur est survenue"))
-                })
 
-                client.on('messageCreate', listener);
+                    XPServerConfig.tipsByLevel = setTipByLevel(level, response.content, XPServerConfig.tipsByLevel);
+                    await XPServerConfig.save();
+                    
+                    if (messageCanBeDeleted)
+                        await response.delete();
 
-                timeout = setTimeout(() => {
-                    client.off('messageCreate', listener);
-                    resolve(this.response(false, "Délai dépassé"));
-                }, 15 * 60 * 1000)
-            }))
+                    resolve(
+                        this.response(true, messageCanBeDeletedMessage+"Tips enregistré avec succès !")
+                    )
+                } catch (e) {
+                    throw new CustomError(<Error>e, {
+                        from: "tipsSetListener",
+                        guild: <Guild>this.guild,
+                        user: this.member,
+                        message: response
+                    })
+                }
+            }, (_) => {
+                clearTimeout(timeout);
+                resolve(this.response(false, "Une erreur est survenue"))
+            })
+
+            client.on('messageCreate', listener);
+
+            timeout = setTimeout(() => {
+                client.off('messageCreate', listener);
+                resolve(this.response(false, "Délai dépassé"));
+            }, 15 * 60 * 1000)
+        })
+    }
+
+    async action_tips_set(args: IConfigXPArgs, XPServerConfig: IXPData) {
+        return this.response(true, "Veuillez rentrer un message pour le tip (tapez 'CANCEL' pour annuler) :", this.getTipsSettingCallback(<number>args.level, XPServerConfig))
     }
 
     async action_tips_delete(args: IConfigXPArgs, XPServerConfig: IXPData) {
