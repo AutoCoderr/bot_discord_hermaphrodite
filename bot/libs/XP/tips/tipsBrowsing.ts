@@ -189,7 +189,7 @@ export function showTip(allTips: ILevelTip[], tip: ILevelTip, interaction: Comma
     //@ts-ignore
     return {
         content: "**Voici le tips du level "+tip.level+" : **\n\n"+tip.content,
-        embeds: embed ? [embed] : undefined,
+        embeds: embed ? [embed] : [],
         ...(
             (prevButton || nextButton) ? {
                 components: [
