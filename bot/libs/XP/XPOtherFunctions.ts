@@ -11,7 +11,7 @@ import {IXPUserData} from "../../Models/XP/XPUserData";
 import XPNotificationAskButton, {
     IXPNotificationAskButton
 } from "../../Models/XP/XPNotificationAskButton";
-import {deleteMP} from "../../Classes/OtherFunctions";
+import {deleteMP, getMP} from "../../Classes/OtherFunctions";
 import {getXPUserConfig} from "./XPCounting/countingOtherFunctions";
 import {getTimezoneDatas} from "../timezones";
 import client from "../../client";
@@ -23,8 +23,16 @@ async function deleteNotificationButtons(serverId: string, user: User|GuildMembe
     })
 
     await Promise.all(buttons.map(async button => {
-        await deleteMP(user instanceof User ? user : user.user, button.messageId);
         await button.remove();
+
+        const message = await getMP(user instanceof User ? user : user.user, button.messageId);
+        if (message === null)
+            return;
+        
+        await message.edit({
+            content: message.content.split("\n-------------------------------")[0],
+            components: []
+        });
     }))
 }
 

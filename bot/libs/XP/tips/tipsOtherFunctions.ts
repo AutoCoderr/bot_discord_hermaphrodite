@@ -1,7 +1,7 @@
 import {ActionRowBuilder, ButtonBuilder, ButtonInteraction, ButtonStyle, GuildMember} from "discord.js";
 import XPTipsUsefulAskButton, {IXPTipsUsefulAskButton} from "../../../Models/XP/XPTipsUsefulAskButton";
 import XPData, {ILevelTip, IXPData} from "../../../Models/XP/XPData";
-import {deleteMP} from "../../../Classes/OtherFunctions";
+import {deleteMP, getMP} from "../../../Classes/OtherFunctions";
 import {approveOrUnApproveTip} from "./tipsManager";
 
 export async function listenXPTipsUseFulApproveButtons(interaction: ButtonInteraction): Promise<boolean> {
@@ -27,57 +27,52 @@ export async function listenXPTipsUseFulApproveButtons(interaction: ButtonIntera
         await interaction.editReply("Ce tip semble ne plus exister");
     }
 
-    await deleteMP(interaction.user, button.messageId);
     await XPTipsUsefulAskButton.deleteMany({
         messageId: button.messageId
     });
+    
+    const message = await getMP(interaction.user, button.messageId);
+    if (message === null)
+        return true;
+
+    await message.edit({
+        content: message.content.split("\n-------------------------------")[0],
+        components: []
+    })
 
     return true;
 }
 
-export async function sendTip(member: GuildMember, level: number, tip: ILevelTip) {
-    const acceptButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "ta";
-    const denyButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "td";
+export async function getTipMessage(member: GuildMember, level: number, tip: ILevelTip)
+    : Promise<{
+        content: string, 
+        components?: [ActionRowBuilder], 
+        tipAcceptButtonId: string|null,
+        tipDenyButtonId: string|null
+    }> {
+    const tipAcceptButtonId = level > 1 ? (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "ta" : null;
+    const tipDenyButtonId = level > 1 ? (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "td" : null;
 
-    await member.send(( level > 1 ?
+    return {
+        tipAcceptButtonId,
+        tipDenyButtonId,
+        content: ( level > 1 ?
             "\nVoici un nouveau tip sur le" :
             "\nVoici le premier tip du" )+" serveur "+member.guild.name
-        +"\n\n"+tip.content)
-
-    if (level === 1)
-        return;
-
-    const message = await member.send({
-        content: "\n-------------------------------\n\nAvez vous trouvé ce tip utile ?",
-        components: [ //@ts-ignore
+        +"\n\n"+tip.content+(level > 1 ? "\n-------------------------------\n\nAvez vous trouvé ce tip utile ?" : ""),
+        components: level > 1 ? [
             new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
-                    .setCustomId(acceptButtonId)
+                    .setCustomId(<string>tipAcceptButtonId)
                     .setLabel("Oui")
                     .setStyle(ButtonStyle.Success),
                 new ButtonBuilder()
-                    .setCustomId(denyButtonId)
+                    .setCustomId(<string>tipDenyButtonId)
                     .setLabel("Non")
                     .setStyle(ButtonStyle.Danger),
             )
-        ]
-    })
-
-    await Promise.all(
-        [
-            [acceptButtonId, true],
-            [denyButtonId, false]
-        ].map(([buttonId, useful]) =>
-            XPTipsUsefulAskButton.create({
-                serverId: member.guild.id,
-                userId: member.id,
-                useful,
-                level,
-                buttonId,
-                messageId: message.id
-            })
-        )
-    )
+        ] : undefined
+    }
 }
 
 export function checkTipsListData(tips: any) {

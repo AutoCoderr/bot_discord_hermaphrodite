@@ -310,13 +310,18 @@ export function round(n, p) {
     return Math.round(n * 10**p)/10**p
 }
 
-export async function deleteMP(user: User, messageId: string) {
+export async function getMP(user: User, messageId: string): Promise<null|Message> {
     const dmChannel = user.dmChannel ?? await user.createDM().catch(() => null);
     if (dmChannel === null)
-        return;
+        return null;
 
-    const message: null|Message = await dmChannel.messages.fetch(messageId).catch(() => null);
+    return dmChannel.messages.fetch(messageId).catch(() => null);
+}
 
+export async function deleteMP(user: User, messageIdOrMessage: string|Message) {
+    const message: null|Message = typeof(messageIdOrMessage) === "string" ? 
+                                        await getMP(user, messageIdOrMessage) :
+                                        messageIdOrMessage;
     if (message === null)
         return;
 

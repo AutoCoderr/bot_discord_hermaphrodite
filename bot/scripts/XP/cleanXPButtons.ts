@@ -1,4 +1,4 @@
-import { deleteMP } from "../../Classes/OtherFunctions";
+import { deleteMP, getMP } from "../../Classes/OtherFunctions";
 import client from "../../client";
 import { getMemberById, serverHasXPsEnabled } from "../../libs/cacheForScripts";
 import { askForNotifications } from "../../libs/XP/XPCounting/countingOtherFunctions";
@@ -12,8 +12,21 @@ function getPromiseArrayFromButton(button: IXPNotificationAskButton|IXPTipsUsefu
             if (!(<IXPTipsUsefulAskButton>button).useful && !(<IXPNotificationAskButton>button).toEnable)
                 return;
             const member = await getMemberById(button.serverId, button.userId);
-            if (member !== null)
-                return deleteMP(member.user, button.messageId);
+            if (member === null)
+                return;
+
+            const message = await getMP(member.user, button.messageId);
+            if (message === null)
+                return;
+
+            const splittedMessage = message.content.split("\n-------------------------------");
+            if (splittedMessage.length > 1)
+                await message.edit({
+                    content: splittedMessage[0],
+                    components: []
+                });
+            else
+                await deleteMP(member.user, message)
         })()
     ]
 }

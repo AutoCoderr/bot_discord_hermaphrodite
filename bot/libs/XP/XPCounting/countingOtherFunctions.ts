@@ -9,45 +9,65 @@ import {
     User
 } from "discord.js";
 import XPUserData, {IXPUserData} from "../../../Models/XP/XPUserData";
-import XPData, {IGrade, IXPData} from "../../../Models/XP/XPData";
+import XPData, {IGrade, ILevelTip, IXPData} from "../../../Models/XP/XPData";
 import {roleCanBeManaged, checkIfBotCanManageRoles} from "../XPOtherFunctions";
 import XPNotificationAskButton from "../../../Models/XP/XPNotificationAskButton";
 import {findTipByLevel} from "../tips/tipsManager";
-import {sendTip} from "../tips/tipsOtherFunctions";
+import {getTipMessage} from "../tips/tipsOtherFunctions";
+import XPTipsUsefulAskButton from "../../../Models/XP/XPTipsUsefulAskButton";
 
-export async function askForNotifications(user: User, serverId, content: string) {
-    const acceptButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "na";
-    const denyButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "nd";
+function getButtonsForAskNotifications(user: User, serverId: string): {
+    notificationsAcceptButtonId: string, 
+    notificationDenyButtonId: string,
+    components: [ActionRowBuilder]
+} {
+    const notificationsAcceptButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "na";
+    const notificationDenyButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "nd";
 
-    const message = await user.send({
-        content,
-        components: [ //@ts-ignore
-            new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId(acceptButtonId)
-                    .setLabel("Oui")
-                    .setStyle(ButtonStyle.Success),
-                new ButtonBuilder()
-                    .setCustomId(denyButtonId)
-                    .setLabel("Non")
-                    .setStyle(ButtonStyle.Danger),
-            )
-        ]
-    })
-    await Promise.all(
+    return {
+        notificationsAcceptButtonId,
+        notificationDenyButtonId,
+        components: [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(notificationsAcceptButtonId)
+                .setLabel("Oui")
+                .setStyle(ButtonStyle.Success),
+            new ButtonBuilder()
+                .setCustomId(notificationDenyButtonId)
+                .setLabel("Non")
+                .setStyle(ButtonStyle.Danger),
+        )
+    ]
+    }
+}
+
+function createNotificationButtons(serverId: string, userId: string, messageId: string, acceptButtonId: string, denyButtonId: string) {
+    return Promise.all(
         [
             [acceptButtonId, true],
             [denyButtonId, false]
         ].map(([buttonId, toEnable]) =>
             XPNotificationAskButton.create({
                 serverId,
-                userId: user.id,
+                userId: userId,
                 toEnable,
                 buttonId,
-                messageId: message.id
+                messageId: messageId
             })
         )
     )
+}
+
+export async function askForNotifications(user: User, serverId, content: string) {
+    const {notificationsAcceptButtonId, notificationDenyButtonId, components} = getButtonsForAskNotifications(user, serverId)
+
+    const message = await user.send({
+        content, //@ts-ignore
+        components: components
+    })
+
+    await createNotificationButtons(serverId, user.id, message.id, notificationsAcceptButtonId, notificationDenyButtonId)
 }
 
 async function detectUpgrade(member: GuildMember, XPUserConfig: IXPUserData, XPServerConfig: IXPData): Promise<null|IGrade> {
@@ -80,6 +100,60 @@ async function detectUpgrade(member: GuildMember, XPUserConfig: IXPUserData, XPS
     return grade;
 }
 
+async function sendTipsAndNotificationAsks(member: GuildMember, level: number, tip: null|ILevelTip): Promise<boolean> {
+    if (level > 1 && tip === null)
+        return true;
+    
+    const {tipAcceptButtonId, tipDenyButtonId, content: contentTip, components: componentsTip} = tip !== null ?
+        await getTipMessage(member, level, tip):
+        {tipAcceptButtonId: null, tipDenyButtonId: null, content: "", components: undefined}
+
+    const {notificationsAcceptButtonId, notificationDenyButtonId, components: componentsNotif} = level === 1 ? getButtonsForAskNotifications(
+        member.user,
+        member.guild.id
+    ) : {notificationsAcceptButtonId: null, notificationDenyButtonId: null, components: undefined}
+
+    try {
+        const message = await member.send({
+            content: contentTip+(
+                level === 1 ?
+                    (contentTip !== "" ? "\n-------------------------------\n\n" : "")+
+                    (tip === null ? "Vous venez de débloquer le premier palier du système d'XP de '"+member.guild.name+"' !\n" : "")+
+                    "Souhaitez vous avoir les notifications activées?" : ""
+            ),
+            components: [ //@ts-ignore
+                ...(componentsTip ?? []), //@ts-ignore
+                ...(componentsNotif ?? [])
+            ]
+        });
+
+        if (notificationsAcceptButtonId) {
+            await createNotificationButtons(member.guild.id, member.user.id, message.id, notificationsAcceptButtonId, notificationDenyButtonId)
+        }
+
+        if (tipAcceptButtonId) {
+            await Promise.all(
+                [
+                    [tipAcceptButtonId, true],
+                    [tipDenyButtonId, false]
+                ].map(([buttonId, useful]) =>
+                    XPTipsUsefulAskButton.create({
+                        serverId: member.guild.id,
+                        userId: member.id,
+                        useful,
+                        level,
+                        buttonId,
+                        messageId: message.id
+                    })
+                )
+            )
+        }
+        return true;
+    } catch(_) {
+        return false;
+    }
+}
+
 async function detectUplevel(member: GuildMember, XPUserConfig: IXPUserData, XPServerConfig: IXPData, grade: IGrade, oldXP: number, setByAdmin: boolean): Promise<void> {
     const oldCurrentLevel = XPUserConfig.currentLevel;
     XPUserConfig.currentLevel = grade.atLevel + Math.floor((XPUserConfig.XP - grade.requiredXP)/grade.XPByLevel);
@@ -90,28 +164,13 @@ async function detectUplevel(member: GuildMember, XPUserConfig: IXPUserData, XPS
         await reportXPAndLevelVariation(XPServerConfig, XPUserConfig, member, oldCurrentLevel, oldXP)
     }
 
-
     for (let level=XPUserConfig.lastNotifiedLevel+1;level<=XPUserConfig.currentLevel;level++) {
         if (level > 1 && (!XPUserConfig.DMEnabled || setByAdmin))
             break;
 
         const tip = findTipByLevel(level, XPServerConfig.tipsByLevel);
-        if (level > 1 && tip === null)
-            continue;
-
-        try {
-            if (tip !== null)
-                await sendTip(member, level, tip);
-            if (level === 1)
-                await askForNotifications(
-                    member.user,
-                    member.guild.id,
-                    (tip === null ? "Vous venez de débloquer le premier palier du système d'XP de '"+member.guild.name+"' !\n" : "")+
-                    "Souhaitez vous avoir les notifications activées?"
-                )
-        } catch (_) {
+        if (!(await sendTipsAndNotificationAsks(member, level, tip)))
             return;
-        }
     }
 
     if (XPUserConfig.DMEnabled || oldCurrentLevel === 0)
