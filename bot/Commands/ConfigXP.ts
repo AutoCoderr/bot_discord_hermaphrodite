@@ -604,7 +604,7 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                     })
                     .then(XPUserDatas => 
                         XPUserDatas.filter(XPUserData =>
-                            gradesById[XPUserData.gradeId].roleId !== grade.roleId   
+                            gradesById[XPUserData.gradeId] === undefined || gradesById[XPUserData.gradeId].roleId !== grade.roleId   
                         )
                     )
                     .then(XPUserDatas =>
@@ -1446,14 +1446,26 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                 ]
             })
 
-        XPServerConfig.tipsByLevel = args.jsonFile.map(tip => 
-                                                tip.level > 1 ? 
-                                                    tip : 
-                                                    {
-                                                        ...tip, 
-                                                        userApproves: null,
-                                                        userUnapproves: null
-                                                    });
+        const existingTipsByLevel = XPServerConfig.tipsByLevel.reduce((acc,tip) => ({
+            ...acc,
+            [tip.level]: tip
+        }), {});
+
+        XPServerConfig.tipsByLevel = args.jsonFile.map(tip => ({
+            ...tip,
+            ...(
+                existingTipsByLevel[tip.level] ? 
+                    {
+                        userApproves: existingTipsByLevel[tip.level].userApproves,
+                        userUnapproves: existingTipsByLevel[tip.level].userUnapproves
+                    } :
+                    {
+                        userApproves: tip.level > 1 ? [] : null,
+                        userUnapproves: tip.level > 1 ? [] : null
+                    }
+            )
+        }), {});
+
         await XPServerConfig.save();
 
         return this.response(true, {
@@ -1462,7 +1474,9 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                     .setTitle("Importation réussie")
                     .setFields({
                         name: "Importation réussie",
-                        value: "l'importation des tips à eu lieu avec succès"
+                        value: "l'importation des tips à eu lieu avec succès\n\n"+
+                               "Les votes des précendents tips avant l'importation ont été maintenus.\n"+
+                               "Si vous le souhaittez, vous pouvez les réinitialiser avec la commande /configxp tips reset_approves"
                     })
             ]
         })
@@ -1470,7 +1484,7 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
 
     getTipsSettingCallback(level: number, XPServerConfig: IXPData): (() => Promise<responseType>) {
         return () => new Promise(resolve => {
-            const limitMessage = Math.min(1950, 2000 - 32-level.toString().length)
+            const limitMessage = 1750;
             let timeout;
             const listener = errorCatcher(async (fnArgs: [Message]) => {
                 const [response] = fnArgs;
