@@ -1,4 +1,4 @@
-import {IArgsModel,responseType} from "../interfaces/CommandInterfaces";
+import {IArgsModel,IFieldLimit,responseType} from "../interfaces/CommandInterfaces";
 import {
     CommandInteraction,
     EmbedBuilder,
@@ -11,7 +11,15 @@ import {
     ButtonBuilder,
     ButtonStyle
 } from "discord.js";
-import XPData, {IGrade, ILevelTip, IXPData, XPDataDefaultValues} from "../Models/XP/XPData";
+import XPData, {
+    IGrade, 
+    ILevelTip, 
+    IXPData, 
+    XPDataDefaultValues, 
+    XPGainsFixedLimits, 
+    gradeFieldsFixedLimits, 
+    tipFieldsFixedLimits
+} from "../Models/XP/XPData";
 import {extractUTCTime, showTime} from "../Classes/DateTimeManager";
 import {
     warningNothingRoleCanBeAssignedMessage, warningSpecificRolesCantBeAssignedMessage, resetUsers, checkParametersData
@@ -89,6 +97,9 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
     static customCommand = false
 
     static slashCommandIdByGuild: {[guildId: string]: string} = {};
+
+    excededXPLimit: IFieldLimit|null = null;
+    excededDurationLimit: IFieldLimit|null = null;
 
     static argsModel: IArgsModel<IConfigXPArgs> = {
         $argsByType: {
@@ -278,7 +289,7 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
 
                     return (
                         (
-                            args.action === "tips" &&
+                            args.action === "tips" && value <= tipFieldsFixedLimits.level.max &&
                             (
                                 args.tipsSubActions === "set" ||
                                 (
@@ -299,8 +310,14 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                                     <number>args.gradeNumber > 1 &&
                                     value > XPServerConfig.grades[<number>args.gradeNumber-2].atLevel &&
                                     (
-                                        args.gradeNumber === XPServerConfig.grades.length+1 ||
-                                        value < XPServerConfig.grades[<number>args.gradeNumber-1].atLevel
+                                        (
+                                            args.gradeNumber === XPServerConfig.grades.length+1 &&
+                                            value <= gradeFieldsFixedLimits.atLevel.max
+                                        ) ||
+                                        (
+                                            <number>args.gradeNumber < XPServerConfig.grades.length+1 &&
+                                            value < XPServerConfig.grades[<number>args.gradeNumber-1].atLevel
+                                        )
                                     )
                                 )
                             )
@@ -310,7 +327,12 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                             args.action === "grades" && args.gradesSubActions === "add" &&
                             (
                                 ((XPServerConfig === null || XPServerConfig.grades.length === 0) && value === 1) ||
-                                (XPServerConfig !== null && XPServerConfig.grades.length > 0 && value > XPServerConfig.grades[XPServerConfig.grades.length-1].atLevel)
+                                (
+                                    XPServerConfig !== null && 
+                                    XPServerConfig.grades.length > 0 && 
+                                    value > XPServerConfig.grades[XPServerConfig.grades.length-1].atLevel && 
+                                    value <= gradeFieldsFixedLimits.atLevel.max
+                                )
                             )
                         )
                             ||
@@ -321,8 +343,14 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                                 (
                                     value > XPServerConfig.grades[<number>args.gradeNumber-2].atLevel &&
                                     (
-                                        args.gradeNumber === XPServerConfig.grades.length ||
-                                        value < XPServerConfig.grades[<number>args.gradeNumber].atLevel
+                                        (
+                                            args.gradeNumber === XPServerConfig.grades.length &&
+                                            value <= gradeFieldsFixedLimits.atLevel.max
+                                        ) ||
+                                        (
+                                            <number>args.gradeNumber < XPServerConfig.grades.length &&
+                                            value < XPServerConfig.grades[<number>args.gradeNumber].atLevel
+                                        )
                                     )
                                 )
                             )
@@ -340,6 +368,13 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                         return {
                             name: "Donnée invalide",
                             value: "Le palier doit être un entier naturel (> 0)"
+                        }
+
+                    const limitMax: number = ({tips: tipFieldsFixedLimits.level, grades: gradeFieldsFixedLimits.atLevel})[<'tips'|'grades'>args.action].max;
+                    if (value > limitMax)
+                        return {
+                            name: "Donnée invalide",
+                            value: "Le palier doit être inférieur ou égal à "+limitMax
                         }
 
                     if (args.action === "tips")
@@ -416,17 +451,33 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                 },
                 valid: async (value, args, command: ConfigXP, validatedArgs) => {
                     if (
-                        args.action !== "grades" ||
                         command.guild === null ||
-                        !["insert","add"].includes(<string>args.gradesSubActions) ||
                         !validatedArgs.level ||
                         (args.gradesSubActions === "insert" && !validatedArgs.gradeNumber)
                     )
                         return true;
 
                     const XPServerConfig = await command.getXPServerConfig();
+                    
+                    const limitObj = args.action === "grades" ?
+                                        gradeFieldsFixedLimits.requiredXP :
+                                        XPGainsFixedLimits[{
+                                            message: 'XPByMessage',
+                                            vocal: 'XPByVocal',
+                                            first_message: 'XPByFirstMessage'
+                                        }[<IConfigXPArgs['XPActionTypes'] & string>args.XPActionTypes]]
+                    if (
+                        value > limitObj.max ||
+                        value < limitObj.min
+                    ) {
+                        command.excededXPLimit = limitObj;
+                        return false;
+                    }
 
-                    return XPServerConfig === null ||
+                    return (
+                        args.action !== "grades" ||
+                        !["add","insert"].includes(<string>args.gradesSubActions) ||
+                        XPServerConfig === null ||
                         XPServerConfig.grades.length === 0 ||
                         (
                             (
@@ -438,44 +489,67 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                                 calculRequiredXPForNextGrade(XPServerConfig.grades, <number>args.level, <number>args.gradeNumber-2) === value
                             )
                         )
+                    )
                 },
-                errorMessage: (value, args) =>
-                    value === undefined ?
-                        {
+                errorMessage: (value: number, _, command: ConfigXP) => {
+                    if (value === undefined)
+                        return {
                             name: "Donnée manquante",
                             value: "Vous devez spécifier des XPs"
-                        } :
-                        (value <= 0 || args.action !== "grades" || (!["add","insert"].includes(<string>args.gradesSubActions))) ?
-                            {
-                                name: "Donnée invalide",
-                                value: "Le nombre d'XP doit être un entier naturel (> 0)"
-                            } :
-                            {
-                                name: "Donnée invalide",
-                                value: "Il semblerait que le niveau d'XP mentionné nécessaire à ce grade ne corresponde pas à la configuration des grades précedents.\n"+
-                                    "Vous pouvez laisser ce champs vide, il sera automatiquement calculé"
-                            }
+                        }
+                    if (value <= 0)
+                        return {
+                            name: "Donnée invalide",
+                            value: "Le nombre d'XP doit être un entier naturel (> 0)"
+                        }
+                    if (command.excededXPLimit !== null)
+                        return {
+                            name: "Donnée invalide",
+                            value: "Le nombre d'XP pour cette commande doit être entre "+
+                                   [command.excededXPLimit.min,command.excededXPLimit.max]
+                                   .join(" et ")
+                        }
+                    
+                    return {
+                        name: "Donnée invalide",
+                        value: "Il semblerait que le niveau d'XP mentionné nécessaire à ce grade ne corresponde pas à la configuration des grades précedents.\n"+
+                            "Vous pouvez laisser ce champs vide, il sera automatiquement calculé"
+                    }
+                }
             },
             name: {
                 referToSubCommands: ['grades.add','grades.insert','grades.set_name'],
                 type: "string",
-                description: "Nom du grade"
+                description: "Nom du grade",
+                valid: value => value.length <= gradeFieldsFixedLimits.name.max,
+                errorMessage: () => ({
+                    name: "Donnée invalide",
+                    value: "Le nom d'un grade ne peut pas dépasser les "+gradeFieldsFixedLimits.name.max+" caractères"
+                })
             },
             XPByLevel: {
                 referToSubCommands: ['grades.add', 'grades.insert','grades.set_xp_by_level'],
                 type: "overZeroInteger",
                 evenCheckAndExtractForSlash: true,
                 description: "Le nombre d'XP nécessaire pour augmenter de palier",
-                errorMessage: (value) =>
-                    value === undefined ?
-                        {
+                valid: value => value <= gradeFieldsFixedLimits.XPByLevel.max,
+                errorMessage: (value) => {
+                    if (value === undefined)
+                        return {
                             name: "Donnée manquante",
                             value: "Vous devez spécifier le nombre d'XP par palier"
-                        } :
-                        {
-                            name: "Donnée invalide",
-                            value: "Le nombre d'XP doit être un entier naturel (> 0)"
                         }
+                    if (value > gradeFieldsFixedLimits.XPByLevel.max)
+                        return {
+                            name: "Donnée invalides",
+                            value: "Le nombre d'XP pour ce champs ne doit pas dépasser "+gradeFieldsFixedLimits.XPByLevel.max
+                        }
+
+                    return  {
+                        name: "Donnée invalide",
+                        value: "Le nombre d'XP doit être un entier naturel (> 0)"
+                    }
+                }
             },
             role: {
                 referToSubCommands: ['active_role.set', 'channel_role.set', 'grades.add','grades.insert','grades.set_role'],
@@ -486,17 +560,39 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                 referToSubCommands: ['first_message_time.set','limit_gain_set.message','limit_gain_set.vocal'],
                 type: "duration",
                 description: "Donnez une durée (ex: 7h, 6h30, etc...)",
-                valid: (value, args) => args.XPActionTypesToLimit !== "vocal" || value >= 10*1000,
-                errorMessage: (value, args) =>
-                    (value < 10*1000 && args.XPActionTypesToLimit === "vocal") ?
-                    {
-                        name: "Valeur incorrecte",
-                        value: "Dans le cas du vocal, vous ne pouvez pas mettre de limite de moins de 10 secondes"
-                    } :
-                    {
-                        name: "Valeur incorrecte",
-                        value: "Avez-vous correctement respecter la syntaxe des durées ?"
+                valid: (value, args, command: ConfigXP) => {
+                    const limitObj = args.action === "first_message_time" ?
+                                        XPGainsFixedLimits.firstMessageTime :
+                                        XPGainsFixedLimits[{
+                                            message: 'timeLimitMessage',
+                                            vocal: 'timeLimitVocal'
+                                        }[<IConfigXPArgs['XPActionTypes'] & string>args.XPActionTypes]];
+                    
+                    if (
+                        value < limitObj.min ||
+                        value > limitObj.max
+                    ) {
+                        command.excededDurationLimit = limitObj
+                        return false
                     }
+
+                    return true;
+                },
+                errorMessage: (value, _, command: ConfigXP) => {
+                    if (command.excededDurationLimit === null)
+                        return {
+                            name: "Valeur incorrecte",
+                            value: "Avez-vous correctement respecter la syntaxe des durées ?"
+                        }
+
+                    return {
+                        name: "Valeur incorrecte",
+                        value: "La durée pour cette commande doit être comprise entre"+
+                                [command.excededDurationLimit.min,command.excededDurationLimit.max]
+                                    .map(d => showTime(extractUTCTime(d), "fr"))
+                                    .join(" et ")
+                    }
+                }
             },
             jsonFile: {
                 referToSubCommands: ['grades.import','tips.import','import'],

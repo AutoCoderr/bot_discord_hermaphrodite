@@ -1,6 +1,7 @@
 import { Schema } from 'mongoose';
 import { connect } from "../../Mongo";
 import IModel from "../../interfaces/IModel";
+import { IFieldLimit } from '../../interfaces/CommandInterfaces';
 
 const db = connect();
 
@@ -16,6 +17,11 @@ export interface IXPUserData extends IModel {
     lastFirstDayMessageTimestamp?: Date;
     lastDayMessageTimestamp?: Date;
 }
+
+export const userFieldsFixedLimits: {[key: string]: IFieldLimit} = {
+    XP: {min: 0, max: 10**12},
+    todayXP: {min: 0, max: 10**12}
+};
 
 const XPUserDataSchema: Schema = new Schema({
     serverId: { type: String, required: true},

@@ -1,4 +1,4 @@
-import {IGrade, IXPData} from "../../Models/XP/XPData";
+import {IGrade, IXPData, gradeFieldsFixedLimits} from "../../Models/XP/XPData";
 import {Guild, GuildMember} from "discord.js";
 import XPUserData, {IXPUserData} from "../../Models/XP/XPUserData";
 import {roleCanBeManaged, checkIfBotCanManageRoles} from "./XPOtherFunctions";
@@ -192,20 +192,25 @@ export function checkGradesListData(guild: Guild, grades: any) {
             (index === 0 && grade.atLevel !== 1) ||
             (index > 0 && grade.atLevel <= grades[index-1].atLevel) ||
             (index < grades.length-1 && grade.atLevel >= grades[index+1].atLevel) ||
+            (index > grades.length-1 && grade.atLevel > gradeFieldsFixedLimits.atLevel.max) ||
 
             typeof(grade.requiredXP) !== "number" ||
             grade.requiredXP%1 !== 0 ||
-            grade.requiredXP <= 0 ||
+            grade.requiredXP < gradeFieldsFixedLimits.requiredXP.min ||
+            grade.requiredXP > gradeFieldsFixedLimits.requiredXP.max ||
 
             (index > 0 && grade.requiredXP !== calculRequiredXPForNextGrade(grades, grade.atLevel, index-1)) ||
 
             typeof(grade.XPByLevel) !== "number" ||
             grade.XPByLevel%1 !== 0 ||
-            grade.XPByLevel <= 0 ||
+            grade.XPByLevel < gradeFieldsFixedLimits.XPByLevel.min ||
+            grade.XPByLevel > gradeFieldsFixedLimits.XPByLevel.max ||
 
             typeof(grade.name) !== "string" ||
-            typeof(grade.roleId) !== "string" ||
+            grade.name.length < gradeFieldsFixedLimits.name.min ||
+            grade.name.length > gradeFieldsFixedLimits.name.max ||
 
+            typeof(grade.roleId) !== "string" ||
             guild.roles.cache.get(grade.roleId) === undefined ||
 
             Object.keys(grade).length > 5

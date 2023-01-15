@@ -60,3 +60,8 @@ export type IFailList = Array<IArgModel<IArgs>&RequireAtLeastOne<{value?: any, f
 export type getCommandTypeArg<C extends null|Command> = C extends Command ? C : Command
 
 export type ISlashCommandsDefinition = {[name: string]: optionCommandType}
+
+export interface IFieldLimit {
+    min: number,
+    max: number
+}

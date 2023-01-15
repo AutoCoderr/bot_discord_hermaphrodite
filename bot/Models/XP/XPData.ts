@@ -1,6 +1,7 @@
 import { Schema } from 'mongoose';
 import { connect } from "../../Mongo";
 import IModel from "../../interfaces/IModel";
+import { IFieldLimit } from '../../interfaces/CommandInterfaces';
 
 const db = connect();
 
@@ -44,7 +45,10 @@ export interface IXPData extends IModel {
 }
 
 
-
+export const tipFieldsFixedLimits: {[key: string]: IFieldLimit} = {
+    level: {min: 1, max: 10**6},
+    content: {min: 1, max: 1750}
+}
 const LevelTipSchema: Schema = new Schema({
     level: { type: Number, required: true },
     content: { type: String, required: true },
@@ -52,6 +56,12 @@ const LevelTipSchema: Schema = new Schema({
     userUnapproves: [String]
 })
 
+export const gradeFieldsFixedLimits: {[key: string]: IFieldLimit} = {
+    atLevel: {min: 1, max: 10**6},
+    requiredXP: {min: 1, max: 10**9},
+    XPByLevel: {min: 1, max: 10**9},
+    name: {min: 1, max: 100}
+}
 const GradeSchema: Schema = new Schema({
     atLevel: { type: Number, required: true },
     requiredXP: { type: Number, required: true },
@@ -73,6 +83,14 @@ export const XPDataDefaultValues = {
     firstMessageTime: 7 * 60 * 60 * 1000
 }
 
+export const XPGainsFixedLimits: {[key: string]: IFieldLimit} = {
+    XPByMessage: {min: 1, max: 10**9},
+    XPByFirstMessage: {min: 1, max: 10**9},
+    XPByVocal: {min: 1, max: 10**9},
+    timeLimitMessage: {min: 0, max: 10*365*24*60*60*1000}, // max: 10 ans
+    timeLimitVocal: {min: 10*1000, max: 10*365*24*60*60*1000}, /// min: 10s, max: 10 ans
+    firstMessageTime: {min: 0, max: 23*60*60*1000 + 59*60*1000 + 59*1000} /// min: 00h00m00s, max: 23h59m59s
+}
 const XPDataSchema: Schema = new Schema({
     serverId: { type: String, required: true },
     enabled: { type: Boolean, required: false, default: XPDataDefaultValues.enabled },

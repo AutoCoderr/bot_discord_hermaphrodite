@@ -1,4 +1,4 @@
-import XPData, {IGrade, IXPData} from "../../Models/XP/XPData";
+import XPData, {IGrade, IXPData, XPGainsFixedLimits} from "../../Models/XP/XPData";
 import XPUserData from "../../Models/XP/XPUserData";
 import {
     ButtonInteraction,
@@ -186,18 +186,18 @@ export function warningSpecificRolesCantBeAssignedMessage(guild: Guild, ...roles
 
 export function checkParametersData(guild: Guild, XPServerConfig: IXPData, params: any): Promise<boolean> {
     return Promise.all(
-        (<[string[], string, ((v) => boolean|Promise<boolean>)][]>[
+        (<[string[], string, ((v,field) => boolean|Promise<boolean>)][]>[
             [['string','undefined'], 'activeRoleId', (v) => (!v && !XPServerConfig.enabled) || guild.roles.cache.get(v)],
             [['string','undefined'], 'channelRoleId', (v) => !v || guild.roles.cache.get(v)],
             [['string'], 'timezone', (v) => getTimezoneDatas().then(({zones}) => zones[v] !== undefined)],
-            [['number'], 'XPByMessage', (v) => v%1 === 0 && v > 0],
-            [['number'], 'XPByFirstMessage', (v) => v%1 === 0 && v > 0],
-            [['number'], 'XPByVocal', (v) => v%1 === 0 && v > 0],
-            [['number'], 'timeLimitMessage', (v) => v%1 === 0 && v >= 0],
-            [['number'], 'timeLimitVocal', (v) => v%1 === 0 && v >= 0],
-            [['number'], 'firstMessageTime', (v) => v%1 === 0 && v >= 0]
+            [['number'], 'XPByMessage', (v, field) => v%1 === 0 && v >= XPGainsFixedLimits[field].min && v <= XPGainsFixedLimits[field].max],
+            [['number'], 'XPByFirstMessage', (v, field) => v%1 === 0 && v >= XPGainsFixedLimits[field].min && v <= XPGainsFixedLimits[field].max],
+            [['number'], 'XPByVocal', (v, field) => v%1 === 0 && v >= XPGainsFixedLimits[field].min && v <= XPGainsFixedLimits[field].max],
+            [['number'], 'timeLimitMessage', (v, field) => v%1 === 0 && v >= XPGainsFixedLimits[field].min && v <= XPGainsFixedLimits[field].max],
+            [['number'], 'timeLimitVocal', (v, field) => v%1 === 0 && v >= XPGainsFixedLimits[field].min && v <= XPGainsFixedLimits[field].max],
+            [['number'], 'firstMessageTime', (v, field) => v%1 === 0 && v >= XPGainsFixedLimits[field].min && v <= XPGainsFixedLimits[field].max]
         ])
-            .map(async ([types, field, check]) => types.includes(typeof(params[field])) && await check(params[field]))
+            .map(async ([types, field, check]) => types.includes(typeof(params[field])) && await check(params[field],field))
     ).then(checkedFields => !checkedFields.some(c => !c))
 }
 

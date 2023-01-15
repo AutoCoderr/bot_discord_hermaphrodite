@@ -1,7 +1,7 @@
 import {ActionRowBuilder, ButtonBuilder, ButtonInteraction, ButtonStyle, GuildMember} from "discord.js";
 import XPTipsUsefulAskButton, {IXPTipsUsefulAskButton} from "../../../Models/XP/XPTipsUsefulAskButton";
-import XPData, {ILevelTip, IXPData} from "../../../Models/XP/XPData";
-import {deleteMP, getMP} from "../../../Classes/OtherFunctions";
+import XPData, {ILevelTip, IXPData, tipFieldsFixedLimits} from "../../../Models/XP/XPData";
+import {getMP} from "../../../Classes/OtherFunctions";
 import {approveOrUnApproveTip} from "./tipsManager";
 
 export async function listenXPTipsUseFulApproveButtons(interaction: ButtonInteraction): Promise<boolean> {
@@ -84,10 +84,13 @@ export function checkTipsListData(tips: any) {
 
             typeof(tip.level) !== "number" ||
             tip.level%1 !== 0 ||
-            tip.level <= 0 ||
+            tip.level < tipFieldsFixedLimits.level.min ||
+            tip.level > tipFieldsFixedLimits.level.max ||
             (index > 0 && tip.level <= tips[index-1].level) ||
 
             typeof(tip.content) !== "string" ||
+            tip.content.length < tipFieldsFixedLimits.content.min ||
+            tip.content.length > tipFieldsFixedLimits.content.max ||
 
             Object.keys(tip).length > 2
         ))
