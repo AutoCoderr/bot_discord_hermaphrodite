@@ -2,7 +2,7 @@ import {IArgsModel} from "../interfaces/CommandInterfaces";
 import {ActionRowBuilder, CommandInteraction, EmbedBuilder, Guild, GuildMember, Message, Role, ButtonBuilder, ButtonStyle} from "discord.js";
 import AbstractXP from "./AbstractXP";
 import {IXPData} from "../Models/XP/XPData";
-import XPUserData, {IXPUserData} from "../Models/XP/XPUserData";
+import XPUserData, {IXPUserData, userFieldsFixedLimits} from "../Models/XP/XPUserData";
 import {detectUpgradeAndLevel} from "../libs/XP/XPCounting/countingOtherFunctions";
 import {resetUsers, warningNothingRoleCanBeAssignedMessage, warningSpecificRolesCantBeAssignedMessage, getUserInfos} from "../libs/XP/XPOtherFunctions";
 import { addCallbackButton } from "../libs/callbackButtons";
@@ -23,6 +23,8 @@ export default class XPA extends AbstractXP<IXPAArgs> {
     static customCommand = false
 
     static slashCommandIdByGuild: {[guildId: string]: string} = {};
+
+
 
     static argsModel: IArgsModel<IXPAArgs> = {
         $argsByType: {
@@ -71,9 +73,11 @@ export default class XPA extends AbstractXP<IXPAArgs> {
                 type: "positiveInteger",
                 evenCheckAndExtractForSlash: true,
                 description: "Rentrez des XP",
+                valid: value => value <= userFieldsFixedLimits.XP.max && value <= userFieldsFixedLimits.XP.min,
                 errorMessage: () => ({
                     name: "Valeur incorrecte",
-                    value: "Vous devez rentrer un entier naturel"
+                    value: "Vous devez rentrer un entier naturel\n"+
+                           "situé entre "+[userFieldsFixedLimits.XP.min,userFieldsFixedLimits.XP.max].join(" et ")
                 })
             }
         },

@@ -8,7 +8,7 @@ import {
     ThreadChannel,
     User
 } from "discord.js";
-import XPUserData, {IXPUserData} from "../../../Models/XP/XPUserData";
+import XPUserData, {IXPUserData, userFieldsFixedLimits} from "../../../Models/XP/XPUserData";
 import XPData, {IGrade, ILevelTip, IXPData} from "../../../Models/XP/XPData";
 import {roleCanBeManaged, checkIfBotCanManageRoles} from "../XPOtherFunctions";
 import XPNotificationAskButton from "../../../Models/XP/XPNotificationAskButton";
@@ -231,11 +231,17 @@ export async function reportXPAndLevelVariation(XPServerConfig: IXPData, XPUserC
 export async function detectUpgradeAndLevel(member: GuildMember, XPUserConfig: IXPUserData, XPServerConfig: IXPData, XP: number, setByAdmin = false) {
     if (XP < 0)
         throw new Error("XPs can't be set less than 0");
+    
+    if (XP > userFieldsFixedLimits.XP.max)
+        XP = userFieldsFixedLimits.XP.max;
+
+    if (XP < userFieldsFixedLimits.XP.min)
+        XP = userFieldsFixedLimits.XP.min;
 
     const addedXPs = XP-XPUserConfig.XP;
     const oldXP = XPUserConfig.XP;
     XPUserConfig.XP = XP;
-    XPUserConfig.todayXP = Math.max(0,XPUserConfig.todayXP+addedXPs);
+    XPUserConfig.todayXP = Math.max(userFieldsFixedLimits.todayXP.min,XPUserConfig.todayXP+addedXPs);
 
     const grade: null|IGrade = await detectUpgrade(member, XPUserConfig, XPServerConfig);
 

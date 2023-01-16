@@ -59,7 +59,7 @@ const LevelTipSchema: Schema = new Schema({
 export const gradeFieldsFixedLimits: {[key: string]: IFieldLimit} = {
     atLevel: {min: 1, max: 10**6},
     requiredXP: {min: 1, max: 10**9},
-    XPByLevel: {min: 1, max: 10**9},
+    XPByLevel: {min: 1, max: 10**4},
     name: {min: 1, max: 100}
 }
 const GradeSchema: Schema = new Schema({

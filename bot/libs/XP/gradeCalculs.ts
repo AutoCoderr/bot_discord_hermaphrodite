@@ -180,14 +180,15 @@ export function calculRequiredXPForNextGrade(grades: IGrade[], level: number, la
 
 export function checkGradesListData(guild: Guild, grades: any) {
     return grades instanceof Array &&
-        !grades.some((grade,index) => (
+        !grades.some((grade,index) =>
+        (
             typeof(grade) !== "object" ||
             grade === null ||
             grade instanceof Array ||
 
             typeof(grade.atLevel) !== "number" ||
             grade.atLevel%1 !== 0 ||
-            grade.atLevel <= 0 ||
+            grade.atLevel < gradeFieldsFixedLimits.atLevel.min ||
 
             (index === 0 && grade.atLevel !== 1) ||
             (index > 0 && grade.atLevel <= grades[index-1].atLevel) ||
@@ -197,7 +198,7 @@ export function checkGradesListData(guild: Guild, grades: any) {
             typeof(grade.requiredXP) !== "number" ||
             grade.requiredXP%1 !== 0 ||
             grade.requiredXP < gradeFieldsFixedLimits.requiredXP.min ||
-            grade.requiredXP > gradeFieldsFixedLimits.requiredXP.max ||
+            (index === 0 && grade.requiredXP > gradeFieldsFixedLimits.requiredXP.max) ||
 
             (index > 0 && grade.requiredXP !== calculRequiredXPForNextGrade(grades, grade.atLevel, index-1)) ||
 

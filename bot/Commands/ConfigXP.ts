@@ -20,7 +20,7 @@ import XPData, {
     gradeFieldsFixedLimits, 
     tipFieldsFixedLimits
 } from "../Models/XP/XPData";
-import {extractUTCTime, showTime} from "../Classes/DateTimeManager";
+import {extractDurationTime, extractUTCTime, showTime} from "../Classes/DateTimeManager";
 import {
     warningNothingRoleCanBeAssignedMessage, warningSpecificRolesCantBeAssignedMessage, resetUsers, checkParametersData
 } from "../libs/XP/XPOtherFunctions";
@@ -459,16 +459,30 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
 
                     const XPServerConfig = await command.getXPServerConfig();
                     
-                    const limitObj = args.action === "grades" ?
-                                        gradeFieldsFixedLimits.requiredXP :
+                    const limitObj = args.action !== "grades" ?
                                         XPGainsFixedLimits[{
                                             message: 'XPByMessage',
                                             vocal: 'XPByVocal',
                                             first_message: 'XPByFirstMessage'
-                                        }[<IConfigXPArgs['XPActionTypes'] & string>args.XPActionTypes]]
+                                        }[<IConfigXPArgs['XPActionTypes'] & string>args.XPActionTypes]] :
+                                     (
+                                        (
+                                            args.gradesSubActions === "add" && 
+                                            (XPServerConfig === null || XPServerConfig.grades.length === 0)
+                                        ) ||
+                                        (
+                                            args.gradesSubActions === "set_xp" &&
+                                            args.gradeNumber === 1
+                                        )
+                                     ) ?
+                                        gradeFieldsFixedLimits.requiredXP :
+                                        null
                     if (
-                        value > limitObj.max ||
-                        value < limitObj.min
+                        limitObj !== null &&
+                        (
+                            value > limitObj.max ||
+                            value < limitObj.min
+                        )
                     ) {
                         command.excededXPLimit = limitObj;
                         return false;
@@ -587,9 +601,9 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
 
                     return {
                         name: "Valeur incorrecte",
-                        value: "La durée pour cette commande doit être comprise entre"+
+                        value: "La durée pour cette commande doit être comprise entre "+
                                 [command.excededDurationLimit.min,command.excededDurationLimit.max]
-                                    .map(d => showTime(extractUTCTime(d), "fr"))
+                                    .map(d => showTime(extractDurationTime(d), "fr"))
                                     .join(" et ")
                     }
                 }
@@ -1580,7 +1594,6 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
 
     getTipsSettingCallback(level: number, XPServerConfig: IXPData): (() => Promise<responseType>) {
         return () => new Promise(resolve => {
-            const limitMessage = 1750;
             let timeout;
             const listener = errorCatcher(async (fnArgs: [Message]) => {
                 const [response] = fnArgs;
@@ -1606,10 +1619,10 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                         return;
                     }
 
-                    if (response.content.length > limitMessage) {
+                    if (response.content.length > tipFieldsFixedLimits.content.max) {
                         if (messageCanBeDeleted)
                             await response.delete();
-                        return resolve(this.response(true, messageCanBeDeletedMessage+"Vous ne pouvez pas dépasser "+limitMessage+" caractères. Vous en avez rentré "+response.content.length+"\nRéessayez :", this.getTipsSettingCallback(level, XPServerConfig)));
+                        return resolve(this.response(true, messageCanBeDeletedMessage+"Vous ne pouvez pas dépasser "+tipFieldsFixedLimits.content.max+" caractères. Vous en avez rentré "+response.content.length+"\nRéessayez :", this.getTipsSettingCallback(level, XPServerConfig)));
                     }
 
                     XPServerConfig.tipsByLevel = setTipByLevel(level, response.content, XPServerConfig.tipsByLevel);
@@ -1712,11 +1725,11 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                     .setFields(
                         {
                             name: "Pour les messages",
-                            value: "Gain de "+XPServerConfig.XPByMessage+"XP par message"+(XPServerConfig.timeLimitMessage > 0 ? " toutes les "+showTime(extractUTCTime(XPServerConfig.timeLimitMessage), 'fr') : "")
+                            value: "Gain de "+XPServerConfig.XPByMessage+"XP par message"+(XPServerConfig.timeLimitMessage > 0 ? " toutes les "+showTime(extractDurationTime(XPServerConfig.timeLimitMessage), 'fr') : "")
                         },
                         {
                             name: "Pour le vocal",
-                            value: "Gain de "+XPServerConfig.XPByVocal+" XP toutes les "+showTime(extractUTCTime(XPServerConfig.timeLimitVocal), 'fr')+" en vocal"
+                            value: "Gain de "+XPServerConfig.XPByVocal+" XP toutes les "+showTime(extractDurationTime(XPServerConfig.timeLimitVocal), 'fr')+" en vocal"
                         },
                         {
                             name: "Pour le premier message de la journée",
@@ -1745,7 +1758,7 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                     }[args.XPActionTypesToLimit])
                     .setFields({
                         name: "Vous avez défini la valeur suivante :",
-                        value: showTime(extractUTCTime(args.duration), 'fr')
+                        value: showTime(extractDurationTime(args.duration), 'fr')
                     })
             ]
         })
