@@ -13,22 +13,25 @@ export async function checkAllUsersInGrades(
         [<string>grade._id]: grade
     }), {})
 ) {
-    if (start < 0 || start > XPServerConfig.grades.length-1)
+    if (XPServerConfig.grades.length > 0 && (start < 0 || start > XPServerConfig.grades.length-1))
         throw new CustomError("Error, bad indexes given to checkAllUsersInGrades", {
             givenStartGradeIndex: start
         });
 
     const membersById: {[id: string]: GuildMember} = {};
 
-    const remainingXPUserConfigs = await loopOnGradesToCheckAllUsers(
-        guild,
-        XPServerConfig.grades.slice(start).reverse(),
-        gradesById,
-        await XPUserData.find({
-            serverId: XPServerConfig.serverId
-        }),
-        membersById
-    );
+    const XPUserConfigs = await XPUserData.find({
+        serverId: XPServerConfig.serverId
+    })
+
+    const remainingXPUserConfigs = XPServerConfig.grades.length > 0 ?
+        await loopOnGradesToCheckAllUsers(
+            guild,
+            XPServerConfig.grades.slice(start).reverse(),
+            gradesById,
+            XPUserConfigs,
+            membersById
+        ) : XPUserConfigs;
 
     if (start !== 0 || remainingXPUserConfigs.length == 0)
         return;

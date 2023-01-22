@@ -73,7 +73,7 @@ export default class XPA extends AbstractXP<IXPAArgs> {
                 type: "positiveInteger",
                 evenCheckAndExtractForSlash: true,
                 description: "Rentrez des XP",
-                valid: value => value <= userFieldsFixedLimits.XP.max && value <= userFieldsFixedLimits.XP.min,
+                valid: value => value <= userFieldsFixedLimits.XP.max && value >= userFieldsFixedLimits.XP.min,
                 errorMessage: () => ({
                     name: "Valeur incorrecte",
                     value: "Vous devez rentrer un entier naturel\n"+
