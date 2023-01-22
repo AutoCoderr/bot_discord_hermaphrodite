@@ -8,7 +8,7 @@ import {
     Guild,
     GuildMember,
     TextChannel,
-    User, EmbedBuilder, EmbedField, ApplicationCommandPermissions, Message, Interaction, CommandInteraction
+    User, EmbedBuilder, EmbedField, ApplicationCommandPermissions, Message, Interaction, CommandInteraction, ModalBuilder
 } from "discord.js";
 import {checkTypes} from "./TypeChecker";
 import {extractTypes} from "./TypeExtractor";
@@ -76,7 +76,7 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
         return this.writtenCommand.split(" ")[0].toLowerCase() == config.command_prefix+this.commandName.toLowerCase();
     }
 
-    async executeCommand(bot, slashCommand = false): Promise<false| Omit<responseType, "success">> {
+    async executeCommand(bot, slashCommand = false): Promise<false | Omit<responseType, "success">> {
         if (this.writtenCommand === null || await this.match()) {
 
             if (this.writtenCommand && !(await this.checkPermissions()))
@@ -889,10 +889,14 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
         return {success: true, result: out};
     }
 
-    response(success: boolean, result: responseResultsType|responseResultType, callback: null|(() => false|responseType|Promise<false|responseType>) = null): responseType {
+    response<TResult extends responseResultsType|responseResultType|ModalBuilder>(
+        success: boolean, 
+        result: TResult, 
+        callback: null|(() => false|responseType|Promise<false|responseType>) = null
+    ): responseType<TResult extends responseResultType ? responseResultsType : TResult> {
         return {
             success,
-            result: result instanceof Array ? result : [result],
+            result: <TResult extends responseResultType ? responseResultsType : TResult>((result instanceof Array || result instanceof ModalBuilder) ? result : [result]),
             ...(callback !== null ? {callback}: {})
         };
     }

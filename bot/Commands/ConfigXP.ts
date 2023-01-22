@@ -9,7 +9,10 @@ import {
     GuildMember,
     ActionRowBuilder,
     ButtonBuilder,
-    ButtonStyle
+    ButtonStyle,
+    TextInputBuilder,
+    TextInputStyle,
+    ModalBuilder
 } from "discord.js";
 import XPData, {
     IGrade, 
@@ -41,6 +44,7 @@ import errorCatcher from "../logging/errorCatcher";
 import CustomError from "../logging/CustomError";
 import {userHasChannelPermissions} from "../Classes/OtherFunctions";
 import { addCallbackButton } from "../libs/callbackButtons";
+import { addCallbackModal } from "../libs/callbackModals";
 
 interface IConfigXPArgs {
     action:
@@ -86,6 +90,7 @@ interface IConfigXPArgs {
     gradeNumber: number;
     jsonFile: any;
     timezone: string;
+    messageMode?: boolean;
 }
 
 export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
@@ -94,7 +99,7 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
     static description = "Configurer le système d'XP"
     static commandName = "configXP";
 
-    static customCommand = false
+    static customCommand = false;
 
     static slashCommandIdByGuild: {[guildId: string]: string} = {};
 
@@ -618,6 +623,12 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                 referToSubCommands: ['timezone.set'],
                 type: "string",
                 description: "Rentrez le nom d'une ville"
+            },
+            messageMode: {
+                referToSubCommands: ["tips.set"],
+                type: "boolean",
+                description: "Voulez vous rentrer le tips dans un message du chat ?",
+                required: false
             }
         }
     }
@@ -767,7 +778,7 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                 ]
             })
         }, [denyButtonId], {command: this.commandName, commandArguments: args});
-
+        
         addCallbackButton(denyButtonId, () => {
             return this.response(true, "Opération annulée");
         }, [acceptButtonId]);
@@ -1657,7 +1668,42 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
     }
 
     async action_tips_set(args: IConfigXPArgs, XPServerConfig: IXPData) {
-        return this.response(true, "Veuillez rentrer un message pour le tip (tapez 'CANCEL' pour annuler) :", this.getTipsSettingCallback(<number>args.level, XPServerConfig))
+        if (args.messageMode) {
+            return this.response(true, "Veuillez rentrer un message pour le tip (tapez 'CANCEL' pour annuler) :", this.getTipsSettingCallback(<number>args.level, XPServerConfig))
+        }
+
+        const modalId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "tips_set_modal";
+
+        addCallbackModal(modalId, async (_,{content}) => {
+            XPServerConfig.tipsByLevel = setTipByLevel(<number>args.level, content, XPServerConfig.tipsByLevel);
+            await XPServerConfig.save();
+
+            return this.response(true, "Tips enregistré avec succès !")
+        })
+
+        const textInput = new TextInputBuilder()
+                                .setCustomId("content")
+                                .setLabel("Rentrez un tips")
+                                .setPlaceholder("Le contenu ici")
+                                .setRequired(true)
+                                .setStyle(TextInputStyle.Paragraph)
+                                .setMinLength(tipFieldsFixedLimits.content.min)
+                                .setMaxLength(tipFieldsFixedLimits.content.max)
+
+        const tip = findTipByLevel(<number>args.level, XPServerConfig.tipsByLevel);
+        if (tip)
+            textInput.setValue(tip.content)
+
+        return this.response(true,
+            new ModalBuilder()
+                .setCustomId(modalId)
+                .setTitle("Création/édition de tips")
+                .setComponents(//@ts-ignore
+                    new ActionRowBuilder()
+                        .addComponents(textInput)
+                )
+
+        )
     }
 
     async action_tips_delete(args: IConfigXPArgs, XPServerConfig: IXPData) {

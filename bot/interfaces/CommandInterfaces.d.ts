@@ -1,4 +1,4 @@
-import {InteractionReplyOptions, MessagePayload} from "discord.js";
+import {InteractionReplyOptions, MessagePayload, ModalBuilder} from "discord.js";
 import {checkTypes} from "../Classes/TypeChecker";
 import Command from "../Classes/Command";
 
@@ -49,9 +49,9 @@ export type IArgsModel<IArgs = {[key: string]: any}, C extends Command = Command
         }
     }>
 
-export interface responseType {
+export interface responseType<TResult extends responseResultsType | ModalBuilder = responseResultsType | ModalBuilder> {
     success: boolean;
-    result: responseResultsType,
+    result: TResult,
     callback?: (() => false|responseType|Promise<false|responseType>)
 }
 

@@ -252,7 +252,15 @@ async function generateSlashOptionFromModel(attr: string, argModel: IArgModel, s
 
 
 async function getAndDisplaySlashCommandsResponse(interaction: CommandInteraction, response: false | Omit<responseType, 'success'>, p = 0) {
-    if (response) {
+    if (!response)
+        return interaction.editReply("Aucune réponse");
+
+    if (response.result instanceof Array) {
+        if (!interaction.deferred) {
+            await interaction.deferReply({
+                ephemeral: true
+            });
+        }
         for (let i = 0; i < response.result.length; i++) {
             const payload = response.result[i];
             if (i == 0 && p == 0)
@@ -270,9 +278,10 @@ async function getAndDisplaySlashCommandsResponse(interaction: CommandInteractio
         if (response.callback) {
             await getAndDisplaySlashCommandsResponse(interaction, await response.callback(), p + 1);
         }
-    } else {
-        await interaction.editReply("Aucune réponse");
+        return;
     }
+
+    await interaction.showModal(response.result);
 }
 
 export async function listenSlashCommands(interaction: CommandInteraction) {
@@ -280,9 +289,6 @@ export async function listenSlashCommands(interaction: CommandInteraction) {
 
     for (const CommandClass of <any[]>Object.values(existingCommands)) {
         if (CommandClass.commandName.toLowerCase() === commandName) {
-            await interaction.deferReply({
-                ephemeral: true
-            });
             const command = <Command>(new CommandClass(interaction, 'slash'));
             try {
                 const response = await command.executeCommand(client, true);

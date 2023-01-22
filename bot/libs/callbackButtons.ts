@@ -1,4 +1,4 @@
-import {ButtonInteraction, MessagePayload} from "discord.js";
+import {ButtonInteraction, MessagePayload, ModalBuilder} from "discord.js";
 import {responseType} from "../interfaces/CommandInterfaces";
 import IReportedData from "../interfaces/IReportedDatas";
 import CustomError from "../logging/CustomError";
@@ -9,7 +9,6 @@ const callbackButtons: {[buttonId: string]: {
     data: IReportedData,
     createdAt: Date
 }} = {};
-
 
 export function addCallbackButton(
     buttonId: string, 
@@ -44,6 +43,12 @@ export async function findAndExecCallbackButton(interaction: ButtonInteraction):
 
         delete callbackButtons[interaction.customId];
 
+        if (response.result instanceof ModalBuilder) {
+            return interaction.showModal(response.result).then(() => true);
+        }
+
+        await interaction.deferReply({ephemeral: true});
+        
         for (const payload of response.result)
             await interaction.followUp(payload instanceof MessagePayload ? payload : {
                 ephemeral: true,

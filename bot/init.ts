@@ -16,6 +16,7 @@ import countingVocalXPs from "./libs/XP/XPCounting/countingVocalXPs";
 import countingMessagesXPs from "./libs/XP/XPCounting/countingMessagesXPs";
 import countingFirstMessagesXPs from "./libs/XP/XPCounting/countingFirstMessagesXPs";
 import {findAndExecCallbackButton} from "./libs/callbackButtons";
+import { findAndExecCallbackModal } from "./libs/callbackModals";
 
 export default function init(bot) {
     client.on('ready', () => {
@@ -48,6 +49,9 @@ export default function init(bot) {
             client.on('interactionCreate', async (interaction: Interaction) => {
                 try {
                     if (interaction.isButton()) {
+                        if (await findAndExecCallbackButton(interaction)) {
+                            return;
+                        }
                         await interaction.deferReply({ephemeral: true});
                         if (await Promise.all([
                             listenInviteButtons(interaction, 'text'),
@@ -57,11 +61,15 @@ export default function init(bot) {
                             listenXPNotificationAskButtons(interaction),
                             listenXPTipsUseFulApproveButtons(interaction),
                             listenXPArrowsTipsButtons(interaction),
-                            findAndExecCallbackButton(interaction)
+                            
                         ]).then(responses => !responses.includes(true))) {
                             await interaction.editReply({content: "Bouton invalide"});
                         }
                         return;
+                    }
+
+                    if (interaction.isModalSubmit()) {
+                        await findAndExecCallbackModal(interaction);
                     }
 
                     if (interaction.isCommand())
@@ -74,8 +82,14 @@ export default function init(bot) {
                                 })
                             })
                 } catch(e) {
-                    if (interaction.isCommand() || interaction.isButton())
+                    if (interaction.isCommand() || interaction.isButton()) {
+                        if (!interaction.deferred) {
+                            await interaction.deferReply({
+                                ephemeral: true
+                            });
+                        }
                         await interaction.editReply({content: "Une erreur interne est survenue"})
+                    }
                     reportError(new CustomError(<CustomError>e, {
                         user: (<GuildMember>interaction.member) ?? interaction.user,
                         channel: interaction.channel ?? undefined,

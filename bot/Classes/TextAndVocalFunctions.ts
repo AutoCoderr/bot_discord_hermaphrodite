@@ -168,10 +168,7 @@ async function inviteBack(interaction: ButtonInteraction, requester: GuildMember
     });
 }
 
-export async function listenInviteButtons(interaction: ButtonInteraction, type: 'text' | 'vocal'): Promise<boolean> {
-
-    const {command, inviteModel, inviteTimeout, userConfigModel, subscribeModel, configModel} = classesBySubscribeType[type]
-
+export async function listenInviteButtons(interaction: ButtonInteraction, type: 'text' | 'vocal'): Promise<boolean> {const {command, inviteModel, inviteTimeout, userConfigModel, subscribeModel, configModel} = classesBySubscribeType[type]
     const currentDate = new Date();
     await inviteModel.deleteMany({
         messageId: {$exists: false},
