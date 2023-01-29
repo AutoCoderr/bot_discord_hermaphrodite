@@ -305,33 +305,39 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
             const everyonePermission = <ApplicationCommandPermissions>permissions.find(({id}) => id === guild.roles.everyone.id);
 
             return guild.ownerId == member.id ||
-                (everyonePermission.permission ?
-                    !member.roles.cache.some(role =>
-                        permissions.some(({id, permission, type}) =>
-                            type === ApplicationCommandPermissionType.Role &&
-                            id !== everyonePermission.id &&
-                            !permission &&
-                            id === role.id
-                        )
-                    ) &&
-                    !permissions.some(({id, permission, type}) =>
-                        type === ApplicationCommandPermissionType.User &&
-                        !permission &&
-                        id === member.id
-                    ) :
-                        member.roles.cache.some(role =>
-                            permissions.some(({id, permission, type}) =>
-                                type === ApplicationCommandPermissionType.Role &&
-                                id !== everyonePermission.id &&
-                                permission &&
-                                id === role.id
+                (
+                    
+                    (everyonePermission && everyonePermission.permission) ?
+                        (
+                            !permissions.some(({id, permission, type}) =>
+                                type === ApplicationCommandPermissionType.User &&
+                                !permission &&
+                                id === member.id
+                            ) &&
+                            !member.roles.cache.some(role =>
+                                permissions.some(({id, permission, type}) =>
+                                    type === ApplicationCommandPermissionType.Role &&
+                                    id !== everyonePermission.id &&
+                                    !permission &&
+                                    id === role.id
+                                )
                             )
-                        ) ||
+                        ) :
+                        (
                             permissions.some(({id, permission, type}) =>
                                 type === ApplicationCommandPermissionType.User &&
                                 permission &&
                                 id === member.id
+                            ) ||
+                            member.roles.cache.some(role =>
+                                permissions.some(({id, permission, type}) =>
+                                    type === ApplicationCommandPermissionType.Role &&
+                                    id !== everyonePermission.id &&
+                                    permission &&
+                                    id === role.id
+                                )
                             )
+                        )
                 )
         }
         return false;
