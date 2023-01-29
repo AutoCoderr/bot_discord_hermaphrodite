@@ -302,7 +302,7 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
             if (permissions === null)
                 return true;
 
-            const everyonePermission = <ApplicationCommandPermissions>permissions.find(({id}) => id === guild.roles.everyone.id);
+            const everyonePermission = <undefined|ApplicationCommandPermissions>permissions.find(({id}) => id === guild.roles.everyone.id);
 
             return guild.ownerId == member.id ||
                 (
@@ -332,7 +332,10 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
                             member.roles.cache.some(role =>
                                 permissions.some(({id, permission, type}) =>
                                     type === ApplicationCommandPermissionType.Role &&
-                                    id !== everyonePermission.id &&
+                                    (
+                                        everyonePermission === undefined || 
+                                        id !== everyonePermission.id
+                                    ) &&
                                     permission &&
                                     id === role.id
                                 )
