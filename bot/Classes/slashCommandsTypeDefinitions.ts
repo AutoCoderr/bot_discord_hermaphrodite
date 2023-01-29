@@ -5,7 +5,11 @@ export const slashCommandsTypeDefinitions = {
         mono: {commandType: "slash", type: ApplicationCommandOptionType.String},
         multi: {commandType: "custom", type: "strings"}
     },
+    jsonFile: {commandType: "slash", type: ApplicationCommandOptionType.Attachment},
     number: {commandType: "slash", type: ApplicationCommandOptionType.Number},
+    integer: {commandType: "slash", type: ApplicationCommandOptionType.Integer},
+    positiveInteger: {commandType: "slash", type: ApplicationCommandOptionType.Integer},
+    overZeroInteger: {commandType: "slash", type: ApplicationCommandOptionType.Integer},
     boolean: {commandType: "slash", type: ApplicationCommandOptionType.Boolean},
     message: {
         multi: {commandType: "custom", type: "messages"}
@@ -35,5 +39,6 @@ export const getterNameBySlashType = {
     [ApplicationCommandOptionType.Channel]: 'getChannel',
     [ApplicationCommandOptionType.Role]: 'getRole',
     [ApplicationCommandOptionType.Mentionable]: 'getMentionable',
-    [ApplicationCommandOptionType.Number]: 'getNumber'
+    [ApplicationCommandOptionType.Number]: 'getNumber',
+    [ApplicationCommandOptionType.Attachment]: 'getAttachment'
 }

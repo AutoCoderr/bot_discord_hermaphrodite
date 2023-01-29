@@ -6,24 +6,33 @@ import {
     ApplicationCommand,
     CommandInteractionOptionResolver,
     Guild,
-    GuildMember, InteractionReplyOptions,
-    MessagePayload, TextChannel,
-    User, EmbedBuilder, EmbedField
+    GuildMember,
+    TextChannel,
+    User, EmbedBuilder, EmbedField, ApplicationCommandPermissions, Message, Interaction, CommandInteraction, ModalBuilder
 } from "discord.js";
 import {checkTypes} from "./TypeChecker";
 import {extractTypes} from "./TypeExtractor";
 import {getCustomType, getSlashTypeGetterName} from "../slashCommands";
 import CustomError from "../logging/CustomError";
-import {IArgsModel, responseResultsType, responseType} from "../interfaces/CommandInterfaces";
+import {
+    getCommandTypeArg,
+    IArgModel,
+    IArgsModel,
+    IFailList, IValidatedArgs,
+    responseResultsType,
+    responseResultType,
+    responseType
+} from "../interfaces/CommandInterfaces";
+import {ApplicationCommandPermissionType} from "discord.js"
 
 const validModelCommands = {};
 
-export default class Command {
+export default class Command<IArgs = {[key: string]: any}, C extends null|Command = null> {
 
     static commandName: null|string = null;
     static display: boolean = false;
     static description: null|string = null;
-    static argsModel: IArgsModel;
+    static argsModel: IArgsModel<any>;
 
     static slashCommandIdByGuild: {[guildId: string]: string} = {};
 
@@ -33,26 +42,33 @@ export default class Command {
 
     commandOrigin: 'slash'|'custom';
 
-    commandName: null|string;
+    commandName: string;
     guild: null|Guild;
     channel: TextChannel;
-    member: User|GuildMember;
-    argsModel: IArgsModel;
+    member: |GuildMember;
+    argsModel: IArgsModel<IArgs, getCommandTypeArg<C>>;
+
+    interaction: null|CommandInteraction = null;
+    message: null|Message = null;
 
     writtenCommand: null|string = null; // If command called as a custom command, get the message typed by the user
     slashCommandOptions: null|CommandInteractionOptionResolver = null; // If command called as a slash command, get options
 
-    constructor(channel: TextChannel, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom', commandName: null|string, argsModel: IArgsModel) {
+    constructor(messageOrInteraction: Message|CommandInteraction, commandOrigin: 'slash'|'custom', commandName: string, argsModel: IArgsModel<IArgs,getCommandTypeArg<C>>) {
+        const {guild, channel, member} = messageOrInteraction;
         this.guild = guild;
-        this.channel = channel;
-        this.member = member;
+        this.channel = <TextChannel>channel;
+        this.member = <GuildMember>member;
         this.commandName = commandName;
         this.argsModel = argsModel;
         this.commandOrigin = commandOrigin;
-        if (writtenCommandOrSlashCommandOptions instanceof CommandInteractionOptionResolver)
-            this.slashCommandOptions = writtenCommandOrSlashCommandOptions;
-        else
-            this.writtenCommand = writtenCommandOrSlashCommandOptions
+        if (messageOrInteraction instanceof Message) {
+            this.writtenCommand = messageOrInteraction.content;
+            this.message = messageOrInteraction;
+        } else {
+            this.slashCommandOptions = <CommandInteractionOptionResolver>messageOrInteraction.options;
+            this.interaction = messageOrInteraction;
+        }
     }
 
     async match() {
@@ -60,7 +76,7 @@ export default class Command {
         return this.writtenCommand.split(" ")[0].toLowerCase() == config.command_prefix+this.commandName.toLowerCase();
     }
 
-    async executeCommand(bot, slashCommand = false): Promise<false| { result: Array<string | MessagePayload | InteractionReplyOptions>, callback?: Function }> {
+    async executeCommand(bot, slashCommand = false): Promise<false | Omit<responseType, "success">> {
         if (this.writtenCommand === null || await this.match()) {
 
             if (this.writtenCommand && !(await this.checkPermissions()))
@@ -90,7 +106,7 @@ export default class Command {
                     throw new CustomError(e, {commandArguments: args});
                 })
 
-            if (success && this.writtenCommand !== null)
+            if (success && this.commandOrigin === "custom")
                 this.saveHistory();
             return {result, callback};
         }
@@ -118,7 +134,7 @@ export default class Command {
         return [{embeds: [Embed]}];
     }
 
-    displayHelp(displayHelp = true, fails: null|Array<any> = null, failsExtract: null|Array<any> = null, args: null|{[attr: string]: any} = null): responseResultsType {
+    async displayHelp(displayHelp = true, fails: null|IFailList = null, failsExtract: null|IFailList = null, args: Partial<IArgs> = {}): Promise<responseResultsType> {
         const commandName = this.commandName;
         let embeds: Array<EmbedBuilder> = [
             new EmbedBuilder()
@@ -128,16 +144,16 @@ export default class Command {
 
         if (fails instanceof Array || failsExtract instanceof Array) {
             if (fails instanceof Array && fails.length > 0) {
-                const subFields = this.getArgsList(fails);
+                const subFields = this.getArgsList(fails, args);
                 for (const fail of fails) {
                     if (typeof(fail.errorMessage) == "function") {
-                        const errors = fail.errorMessage(fail.value, args)
+                        const errors = await fail.errorMessage(fail.value, args, this)
                         if (errors instanceof Array){
                             for (const error of errors) {
-                                subFields.push(error);
+                                subFields.push({...error, inline: false});
                             }
                         } else {
-                            subFields.push(errors);
+                            subFields.push({...errors, inline: false});
                         }
                     }
                 }
@@ -149,17 +165,17 @@ export default class Command {
             }
             if (failsExtract instanceof Array && failsExtract.length > 0) {
 
-                const subFields = this.getArgsList(failsExtract);
+                const subFields = this.getArgsList(failsExtract, args);
 
                 for (const failExtract of failsExtract) {
                     if (typeof(failExtract.errorMessage) == "function") {
-                        const errors = failExtract.errorMessage(failExtract.value, args)
+                        const errors = await failExtract.errorMessage(failExtract.value, args, this)
                         if (errors instanceof Array){
                             for (const error of errors) {
-                                subFields.push(error);
+                                subFields.push({...error, inline: false});
                             }
                         } else {
-                            subFields.push(errors);
+                            subFields.push({...errors, inline: false});
                         }
                     }
                 }
@@ -172,31 +188,30 @@ export default class Command {
             }
         } else {
             const subFields: EmbedField[] = [];
-            for (const attr in this.argsModel) {
-                if (attr[0] != "$") {
-                    const field = this.argsModel[attr];
-                    subFields.push({
-                        inline: false,
-                        name: field.fields.join(", "),
-                        value: field.description + " | ( "+(field.default != undefined ? "Par défaut : "+field.default+" ; " : "")+"type attendu : " + (field.type ?? field.types) + " )"
-                    })
-                }
-            }
             if (this.argsModel.$argsByOrder) {
                 for (const arg of this.argsModel.$argsByOrder) {
+
+                    const description = typeof(arg.description) === "string" ?
+                        arg.description :
+                        arg.description(args, this, false)
+
                     subFields.push({
                         inline: false,
                         name: arg.field,
-                        value: arg.description + " | ( "+(arg.default != undefined ? "Par défaut : "+arg.default+" ; " : "")+"type attendu : " + (arg.type ?? arg.types) + " )"
+                        value: description + " | ( "+(arg.default != undefined ? "Par défaut : "+arg.default+" ; " : "")+"type attendu : " + arg.type + " )"
                     });
                 }
-            } else if (this.argsModel.$argsByType) {
-                for (const attr in this.argsModel.$argsByType) {
-                    const field = this.argsModel.$argsByType[attr];
+            } else if (this.argsModel.$argsByType || this.argsModel.$argsByName) {
+                for (const [attr, field] of Object.entries(<{[field: string]: IArgModel<IArgs,getCommandTypeArg<C>>}>this.argsModel.$argsByType??this.argsModel.$argsByName)) {
+
+                    const description = typeof(field.description) === "string" ?
+                        field.description :
+                        field.description(args, this, false)
+
                     subFields.push({
                         inline: false,
                         name: attr,
-                        value: field.description + " | ( "+(field.default != undefined ? "Par défaut : "+field.default+" ; " : "")+"type attendu : " + (field.type ?? field.types) + " )"
+                        value: description + " | ( "+(field.default != undefined ? "Par défaut : "+field.default+" ; " : "")+"type attendu : " + field.type + " )"
                     });
                 }
             }
@@ -226,14 +241,15 @@ export default class Command {
         return [{embeds}];
     }
 
-    getArgsList(args: Array<any>): EmbedField[] {
-        return args
-            .filter(arg => typeof(arg.errorMessage) != "function")
+    getArgsList(fails: IFailList, args: Partial<IArgs>): EmbedField[] {
+        return fails
+            .filter(arg => typeof(arg.errorMessage) !== "function")
             .map(arg =>
                 ({
                     inline: false,
-                    name: (arg.fields instanceof Array ? arg.fields.join(", ") : arg.field),
-                    value: arg.description + " | ( "+(arg.default != undefined ? "Par défaut : "+arg.default+" ; " : "")+"type attendu : " + (arg.type ?? arg.types) + " )"
+                    name: (arg.fields ? arg.fields.join(", ") : arg.field ?? ""),
+                    value: (typeof(arg.description) === "string" ? arg.description : arg.description(args, this, false)) +
+                        " | ( "+(arg.default != undefined ? "Par défaut : "+arg.default+" ; " : "")+"type attendu : " + arg.type + " )"
                 })
             );
     }
@@ -282,9 +298,41 @@ export default class Command {
 
         const slashCommand: null|ApplicationCommand = await guild.commands.fetch(this.slashCommandIdByGuild[guild.id]).catch(() => null);
         if (slashCommand) {
-            const permissions = (await slashCommand.permissions.fetch({guild}).catch(() => null))??[];
+            const permissions = (await slashCommand.permissions.fetch({guild}).catch(() => null));
+            if (permissions === null)
+                return true;
+
+            const everyonePermission = <ApplicationCommandPermissions>permissions.find(({id}) => id === guild.roles.everyone.id);
+
             return guild.ownerId == member.id ||
-                member.roles.cache.some(role => permissions.some(({id, permission}) => permission && id === role.id))
+                (everyonePermission.permission ?
+                    !member.roles.cache.some(role =>
+                        permissions.some(({id, permission, type}) =>
+                            type === ApplicationCommandPermissionType.Role &&
+                            id !== everyonePermission.id &&
+                            !permission &&
+                            id === role.id
+                        )
+                    ) &&
+                    !permissions.some(({id, permission, type}) =>
+                        type === ApplicationCommandPermissionType.User &&
+                        !permission &&
+                        id === member.id
+                    ) :
+                        member.roles.cache.some(role =>
+                            permissions.some(({id, permission, type}) =>
+                                type === ApplicationCommandPermissionType.Role &&
+                                id !== everyonePermission.id &&
+                                permission &&
+                                id === role.id
+                            )
+                        ) ||
+                            permissions.some(({id, permission, type}) =>
+                                type === ApplicationCommandPermissionType.User &&
+                                permission &&
+                                id === member.id
+                            )
+                )
         }
         return false;
     }
@@ -306,7 +354,7 @@ export default class Command {
         let valid = true;
         if (this.commandName != null && validModelCommands[this.commandName] === false) valid = false;
 
-        if (valid && this.argsModel.$argsByType && this.argsModel.$argsByOrder) valid = false;
+        if (valid && this.argsModel !== undefined && Object.keys(this.argsModel).length !== 1) valid = false;
 
 
         if (this.commandName != null && !validModelCommands[this.commandName]) {
@@ -324,7 +372,7 @@ export default class Command {
         return true;
     }
 
-    getSlashRawArguments(): null|{[key: string]: any} {
+    async getSlashRawArguments(): Promise<null|{[key: string]: any}> {
         if (this.slashCommandOptions === null)
             return null;
         const rawArguments = {};
@@ -334,18 +382,18 @@ export default class Command {
         for (const attr in this.argsModel) {
             if (attr == '$argsByOrder' && this.argsModel.$argsByOrder) {
                 for (const argModel of this.argsModel.$argsByOrder) {
-                    this.getRawArgumentFromModel(argModel.field,argModel,additionalParams,rawArguments);
+                    await this.getRawArgumentFromModel(argModel.field,argModel,additionalParams,rawArguments);
                 }
             } else {
                 for (const [attr2,argModel] of Object.entries(this.argsModel[attr])) {
-                    this.getRawArgumentFromModel(attr2,argModel,additionalParams,rawArguments);
+                    await this.getRawArgumentFromModel(attr2,argModel,additionalParams,rawArguments);
                 }
             }
         }
         return rawArguments;
     }
 
-    getRawArgumentFromModel(attr, argModel,additionalParams,rawArguments) {
+    async getRawArgumentFromModel(attr, argModel,additionalParams,rawArguments) {
         if (this.slashCommandOptions === null)
             return null;
         if (!argModel.isSubCommand)
@@ -354,9 +402,12 @@ export default class Command {
             const subCommand = this.slashCommandOptions.getSubcommand();
             const subCommandGroup = this.slashCommandOptions.getSubcommandGroup(false);
 
-            if ((subCommandGroup === null || additionalParams.subCommandGroupSet) && additionalParams.subCommand !== null && Object.keys(argModel.choices).includes(subCommand)) {
+            const choices = typeof(argModel.choices) === "function" ? await argModel.choices() : argModel.choices;
+            const choiceList = choices instanceof Array ? choices : Object.keys(choices);
+
+            if ((subCommandGroup === null || additionalParams.subCommandGroupSet) && additionalParams.subCommand !== null && choiceList.includes(subCommand)) {
                 rawArguments[attr] = subCommand;
-            } else if (subCommandGroup !== null && Object.keys(argModel.choices).includes(subCommandGroup)) {
+            } else if (subCommandGroup !== null && choiceList.includes(subCommandGroup)) {
                 additionalParams.subCommandGroupSet = true
                 rawArguments[attr] = subCommandGroup;
             }
@@ -365,32 +416,34 @@ export default class Command {
 
     async getArgsFromSlashOptions(): Promise<{ success: boolean, result: {[attr: string]: any}|responseResultsType }> {
         if (this.slashCommandOptions === null) return {success: false, result: {}};
-        let args: {[name: string]: any} = {};
-        let fails: Array<any> = [];
-        let failsExtract: Array<any> = [];
+        let args: Partial<IArgs> = {};
+        let fails: IFailList = [];
+        let failsExtract: IFailList = [];
+        const validatedArgs: IValidatedArgs<IArgs> = {}
 
         const additionalParams = {
-            subCommandGroupSet: false
+            subCommand: null,
+            subCommandGroup: null
         };
 
         for (const attr in this.argsModel) {
             if (attr == '$argsByOrder' && this.argsModel.$argsByOrder) {
                 for (const argModel of this.argsModel.$argsByOrder) {
-                    await this.getSlashArgFromModel(argModel.field,argModel,args, fails, failsExtract, additionalParams);
+                    await this.getSlashArgFromModel(argModel.field,argModel,args, fails, failsExtract, validatedArgs, additionalParams);
                 }
             } else {
-                for (const [attr2,argModel] of Object.entries(this.argsModel[attr])) {
-                    await this.getSlashArgFromModel(attr2,argModel,args, fails, failsExtract, additionalParams);
+                for (const [attr2,argModel] of <[string,IArgModel<IArgs>][]>Object.entries(this.argsModel[attr])) {
+                    await this.getSlashArgFromModel(attr2,argModel,args, fails, failsExtract, validatedArgs, additionalParams);
                 }
             }
         }
         if (fails.length > 0 || failsExtract.length > 0) {
-            return {success: false, result: this.displayHelp(false, fails, failsExtract, args)};
+            return {success: false, result: await this.displayHelp(false, fails, failsExtract, args)};
         }
         return {success: true, result: args};
     }
 
-    async getSlashArgFromModel(attr: string, argModel: any, args: {[name: string]: any}, fails: Array<any>, failsExtract: Array<any>, additionalParams: {[key: string]: any}) {
+    async getSlashArgFromModel(attr: string, argModel: IArgModel<IArgs>, args: Partial<IArgs>, fails: IFailList, failsExtract: IFailList, validatedArgs: IValidatedArgs<IArgs>, additionalParams: {subCommand: null|string, subCommandGroup: null|string}) {
         if (this.slashCommandOptions === null) return;
         if (!argModel.isSubCommand) {
 
@@ -399,9 +452,16 @@ export default class Command {
             let failed = false;
 
             if (initialValue === null) {
-                const required = argModel.required == undefined ||
+                const actionPath = [additionalParams.subCommandGroup,additionalParams.subCommand].filter(v => v !== null).join(".");
+
+                const required = (
+                    (actionPath === '' && argModel.referToSubCommands === undefined) ||
+                    (actionPath !== '' && argModel.referToSubCommands && argModel.referToSubCommands.includes(actionPath))
+                ) && (
+                    argModel.required == undefined ||
                     (typeof (argModel.required) == "boolean" && argModel.required) ||
-                    (typeof (argModel.required) == "function" && await argModel.required(args, this));
+                    (typeof (argModel.required) == "function" && await argModel.required(args, this, false))
+                );
 
                 if (required) {
                     fails.push({...argModel, field: attr});
@@ -409,17 +469,19 @@ export default class Command {
                 }
                 const defaultValue = typeof (argModel.default) == "function" ? argModel.default(args, this) : argModel.default;
                 if (defaultValue !== undefined) {
+                    validatedArgs[attr] = true;
                     args[attr] = defaultValue;
                 } else if (argModel.multi) {
                     args[attr] = [];
                 }
             } else {
                 const customType = getCustomType(argModel);
-                if (customType) {
-                    if (checkTypes[customType](initialValue)) {
-                        if (extractTypes[customType]) {
-                            const moreDatas = typeof (argModel.moreDatas) == "function" ? await argModel.moreDatas(args, customType, this) : null
-                            const data = await extractTypes[customType](initialValue, this, moreDatas);
+                if (customType || argModel.evenCheckAndExtractForSlash) {
+                    const type = customType ?? argModel.type
+                    if (checkTypes[type](initialValue)) {
+                        if (extractTypes[type]) {
+                            const moreDatas = typeof (argModel.moreDatas) == "function" ? await argModel.moreDatas(args, type, this) : null
+                            const data = await extractTypes[type](initialValue, this, moreDatas);
                             if (data === false) {
                                 failed = true;
                                 failsExtract.push({...argModel, field: attr, value: args[attr]});
@@ -432,21 +494,42 @@ export default class Command {
                         fails.push({...argModel, field: attr, value: initialValue});
                     }
                 }
-                if (args[attr] === undefined)
+                if (args[attr] === undefined) {
                     args[attr] = initialValue;
+                }
             }
 
-            if (!failed && args[attr] !== undefined && typeof(argModel.valid) == 'function' && !(await argModel.valid(args[attr],args,this))) {
+            if (!failed && args[attr] !== undefined && typeof(argModel.valid) == 'function' && !(await argModel.valid(args[attr],args,this,validatedArgs))) {
                 fails.push({...argModel, field: attr, value: args[attr]});
+            } else {
+                validatedArgs[attr] = true;
             }
         } else {
             const subCommand = this.slashCommandOptions.getSubcommand();
             const subCommandGroup = this.slashCommandOptions.getSubcommandGroup(false);
 
-            if ((subCommandGroup === null || additionalParams.subCommandGroupSet) && additionalParams.subCommand !== null && Object.keys(argModel.choices).includes(subCommand)) {
+            if (!argModel.choices)
+                return;
+
+            const choices = typeof(argModel.choices) === "function" ? await argModel.choices() : argModel.choices;
+            const choiceList = choices instanceof Array ? choices : Object.keys(choices);
+
+            if (
+                (
+                    subCommandGroup === null ||
+                    additionalParams.subCommandGroup !== null
+                ) &&
+                choiceList.includes(subCommand)
+            ) {
+                additionalParams.subCommand = subCommand;
                 args[attr] = subCommand;
-            } else if (subCommandGroup !== null && Object.keys(argModel.choices).includes(subCommandGroup)) {
-                additionalParams.subCommandGroupSet = true
+                return;
+            }
+
+
+            if (subCommandGroup !== null && choiceList.includes(subCommandGroup)
+            ) {
+                additionalParams.subCommandGroup = subCommandGroup;
                 args[attr] = subCommandGroup;
             }
         }
@@ -529,261 +612,292 @@ export default class Command {
         return args['--help'] || args['-h'];
     }
 
-    async computeArgs(args,model): Promise<{ success: boolean, result: {[attr: string]: any}|responseResultsType }> {
+    async computeArgs(args,model: IArgsModel<IArgs,C extends Command ? C : Command>): Promise<{ success: boolean, result: {[attr: string]: any}|responseResultsType }> {
         if (this.helpAsked(args))
-            return this.response(false, this.displayHelp());
+            return this.response(false, await this.displayHelp());
 
-        let out: {[attr: string]: any} = {};
-        let fails: Array<any> = [];
-        let failsExtract: Array<any> = [];
-        let argsWithoutKeyDefined = false;
+        let out: Partial<IArgs> = {};
+        let fails: IFailList = [];
+        let failsExtract: IFailList = [];
+        const validatedArgs: IValidatedArgs<IArgs> = {}
 
-        for (const attr in model) {
-            if (attr === "$argsByName") {
-                const argsByName = model.$argsByName;
-                for (const attr in argsByName) {
-                    let found = false;
-                    let incorrectField = false;
-                    let extractFailed = false;
-                    let triedValue;
+        if (model === undefined)
+            return {success: true, result: out};
 
-                    for (let field of argsByName[attr].fields) {
-                        let argType: string = argsByName[attr].type;
-                        if (args[field] != undefined &&
+
+        if (model.$argsByName !== undefined) {
+            for (const [attr,arg] of Object.entries(model.$argsByName)) {
+                let found = false;
+                let incorrectField = false;
+                let extractFailed = false;
+                let triedValue;
+
+                for (let field of arg.fields) {
+                    if (args[field] != undefined &&
+                        (
+                            typeof(arg.type) === "string" && (
+                                arg.type === "string" || await checkTypes[arg.type](args[field])
+                            )
+                        )
+                    ) {
+                        if (extractTypes[arg.type]) {
+                            const moreDatas = typeof(arg.moreDatas) === "function" ? await arg.moreDatas(out,arg.type, this) : null
+                            const data = await extractTypes[arg.type](args[field],this,moreDatas);
+
+                            if (data !== false) {
+                                let choices, choiceList;
+                                if (
+                                    (arg.valid === undefined || await arg.valid(data,out, this, validatedArgs)) &&
+                                    (
+                                        arg.choices === undefined ||
+                                        (
+                                            (choices = typeof(arg.choices) === "function" ? await arg.choices() : arg.choices) &&
+                                            (choiceList = choices instanceof Array ? choices : Object.keys(choices)) &&
+                                            choiceList.includes(data)
+                                        )
+                                    )
+                                ) {
+                                    validatedArgs[attr] = true;
+                                    out[attr] = data;
+                                } else {
+                                    incorrectField = true;
+                                    triedValue = args[field];
+                                }
+                            } else {
+                                extractFailed = true;
+                                triedValue = args[field];
+                            }
+                        } else if (typeof(arg.valid) != "function" || await arg.valid(args[field],out, this, validatedArgs)) {
+                            validatedArgs[attr] = true;
+                            out[attr] = arg.type === "string" ? args[field].toString() : args[field];
+                        } else {
+                            incorrectField = true;
+                            triedValue = args[field];
+                        }
+
+                        if (out[attr] != undefined) {
+                            found = true;
+                            break;
+                        }
+                    } else if (args[field] != undefined) {
+                        triedValue = args[field];
+                        incorrectField = true;
+                    }
+                }
+                const required = arg.required == undefined ||
+                    (typeof(arg.required) == "boolean" && arg.required) ||
+                    (typeof(arg.required) == "function" && await arg.required(out, this, false));
+
+                if (!found && !incorrectField && !extractFailed) {
+                    const defaultValue = typeof (arg.default) == "function" ? arg.default(out, this) : arg.default;
+                    if (defaultValue != undefined) {
+                        out[attr] = defaultValue;
+                        found = true;
+                    }
+                }
+                if (!found) {
+                    if (extractFailed) {
+                        failsExtract.push({...arg, value: triedValue});
+                    } else if (incorrectField || required) {
+                        fails.push({...arg, value: triedValue });
+                    }
+                }
+            }
+        } else if (model.$argsByOrder !== undefined) {
+            let currentIndex = 0;
+            for (let j=0;j<model.$argsByOrder.length;j++) {
+                const arg = model.$argsByOrder[j];
+                if (arg.multi)
+                    out[arg.field] = [];
+                let found = false;
+                let incorrectField = false;
+                let triedValue;
+                let extractFailed = false;
+                for (let i=currentIndex;args[i] !== undefined;i++) {
+                    if (args[i] != undefined && (
+                        typeof(arg.type) === "string" && (
+                            arg.type === "string" || (arg.type == "boolean" && args[i] === arg.field) || await checkTypes[arg.type](args[i])
+                        )
+                    )) {
+                        let data = arg.type == "string" ? args[i].toString() : args[i];
+                        if (extractTypes[arg.type]) {
+                            const moreDatas = typeof(arg.moreDatas) == "function" ? await arg.moreDatas(out,arg.type, this) : null
+                            data = await extractTypes[arg.type](data,this,moreDatas);
+                            if (data === false) {
+                                failsExtract.push({...arg, value: args[i]});
+                                extractFailed = true;
+                            }
+                        }
+
+                        let choices, choiceList;
+
+                        if (!extractFailed &&
+                            (typeof(arg.valid) != "function" || await arg.valid(data,out, this, validatedArgs)) &&
                             (
-                                typeof(argType) == "string" && (
-                                    argType == "string" || await checkTypes[argType](args[field])
+                                arg.choices === undefined || (
+                                    (choices = typeof(arg.choices) === "function" ? await arg.choices() : arg.choices) &&
+                                    (choiceList = choices instanceof Array ? choices : Object.keys(choices)) &&
+                                    choiceList.includes(data)
                                 )
                             )
                         ) {
-                            if (extractTypes[<string>argType]) {
-                                const moreDatas = typeof(argsByName[attr].moreDatas) == "function" ? await argsByName[attr].moreDatas(out,argType, this) : null
-                                const data = await extractTypes[<string>argType](args[field],this,moreDatas);
-                                if (data !== false) {
-                                    if (typeof(argsByName[attr].valid) != "function" || await argsByName[attr].valid(data,out, this))
-                                        out[attr] = data;
-                                    else {
-                                        incorrectField = true;
-                                        triedValue = args[field];
-                                    }
-                                } else {
-                                    extractFailed = true;
-                                    triedValue = args[field];
-                                }
-                            } else if (typeof(argsByName[attr].valid) != "function" || await argsByName[attr].valid(args[field],out, this))
-                                out[attr] = argType == "string" ? args[field].toString() : args[field];
-                            else {
-                                incorrectField = true;
-                                triedValue = args[field];
-                            }
-
-                            if (out[attr] != undefined) {
-                                found = true;
-                                break;
-                            }
-                        } else if (args[field] != undefined) {
-                            triedValue = args[field];
+                            validatedArgs[arg.field] = true;
+                            if (arg.type === "boolean" && data === arg.field)
+                                data = true;
+                            if (arg.multi)
+                                out[arg.field].push(data)
+                            else
+                                out[arg.field] = data
+                            found = true;
+                        } else if (!extractFailed) {
+                            triedValue = args[i];
                             incorrectField = true;
                         }
-                    }
-                    const required = argsByName[attr].required == undefined ||
-                        (typeof(argsByName[attr].required) == "boolean" && argsByName[attr].required) ||
-                        (typeof(argsByName[attr].required) == "function" && await argsByName[attr].required(out, this));
 
-                    if (!found && !incorrectField && !extractFailed) {
-                        const defaultValue = typeof (argsByName[attr].default) == "function" ? argsByName[attr].default(out, this) : argsByName[attr].default;
-                        if (defaultValue != undefined) {
-                            out[attr] = defaultValue;
-                            found = true;
-                        }
-                    }
-                    if (!found) {
-                        if (extractFailed) {
-                            failsExtract.push({...argsByName[attr], value: triedValue});
-                        } else if (incorrectField || required) {
-                            fails.push({...argsByName[attr], value: triedValue });
-                        }
-                    }
-                }
-            } else if (attr == "$argsByOrder" && !argsWithoutKeyDefined) {
-                argsWithoutKeyDefined = true;
-                let currentIndex = 0;
-                const argsByOrder = model[attr];
-                for (let j=0;j<argsByOrder.length;j++) {
-                    const argModel = argsByOrder[j];
-                    if (argModel.multi)
-                        out[argModel.field] = [];
-                    let argType: string = argModel.type;
-                    let found = false;
-                    let incorrectField = false;
-                    let triedValue;
-                    let extractFailed = false;
-                    for (let i=currentIndex;args[i] !== undefined;i++) {
-                        if (args[i] != undefined && (
-                            typeof(argType) == "string" && (
-                                argType == "string" || await checkTypes[argType](args[i]) || (argType == "boolean" && args[i] === argModel.field)
-                            )
-                        )) {
-                            let data = argType == "string" ? args[i].toString() : args[i];
-                            if (extractTypes[<string>argType]) {
-                                const moreDatas = typeof(argModel.moreDatas) == "function" ? await argModel.moreDatas(out,argType, this) : null
-                                data = await extractTypes[<string>argType](data,this,moreDatas);
-                                if (data === false) {
-                                    failsExtract.push({...argModel, value: args[i]});
-                                    extractFailed = true;
-                                }
-                            }
-
-                            if (!extractFailed &&
-                                (typeof(argModel.valid) != "function" || await argModel.valid(data,out, this)) &&
-                                (argModel.choices === undefined || Object.keys(argModel.choices).includes(data))
-                            ) {
-                                if (argType === "boolean" && data === argModel.field)
-                                    data = true;
-                                if (argModel.multi)
-                                    out[argModel.field].push(data)
-                                else
-                                    out[argModel.field] = data
-                                found = true;
-                            } else if (!extractFailed) {
-                                triedValue = args[i];
-                                incorrectField = true;
-                            }
-
-                            if (incorrectField || extractFailed) {
-                                currentIndex = i;
-                                break;
-                            }
-                            if (found) {
-                                currentIndex = i+1;
-                                if (!argModel.multi)
-                                    break;
-                            }
-                        } else {
-                            if (j == argsByOrder.length - 1) {
-                                triedValue = args[i];
-                                incorrectField = true;
-                            }
+                        if (incorrectField || extractFailed) {
                             currentIndex = i;
                             break;
                         }
-                    }
-                    const required = argModel.required == undefined ||
-                        (typeof(argModel.required) == "boolean" && argModel.required) ||
-                        (typeof(argModel.required) == "function" && await argModel.required(out, this));
-
-                    if (!found && !incorrectField) {
-                        const defaultValue = typeof (argModel.default) == "function" ? argModel.default(out, this) : argModel.default;
-                        if (defaultValue != undefined) {
-                            out[argModel.field] = defaultValue;
-                            found = true;
+                        if (found) {
+                            currentIndex = i+1;
+                            if (!arg.multi)
+                                break;
                         }
-                    }
-                    if (
-                        !found && !extractFailed && (incorrectField || required )
-                    ) {
-                        fails.push({...argModel, value: triedValue});
+                    } else {
+                        if (j == model.$argsByOrder.length - 1) {
+                            triedValue = args[i];
+                            incorrectField = true;
+                        }
+                        currentIndex = i;
+                        break;
                     }
                 }
-            } else if (attr == "$argsByType" && !argsWithoutKeyDefined) {
-                argsWithoutKeyDefined = true;
-                const argsByType = model[attr];
-                const alreadyDefineds = {};
+                const required = arg.required == undefined ||
+                    (typeof(arg.required) == "boolean" && arg.required) ||
+                    (typeof(arg.required) == "function" && await arg.required(out, this, false));
 
-                for (let attr in argsByType) {
-                    if (argsByType[attr].multi)
-                        out[attr] = [];
+                if (!found && !incorrectField) {
+                    const defaultValue = typeof (arg.default) == "function" ? arg.default(out, this) : arg.default;
+                    if (defaultValue != undefined) {
+                        out[arg.field] = defaultValue;
+                        found = true;
+                    }
+                }
+                if (
+                    !found && !extractFailed && (incorrectField || required )
+                ) {
+                    fails.push({...arg, value: triedValue});
+                }
+            }
+        } else if (model.$argsByType !== undefined) {
+            const alreadyDefineds = {};
 
-                    let found = false;
-                    let extractFailed = false;
-                    let validFailed = false;
-                    let triedValue;
-                    let argType: string = argsByType[attr].type;
+            for (let [attr,arg] of Object.entries(model.$argsByType)) {
+                if (arg.multi)
+                    out[attr] = [];
 
-                    const required = argsByType[attr].required == undefined ||
-                        (typeof(argsByType[attr].required) == "boolean" && argsByType[attr].required) ||
-                        (typeof(argsByType[attr].required) == "function" && await argsByType[attr].required(out, this));
+                let found = false;
+                let extractFailed = false;
+                let validFailed = false;
+                let triedValue;
 
-                    const displayExtractError = (typeof(argsByType[attr].displayExtractError) == "boolean" && argsByType[attr].displayExtractError) ||
-                        (typeof(argsByType[attr].displayExtractError) == "function" && await argsByType[attr].displayExtractError(out, this));
+                const required = arg.required == undefined ||
+                    (typeof(arg.required) == "boolean" && arg.required) ||
+                    (typeof(arg.required) == "function" && await arg.required(out, this, false));
 
-                    const displayValidErrorEvenIfFound = (typeof(argsByType[attr].displayValidErrorEvenIfFound) == "boolean" && argsByType[attr].displayValidErrorEvenIfFound) ||
-                        (typeof(argsByType[attr].displayValidErrorEvenIfFound) == "function" && await argsByType[attr].displayValidErrorEvenIfFound(out, this));
+                const displayExtractError = (typeof(arg.displayExtractError) == "boolean" && arg.displayExtractError) ||
+                    (typeof(arg.displayExtractError) == "function" && arg.displayExtractError(out, this));
 
-                    const displayValidError = (typeof(argsByType[attr].displayValidError) == "boolean" && argsByType[attr].displayValidError) ||
-                        (typeof(argsByType[attr].displayValidError) == "function" && await argsByType[attr].displayValidError(out,this)) ||
-                        displayValidErrorEvenIfFound;
+                const displayValidErrorEvenIfFound = (typeof(arg.displayValidErrorEvenIfFound) == "boolean" && arg.displayValidErrorEvenIfFound) ||
+                    (typeof(arg.displayValidErrorEvenIfFound) == "function" && arg.displayValidErrorEvenIfFound(out, this));
 
-                    for (let i=0;args[i] !== undefined;i++) {
-                        if (alreadyDefineds[i]) {
-                            if (found)
-                                break;
-                            else
-                                continue;
-                        }
+                const displayValidError = (typeof(arg.displayValidError) == "boolean" && arg.displayValidError) ||
+                    (typeof(arg.displayValidError) == "function" && arg.displayValidError(out,this)) ||
+                    displayValidErrorEvenIfFound;
 
-                        if (args[i] !== undefined && (
-                            typeof(argType) == "string" && (
-                                argType == "string" || checkTypes[argType](args[i]) || (argType == "boolean" && args[i] === attr)
-                            ))
-                        ) {
-                            let data = argType == "string" ? args[i].toString() : args[i];
-                            if (extractTypes[<string>argType]) {
-                                const moreDatas = typeof(argsByType[attr].moreDatas) == "function" ? await argsByType[attr].moreDatas(out,argType, this) : null
-                                data = await extractTypes[<string>argType](data,this,moreDatas);
-                                if (data === false) {
-                                    extractFailed = true;
-                                    triedValue = args[i];
-                                }
-                            }
-                            if (!extractFailed &&
-                                (typeof(argsByType[attr].valid) != "function" || await argsByType[attr].valid(data,out, this)) &&
-                                (argsByType[attr].choices === undefined || Object.keys(argsByType[attr].choices).includes(data)) ) {
-                                if (argType === "boolean" && data === attr)
-                                    data = true
-                                if (argsByType[attr].multi)
-                                    out[attr].push(data);
-                                else
-                                    out[attr] = data;
-                                found = true;
-                                alreadyDefineds[i] = true;
-                            } else if (!extractFailed) {
-                                validFailed = true;
+                for (let i=0;args[i] !== undefined;i++) {
+                    if (alreadyDefineds[i]) {
+                        if (found)
+                            break;
+                        else
+                            continue;
+                    }
+
+                    if (args[i] !== undefined && (
+                        typeof(arg.type) === "string" && (
+                            arg.type === "string" || checkTypes[arg.type](args[i]) || (arg.type == "boolean" && args[i] === attr)
+                        ))
+                    ) {
+                        let data = arg.type == "string" ? args[i].toString() : args[i];
+                        if (extractTypes[<string>arg.type]) {
+                            const moreDatas = typeof(arg.moreDatas) == "function" ? await arg.moreDatas(out,arg.type, this) : null
+                            data = await extractTypes[<string>arg.type](data,this,moreDatas);
+                            if (data === false) {
+                                extractFailed = true;
                                 triedValue = args[i];
                             }
-
-                            if (found && (!argsByType[attr].multi || validFailed || extractFailed))
-                                break;
-                        } else if (found)
-                            break;
-                    }
-
-                    if (!found) {
-                        const defaultValue = typeof (argsByType[attr].default) == "function" ? argsByType[attr].default(out, this) : argsByType[attr].default;
-                        if (defaultValue != undefined) {
-                            out[attr] = defaultValue;
-                            found = true;
                         }
+                        let choices, choiceList;
+                        if (!extractFailed &&
+                            (typeof(arg.valid) != "function" || await arg.valid(data,out, this, validatedArgs)) &&
+                            (
+                                arg.choices === undefined ||
+                                (
+                                    (choices = typeof(arg.choices) === "function" ? await arg.choices() : arg.choices) &&
+                                    (choiceList = choices instanceof Array ? choices : Object.keys(choices)) &&
+                                    choiceList.includes(data)
+                                )
+                            ) 
+                            ) {
+                            validatedArgs[attr] = true;
+                            if (arg.type === "boolean" && data === attr)
+                                data = true
+                            if (arg.multi)
+                                out[attr].push(data);
+                            else
+                                out[attr] = data;
+                            found = true;
+                            alreadyDefineds[i] = true;
+                        } else if (!extractFailed) {
+                            validFailed = true;
+                            triedValue = args[i];
+                        }
+
+                        if (found && (!arg.multi || validFailed || extractFailed))
+                            break;
+                    } else if (found)
+                        break;
+                }
+
+                if (!found) {
+                    const defaultValue = typeof (arg.default) == "function" ? arg.default(out, this) : arg.default;
+                    if (defaultValue != undefined) {
+                        out[attr] = defaultValue;
+                        found = true;
                     }
-                    if (!found && extractFailed && (required || displayExtractError)) {
-                        failsExtract.push({...argsByType[attr], value: triedValue, field: attr});
-                    } else if ((!found && (required || (validFailed && displayValidError)) ) || (found && validFailed && displayValidErrorEvenIfFound)) {
-                        fails.push({...argsByType[attr], value: triedValue, field: attr});
-                    }
+                }
+                if (!found && extractFailed && (required || displayExtractError)) {
+                    failsExtract.push({...arg, value: triedValue, field: attr});
+                } else if ((!found && (required || (validFailed && displayValidError)) ) || (found && validFailed && displayValidErrorEvenIfFound)) {
+                    fails.push({...arg, value: triedValue, field: attr});
                 }
             }
         }
         if (fails.length > 0 || failsExtract.length > 0) {
-            return {success: false, result: this.displayHelp(false, fails, failsExtract, out)};
+            return {success: false, result: await this.displayHelp(false, fails, failsExtract, out)};
         }
         return {success: true, result: out};
     }
 
-    response(success: boolean, result: responseResultsType|string | MessagePayload | InteractionReplyOptions, callback: null|Function = null): responseType {
+    response<TResult extends responseResultsType|responseResultType|ModalBuilder>(
+        success: boolean, 
+        result: TResult, 
+        callback: null|(() => false|responseType|Promise<false|responseType>) = null
+    ): responseType<TResult extends responseResultType ? responseResultsType : TResult> {
         return {
             success,
-            result: result instanceof Array ? result : [result],
-            ...(callback ? {callback}: {})
+            result: <TResult extends responseResultType ? responseResultsType : TResult>((result instanceof Array || result instanceof ModalBuilder) ? result : [result]),
+            ...(callback !== null ? {callback}: {})
         };
     }
 
@@ -791,7 +905,7 @@ export default class Command {
         return new EmbedBuilder();
     }
 
-    async action(args: any,bot): Promise<responseType> { // To be overloaded
+    async action(args: IArgs,bot): Promise<responseType> { // To be overloaded
         return this.response(true, 'Hello');
     }
 }

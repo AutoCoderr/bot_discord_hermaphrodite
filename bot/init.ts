@@ -7,6 +7,16 @@ import {listenInviteButtons, listenAskInviteBackButtons} from "./Classes/TextAnd
 import {listenCustomCommands} from "./listenCustomCommands";
 import CustomError from "./logging/CustomError";
 import reportError from "./logging/reportError";
+import {
+    listenXPNotificationAskButtons
+} from "./libs/XP/XPOtherFunctions";
+import {listenXPTipsUseFulApproveButtons} from "./libs/XP/tips/tipsOtherFunctions";
+import {listenXPArrowsTipsButtons} from "./libs/XP/tips/tipsBrowsing";
+import countingVocalXPs from "./libs/XP/XPCounting/countingVocalXPs";
+import countingMessagesXPs from "./libs/XP/XPCounting/countingMessagesXPs";
+import countingFirstMessagesXPs from "./libs/XP/XPCounting/countingFirstMessagesXPs";
+import {findAndExecCallbackButton} from "./libs/callbackButtons";
+import { findAndExecCallbackModal } from "./libs/callbackModals";
 
 export default function init(bot) {
     client.on('ready', () => {
@@ -39,16 +49,27 @@ export default function init(bot) {
             client.on('interactionCreate', async (interaction: Interaction) => {
                 try {
                     if (interaction.isButton()) {
-                        await interaction.deferReply();
+                        if (await findAndExecCallbackButton(interaction)) {
+                            return;
+                        }
+                        await interaction.deferReply({ephemeral: true});
                         if (await Promise.all([
                             listenInviteButtons(interaction, 'text'),
                             listenInviteButtons(interaction, 'vocal'),
                             listenAskInviteBackButtons(interaction, 'text'),
-                            listenAskInviteBackButtons(interaction, 'vocal')
+                            listenAskInviteBackButtons(interaction, 'vocal'),
+                            listenXPNotificationAskButtons(interaction),
+                            listenXPTipsUseFulApproveButtons(interaction),
+                            listenXPArrowsTipsButtons(interaction),
+                            
                         ]).then(responses => !responses.includes(true))) {
                             await interaction.editReply({content: "Bouton invalide"});
                         }
                         return;
+                    }
+
+                    if (interaction.isModalSubmit()) {
+                        await findAndExecCallbackModal(interaction);
                     }
 
                     if (interaction.isCommand())
@@ -61,8 +82,14 @@ export default function init(bot) {
                                 })
                             })
                 } catch(e) {
-                    if (interaction.isCommand() || interaction.isButton())
+                    if (interaction.isCommand() || interaction.isButton()) {
+                        if (!interaction.deferred) {
+                            await interaction.deferReply({
+                                ephemeral: true
+                            });
+                        }
                         await interaction.editReply({content: "Une erreur interne est survenue"})
+                    }
                     reportError(new CustomError(<CustomError>e, {
                         user: (<GuildMember>interaction.member) ?? interaction.user,
                         channel: interaction.channel ?? undefined,
@@ -84,18 +111,22 @@ export default function init(bot) {
                             user: newState.member??undefined
                         }))
                     })
+                countingVocalXPs(oldState, newState);
             })
 
             client.on("messageCreate", async message => {
                 try {
-                    await listenCustomCommands(message)
-
-                    //@ts-ignore
-                    await existingCommands.ConfigWelcome.listenJoinsToWelcome(message)
-
-                    //@ts-ignore
-                    await existingCommands.Text.listenTextMessages(message)
-
+                    await Promise.all([
+                        listenCustomCommands(message),
+                        //@ts-ignore
+                        existingCommands.ConfigWelcome.listenJoinsToWelcome(message),
+                        //@ts-ignore
+                        existingCommands.Text.listenTextMessages(message),
+                        (async () => {
+                            await countingMessagesXPs(message);
+                            await countingFirstMessagesXPs(message);
+                        })()
+                    ])
                 } catch(e) {
                     reportError(new CustomError(<Error|CustomError>e, {
                         from: (e instanceof CustomError && e.data && e.data.from) ? e.data.from : "messageCreate",

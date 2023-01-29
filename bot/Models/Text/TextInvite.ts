@@ -1,11 +1,16 @@
 import { Schema } from 'mongoose';
+import IModel from '../../interfaces/IModel';
 import { connect } from "../../Mongo";
 
 const db = connect();
 
-export interface ITextInvite {
+export const TextInviteTimeout = 8 * 60 * 60 * 1000;
+export const TextInviteTimeoutWithoutMessageId = 48 * 60 * 60 * 1000;
+
+export interface ITextInvite extends IModel {
     inviteId: string;
     buttonId: string;
+    messageId: null|string;
     requesterId: string;
     requestedId: string;
     channelsId?: string[];
@@ -18,6 +23,7 @@ export interface ITextInvite {
 const TextInviteSchema: Schema = new Schema({
     inviteId: { type: String, required: true },
     buttonId: { type: String, required: true },
+    messageId: { type: String, required: true },
     requesterId: { type: String, required: true },
     requestedId: { type: String, required: true },
     channelsId: { type: Array, required: false, default: () => undefined },

@@ -4,5 +4,5 @@
 /.env
 /bot/**/*.js
 !/bot/config.example.js
-script_logs/*
+script_logs/**/*.log
 logs/**/*.json

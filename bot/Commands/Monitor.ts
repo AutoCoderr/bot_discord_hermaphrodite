@@ -7,7 +7,7 @@ import {
     Message,
     PartialGuildMember, Presence,
     Role, TextChannel, User,
-    ChannelType
+    ChannelType, CommandInteraction
 } from "discord.js";
 import config from "../config";
 import MonitoringMessage, {IMonitoringMessage} from "../Models/MonitoringMessage";
@@ -242,8 +242,8 @@ export default class Monitor extends Command {
         }
     }
 
-    constructor(channel: TextChannel, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
-        super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, Monitor.commandName, Monitor.argsModel);
+    constructor(messageOrInteraction: Message|CommandInteraction, commandOrigin: 'slash'|'custom') {
+        super(messageOrInteraction, commandOrigin, Monitor.commandName, Monitor.argsModel);
     }
 
     async action(args: {action: string, channel: TextChannel, messages: Array<Message>}, bot) {

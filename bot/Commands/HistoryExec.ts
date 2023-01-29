@@ -1,10 +1,11 @@
 import Command from "../Classes/Command";
 import config from "../config";
 import {
+    CommandInteraction,
     CommandInteractionOptionResolver, EmbedBuilder,
     Guild,
     GuildChannel,
-    GuildMember,
+    GuildMember, Message,
     TextChannel,
     User
 } from "discord.js";
@@ -20,8 +21,8 @@ export default class HistoryExec extends Command {
 
     static argsModel: IArgsModel = getArgsModelHistory();
 
-    constructor(channel: TextChannel, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
-        super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, HistoryExec.commandName, HistoryExec.argsModel);
+    constructor(messageOrInteraction: Message|CommandInteraction, commandOrigin: 'slash'|'custom') {
+        super(messageOrInteraction, commandOrigin, HistoryExec.commandName, HistoryExec.argsModel);
     }
 
 

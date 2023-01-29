@@ -1,9 +1,9 @@
-import TextAskInviteBack from "../../Models/Text/TextAskInviteBack";
-import VocalAskInviteBack from "../../Models/Vocal/VocalAskInviteBack";
+import TextAskInviteBack, { ITextAskInviteBack, TextAskInviteBackTimeoutWithoutMessageId } from "../../Models/Text/TextAskInviteBack";
+import VocalAskInviteBack, { IVocalAskInviteBack, VocalAskInviteBackTimeoutWithoutMessageId } from "../../Models/Vocal/VocalAskInviteBack";
 import TextConfig from "../../Models/Text/TextConfig";
 import VocalConfig from "../../Models/Vocal/VocalConfig";
-import TextInvite from "../../Models/Text/TextInvite";
-import VocalInvite from "../../Models/Vocal/VocalInvite";
+import TextInvite, { ITextInvite, TextInviteTimeoutWithoutMessageId } from "../../Models/Text/TextInvite";
+import VocalInvite, { IVocalInvite, VocalInviteTimeoutWithoutMessageId } from "../../Models/Vocal/VocalInvite";
 import TextSubscribe from "../../Models/Text/TextSubscribe";
 import VocalSubscribe from "../../Models/Vocal/VocalSubscribe";
 import TextUserConfig from "../../Models/Text/TextUserConfig";
@@ -41,9 +41,16 @@ Array.prototype.promiseFindElem = async function (callback, elem = null) {
     return arr.slice(1).promiseFindElem(callback, await callback(arr[0]))
 }
 
-function checkAndDeleteUselessEntries(model, name, colsTypes, listsTypes = {}, colsExpires = {}) {
+function checkAndDeleteUselessEntries<ModelType = any>(
+    model, 
+    name, 
+    colsTypes, 
+    listsTypes = {}, 
+    colsExpires = {}, 
+    filtersForDelete: null|((ModelType) => boolean) = null
+) {
     return model.find()
-        .then(elements => filterElementsToDelete(elements, colsTypes, colsExpires))
+        .then(elements => filterElementsToDelete(elements, colsTypes, colsExpires, filtersForDelete))
         .then(({toDelete, toKeep, ...datas}) => {
             if (!toDelete || toDelete.length === 0) {
                 console.log("nothing to delete for " + name);
@@ -71,20 +78,20 @@ function checkAndDeleteUselessEntries(model, name, colsTypes, listsTypes = {}, c
 
 async function cleanDatabase() {
     await Promise.all([
-        checkAndDeleteUselessEntries(TextAskInviteBack, "textAskInviteBack", {
+        checkAndDeleteUselessEntries<ITextAskInviteBack>(TextAskInviteBack, "textAskInviteBack", {
             server: ['serverId'],
             member: ['requesterId', 'requestedId']
         }, {
             channel: ['channelsId']
         }, {
-            timestamp: Text.buttonsTimeout
-        }),
-        checkAndDeleteUselessEntries(VocalAskInviteBack, "vocalAskInviteBack", {
+            timestamp: TextAskInviteBackTimeoutWithoutMessageId
+        }, (elem) => elem.messageId === undefined),
+        checkAndDeleteUselessEntries<IVocalAskInviteBack>(VocalAskInviteBack, "vocalAskInviteBack", {
             server: ['serverId'],
             member: ['requesterId', 'requestedId']
         }, {}, {
-            timestamp: Vocal.buttonsTimeout
-        }),
+            timestamp: VocalAskInviteBackTimeoutWithoutMessageId
+        }, (elem) => elem.messageId === undefined),
         checkAndDeleteUselessEntries(TextConfig, "textConfig", {
             server: ['serverId']
         }, {
@@ -99,20 +106,20 @@ async function cleanDatabase() {
             member: ['listenerBlacklist.users'],
             role: ['listenerBlacklist.roles']
         }),
-        checkAndDeleteUselessEntries(TextInvite, "textInvite", {
+        checkAndDeleteUselessEntries<ITextInvite>(TextInvite, "textInvite", {
             server: ['serverId'],
             member: ['requesterId', 'requestedId']
         }, {
             channel: ['channelsId']
         }, {
-            timestamp: Text.buttonsTimeout
-        }),
-        checkAndDeleteUselessEntries(VocalInvite, "vocalInvite", {
+            timestamp: TextInviteTimeoutWithoutMessageId
+        }, (elem) => elem.messageId === undefined),
+        checkAndDeleteUselessEntries<IVocalInvite>(VocalInvite, "vocalInvite", {
             server: ['serverId'],
             member: ['requesterId', 'requestedId']
         }, {}, {
-            timestamp: Vocal.buttonsTimeout
-        }),
+            timestamp: VocalInviteTimeoutWithoutMessageId
+        }, (elem) => elem.messageId === undefined),
         checkAndDeleteUselessEntries(TextSubscribe, "textSubscribe", {
             server: ['serverId'],
             member: ['listenerId', 'listenedId'],
@@ -168,7 +175,10 @@ async function cleanDatabase() {
         checkAndDeleteUselessEntries(WelcomeMessage, "welcomeMessage", {
             server: ['serverId'],
         })
-    ])
+    ]).catch(e => {
+        console.log("ERROR");
+        console.log(e)
+    })
 
     process.exit();
 }

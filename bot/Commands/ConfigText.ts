@@ -1,11 +1,11 @@
 import {
-    CommandInteractionOptionResolver, Guild,
-    GuildMember, TextChannel, User
+    CommandInteraction,
+    Message
 } from "discord.js";
-import ConfigTextAndVocal from "./ConfigTextAndVocal";
+import AbstractConfigTextAndVocal from "./AbstractConfigTextAndVocal";
 import {IArgsModel} from "../interfaces/CommandInterfaces";
 
-export default class ConfigText extends ConfigTextAndVocal {
+export default class ConfigText extends AbstractConfigTextAndVocal {
     static display = true;
     static description = "Pour configurer l'option d'abonnement textuel";
     static commandName = "configText";
@@ -14,9 +14,9 @@ export default class ConfigText extends ConfigTextAndVocal {
 
     static abstract = false;
 
-    static argsModel: IArgsModel = ConfigTextAndVocal.argsModelFunction('text')
+    static argsModel: IArgsModel = AbstractConfigTextAndVocal.argsModelFunction('text')
 
-    constructor(channel: TextChannel, member: User | GuildMember, guild: null | Guild = null, writtenCommandOrSlashCommandOptions: null | string | CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
-        super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, ConfigText.commandName, ConfigText.argsModel, 'text');
+    constructor(messageOrInteraction: Message|CommandInteraction, commandOrigin: 'slash'|'custom') {
+        super(messageOrInteraction, commandOrigin, ConfigText.commandName, ConfigText.argsModel, 'text');
     }
 }
