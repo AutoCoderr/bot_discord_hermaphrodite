@@ -1,21 +1,26 @@
 import config from "./config";
-import {Message, MessageCreateOptions, MessagePayload} from "discord.js";
+import {Message, MessageCreateOptions, MessagePayload, ModalBuilder} from "discord.js";
 import client from "./client";
 import {existingCommands} from "./Classes/CommandsDescription";
 import CustomError from "./logging/CustomError";
 import Command from "./Classes/Command";
 
-type TResponse = false | { result: Array<string | MessagePayload | MessageCreateOptions>, callback?: Function }
+type TResponse = false | { result: Array<string | MessagePayload | MessageCreateOptions>|ModalBuilder, callback?: Function }
 
 async function getAndDisplayCustomCommandsResponse(message: Message, response: TResponse) {
-    if (response !== false) {
+    if (!response)
+        return;
+    if (response.result instanceof Array) {
         for (const payload of response.result)
             await message.channel.send(payload).then(_ => {
                 if (response.callback) {
                     response.callback().then(response => getAndDisplayCustomCommandsResponse(message, response));
                 }
             });
+        return;
     }
+
+    throw new Error("You can't return a modal on custom command");
 }
 // check all commands
 export async function listenCustomCommands(message: Message) {
@@ -23,7 +28,7 @@ export async function listenCustomCommands(message: Message) {
         for (let commandName in existingCommands) {
             const commandClass = existingCommands[commandName];
             if (commandClass.customCommand) {
-                const command = <Command>(new commandClass(message.channel, message.member, message.guild, message.content, 'custom'));
+                const command = <Command>(new commandClass(message, 'custom'));
                 await command.executeCommand(client)
                     .then(response => getAndDisplayCustomCommandsResponse(message, <TResponse>response))
                     .catch(e => {

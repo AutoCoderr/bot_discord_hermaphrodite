@@ -8,13 +8,14 @@ import {
     Role,
     ThreadChannel,
     VoiceChannel,
-    ChannelType
+    ChannelType, Attachment, User
 } from "discord.js";
 import client from "../client";
 import {existingCommands} from "./CommandsDescription";
 import Command from "./Command";
 import {isNumber, userHasChannelPermissions} from "./OtherFunctions";
 import {durationUnits,durationUnitsMult} from "./DateTimeManager";
+import request from "./request";
 
 export const extractTypes = {
     channel: (field, command: Command): GuildChannel|ThreadChannel|VoiceChannel|false => {
@@ -83,10 +84,17 @@ export const extractTypes = {
         const emote = client.emojis.cache.get(emoteId);
         return emote ? emote : false;
     },
-    user: async (field, command: Command): Promise<GuildMember|false> => {
+    user: async (field: string|User, command: Command): Promise<GuildMember|false> => {
         if (command.guild == null) return false;
-        let userId = field.split("<@")[1].split(">")[0];
-        if (userId[0] == "!") userId = userId.substring(1);
+
+        let userId;
+        if (field instanceof User) {
+            userId = field.id;
+        } else {
+            userId = field.split("<@")[1].split(">")[0];
+            if (userId[0] == "!") userId = userId.substring(1);
+        }
+
         try {
             return await command.guild.members.fetch(userId);
         } catch(e) {
@@ -185,6 +193,20 @@ export const extractTypes = {
 
         return ms;
     },
+    jsonFile: async (attachment: Attachment) => {
+      const {status, body} = await request(attachment.url);
+
+      if (status !== 200)
+          return false;
+
+      let json;
+      try {
+          json = JSON.parse(body);
+      } catch(_) {
+          return false;
+      }
+      return json;
+    },
     strings: (field) => {
         let quote = null;
         const strings: string[] = [];
@@ -207,5 +229,8 @@ export const extractTypes = {
             strings.push(string);
 
         return strings;
+    },
+    timezone: (field) => {
+        return parseInt(field.match("(\\-|\\+)?(1[0-2]|[0-9])"));
     }
 };

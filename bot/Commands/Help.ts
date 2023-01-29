@@ -1,13 +1,9 @@
 import Command from "../Classes/Command";
 import { existingCommands } from "../Classes/CommandsDescription";
-import * as Discord from "discord.js";
 import config from "../config";
 import {
-    CommandInteractionOptionResolver, EmbedBuilder,
-    Guild,
-    GuildMember,
-    TextChannel,
-    User
+    CommandInteraction,
+    EmbedBuilder,Message,
 } from "discord.js";
 
 export default class Help extends Command {
@@ -16,8 +12,8 @@ export default class Help extends Command {
 
     static description = "Afficher l'aide de toutes les commandes";
 
-    constructor(channel: TextChannel, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
-        super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, Help.commandName, Help.argsModel);
+    constructor(messageOrInteraction: Message|CommandInteraction, commandOrigin: 'slash'|'custom') {
+        super(messageOrInteraction, commandOrigin, Help.commandName, Help.argsModel);
     }
 
     async action() {

@@ -2,7 +2,7 @@ import config from "../config";
 import Command from "../Classes/Command";
 import StoredNotifyOnReact, { IStoredNotifyOnReact } from "../Models/StoredNotifyOnReact";
 import {
-    ClientUser,
+    ClientUser, CommandInteraction,
     CommandInteractionOptionResolver, EmbedBuilder, Emoji,
     Guild,
     GuildChannel,
@@ -74,8 +74,8 @@ export default class NotifyOnReact extends Command {
         }
     };
 
-    constructor(channel: TextChannel, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
-        super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, NotifyOnReact.commandName, NotifyOnReact.argsModel);
+    constructor(messageOrInteraction: Message|CommandInteraction, commandOrigin: 'slash'|'custom') {
+        super(messageOrInteraction, commandOrigin, NotifyOnReact.commandName, NotifyOnReact.argsModel);
         this.listenings = NotifyOnReact.listenings;
     }
 

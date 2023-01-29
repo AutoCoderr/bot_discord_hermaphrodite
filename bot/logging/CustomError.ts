@@ -8,6 +8,8 @@ export default class CustomError extends Error {
             this.message = eOrMessage.message;
             this.name = eOrMessage.name;
             this.stack = eOrMessage.stack
+        } else {
+            this.message = eOrMessage;
         }
 
         this.data = (eOrMessage instanceof CustomError && eOrMessage.data !== null) ? {

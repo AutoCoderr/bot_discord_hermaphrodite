@@ -2,6 +2,7 @@ import config from "../config";
 import {forEachNotifyOnReact} from "../Classes/OtherFunctions";
 import Command from "../Classes/Command";
 import Discord, {
+    CommandInteraction,
     CommandInteractionOptionResolver, EmbedBuilder, Emoji,
     Guild,
     GuildChannel,
@@ -52,8 +53,8 @@ export default class ListNotifyOnReact extends Command {
         }
     };
 
-    constructor(channel: TextChannel, member: User|GuildMember, guild: null|Guild = null, writtenCommandOrSlashCommandOptions: null|string|CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
-        super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, ListNotifyOnReact.commandName, ListNotifyOnReact.argsModel);
+    constructor(messageOrInteraction: Message|CommandInteraction, commandOrigin: 'slash'|'custom') {
+        super(messageOrInteraction, commandOrigin, ListNotifyOnReact.commandName, ListNotifyOnReact.argsModel);
     }
 
     async action(args: {channel: GuildChannel, message: Message, emote: GuildEmoji|string, all: boolean}, bot) {

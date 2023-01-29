@@ -1,17 +1,16 @@
 import Command from "../Classes/Command";
 import {
-    ActionRowBuilder, ButtonBuilder,
-    CommandInteractionOptionResolver, EmbedBuilder,
+    ActionRowBuilder, ButtonBuilder, EmbedBuilder,
     Guild,
     GuildMember,
-    Role, StageChannel, TextChannel, User, VoiceChannel, VoiceState,
-    ButtonStyle, PermissionFlagsBits
+    Role, StageChannel, User, VoiceChannel, VoiceState,
+    ButtonStyle, PermissionFlagsBits, CommandInteraction, Message
 } from "discord.js";
 import config from "../config";
 import VocalSubscribe, {IVocalSubscribe} from "../Models/Vocal/VocalSubscribe";
 import VocalConfig, {IVocalConfig, minimumLimit} from "../Models/Vocal/VocalConfig";
 import VocalUserConfig, {IVocalUserConfig} from "../Models/Vocal/VocalUserConfig";
-import VocalInvite from "../Models/Vocal/VocalInvite";
+import VocalInvite, { VocalInviteTimeoutWithoutMessageId } from "../Models/Vocal/VocalInvite";
 import {splitFieldsEmbed} from "../Classes/OtherFunctions";
 import {
     extractUTCTime,
@@ -22,7 +21,6 @@ import {
     showDate
 } from "../Classes/DateTimeManager";
 import {IArgsModel} from "../interfaces/CommandInterfaces";
-import reportDebug from "../logging/reportDebug";
 
 export default class Vocal extends Command {
     static display = true;
@@ -123,12 +121,10 @@ export default class Vocal extends Command {
         }
     }
 
-    static buttonsTimeout = 48 * 60 * 60 * 1000; // 48h pour répondre à une invitation
-
     static usersWhoAreOnVocal: { [id: string]: VoiceChannel|StageChannel } = {};
 
-    constructor(channel: TextChannel, member: User | GuildMember, guild: null | Guild = null, writtenCommandOrSlashCommandOptions: null | string | CommandInteractionOptionResolver = null, commandOrigin: 'slash'|'custom') {
-        super(channel, member, guild, writtenCommandOrSlashCommandOptions, commandOrigin, Vocal.commandName, Vocal.argsModel);
+    constructor(messageOrInteraction: Message|CommandInteraction, commandOrigin: 'slash'|'custom') {
+        super(messageOrInteraction, commandOrigin, Vocal.commandName, Vocal.argsModel);
     }
 
     async action(args: { action: string, subs: boolean, users: GuildMember[], roles: Role[], time: number }) {
@@ -142,6 +138,7 @@ export default class Vocal extends Command {
                 })
             );
         }
+
 
         const vocalConfig: IVocalConfig = await VocalConfig.findOne({serverId: this.guild.id, enabled: true});
         if (vocalConfig == null) {
@@ -212,7 +209,7 @@ export default class Vocal extends Command {
                     serverId: this.guild.id,
                     requesterId: this.member.id,
                     requestedId: user.id,
-                    timestamp: {$lte: new Date(currentDate.getTime() - Vocal.buttonsTimeout)}
+                    timestamp: {$lte: new Date(currentDate.getTime() - VocalInviteTimeoutWithoutMessageId)}
                 });
 
                 const invite = await VocalInvite.findOne({
@@ -715,29 +712,30 @@ export default class Vocal extends Command {
         const acceptButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "a";
         const denyButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "d";
 
-        try {
-            await requested.send({
-                content: (requester instanceof GuildMember ? (requester.nickname ?? requester.user.username) : requester.username) + " souhaite pouvoir recevoir des notifications de vos connexions vocales sur le serveur '" + guild.name + "'",
-                components: [ //@ts-ignore
-                    new ActionRowBuilder().addComponents(
-                        new ButtonBuilder()
-                            .setCustomId(acceptButtonId)
-                            .setLabel("Accepter")
-                            .setStyle(ButtonStyle.Success),
-                        new ButtonBuilder()
-                            .setCustomId(denyButtonId)
-                            .setLabel("Refuser")
-                            .setStyle(ButtonStyle.Danger),
-                    )
-                ]
-            })
-        } catch (_) {
+        
+        const message: null|Message = await requested.send({
+            content: (requester instanceof GuildMember ? (requester.nickname ?? requester.user.username) : requester.username) + " souhaite pouvoir recevoir des notifications de vos connexions vocales sur le serveur '" + guild.name + "'",
+            components: [ //@ts-ignore
+                new ActionRowBuilder().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId(acceptButtonId)
+                        .setLabel("Accepter")
+                        .setStyle(ButtonStyle.Success),
+                    new ButtonBuilder()
+                        .setCustomId(denyButtonId)
+                        .setLabel("Refuser")
+                        .setStyle(ButtonStyle.Danger),
+                )
+            ]
+        }).catch(() => null)
+
+        if (message === null)
             return false;
-        }
 
         VocalInvite.create({
             inviteId,
             buttonId: acceptButtonId,
+            messageId: message.id,
             requesterId: requester.id,
             requestedId: requested.id,
             timestamp: new Date(),
@@ -747,6 +745,7 @@ export default class Vocal extends Command {
         VocalInvite.create({
             inviteId,
             buttonId: denyButtonId,
+            messageId: message.id,
             requesterId: requester.id,
             requestedId: requested.id,
             timestamp: new Date(),

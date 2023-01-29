@@ -21,6 +21,8 @@ export const connect = () => {
 
     mongoose.connect(url);
 
+    mongoose.set('strictQuery', true);
+
     database = mongoose;
 
     database.connection.once("open", () => {
