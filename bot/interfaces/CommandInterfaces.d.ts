@@ -1,3 +1,4 @@
+
 import {InteractionReplyOptions, MessagePayload, ModalBuilder} from "discord.js";
 import {checkTypes} from "../Classes/TypeChecker";
 import Command from "../Classes/Command";

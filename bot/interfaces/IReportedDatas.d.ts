@@ -59,6 +59,7 @@ export default interface IReportedData {
 
     idConfigTicket?: string,
     ticketConfig?: ITicketConfig,
+    
     listening?: IMessageToListen,
 
     welcomeMessage?: IWelcomeMessage,
