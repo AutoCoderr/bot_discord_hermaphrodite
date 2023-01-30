@@ -297,53 +297,47 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
             return false;
 
         const slashCommand: null|ApplicationCommand = await guild.commands.fetch(this.slashCommandIdByGuild[guild.id]).catch(() => null);
-        if (slashCommand) {
-            const permissions = (await slashCommand.permissions.fetch({guild}).catch(() => null));
-            if (permissions === null)
-                return true;
+        if (slashCommand === null)
+            return false;
 
-            const everyonePermission = <undefined|ApplicationCommandPermissions>permissions.find(({id}) => id === guild.roles.everyone.id);
+        const permissions = (await slashCommand.permissions.fetch({guild}).catch(() => null));
+        if (permissions === null)
+            return true;
 
-            return guild.ownerId == member.id ||
-                (
-                    
-                    (everyonePermission && everyonePermission.permission) ?
-                        (
-                            !permissions.some(({id, permission, type}) =>
-                                type === ApplicationCommandPermissionType.User &&
-                                !permission &&
-                                id === member.id
-                            ) &&
-                            !member.roles.cache.some(role =>
-                                permissions.some(({id, permission, type}) =>
-                                    type === ApplicationCommandPermissionType.Role &&
-                                    id !== everyonePermission.id &&
-                                    !permission &&
-                                    id === role.id
-                                )
-                            )
-                        ) :
-                        (
+        const everyonePermission = <undefined|ApplicationCommandPermissions>permissions.find(({id}) => id === guild.roles.everyone.id);
+
+        return guild.ownerId == member.id ||
+            (
+                (everyonePermission === undefined || everyonePermission.permission) ?
+                    (
+                        !permissions.some(({id, permission, type}) =>
+                            type === ApplicationCommandPermissionType.User &&
+                            !permission &&
+                            id === member.id
+                        ) &&
+                        !member.roles.cache.some(role =>
                             permissions.some(({id, permission, type}) =>
-                                type === ApplicationCommandPermissionType.User &&
-                                permission &&
-                                id === member.id
-                            ) ||
-                            member.roles.cache.some(role =>
-                                permissions.some(({id, permission, type}) =>
-                                    type === ApplicationCommandPermissionType.Role &&
-                                    (
-                                        everyonePermission === undefined || 
-                                        id !== everyonePermission.id
-                                    ) &&
-                                    permission &&
-                                    id === role.id
-                                )
+                                type === ApplicationCommandPermissionType.Role &&
+                                !permission &&
+                                id === role.id
                             )
                         )
+                    ) :
+                    (
+                        permissions.some(({id, permission, type}) =>
+                            type === ApplicationCommandPermissionType.User &&
+                            permission &&
+                            id === member.id
+                        ) ||
+                        member.roles.cache.some(role =>
+                            permissions.some(({id, permission, type}) =>
+                                type === ApplicationCommandPermissionType.Role &&
+                                permission &&
+                                id === role.id
+                            )
+                        )
+                    )
                 )
-        }
-        return false;
     }
 
     getValueInCorrectType(value: string) {
