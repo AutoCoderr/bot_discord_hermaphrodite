@@ -70,7 +70,7 @@ function getSlashCommandsDefinition(): Promise<ISlashCommandsDefinition> {
 }
 
 export async function initSlashCommandsOnGuild(guild: Guild, slashCommandsDefinitions: null|ISlashCommandsDefinition = null) {
-    console.log('Creating slash commands for ' + guild.name + ' server');
+    console.log(guild.name+" : Creating slash commands");
 
     slashCommandsDefinitions = slashCommandsDefinitions ?? await getSlashCommandsDefinition();
 
@@ -111,6 +111,7 @@ export async function initSlashCommandsOnGuild(guild: Guild, slashCommandsDefini
             !(<ISlashCommandsDefinition>slashCommandsDefinitions)[name] ? (<ApplicationCommand>slashCommand).delete().catch(() => null) : null
         )
     ])
+    console.log(guild.name+" : Slash commands created")
 }
 
 async function generateSlashCommandFromModel(command: typeof Command): Promise<IOptionCommand> {
