@@ -1,6 +1,7 @@
 import { Schema } from 'mongoose';
 import { connect } from "../../Mongo";
 import {Snowflake} from "discord.js";
+import IModel from '../../interfaces/IModel';
 
 
 const db = connect();
@@ -8,7 +9,7 @@ const db = connect();
 export const defaultLimit = 5*60*1000; // By default 5 minutes for the limit, can be changed by admin
 export const minimumLimit = 2*60*1000; // At least 2 minutes for the limit
 
-export interface ITextConfig {
+export interface ITextConfig extends IModel {
     enabled: boolean;
     listenerBlacklist: { roles: Snowflake[], users: Snowflake[] };
     channelBlacklist: Snowflake[];

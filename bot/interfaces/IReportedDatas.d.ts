@@ -38,7 +38,8 @@ export default interface IReportedData {
         'tipsSetListener'|
         'welcomeMessageSetListener'|
         'callbackButton'|
-        'callbackModal',
+        'callbackModal'|
+        'vocalNotifTimeout',
     guild?: Guild,
     message?: Message,
     user?: User|GuildMember,

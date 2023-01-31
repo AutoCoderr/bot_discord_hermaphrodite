@@ -1,32 +1,40 @@
 import {
-    CommandInteractionOptionResolver,
-    Guild,
     GuildChannel,
     GuildMember,
     Role,
-    TextChannel,
-    ThreadChannel, User,
+    ThreadChannel,
     VoiceChannel,
     ChannelType, EmbedBuilder, EmbedField, CommandInteraction, Message
 } from "discord.js";
 import {splitFieldsEmbed} from "../Classes/OtherFunctions";
-import TextConfig, {minimumLimit as textMinimumLimit} from "../Models/Text/TextConfig";
-import VocalConfig, {minimumLimit as vocalMinimumLimit} from "../Models/Vocal/VocalConfig";
+import TextConfig, {
+    ITextConfig, 
+    minimumLimit as textMinimumLimit, 
+    defaultLimit as textDefaultLimit
+} from "../Models/Text/TextConfig";
+import VocalConfig, {
+    IVocalConfig, 
+    minimumDelay, 
+    minimumLimit as vocalMinimumLimit, 
+    defaultLimit as vocalDefaultLimit,
+    defaultDelay,
+    maximumDelay
+} from "../Models/Vocal/VocalConfig";
 import Command from "../Classes/Command";
 import VocalSubscribe from "../Models/Vocal/VocalSubscribe";
 import TextSubscribe from "../Models/Text/TextSubscribe";
 import config from "../config";
-import {extractUTCTime, showTime} from "../Classes/DateTimeManager";
+import {extractDurationTime, extractUTCTime, showTime} from "../Classes/DateTimeManager";
 import {IArgsModel} from "../interfaces/CommandInterfaces";
 
 interface configTextAndVocalArgs {
-    action: string,
-    subAction: string,
+    action: 'blacklist'|'enable'|'disable'|'defaultlimit'|'delay',
+    subAction: 'add'|'remove'|'clear'|'show',
     blacklistType: string,
     users: GuildMember[],
     roles: Role[],
     channels: VoiceChannel[],
-    limit?: number
+    duration?: number
 }
 
 export default abstract class AbstractConfigTextAndVocal extends Command {
@@ -41,13 +49,15 @@ export default abstract class AbstractConfigTextAndVocal extends Command {
             configModel: VocalConfig,
             subscribeModel: VocalSubscribe,
             channelTypes: [ChannelType.GuildVoice],
-            minimumLimit: vocalMinimumLimit
+            minimumLimit: vocalMinimumLimit,
+            defaultLimit: vocalDefaultLimit
         },
         text: {
             configModel: TextConfig,
             subscribeModel: TextSubscribe,
             channelTypes: [ChannelType.GuildText,ChannelType.GuildPublicThread],
-            minimumLimit: textMinimumLimit
+            minimumLimit: textMinimumLimit,
+            defaultLimit: textDefaultLimit
         }
     }
 
@@ -56,7 +66,7 @@ export default abstract class AbstractConfigTextAndVocal extends Command {
         this.type = type;
     }
 
-    static argsModelFunction: (type: 'vocal'|'text') => IArgsModel = (type) => ({
+    static argsModelFunction: (type: 'vocal'|'text') => IArgsModel<configTextAndVocalArgs> = (type) => ({
         $argsByType: {
             action: {
                 isSubCommand: true,
@@ -67,7 +77,13 @@ export default abstract class AbstractConfigTextAndVocal extends Command {
                     blacklist: "Gérer la blacklist",
                     enable: "Activer l'écoute " + (type === "vocal" ? "vocale" : "textuelle") + " du serveur",
                     disable: "Désactiver l'écoute " + (type === "vocal" ? "vocale" : "textuelle") + " du serveur",
-                    defaultlimit: "Définir ou voir la limite par défaut des écoutes " + (type === 'vocal' ? "vocales" : "textuelles")
+                    defaultlimit: "Définir ou voir la limite par défaut des écoutes " + (type === 'vocal' ? "vocales" : "textuelles"),
+                    ...(
+                        type === "vocal" ? 
+                        {
+                            delay: "Définir ou voir le délai avant envoie de la notification vocale"
+                        } : {}
+                    )
                 }
             },
             subAction: {
@@ -106,11 +122,11 @@ export default abstract class AbstractConfigTextAndVocal extends Command {
                 referToSubCommands: ['blacklist.add', 'blacklist.remove'],
                 displayExtractError: true,
                 required: (args, _, modelizeSlashCommand = false) => !modelizeSlashCommand && args.action === "blacklist" &&
-                    ['add', 'remove'].includes(args.subAction) && args.blacklistType == 'listener' && args.users.length == 0,
+                    ['add', 'remove'].includes(<string>args.subAction) && args.blacklistType == 'listener' && (args.users??[]).length == 0,
                 type: 'role',
                 multi: true,
                 description: "Les roles à ajouter ou retirer de la blacklist",
-                errorMessage: (value, args) => (value === undefined && args.users.length == 0) ? {
+                errorMessage: (value, args) => (value === undefined && (args.users??[]).length == 0) ? {
                     name: "Au moins l'un des deux",
                     value: "Vous devez mentioner au moins un utilisateur ou un role à retirer ou à ajouter à la blacklist listener"
                 } : {
@@ -120,7 +136,7 @@ export default abstract class AbstractConfigTextAndVocal extends Command {
             },
             channels: {
                 referToSubCommands: ['blacklist.add', 'blacklist.remove'],
-                required: (args) => ['add', 'remove'].includes(args.subAction) && args.blacklistType == "channel",
+                required: (args) => ['add', 'remove'].includes(<string>args.subAction) && args.blacklistType == "channel",
                 type: 'channel',
                 multi: true,
                 displayValidErrorEvenIfFound: true,
@@ -133,16 +149,20 @@ export default abstract class AbstractConfigTextAndVocal extends Command {
                     value: "Ils ne peuvent être que des channels " + (type === "vocal" ? "vocaux" : "textuels")
                 })
             },
-            limit: {
-                referToSubCommands: ['defaultlimit'],
+            duration: {
+                referToSubCommands: ['defaultlimit', ...(type === "vocal" ? ["delay"] : [])],
                 required: false,
                 type: 'duration',
-                description: "Re définir la limite par défaut",
-                valid: (value: number) => value >= AbstractConfigTextAndVocal.types[type].minimumLimit,
-                errorMessage: value => ({
-                    name: "Vous avez mal rentrez la limite",
+                description: (args) => args.action === "defaultlimit" ? "Re définir la limite par défaut" : "Définir le délai avant notification",
+                valid: (value: number, args) => 
+                    (args.action === "defaultlimit" && value >= AbstractConfigTextAndVocal.types[type].minimumLimit) ||
+                    (args.action === "delay" && value >= minimumDelay && value <= maximumDelay),
+                errorMessage: (value, args) => ({
+                    name: "Vous avez mal rentrez la durée",
                     value: typeof (value) === "number" ?
-                        "Avez vous rentrez une valeur supérieure ou égale à " + showTime(extractUTCTime(AbstractConfigTextAndVocal.types[type].minimumLimit), 'fr')+" ?" :
+                        args.action === "defaultlimit" ?
+                            "Avez vous rentrez une valeur supérieure ou égale à " + showTime(extractDurationTime(args.action === "defaultlimit" ? AbstractConfigTextAndVocal.types[type].minimumLimit : minimumDelay), 'fr')+" ?" :
+                            "Le délai doit être situé entre "+[minimumDelay,maximumDelay].map(d => showTime(extractDurationTime(d), 'fr')).join(' et ')+" inclus" :
                         "Syntaxe incorrecte"
                 })
             }
@@ -150,7 +170,7 @@ export default abstract class AbstractConfigTextAndVocal extends Command {
     })
 
     async action(args: configTextAndVocalArgs) {
-        const {action, subAction, blacklistType, users, roles, channels, limit} = args;
+        const {action, subAction, blacklistType, users, roles, channels, duration} = args;
 
         if (this.type === null || AbstractConfigTextAndVocal.types[this.type] === undefined)
             return this.response(false,
@@ -160,7 +180,7 @@ export default abstract class AbstractConfigTextAndVocal extends Command {
                 })
             );
 
-        const {configModel, subscribeModel} = AbstractConfigTextAndVocal.types[this.type];
+        const {configModel, subscribeModel, defaultLimit} = AbstractConfigTextAndVocal.types[this.type];
 
         if (this.guild == null)
             return this.response(false,
@@ -170,7 +190,7 @@ export default abstract class AbstractConfigTextAndVocal extends Command {
                 })
             );
 
-        let configObj = await configModel.findOne({serverId: this.guild.id})
+        let configObj = await <Promise<IVocalConfig|ITextConfig>>configModel.findOne({serverId: this.guild.id})
 
         if (action == "enable" || action == "disable") {
             if (configObj == null) {
@@ -182,7 +202,7 @@ export default abstract class AbstractConfigTextAndVocal extends Command {
                 })
             } else {
                 configObj.enabled = action === "enable";
-                configObj.save();
+                await configObj.save();
             }
             return this.response(true, "L'abonnement " + (this.type === "vocal" ? "vocal" : "textuel") + " a été " + (action == "enable" ? "activé" : "désactivé") + " sur ce serveur");
 
@@ -198,14 +218,14 @@ export default abstract class AbstractConfigTextAndVocal extends Command {
             );
 
         if (action === "defaultlimit") {
-            if (limit) {
-                configObj.defaultLimit = limit;
-                configObj.save();
+            if (duration !== undefined) {
+                configObj.defaultLimit = duration;
+                await configObj.save();
                 return this.response(true, {
                     embeds: [
                         new EmbedBuilder().addFields({
                             name: "Valeur changée avec succès!",
-                            value: "Vous avez fixé la limite par défaut de l'écoute " +(this.type === "vocal" ? "vocale" : "textuelle") + " à " + showTime(extractUTCTime(limit), "fr_long")
+                            value: "Vous avez fixé la limite par défaut de l'écoute " +(this.type === "vocal" ? "vocale" : "textuelle") + " à " + showTime(extractUTCTime(duration), "fr_long")
                         })
                     ]
                 })
@@ -214,7 +234,31 @@ export default abstract class AbstractConfigTextAndVocal extends Command {
                 embeds: [
                     new EmbedBuilder().addFields({
                         name: "Voici la limite par défaut de l'écoute " +(this.type === "vocal" ? "vocale" : "textuelle"),
-                        value: "La limite par défaut est : " +showTime(extractUTCTime(configObj.defaultLimit), "fr_long")
+                        value: "La limite par défaut est : " +showTime(extractUTCTime(configObj.defaultLimit ?? defaultLimit), "fr_long")
+                    })
+                ]
+            })
+        }
+        
+        if (action === "delay") {
+            if (duration !== undefined) {
+                (<IVocalConfig>configObj).delay = duration;
+                await configObj.save();
+                return this.response(true, {
+                    embeds: [
+                        new EmbedBuilder().addFields({
+                            name: "Valeur changée avec succès!",
+                            value: "Vous avez fixé le délai d'attente avant notification vocale à " + showTime(extractUTCTime(duration), "fr_long")
+                        })
+                    ]
+                })
+            }
+
+            return this.response(true, {
+                embeds: [
+                    new EmbedBuilder().addFields({
+                        name: "Voici le délai d'attente avant notification vocale",
+                        value: "Le délai est : " +showTime(extractUTCTime((<IVocalConfig>configObj).delay ?? defaultDelay), "fr_long")
                     })
                 ]
             })

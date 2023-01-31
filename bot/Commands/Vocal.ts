@@ -8,7 +8,7 @@ import {
 } from "discord.js";
 import config from "../config";
 import VocalSubscribe, {IVocalSubscribe} from "../Models/Vocal/VocalSubscribe";
-import VocalConfig, {IVocalConfig, minimumLimit} from "../Models/Vocal/VocalConfig";
+import VocalConfig, {defaultDelay, IVocalConfig, minimumLimit} from "../Models/Vocal/VocalConfig";
 import VocalUserConfig, {IVocalUserConfig} from "../Models/Vocal/VocalUserConfig";
 import VocalInvite, { VocalInviteTimeoutWithoutMessageId } from "../Models/Vocal/VocalInvite";
 import {splitFieldsEmbed} from "../Classes/OtherFunctions";
@@ -21,6 +21,8 @@ import {
     showDate
 } from "../Classes/DateTimeManager";
 import {IArgsModel} from "../interfaces/CommandInterfaces";
+import CustomError from "../logging/CustomError";
+import reportError from "../logging/reportError";
 
 export default class Vocal extends Command {
     static display = true;
@@ -121,7 +123,7 @@ export default class Vocal extends Command {
         }
     }
 
-    static usersWhoAreOnVocal: { [id: string]: VoiceChannel|StageChannel } = {};
+    static usersWhoAreOnVocal: { [id: string]: {channel: VoiceChannel|StageChannel, timeout: null|NodeJS.Timeout} } = {};
 
     constructor(messageOrInteraction: Message|CommandInteraction, commandOrigin: 'slash'|'custom') {
         super(messageOrInteraction, commandOrigin, Vocal.commandName, Vocal.argsModel);
@@ -760,106 +762,138 @@ export default class Vocal extends Command {
             return;
 
         if (newState.channelId === null || newState.channel === null) {
+            if (Vocal.usersWhoAreOnVocal[newState.member.id] && Vocal.usersWhoAreOnVocal[newState.member.id].timeout !== null)
+                clearTimeout(<NodeJS.Timeout>Vocal.usersWhoAreOnVocal[newState.member.id].timeout);
             delete Vocal.usersWhoAreOnVocal[newState.member.id];
             return;
         }
 
-        Vocal.usersWhoAreOnVocal[newState.member.id] = newState.channel;
+        if (
+            Vocal.usersWhoAreOnVocal[newState.member.id] &&
+            Vocal.usersWhoAreOnVocal[newState.member.id].timeout !== null
+        )
+            clearTimeout(<NodeJS.Timeout>Vocal.usersWhoAreOnVocal[newState.member.id].timeout);
 
         const vocalConfig: IVocalConfig = await VocalConfig.findOne({serverId: newState.guild.id, enabled: true});
         if (vocalConfig === null) return;
 
         if (vocalConfig.channelBlacklist.includes(newState.channelId)) return;
 
-        const listened = newState.member;
+        const {channel} = newState;
+        Vocal.usersWhoAreOnVocal[newState.member.id] = {
+            channel: channel,
+            timeout: setTimeout(async () => {
+                try {
+                    if (
+                        newState.member === null ||
+                        newState.channel === null ||
+                        Vocal.usersWhoAreOnVocal[newState.member.id] === undefined ||
+                        Vocal.usersWhoAreOnVocal[newState.member.id].channel.id !== channel.id ||
+                        newState.channelId !== channel.id
+                    )
+                        return;
 
-        const vocalSubscribes: IVocalSubscribe[] = await VocalSubscribe.find({
-            serverId: newState.guild.id,
-            listenedId: listened.id,
-            enabled: true
-        });
-
-        const allowedUsers: { [id: string]: boolean } = {};
-
-        for (const vocalSubscribe of vocalSubscribes) {
-            const {channel,channelId,member,guild} = newState;
-            if (guild === null || member?.id !== listened.id)
-                return;
-            if ([channel,channelId].some(elem => elem === null)) {
-                delete Vocal.usersWhoAreOnVocal[listened.id];
-                return;
-            }
-            if (channel.id !== Vocal.usersWhoAreOnVocal[listened.id].id) {
-                Vocal.usersWhoAreOnVocal[listened.id] = channel;
-            }
-
-            if (Vocal.usersWhoAreOnVocal[vocalSubscribe.listenerId] && Vocal.usersWhoAreOnVocal[vocalSubscribe.listenerId].id === channelId)
-                continue;
-
-            let listener: null | GuildMember = null;
-            try {
-                listener = await guild.members.fetch(vocalSubscribe.listenerId);
-            } catch (_) {
-            }
-
-            if (listener === null) {
-                await VocalSubscribe.deleteMany({
-                    serverId: guild.id,
-                    listenerId: vocalSubscribe.listenerId
-                });
-                await VocalUserConfig.deleteMany({
-                    serverId: guild.id,
-                    userId: vocalSubscribe.listenerId
-                })
-                continue;
-            }
-
-            const permissionsForListener = channel.permissionsFor(listener);
-            if (!permissionsForListener || !permissionsForListener.has(PermissionFlagsBits.ViewChannel))
-                continue;
-
-            if (allowedUsers[listener.id] === undefined)
-                allowedUsers[listener.id] = await Vocal.staticCheckPermissions(listener, guild);
-            if (!allowedUsers[listener.id])
-                continue;
-
-            if (allowedUsers[listened.id] === undefined)
-                allowedUsers[listened.id] = await Vocal.staticCheckPermissions(listened, guild);
-            if (!allowedUsers[listened.id])
-                continue;
-
-            let listenerConfig: IVocalUserConfig | typeof VocalUserConfig = await VocalUserConfig.findOne({
-                serverId: guild.id,
-                userId: vocalSubscribe.listenerId
-            });
-
-            if (listenerConfig === null) {
-                listenerConfig = await VocalUserConfig.create({
-                    serverId: guild.id,
-                    userId: vocalSubscribe.listenerId,
-                    blocked: {users: [], roles: []},
-                    listening: true,
-                    limit: 0
-                });
-            }
-
-            if (
-                listenerConfig.lastMute instanceof Date &&
-                typeof (listenerConfig.mutedFor) == "number" &&
-                Date.now() - listenerConfig.lastMute.getTime() < listenerConfig.mutedFor
-            ) continue;
-
-            try {
-                await listener.send("'" + (member.nickname ?? member.user.username) + "' s'est connecté sur le channel vocal <#" + channel.id + "> sur le serveur '" + guild.name + "'");
-            } catch (_) {
-                continue;
-            }
-
-            if (listenerConfig.limit > 0) {
-                listenerConfig.lastMute = new Date(Math.floor(Date.now() / 1000) * 1000);
-                listenerConfig.mutedFor = listenerConfig.limit;
-                listenerConfig.save();
-            }
+                    Vocal.usersWhoAreOnVocal[newState.member.id].timeout = null
+        
+                    const listened = newState.member;
+        
+                    const vocalSubscribes: IVocalSubscribe[] = await VocalSubscribe.find({
+                        serverId: newState.guild.id,
+                        listenedId: listened.id,
+                        enabled: true
+                    });
+        
+                    const allowedUsers: { [id: string]: boolean } = {};
+        
+                    for (const vocalSubscribe of vocalSubscribes) {
+                        const {channel,channelId,member,guild} = newState;
+                        if (guild === null || member?.id !== listened.id)
+                            return;
+                        if ([channel,channelId].some(elem => elem === null)) {
+                            delete Vocal.usersWhoAreOnVocal[listened.id];
+                            return;
+                        }
+                        if (channel.id !== Vocal.usersWhoAreOnVocal[listened.id].channel.id) {
+                            Vocal.usersWhoAreOnVocal[listened.id].channel = channel;
+                        }
+        
+                        if (Vocal.usersWhoAreOnVocal[vocalSubscribe.listenerId] && Vocal.usersWhoAreOnVocal[vocalSubscribe.listenerId].channel.id === channelId)
+                            continue;
+        
+                        let listener: null | GuildMember = null;
+                        try {
+                            listener = await guild.members.fetch(vocalSubscribe.listenerId);
+                        } catch (_) {
+                        }
+        
+                        if (listener === null) {
+                            await VocalSubscribe.deleteMany({
+                                serverId: guild.id,
+                                listenerId: vocalSubscribe.listenerId
+                            });
+                            await VocalUserConfig.deleteMany({
+                                serverId: guild.id,
+                                userId: vocalSubscribe.listenerId
+                            })
+                            continue;
+                        }
+        
+                        const permissionsForListener = channel.permissionsFor(listener);
+                        if (!permissionsForListener || !permissionsForListener.has(PermissionFlagsBits.ViewChannel))
+                            continue;
+        
+                        if (allowedUsers[listener.id] === undefined)
+                            allowedUsers[listener.id] = await Vocal.staticCheckPermissions(listener, guild);
+                        if (!allowedUsers[listener.id])
+                            continue;
+        
+                        if (allowedUsers[listened.id] === undefined)
+                            allowedUsers[listened.id] = await Vocal.staticCheckPermissions(listened, guild);
+                        if (!allowedUsers[listened.id])
+                            continue;
+        
+                        let listenerConfig: IVocalUserConfig | typeof VocalUserConfig = await VocalUserConfig.findOne({
+                            serverId: guild.id,
+                            userId: vocalSubscribe.listenerId
+                        });
+        
+                        if (listenerConfig === null) {
+                            listenerConfig = await VocalUserConfig.create({
+                                serverId: guild.id,
+                                userId: vocalSubscribe.listenerId,
+                                blocked: {users: [], roles: []},
+                                listening: true,
+                                limit: 0
+                            });
+                        }
+        
+                        if (
+                            listenerConfig.lastMute instanceof Date &&
+                            typeof (listenerConfig.mutedFor) == "number" &&
+                            Date.now() - listenerConfig.lastMute.getTime() < listenerConfig.mutedFor
+                        ) continue;
+        
+                        try {
+                            await listener.send("'" + (member.nickname ?? member.user.username) + "' s'est connecté sur le channel vocal <#" + channel.id + "> sur le serveur '" + guild.name + "'");
+                        } catch (_) {
+                            continue;
+                        }
+        
+                        if (listenerConfig.limit > 0) {
+                            listenerConfig.lastMute = new Date(Math.floor(Date.now() / 1000) * 1000);
+                            listenerConfig.mutedFor = listenerConfig.limit;
+                            listenerConfig.save();
+                        }
+                    }
+                } catch (e) {
+                    reportError(new CustomError(<Error>e, {
+                        from: "vocalNotifTimeout",
+                        oldVoiceState: oldState,
+                        newVoiceState: newState
+                    }));
+                }
+                
+            }, vocalConfig.delay ?? defaultDelay)
         }
     }
 
