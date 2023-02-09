@@ -6,6 +6,7 @@
   "scripts": {
     "start": "tsc && node --trace-deprecation --trace-warnings bot.js",
     "clean_database": "node --trace-deprecation --trace-warnings scripts/cleanDatabase/cleanDatabase.js",
+    "prepare_spammers_config": "node --trace-deprecation --trace-warnings scripts/prepareSpammersConfig/start.js",
     "watch": "tsc -w",
     "build": "tsc"
   },
