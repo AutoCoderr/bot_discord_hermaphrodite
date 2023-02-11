@@ -1,35 +1,79 @@
+import { Model, Schema } from "mongoose";
 import { rand } from "../../Classes/OtherFunctions";
+import TextAskInviteBack from "../../Models/Text/TextAskInviteBack";
+import TextConfig from "../../Models/Text/TextConfig";
+import TextInvite from "../../Models/Text/TextInvite";
+import TextSubscribe from "../../Models/Text/TextSubscribe";
+import TextUserConfig from "../../Models/Text/TextUserConfig";
 import VocalAskInviteBack from "../../Models/Vocal/VocalAskInviteBack";
 import VocalConfig from "../../Models/Vocal/VocalConfig";
 import VocalInvite from "../../Models/Vocal/VocalInvite";
 import VocalSubscribe from "../../Models/Vocal/VocalSubscribe";
 import VocalUserConfig from "../../Models/Vocal/VocalUserConfig";
-import { IConfig } from "./interfaces";
+import { IConfig, INotificationConfig } from "./interfaces";
 
-export default async function prepareVocal(config: IConfig) {
-    if (!config.vocal)
+const checkAndSetConfigs = (configFields: [keyof IConfig,string][]) =>
+    (config: IConfig) =>
+        configFields.reduce((acc,[configField,wantedField]) => ({
+            ...acc,
+            ...(
+                config[configField] !== undefined ?
+                    {
+                        [wantedField]: config[configField]
+                    } : {}
+            )
+        }), {})
+
+const datasByTypes: {
+    [type: string]: INotificationConfig
+} = {
+    vocal: {
+        configModel: VocalConfig,
+        subscribeModel: VocalSubscribe,
+        allModels: [VocalConfig, VocalSubscribe, VocalAskInviteBack, VocalInvite, VocalUserConfig],
+        getNbListenByUser: (config: IConfig) => config.vocalNbListenByUser,
+        additionnalConfigParams: checkAndSetConfigs([
+            ['vocalDelay','delay'],
+            ['vocalDefaultLimit', 'defaultLimit']
+        ])
+    },
+    text: {
+        configModel: TextConfig,
+        subscribeModel: TextSubscribe,
+        allModels: [TextConfig, TextSubscribe, TextAskInviteBack, TextInvite, TextUserConfig],
+        getNbListenByUser: (config: IConfig) => config.textNbListenByUser,
+        additionnalConfigParams: checkAndSetConfigs([
+            ['textDefaultLimit', 'defaultLimit']
+        ])
+    }
+}
+
+
+export default async function prepareVocalAndText(config: IConfig, type: 'vocal'|'text') {
+    if (!config[type])
         return;
 
-    console.log("Configuring vocal ...");
+    console.log("\nConfiguring "+type+" ...");
 
     const date = new Date();
     const servers = config.servers instanceof Array ? config.servers : [config.servers];
 
     const serversIds = servers.map(({id}) => id);
-    await Promise.all([
-        VocalConfig, VocalSubscribe, VocalAskInviteBack, VocalInvite, VocalUserConfig
-    ].map(model => model.deleteMany({serverId: {$in: serversIds}})));
+    await Promise.all(datasByTypes[type].allModels.map(model => model.deleteMany({serverId: {$in: serversIds}})));
 
     console.log("Old vocal config reset");
 
     await Promise.all(
         servers.map(async server => {
-            await VocalConfig.create({
+            const create = {
                 enabled: true,
                 serverId: server.id,
                 channelBlacklist: [],
-                listenerBlacklist: {roles: [], users: []}
-            });
+                listenerBlacklist: {roles: [], users: []},
+                ...datasByTypes[type].additionnalConfigParams(config)
+            }
+            console.log({create})
+            await datasByTypes[type].configModel.create(create);
 
             const spammersSubscribes: {listenerId: string, listenedIds: string[]}[] = server.spammersIds
                 .map(spammerId => {
@@ -57,7 +101,7 @@ export default async function prepareVocal(config: IConfig) {
                 spammersSubscribes.map(({listenerId, listenedIds}) =>
                     Promise.all(
                         listenedIds.map(listenedId =>
-                            VocalSubscribe.create({
+                            datasByTypes[type].subscribeModel.create({
                                 serverId: server.id,
                                 listenerId,
                                 listenedId,
@@ -70,5 +114,5 @@ export default async function prepareVocal(config: IConfig) {
             )
         })
     )
-    console.log("new vocal config generated");
+    console.log("new "+type+" config generated");
 }

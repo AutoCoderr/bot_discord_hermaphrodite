@@ -9,10 +9,24 @@ interface IConfigServer {
 
 interface IConfig {
     vocal?: boolean;
+    vocalDefaultLimit?: number;
     vocalNbListenByUser?: number|[number,number];
+    vocalDelay?: number;
+
     text?: boolean;
-    XP?: boolean;
+    textDefaultLimit?: number;
     textNbListenByUser?: number|[number,number];
+
+    XP?: boolean;
     XPConfig?: PartialBy<Omit<IXPData, 'serverId'|'enabled','save','remove'>, 'timezone'>;
+
     servers: IConfigServer[]|IConfigServer;
+}
+
+interface INotificationConfig {
+    configModel: Model<Schema>,
+    subscribeModel: Model<Schema>,
+    allModels: Model<Schema>[],
+    getNbListenByUser: (config: IConfig) => IConfig['vocalNbListenByUser']|IConfig['textNbListenByUser'],
+    additionnalConfigParams: (config: IConfig) => {[key: string]: any}
 }
