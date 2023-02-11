@@ -883,7 +883,7 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
     }
 
     async action_import(args: IConfigXPArgs, XPServerConfig: IXPData) {
-        if (!(await checkParametersData(<Guild>this.guild, XPServerConfig, args.jsonFile)))
+        if (!(await checkParametersData(<Guild>this.guild, args.jsonFile, XPServerConfig)))
             return this.response(false, {
                 embeds: [
                     new EmbedBuilder()

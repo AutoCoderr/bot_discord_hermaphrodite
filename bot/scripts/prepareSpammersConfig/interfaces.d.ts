@@ -1,10 +1,16 @@
-import { IXPData } from "../../Models/XP/XPData";
+import { Guild } from "discord.js";
+import { ILevelTip, IXPData } from "../../Models/XP/XPData";
 
-type PartialBy<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>
+type RequiredBy<M, K> = Omit<M, K> & Required<Pick<M,K>>
+
+type ISpecifiedXPConfig = RequiredBy<Partial<Omit<IXPData, 'serverId'|'enabled'|'save'|'remove'>>, 'activeRoleId'>;
+
+type ISpecifiedLevelTip = Omit<ILevelTip, 'userApproves', 'userUnapproves'>
 
 interface IConfigServer {
     id: string;
     spammersIds: string[];
+    XPConfig?: ISpecifiedXPConfig;
 }
 
 interface IConfig {
@@ -18,7 +24,7 @@ interface IConfig {
     textNbListenByUser?: number|[number,number];
 
     XP?: boolean;
-    XPConfig?: PartialBy<Omit<IXPData, 'serverId'|'enabled','save','remove'>, 'timezone'>;
+    XPConfig?: Omit<ISpecifiedXPConfig, 'tipsByLevel'> & {tipsByLevel?: ISpecifiedLevelTip[]};
 
     servers: IConfigServer[]|IConfigServer;
 }

@@ -184,20 +184,28 @@ export function warningSpecificRolesCantBeAssignedMessage(guild: Guild, ...roles
     }
 }
 
-export function checkParametersData(guild: Guild, XPServerConfig: IXPData, params: any): Promise<boolean> {
+const checkGainsParameterInteger = (v,field) => v === undefined || (v%1 === 0 && v >= XPGainsFixedLimits[field].min && v <= XPGainsFixedLimits[field].max)
+
+export function checkParametersData(guild: Guild, params: any, XPServerConfig: null|IXPData = null, toSkip: string[] = []): Promise<boolean> {
     return Promise.all(
-        (<[string[], string, ((v,field) => boolean|Promise<boolean>)][]>[
-            [['string','undefined'], 'activeRoleId', (v) => (!v && !XPServerConfig.enabled) || guild.roles.cache.get(v)],
-            [['string','undefined'], 'channelRoleId', (v) => !v || guild.roles.cache.get(v)],
-            [['string'], 'timezone', (v) => getTimezoneDatas().then(({zones}) => zones[v] !== undefined)],
-            [['number'], 'XPByMessage', (v, field) => v%1 === 0 && v >= XPGainsFixedLimits[field].min && v <= XPGainsFixedLimits[field].max],
-            [['number'], 'XPByFirstMessage', (v, field) => v%1 === 0 && v >= XPGainsFixedLimits[field].min && v <= XPGainsFixedLimits[field].max],
-            [['number'], 'XPByVocal', (v, field) => v%1 === 0 && v >= XPGainsFixedLimits[field].min && v <= XPGainsFixedLimits[field].max],
-            [['number'], 'timeLimitMessage', (v, field) => v%1 === 0 && v >= XPGainsFixedLimits[field].min && v <= XPGainsFixedLimits[field].max],
-            [['number'], 'timeLimitVocal', (v, field) => v%1 === 0 && v >= XPGainsFixedLimits[field].min && v <= XPGainsFixedLimits[field].max],
-            [['number'], 'firstMessageTime', (v, field) => v%1 === 0 && v >= XPGainsFixedLimits[field].min && v <= XPGainsFixedLimits[field].max]
+        (<[string, string, ((v,field) => boolean|Promise<boolean>)][]>[
+            ['string', 'activeRoleId', (v) => (!v && XPServerConfig && !XPServerConfig.enabled) || guild.roles.cache.get(v)],
+            ['string', 'channelRoleId', (v) => !v || guild.roles.cache.get(v)],
+            ['string', 'timezone', (v) => v === undefined || getTimezoneDatas().then(({zones}) => zones[v] !== undefined)],
+            ['number', 'XPByMessage', checkGainsParameterInteger],
+            ['number', 'XPByFirstMessage', checkGainsParameterInteger],
+            ['number', 'XPByVocal', checkGainsParameterInteger],
+            ['number', 'timeLimitMessage', checkGainsParameterInteger],
+            ['number', 'timeLimitVocal', checkGainsParameterInteger],
+            ['number', 'firstMessageTime', checkGainsParameterInteger]
         ])
-            .map(async ([types, field, check]) => types.includes(typeof(params[field])) && await check(params[field],field))
+            .map(async ([type, field, check]) => 
+                toSkip.includes(field) ||
+                (
+                    (params[field] === undefined || type === typeof(params[field])) && 
+                    await check(params[field],field)
+                )
+            )
     ).then(checkedFields => !checkedFields.some(c => !c))
 }
 

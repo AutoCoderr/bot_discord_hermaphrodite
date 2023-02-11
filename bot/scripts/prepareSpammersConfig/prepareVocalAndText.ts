@@ -61,19 +61,17 @@ export default async function prepareVocalAndText(config: IConfig, type: 'vocal'
     const serversIds = servers.map(({id}) => id);
     await Promise.all(datasByTypes[type].allModels.map(model => model.deleteMany({serverId: {$in: serversIds}})));
 
-    console.log("Old vocal config reset");
+    console.log("Old "+type+" config reset");
 
     await Promise.all(
         servers.map(async server => {
-            const create = {
+            await datasByTypes[type].configModel.create({
                 enabled: true,
                 serverId: server.id,
                 channelBlacklist: [],
                 listenerBlacklist: {roles: [], users: []},
                 ...datasByTypes[type].additionnalConfigParams(config)
-            }
-            console.log({create})
-            await datasByTypes[type].configModel.create(create);
+            });
 
             const spammersSubscribes: {listenerId: string, listenedIds: string[]}[] = server.spammersIds
                 .map(spammerId => {
@@ -114,5 +112,5 @@ export default async function prepareVocalAndText(config: IConfig, type: 'vocal'
             )
         })
     )
-    console.log("new "+type+" config generated");
+    console.log("New "+type+" config generated");
 }
