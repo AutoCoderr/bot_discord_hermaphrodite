@@ -8,12 +8,14 @@ import {
     Guild,
     GuildMember,
     TextChannel,
-    User, EmbedBuilder, EmbedField, ApplicationCommandPermissions, Message, Interaction, CommandInteraction, ModalBuilder
+    User, EmbedBuilder, EmbedField, ApplicationCommandPermissions, 
+    Message, CommandInteraction, ModalBuilder, ApplicationCommandPermissionType
 } from "discord.js";
 import {checkTypes} from "./TypeChecker";
 import {extractTypes} from "./TypeExtractor";
 import {getCustomType, getSlashTypeGetterName} from "../slashCommands";
 import CustomError from "../logging/CustomError";
+
 import {
     getCommandTypeArg,
     IArgModel,
@@ -23,8 +25,6 @@ import {
     responseResultType,
     responseType
 } from "../interfaces/CommandInterfaces";
-import {ApplicationCommandPermissionType} from "discord.js"
-
 const validModelCommands = {};
 
 export default class Command<IArgs = {[key: string]: any}, C extends null|Command = null> {

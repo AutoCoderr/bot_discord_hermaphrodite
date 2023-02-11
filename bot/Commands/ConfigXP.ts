@@ -82,7 +82,7 @@ interface IConfigXPArgs {
         'import'|
         'reset';
     role: Role;
-    duration: number;
+    time: number;
     XP?: number;
     XPByLevel: number;
     level?: number;
@@ -575,10 +575,10 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                 type: "role",
                 description: "Quel rôle définir"
             },
-            duration: {
+            time: {
                 referToSubCommands: ['first_message_time.set','limit_gain_set.message','limit_gain_set.vocal'],
                 type: "duration",
-                description: "Donnez une durée (ex: 7h, 6h30, etc...)",
+                description: "Donnez une temps (ex: 7h, 6h30m, 5m, 30s, etc...)",
                 valid: (value, args, command: ConfigXP) => {
                     const limitObj = args.action === "first_message_time" ?
                                         XPGainsFixedLimits.firstMessageTime :
@@ -1748,7 +1748,7 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                 ]
             })
         }
-        XPServerConfig.firstMessageTime = args.duration;
+        XPServerConfig.firstMessageTime = args.time;
         await XPServerConfig.save();
 
         return this.response(true, {
@@ -1757,7 +1757,7 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                     .setTitle("Heure minimale du premier message")
                     .setFields({
                         name: "Vous avez configuré avec succès l'heure suivante :",
-                        value: showTime(extractUTCTime(args.duration), 'fr')
+                        value: showTime(extractUTCTime(args.time), 'fr')
                     })
             ]
         })
@@ -1792,7 +1792,7 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
             vocal: 'timeLimitVocal'
         }[args.XPActionTypesToLimit]
 
-        XPServerConfig[col] = args.duration;
+        XPServerConfig[col] = args.time;
         await XPServerConfig.save();
 
         return this.response(true, {
@@ -1804,7 +1804,7 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                     }[args.XPActionTypesToLimit])
                     .setFields({
                         name: "Vous avez défini la valeur suivante :",
-                        value: showTime(extractDurationTime(args.duration), 'fr')
+                        value: showTime(extractDurationTime(args.time), 'fr')
                     })
             ]
         })
