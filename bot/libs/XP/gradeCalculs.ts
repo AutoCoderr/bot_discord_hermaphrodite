@@ -1,5 +1,5 @@
 import {IGrade, IXPData, gradeFieldsFixedLimits} from "../../Models/XP/XPData";
-import {Guild, GuildMember} from "discord.js";
+import {Guild, GuildMember, Role} from "discord.js";
 import XPUserData, {IXPUserData} from "../../Models/XP/XPUserData";
 import {roleCanBeManaged, checkIfBotCanManageRoles} from "./XPOtherFunctions";
 import CustomError from "../../logging/CustomError";
@@ -219,4 +219,69 @@ export function checkGradesListData(guild: Guild, grades: any) {
 
             Object.keys(grade).length > 5
         ))
+}
+
+export async function reassignRoles(
+    guild: Guild, 
+    grades: IGrade[], 
+    nonManageableRoles: {[id: string]: true}, 
+    rolesById: {[id: string]: null|Role}
+) {
+
+    const gradesById = grades.reduce((acc,grade) => ({
+        ...acc,
+        [<string>grade._id]: grade
+    }), {})
+
+    for (const grade of grades) {
+        if (nonManageableRoles[grade.roleId] || !rolesById[grade.roleId])
+            continue;
+        
+        await Promise.all(
+            await (<Promise<Array<GuildMember|null>>>Promise.all(
+                await XPUserData.find({
+                    serverId: guild.id,
+                    gradeId: (<string>grade._id).toString()
+                })
+                .then(XPUserDatas =>
+                    XPUserDatas.map(XPUserData => 
+                        guild.members.fetch(XPUserData.userId).catch(() => null)
+                    )    
+                )
+            ))
+            .then(members => 
+                members.filter(member => 
+                    member !== null &&
+                        !member.roles.cache.some(role => role.id === grade.roleId)
+                    )
+                )
+            .then(members => members.map(member => (<GuildMember>member).roles.add(<Role>rolesById[grade.roleId])))
+        )
+
+        await Promise.all(
+            await (<Promise<Array<GuildMember|null>>>Promise.all(
+                await XPUserData.find({
+                    serverId: guild.id,
+                    gradeId: {$ne: (<string>grade._id).toString()}
+                })
+                .then(XPUserDatas => 
+                    XPUserDatas.filter(XPUserData =>
+                        gradesById[XPUserData.gradeId] === undefined || gradesById[XPUserData.gradeId].roleId !== grade.roleId   
+                    )
+                )
+                .then(XPUserDatas =>
+                    XPUserDatas.map(XPUserData => 
+                            guild.members.fetch(XPUserData.userId).catch(() => null)
+                    )    
+                )
+            ))
+            .then(members => 
+                members.filter((member) => 
+                    member !== null &&
+                    member.roles.cache.some(role => role.id === grade.roleId)
+                )
+            )
+            .then(members => members.map(member => (<GuildMember>member).roles.remove(<Role>rolesById[grade.roleId])))
+        )
+    }
 }

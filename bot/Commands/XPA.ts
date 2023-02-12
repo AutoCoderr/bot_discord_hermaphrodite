@@ -102,11 +102,12 @@ export default class XPA extends AbstractXP<IXPAArgs> {
                 ]
             })
 
-        const XPUserConfig: IXPUserData = await this.getXPUserConfig(args.member)
+        const XPUserConfig: null|IXPUserData = args.action === "reset_all" ? null : 
+            await this.getXPUserConfig(args.member)
             .then(XPUserConfig => XPUserConfig ?? XPUserData.create({
-                userId: args.member.id,
-                serverId: (<Guild>this.guild).id
-            }))
+                    userId: args.member.id,
+                    serverId: (<Guild>this.guild).id
+                }))
 
         return this['action_'+args.action](args, XPServerConfig, XPUserConfig)
     }

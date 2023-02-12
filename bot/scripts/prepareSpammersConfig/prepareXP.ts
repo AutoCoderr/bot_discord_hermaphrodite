@@ -1,12 +1,12 @@
-import XPData from "../../Models/XP/XPData";
+import XPData, { IXPData } from "../../Models/XP/XPData";
 import XPNotificationAskButton from "../../Models/XP/XPNotificationAskButton";
 import XPTipsUsefulAskButton from "../../Models/XP/XPTipsUsefulAskButton";
 import XPUserData from "../../Models/XP/XPUserData";
 import { IConfig, ISpecifiedXPConfig } from "./interfaces";
-import { checkParametersData } from "../../libs/XP/XPOtherFunctions";
-import { checkGradesListData } from "../../libs/XP/gradeCalculs";
+import { checkIfBotCanManageRoles, checkParametersData, roleCanBeManaged } from "../../libs/XP/XPOtherFunctions";
+import { checkGradesListData, reassignRoles } from "../../libs/XP/gradeCalculs";
 import { checkTipsListData } from "../../libs/XP/tips/tipsOtherFunctions";
-import { Guild } from "discord.js";
+import { Guild, Role } from "discord.js";
 
 export default async function prepareXP(config: IConfig, guilds: Guild[]) {
     if (!config.XP)
@@ -53,10 +53,32 @@ export default async function prepareXP(config: IConfig, guilds: Guild[]) {
 
     console.log("Old XP config reset");
 
+    const rolesById: {[id: string]: null|Role} = servers.reduce((acc,serverConfig,i) => {
+        const XPConfig: ISpecifiedXPConfig = <ISpecifiedXPConfig>(serverConfig.XPConfig ?? config.XPConfig);
+
+        return (XPConfig.grades??[]).reduce((acc,{roleId}) => ({
+            ...acc,
+            [roleId]: acc[roleId] !== undefined ?
+                        acc[roleId] :
+                        (guilds[i].roles.cache.get(roleId)??null)
+        }), acc)
+    }, {})
+
     await Promise.all(
-        servers.map(serverConfig => {
+        servers.map(async (serverConfig,i) => {
             const XPConfig: ISpecifiedXPConfig = <ISpecifiedXPConfig>(serverConfig.XPConfig ?? config.XPConfig)
-            return XPData.create({
+
+            await Promise.all(
+                serverConfig.spammersIds.map(spammerId =>
+                    XPUserData.create({
+                        serverId: serverConfig.id,
+                        userId: spammerId,
+                        DMEnabled: true
+                    })    
+                )
+            )
+
+            const savedXPConfig: IXPData = await XPData.create({
                 serverId: serverConfig.id,
                 enabled: true,
                 ...XPConfig,
@@ -66,7 +88,20 @@ export default async function prepareXP(config: IConfig, guilds: Guild[]) {
                         userApproves: i === 0 ? null : [],
                         userUnapproves: i === 0 ? null : []
                     })) : []
-            })    
+            })
+
+            const guild = guilds[i];
+
+            if (XPConfig.grades === undefined || !checkIfBotCanManageRoles(guild))
+                return;
+
+            const nonManageableRoles = Object.entries(rolesById)
+                .reduce((acc,[id,role]) => ({
+                    ...acc,
+                    [id]: role === null || role.guild.id !== guild.id || !roleCanBeManaged(guild, role)
+                }), {})
+
+            await reassignRoles(guild, savedXPConfig.grades, nonManageableRoles, rolesById)
         })
     )
     console.log("new XP config generated");
