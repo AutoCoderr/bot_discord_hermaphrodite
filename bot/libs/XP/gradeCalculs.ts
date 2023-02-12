@@ -225,7 +225,8 @@ export async function reassignRoles(
     guild: Guild, 
     grades: IGrade[], 
     nonManageableRoles: {[id: string]: true}, 
-    rolesById: {[id: string]: null|Role}
+    rolesById: {[id: string]: null|Role},
+    XPUserConfigs: null|IXPUserData[] = null
 ) {
 
     const gradesById = grades.reduce((acc,grade) => ({
@@ -239,14 +240,17 @@ export async function reassignRoles(
         
         await Promise.all(
             await (<Promise<Array<GuildMember|null>>>Promise.all(
-                await XPUserData.find({
-                    serverId: guild.id,
-                    gradeId: (<string>grade._id).toString()
-                })
-                .then(XPUserDatas =>
-                    XPUserDatas.map(XPUserData => 
-                        guild.members.fetch(XPUserData.userId).catch(() => null)
-                    )    
+                (
+                    XPUserConfigs === null ?
+                        await XPUserData.find({
+                            serverId: guild.id,
+                            gradeId: (<string>grade._id).toString()
+                        }) :
+                        XPUserConfigs.filter(XPUserConfig => 
+                            XPUserConfig.gradeId === (<string>grade._id).toString()
+                        )
+                ).map(XPUserConfig => 
+                    guild.members.fetch(XPUserConfig.userId).catch(() => null)
                 )
             ))
             .then(members => 
@@ -260,20 +264,20 @@ export async function reassignRoles(
 
         await Promise.all(
             await (<Promise<Array<GuildMember|null>>>Promise.all(
-                await XPUserData.find({
-                    serverId: guild.id,
-                    gradeId: {$ne: (<string>grade._id).toString()}
-                })
-                .then(XPUserDatas => 
-                    XPUserDatas.filter(XPUserData =>
-                        gradesById[XPUserData.gradeId] === undefined || gradesById[XPUserData.gradeId].roleId !== grade.roleId   
-                    )
-                )
-                .then(XPUserDatas =>
-                    XPUserDatas.map(XPUserData => 
-                            guild.members.fetch(XPUserData.userId).catch(() => null)
-                    )    
-                )
+                (
+                    XPUserConfigs === null ?
+                        await XPUserData.find({
+                            serverId: guild.id,
+                            gradeId: {$ne: (<string>grade._id).toString()}
+                        }) :
+                        XPUserConfigs.filter(XPUserConfig => 
+                            XPUserConfig.gradeId !== (<string>grade._id).toString()
+                        )
+                ).filter(XPUserConfig =>
+                    gradesById[XPUserConfig.gradeId] === undefined || gradesById[XPUserConfig.gradeId].roleId !== grade.roleId   
+                ).map(XPUserConfig => 
+                    guild.members.fetch(XPUserConfig.userId).catch(() => null)
+                )    
             ))
             .then(members => 
                 members.filter((member) => 

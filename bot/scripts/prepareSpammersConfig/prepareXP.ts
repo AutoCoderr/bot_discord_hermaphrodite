@@ -1,7 +1,7 @@
 import XPData, { IXPData } from "../../Models/XP/XPData";
 import XPNotificationAskButton from "../../Models/XP/XPNotificationAskButton";
 import XPTipsUsefulAskButton from "../../Models/XP/XPTipsUsefulAskButton";
-import XPUserData from "../../Models/XP/XPUserData";
+import XPUserData, { IXPUserData } from "../../Models/XP/XPUserData";
 import { IConfig, ISpecifiedXPConfig } from "./interfaces";
 import { checkIfBotCanManageRoles, checkParametersData, roleCanBeManaged } from "../../libs/XP/XPOtherFunctions";
 import { checkGradesListData, reassignRoles } from "../../libs/XP/gradeCalculs";
@@ -68,7 +68,7 @@ export default async function prepareXP(config: IConfig, guilds: Guild[]) {
         servers.map(async (serverConfig,i) => {
             const XPConfig: ISpecifiedXPConfig = <ISpecifiedXPConfig>(serverConfig.XPConfig ?? config.XPConfig)
 
-            await Promise.all(
+            const XPUserConfigs: IXPUserData[] = await Promise.all(
                 serverConfig.spammersIds.map(spammerId =>
                     XPUserData.create({
                         serverId: serverConfig.id,
@@ -101,7 +101,7 @@ export default async function prepareXP(config: IConfig, guilds: Guild[]) {
                     [id]: role === null || role.guild.id !== guild.id || !roleCanBeManaged(guild, role)
                 }), {})
 
-            await reassignRoles(guild, savedXPConfig.grades, nonManageableRoles, rolesById)
+            await reassignRoles(guild, savedXPConfig.grades, nonManageableRoles, rolesById, XPUserConfigs)
         })
     )
     console.log("new XP config generated");
