@@ -44,9 +44,9 @@ export default class ConfigVocal extends AbstractConfigTextAndVocal {
             type: "string",
             description: "Activer ou désactiver",
             choices: {
-                enable: (parentDescription) => "Activer "+parentDescription,
-                disable: (parentDescription) => "Désactiver "+parentDescription,
-                is_enabled: (parentDescription) => "Voir si "+parentDescription+" est activé ou non"
+                enable: (_, parentDescription) => "Activer "+parentDescription,
+                disable: (_, parentDescription) => "Désactiver "+parentDescription,
+                is_enabled: (_, parentDescription) => "Voir si "+parentDescription+" est activé ou non"
             }
         }
     })
