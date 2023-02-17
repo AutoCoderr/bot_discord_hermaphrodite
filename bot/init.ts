@@ -17,6 +17,7 @@ import countingMessagesXPs from "./libs/XP/XPCounting/countingMessagesXPs";
 import countingFirstMessagesXPs from "./libs/XP/XPCounting/countingFirstMessagesXPs";
 import {findAndExecCallbackButton} from "./libs/callbackButtons";
 import { findAndExecCallbackModal } from "./libs/callbackModals";
+import { countingStatsVoiceConnections } from "./libs/StatsCounters";
 
 export default function init(bot) {
     client.on('ready', () => {
@@ -112,6 +113,7 @@ export default function init(bot) {
                         }))
                     })
                 countingVocalXPs(oldState, newState);
+                countingStatsVoiceConnections(oldState, newState);
             })
 
             client.on("messageCreate", async message => {

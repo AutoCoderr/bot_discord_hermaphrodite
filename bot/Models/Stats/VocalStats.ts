@@ -14,7 +14,7 @@ export interface IVocalStats extends IModel {
 const VocalStatsSchema: Schema = new Schema({
     serverId: { type: String, required: true },
     date: { type: Date, required: true },
-    nbVocalConnections: { type: Date, required: false, default: 1 }
+    nbVocalConnections: { type: Number, required: false, default: 1 }
 });
 
 // @ts-ignore

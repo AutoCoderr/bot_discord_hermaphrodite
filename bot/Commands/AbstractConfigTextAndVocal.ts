@@ -36,7 +36,7 @@ export interface IConfigTextAndVocalArgs {
     duration?: number
 }
 
-export default abstract class AbstractConfigTextAndVocal extends Command {
+export default abstract class AbstractConfigTextAndVocal<IArgs = IConfigTextAndVocalArgs> extends Command<IArgs> {
     type: null | 'vocal' | 'text' = null;
 
     static abstract = true;
@@ -182,8 +182,11 @@ export default abstract class AbstractConfigTextAndVocal extends Command {
         }
     }
 
-    async mutualizedAction(args: IConfigTextAndVocalArgs): Promise<{executed: boolean, configObj: null|IVocalConfig|ITextConfig, response: null|ReturnType<Command['response']>}> {
-        const {action, subAction, blacklistType, users, roles, channels, duration} = args;
+    async mutualizedAction(
+        args: IArgs, 
+        checkIfEnabled: null|((args: IArgs, configObj: IVocalConfig|ITextConfig) => boolean) = null
+    ): Promise<{executed: boolean, configObj: null|IVocalConfig|ITextConfig, response: null|ReturnType<Command['response']>}> {
+        const {action, subAction, blacklistType, users, roles, channels, duration} = <IConfigTextAndVocalArgs><unknown>args;
 
         if (this.type === null || AbstractConfigTextAndVocal.types[this.type] === undefined)
             return this.lresponse(false,
@@ -222,7 +225,10 @@ export default abstract class AbstractConfigTextAndVocal extends Command {
         }
 
         // if action is 'blacklist' or 'defaultlimit'
-        if (configObj == null || !configObj.enabled)
+        if (
+            (checkIfEnabled !== null && checkIfEnabled(args, configObj)) || 
+            (checkIfEnabled === null && (configObj == null || !configObj.enabled))
+        )
             return this.lresponse(false,
                 this.sendErrors({
                     name: (this.type === "vocal" ? "Vocal" : "Textuel") + " désactivé",

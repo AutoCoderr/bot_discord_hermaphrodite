@@ -8,12 +8,12 @@ import { extractUTCTime, showTime } from "../Classes/DateTimeManager";
 import Command from "../Classes/Command";
 import StatsConfig, { IStatsConfig } from "../Models/Stats/StatsConfig";
 
-type IConfigVocalArgs = IConfigTextAndVocalArgs & {
-    action: 'delay'|'stats';
+type IConfigVocalArgs = Omit<IConfigTextAndVocalArgs, 'action'> & {
+    action: IConfigTextAndVocalArgs['action'] | 'delay' | 'stats';
     statsSubAction: 'enable'|'disable'|'is_enabled'
 }
 
-export default class ConfigVocal extends AbstractConfigTextAndVocal {
+export default class ConfigVocal extends AbstractConfigTextAndVocal<IConfigVocalArgs> {
     static display = true;
     static description = "Pour configurer l'option d'abonnement vocal";
     static commandName = "configVocal";
@@ -22,7 +22,7 @@ export default class ConfigVocal extends AbstractConfigTextAndVocal {
 
     static abstract = false;
 
-    static argsModel: IArgsModel = AbstractConfigTextAndVocal.argsModelFunction('vocal', {
+    static argsModel: IArgsModel<IConfigVocalArgs> = AbstractConfigTextAndVocal.argsModelFunction<IConfigVocalArgs>('vocal', {
         action: (argModel) => ({
             ...argModel,
             description: argModel.description+", delay, stats",
@@ -55,8 +55,11 @@ export default class ConfigVocal extends AbstractConfigTextAndVocal {
         super(messageOrInteraction, commandOrigin, ConfigVocal.commandName, ConfigVocal.argsModel, 'vocal');
     }
 
-    async action(args: IConfigVocalArgs) {
-        const res = await this.mutualizedAction(args);
+    async action(args) {
+        const res = await this.mutualizedAction(args, (args, configObj) => 
+            !["delay","stats"].includes(args.action) &&
+            (configObj === null || !configObj.enabled)
+        );
 
         if (res.executed)
             return <ReturnType<Command['response']>>res.response;
