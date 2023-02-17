@@ -7,10 +7,13 @@ import { IVocalConfig, defaultDelay } from "../Models/Vocal/VocalConfig";
 import { extractUTCTime, showTime } from "../Classes/DateTimeManager";
 import Command from "../Classes/Command";
 import StatsConfig, { IStatsConfig } from "../Models/Stats/StatsConfig";
+import { IStatsPrecisionUnits, statsPrecisionExists } from "../libs/StatsCounters";
 
 type IConfigVocalArgs = Omit<IConfigTextAndVocalArgs, 'action'> & {
     action: IConfigTextAndVocalArgs['action'] | 'delay' | 'stats';
-    statsSubAction: 'enable'|'disable'|'is_enabled'
+    statsSubAction: 'enable'|'disable'|'is_enabled'|'export';
+    statstime: {unit: IStatsPrecisionUnits, value: number}
+    precision?: IStatsPrecisionUnits;
 }
 
 export default class ConfigVocal extends AbstractConfigTextAndVocal<IConfigVocalArgs> {
@@ -46,7 +49,32 @@ export default class ConfigVocal extends AbstractConfigTextAndVocal<IConfigVocal
             choices: {
                 enable: (_, parentDescription) => "Activer "+parentDescription,
                 disable: (_, parentDescription) => "Désactiver "+parentDescription,
-                is_enabled: (_, parentDescription) => "Voir si "+parentDescription+" est activé ou non"
+                is_enabled: (_, parentDescription) => "Voir si "+parentDescription+" est activé ou non",
+                export: "Exporter les statistiques vocales"
+            }
+        },
+        statstime: {
+            referToSubCommands: ["stats.export"],
+            type: "timeUnits",
+            description: "Jusqu'à combiens de temps (ex: 7j, 2mon) en arrière ?",
+            valid: ({unit}) => statsPrecisionExists(unit),
+            errorMessage: () => ({
+                name: "Donnée invalide",
+                value: "Vous ne pouvez mentionner comme unité de temps que des heures (h), jours (j,d), mois (month,mon), ou années (a,y).\n"+
+                        "Contrairement aux durées, vous ne pouvez mentionner qu'une seule unité, comme 7j ou 2h, mais pas plusieurs à la fois, comme 7j2h"
+            }),
+            required: true
+        },
+        precision: {
+            referToSubCommands: ["stats.export"],
+            type: "string",
+            description: "Choisissez un niveau de précision",
+            required: false,
+            choices: {
+                hour: "Heure",
+                day: "Jour",
+                month: "Mois",
+                year: "Année"
             }
         }
     })
@@ -64,7 +92,7 @@ export default class ConfigVocal extends AbstractConfigTextAndVocal<IConfigVocal
         if (res.executed)
             return <ReturnType<Command['response']>>res.response;
 
-        const {action, duration, statsSubAction} = args;
+        const {action, duration, statsSubAction, precision, statstime} = args;
         const configVocal = <IVocalConfig>res.configObj;
 
         if (action === "delay") {
@@ -108,24 +136,33 @@ export default class ConfigVocal extends AbstractConfigTextAndVocal<IConfigVocal
                 ]
             })
         }
+        
+        if (["enable","disable"].includes(action)) {
+            if (statsConfig === null) {
+                await StatsConfig.create({
+                    serverId: (<Guild>this.guild).id,
+                    listenVocal: statsSubAction === "enable"
+                })
+            } else {
+                statsConfig.listenVocal = statsSubAction === "enable";
+                await statsConfig.save()
+            }
 
-        if (statsConfig === null) {
-            await StatsConfig.create({
-                serverId: (<Guild>this.guild).id,
-                listenVocal: statsSubAction === "enable"
+            return this.response(true, {
+                embeds: [
+                    new EmbedBuilder().addFields({
+                        name: "Statistique vocales "+(statsSubAction === "enable" ? "activées" : "désactivées"),
+                        value: "Les statistique vocales ont été "+(statsSubAction === "enable" ? "activées" : "désactivées")
+                    })
+                ]
             })
-        } else {
-            statsConfig.listenVocal = statsSubAction === "enable";
-            await statsConfig.save()
         }
 
-        return this.response(true, {
-            embeds: [
-                new EmbedBuilder().addFields({
-                    name: "Statistique vocales "+(statsSubAction === "enable" ? "activées" : "désactivées"),
-                    value: "Les statistique vocales ont été "+(statsSubAction === "enable" ? "activées" : "désactivées")
-                })
-            ]
-        })
+        
+        //sub action is export
+
+        console.log({statsSubAction, precision, statstime})
+
+        return this.response(true, "BANANE");
     }
 }

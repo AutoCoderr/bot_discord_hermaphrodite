@@ -23,7 +23,7 @@ import Command from "../Classes/Command";
 import VocalSubscribe from "../Models/Vocal/VocalSubscribe";
 import TextSubscribe from "../Models/Text/TextSubscribe";
 import config from "../config";
-import {extractDurationTime, extractUTCTime, showTime} from "../Classes/DateTimeManager";
+import {extractDurationTime, showTime} from "../Classes/DateTimeManager";
 import {IArgModel, IArgsModel} from "../interfaces/CommandInterfaces";
 
 export interface IConfigTextAndVocalArgs {
@@ -244,7 +244,7 @@ export default abstract class AbstractConfigTextAndVocal<IArgs = IConfigTextAndV
                     embeds: [
                         new EmbedBuilder().addFields({
                             name: "Valeur changée avec succès!",
-                            value: "Vous avez fixé la limite par défaut de l'écoute " +(this.type === "vocal" ? "vocale" : "textuelle") + " à " + showTime(extractUTCTime(duration), "fr_long")
+                            value: "Vous avez fixé la limite par défaut de l'écoute " +(this.type === "vocal" ? "vocale" : "textuelle") + " à " + showTime(extractDurationTime(duration), "fr_long")
                         })
                     ]
                 })
@@ -253,7 +253,7 @@ export default abstract class AbstractConfigTextAndVocal<IArgs = IConfigTextAndV
                 embeds: [
                     new EmbedBuilder().addFields({
                         name: "Voici la limite par défaut de l'écoute " +(this.type === "vocal" ? "vocale" : "textuelle"),
-                        value: "La limite par défaut est : " +showTime(extractUTCTime(configObj.defaultLimit ?? defaultLimit), "fr_long")
+                        value: "La limite par défaut est : " +showTime(extractDurationTime(configObj.defaultLimit ?? defaultLimit), "fr_long")
                     })
                 ]
             })

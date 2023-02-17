@@ -23,6 +23,12 @@ const precisions = {
     }
 }
 
+export function statsPrecisionExists(precision: string) {
+    return precisions[precision] !== undefined
+}
+
+export type IStatsPrecisionUnits = keyof typeof precisions;
+
 function getDateWithPrecision(date: Date = new Date, precision: keyof typeof precisions = 'hour') {
     return precisions[precision](date);
 }
