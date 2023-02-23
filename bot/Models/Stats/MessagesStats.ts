@@ -5,18 +5,16 @@ import IModel from '../../interfaces/IModel';
 
 const db = connect();
 
-export interface IVocalStats extends IModel {
+export interface IMessagesStats extends IModel {
     serverId: string;
     date: Date;
-    nbVocalConnections: number;
-    nbMinutes: number;
+    nbMessages: number;
 }
 
 const VocalStatsSchema: Schema = new Schema({
     serverId: { type: String, required: true },
     date: { type: Date, required: true },
-    nbVocalConnections: { type: Number, required: false, default: 0 },
-    nbMinutes: { type: Number, required: false, default: 0 }
+    nbMessages: { type: Number, required: false, default: 0 }
 });
 
 // @ts-ignore
