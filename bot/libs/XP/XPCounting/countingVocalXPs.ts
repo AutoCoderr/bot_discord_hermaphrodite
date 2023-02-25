@@ -1,36 +1,25 @@
 import {GuildChannel, GuildMember, VoiceBasedChannel, VoiceState} from "discord.js";
-import {spawn} from "node:child_process";
 import {IXPData} from "../../../Models/XP/XPData";
 import {XPCanBeCount} from "./countingOtherFunctions";
+import { abortProcess, createProcess } from "../../subProcessManager";
 
-const subProcessVoiceCounterByMemberId: {[id: string]: AbortController|NodeJS.Timeout} = {};
-const mutedMembersById: {[id: string]: boolean} = {};
+const voiceCounterProcessTag = "XPVoice";
 
 function abortMemberSubProcessVoiceCounter(member: GuildMember) {
-    if (subProcessVoiceCounterByMemberId[member.id] instanceof AbortController) {
-        (<AbortController>subProcessVoiceCounterByMemberId[member.id]).abort();
-    } else if (subProcessVoiceCounterByMemberId[member.id]) {
-        clearTimeout(<NodeJS.Timeout>subProcessVoiceCounterByMemberId[member.id]);
-    }
-    if (subProcessVoiceCounterByMemberId[member.id] !== undefined)
-        delete subProcessVoiceCounterByMemberId[member.id];
+    abortProcess(voiceCounterProcessTag, member);
 }
 
 function createMemberSubProcessVoiceCounter(member: GuildMember) {
-    if (subProcessVoiceCounterByMemberId[member.id] === undefined) {
-        subProcessVoiceCounterByMemberId[member.id] = setTimeout(() => {
-            const controller = new AbortController();
-            const {signal} = controller;
-            const process = spawn("node", [
-                "/bot/scripts/XP/XPVoiceCounter.js",
-                member.guild.id,
-                member.id
-            ], {signal});
-            process.on("error", () => {})
-            subProcessVoiceCounterByMemberId[member.id] = controller;
-        }, 10_000)
-    }
+    createProcess(
+        "/bot/scripts/XP/XPVoiceCounter.js", 
+        voiceCounterProcessTag, 
+        member, 
+        [member.guild.id, member.id], 
+        10_000
+    )
 }
+
+const mutedMembersById: {[id: string]: boolean} = {};
 
 type ICountAndGetUnMutedMembers = {nbUnMutedMembers: number, lastUnMutedMember: null|GuildMember};
 
