@@ -11,11 +11,11 @@ export interface IMessagesStats extends IModel {
     nbMessages: number;
 }
 
-const VocalStatsSchema: Schema = new Schema({
+const MessagesStatsSchema: Schema = new Schema({
     serverId: { type: String, required: true },
     date: { type: Date, required: true },
     nbMessages: { type: Number, required: false, default: 0 }
 });
 
 // @ts-ignore
-export default db.model<IVocalStats>('VocalStats', VocalStatsSchema);
+export default db.model<IMessagesStats>('MessagesStats', MessagesStatsSchema);

@@ -17,7 +17,7 @@ import countingMessagesXPs from "./libs/XP/XPCounting/countingMessagesXPs";
 import countingFirstMessagesXPs from "./libs/XP/XPCounting/countingFirstMessagesXPs";
 import {findAndExecCallbackButton} from "./libs/callbackButtons";
 import { findAndExecCallbackModal } from "./libs/callbackModals";
-import { countingStatsVoiceConnections } from "./libs/StatsCounters";
+import { countingStatsMessages, countingStatsVoiceConnections } from "./libs/StatsCounters";
 
 export default function init(bot) {
     client.on('ready', () => {
@@ -120,6 +120,8 @@ export default function init(bot) {
                 try {
                     await Promise.all([
                         listenCustomCommands(message),
+
+                        countingStatsMessages(message),
                         //@ts-ignore
                         existingCommands.ConfigWelcome.listenJoinsToWelcome(message),
                         //@ts-ignore
