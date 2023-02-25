@@ -2,6 +2,7 @@ import { Message, VoiceState } from "discord.js";
 import StatsConfig, { IStatsConfig } from "../Models/Stats/StatsConfig";
 import VocalStats, { IVocalStats } from "../Models/Stats/VocalStats";
 import MessagesStats, { IMessagesStats } from "../Models/Stats/MessagesStats";
+import { abortProcess, createProcess } from "./subProcessManager";
 
 const precisions = {
     year: (date: Date) => {
@@ -30,7 +31,7 @@ export function statsPrecisionExists(precision: string) {
 
 export type IStatsPrecisionUnits = keyof typeof precisions;
 
-function getDateWithPrecision(date: Date = new Date, precision: keyof typeof precisions = 'hour') {
+export function getDateWithPrecision(date: Date = new Date, precision: keyof typeof precisions = 'hour') {
     return precisions[precision](date);
 }
 
@@ -65,15 +66,31 @@ export async function countingStatsMessages(message: Message) {
     await messageStats.save();
 }
 
-export async function countingStatsVoiceConnections(oldVoiceState: VoiceState, newVoiceState: VoiceState) {
-    if (newVoiceState.channelId === null || newVoiceState.channelId === oldVoiceState.channelId)
-        return;
-
+export async function countingStatsVoiceConnectionsAndMinutes(oldVoiceState: VoiceState, newVoiceState: VoiceState) {
     const statsConfig: null|IStatsConfig = await StatsConfig.findOne({
         serverId: newVoiceState.guild.id,
         listenVocal: true
     })
     if (statsConfig === null)
+        return;
+
+    countingStatsVoicesMinutes(oldVoiceState, newVoiceState);
+    countingStatsVoiceConnections(oldVoiceState, newVoiceState);
+}
+
+function countingStatsVoicesMinutes(oldVoiceState: VoiceState, newVoiceState: VoiceState) {
+    if (newVoiceState.member === null)
+        return;
+    if (oldVoiceState.channelId !== null && (newVoiceState.channelId === null || oldVoiceState.guild.id !== newVoiceState.guild.id)) {
+        abortProcess("voiceMinutesCounter", newVoiceState.member);
+    }
+    if (newVoiceState.channelId !== null && (oldVoiceState.channelId === null || oldVoiceState.guild.id !== newVoiceState.guild.id)) {
+        createProcess("/bot/scripts/statsVocalMinutesCounter.js", "voiceMinutesCounter", newVoiceState.member, [newVoiceState.guild.id]);
+    }
+}
+
+async function countingStatsVoiceConnections(oldVoiceState: VoiceState, newVoiceState: VoiceState) {
+    if (newVoiceState.channelId === null || newVoiceState.channelId === oldVoiceState.channelId)
         return;
 
     const date = getDateWithPrecision();
