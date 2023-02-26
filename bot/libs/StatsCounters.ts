@@ -85,7 +85,7 @@ function countingStatsVoicesMinutes(oldVoiceState: VoiceState, newVoiceState: Vo
         abortProcess("voiceMinutesCounter", newVoiceState.member);
     }
     if (newVoiceState.channelId !== null && (oldVoiceState.channelId === null || oldVoiceState.guild.id !== newVoiceState.guild.id)) {
-        createProcess("/bot/scripts/statsVocalMinutesCounter.js", "voiceMinutesCounter", newVoiceState.member, [newVoiceState.guild.id]);
+        createProcess("/bot/scripts/statsVocalMinutesCounter.js", "voiceMinutesCounter", newVoiceState.member, [newVoiceState.guild.id], 10_000);
     }
 }
 

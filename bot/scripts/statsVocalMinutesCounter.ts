@@ -1,9 +1,7 @@
 import VocalStats, { IVocalStats } from "../Models/Stats/VocalStats";
 import { getDateWithPrecision } from "../libs/StatsCounters";
 
-const [serverId] = process.argv.slice(2);
-    
-setInterval(async () => {
+async function addMinute(serverId: string) {
     const date = getDateWithPrecision();
     const vocalStats: null|IVocalStats = await VocalStats.findOne({
         serverId,
@@ -19,4 +17,12 @@ setInterval(async () => {
     }
     vocalStats.nbMinutes += 1;
     await vocalStats.save()
-}, 60*1000)
+}
+
+setTimeout(() => {
+    const [serverId] = process.argv.slice(2);
+
+    addMinute(serverId);
+
+    setInterval(() => addMinute(serverId), 60*1000)
+}, 50*1000)
