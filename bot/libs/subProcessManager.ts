@@ -1,63 +1,86 @@
-import { GuildMember } from "discord.js";
-import {spawn} from "node:child_process";
+import {ChildProcess, fork} from "node:child_process";
+
+type IForkProcess = {type: 'fork', abortController: AbortController, child: ChildProcess};
+type ITimeoutProcess = {type: 'timeout', timeout: NodeJS.Timeout}
+type IProcess = ITimeoutProcess|IForkProcess;
 
 const subProcessByTagAndMemberId: {
-    [tag: string]: AbortController|NodeJS.Timeout|{[id: string] : AbortController|NodeJS.Timeout}
+    [tag: string]: IProcess|{[id: string] : IProcess}
 } = {};
 
-export function abortProcess(tag: string, member: null|GuildMember = null) {
-    const process = getProcess(tag, member);
+export function abortProcess(tag: string, key: null|string = null): boolean {
+    const process = getProcess(tag, key);
     if (process === undefined)
-        return;
-    if (process instanceof AbortController) {
-        (<AbortController>process).abort();
+        return false;
+    if (process.type === "fork") {
+        process.abortController.abort()
     } else {
-        clearTimeout(<NodeJS.Timeout>process);
+        clearTimeout(process.timeout);
     }
-    if (member !== null) {
-        delete subProcessByTagAndMemberId[tag][member.id];
+    return true;
+}
+
+function deleteProcessRef(tag: string, key: null|string) {
+    if (key !== null) {
+        delete subProcessByTagAndMemberId[tag][key];
     } else {
         delete subProcessByTagAndMemberId[tag];
     }
 }
 
-export function createProcess(file: string, tag: string, member: null|GuildMember = null, params: any[] = [], timeout: null|number = null) {
-    if (getProcess(tag,member) === undefined) {
+export function contactProcess(data: any, tag: string, key: null|string = null): boolean {
+    const process = getProcess(tag, key);
+    if (process === undefined || process.type === "timeout")
+        return false;
+    
+    return process.child.send(data);
+}
+
+export function createProcess(file: string, tag: string, key: null|string = null, params: any[] = [], timeout: null|number = null): boolean {
+    if (getProcess(tag,key) === undefined) {
         setProcess(
             tag,
-            member,
+            key,
             timeout === null ?
-                createProcessObject(file, params) :
-                setTimeout(() => {
-                    setProcess(tag,member,createProcessObject(file,params))
-                }, timeout)
+                createForkProcess(tag, key, file, params) :
+                {
+                    type: "timeout", timeout: setTimeout(() => {
+                        setProcess(tag,key,createForkProcess(tag,key,file,params))
+                    }, timeout)
+                }
         )
+        return true;
     }
+    return false;
 }
 
-function createProcessObject(file: string, params: any[] = []) {
-    const controller = new AbortController();
-    const {signal} = controller;
-    const process = spawn("node", [
-        file, ...params
-    ], {signal});
-    process.on("error", () => {})
-    return controller;
+function createForkProcess(tag: string, key: null|string, file: string, params: any[] = []): IForkProcess {
+    const abortController = new AbortController();
+    const {signal} = abortController;
+    const child = fork(file, params, {signal});
+    child.on("error", () => {});
+    child.on('exit', () => {
+        deleteProcessRef(tag, key)
+    });
+    child.on('close', () => {
+        deleteProcessRef(tag, key)
+    });
+    return {type: 'fork', abortController, child};
 }
 
-function setProcess(tag: string, member: null|GuildMember, process: AbortController|NodeJS.Timeout) {
-    if (member === null) {
+function setProcess(tag: string, key: null|string, process: IProcess) {
+    if (key === null) {
         subProcessByTagAndMemberId[tag] = process;
         return;
     }
     if (subProcessByTagAndMemberId[tag] === undefined) {
         subProcessByTagAndMemberId[tag] = {}
     }
-    subProcessByTagAndMemberId[tag][member.id] = process
+    subProcessByTagAndMemberId[tag][key] = process
 }
 
-function getProcess(tag: string, member: null|GuildMember) {
-    return (subProcessByTagAndMemberId[tag] && member !== null) ?
-                subProcessByTagAndMemberId[tag][member.id] :
+function getProcess(tag: string, key: null|string): undefined|IProcess {
+    return (subProcessByTagAndMemberId[tag] && key !== null) ?
+                subProcessByTagAndMemberId[tag][key] :
                 subProcessByTagAndMemberId[tag]
 }

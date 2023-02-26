@@ -6,14 +6,14 @@ import { abortProcess, createProcess } from "../../subProcessManager";
 const voiceCounterProcessTag = "XPVoice";
 
 function abortMemberSubProcessVoiceCounter(member: GuildMember) {
-    abortProcess(voiceCounterProcessTag, member);
+    abortProcess(voiceCounterProcessTag, member.id);
 }
 
 function createMemberSubProcessVoiceCounter(member: GuildMember) {
     createProcess(
         "/bot/scripts/XP/XPVoiceCounter.js", 
         voiceCounterProcessTag, 
-        member, 
+        member.id, 
         [member.guild.id, member.id], 
         10_000
     )

@@ -1,8 +1,8 @@
-import { Message, VoiceState } from "discord.js";
+import { GuildMember, Message, VoiceState } from "discord.js";
 import StatsConfig, { IStatsConfig } from "../Models/Stats/StatsConfig";
 import VocalStats, { IVocalStats } from "../Models/Stats/VocalStats";
 import MessagesStats, { IMessagesStats } from "../Models/Stats/MessagesStats";
-import { abortProcess, createProcess } from "./subProcessManager";
+import { abortProcess, contactProcess, createProcess } from "./subProcessManager";
 
 const precisions = {
     year: (date: Date) => {
@@ -82,10 +82,10 @@ function countingStatsVoicesMinutes(oldVoiceState: VoiceState, newVoiceState: Vo
     if (newVoiceState.member === null)
         return;
     if (oldVoiceState.channelId !== null && (newVoiceState.channelId === null || oldVoiceState.guild.id !== newVoiceState.guild.id)) {
-        abortProcess("voiceMinutesCounter", newVoiceState.member);
+        abortProcess("voiceMinutesCounter", newVoiceState.member.id);
     }
     if (newVoiceState.channelId !== null && (oldVoiceState.channelId === null || oldVoiceState.guild.id !== newVoiceState.guild.id)) {
-        createProcess("/bot/scripts/statsVocalMinutesCounter.js", "voiceMinutesCounter", newVoiceState.member, [newVoiceState.guild.id], 10_000);
+        createProcess("/bot/scripts/statsVocalMinutesCounter.js", "voiceMinutesCounter", newVoiceState.member.id, [newVoiceState.guild.id], 10_000);
     }
 }
 
