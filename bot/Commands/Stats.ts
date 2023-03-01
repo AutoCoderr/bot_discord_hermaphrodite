@@ -3,6 +3,7 @@ import Command from "../Classes/Command"
 import { IStatsPrecisionUnits, statsPrecisionExists } from "../libs/StatsCounters";
 import { IArgsModel, responseResultsType, responseType } from "../interfaces/CommandInterfaces";
 import StatsConfig, { IStatsConfig } from "../Models/Stats/StatsConfig";
+import { abortProcess } from "../libs/subProcessManager";
 
 interface IStatsArgs {
     action: 'messages'|'vocal';
@@ -116,6 +117,10 @@ export default class Stats extends Command<IStatsArgs> {
             } else {
                 statsConfig[enabledCol] = subAction === "enable";
                 await statsConfig.save()
+            }
+
+            if (subAction === "disable") {
+                abortProcess(action === "vocal" ? "vocalStats" : "messageStats", (<Guild>this.guild).id)
             }
 
             return this.response(true, {

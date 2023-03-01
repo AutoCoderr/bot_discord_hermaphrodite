@@ -1,14 +1,14 @@
-import VocalStats, { IVocalStats } from "../Models/Stats/VocalStats";
+import VocalMinutesStats, { IVocalMinutesStats } from "../Models/Stats/VocalMinutesStats";
 import { getDateWithPrecision } from "../libs/StatsCounters";
 
 async function addMinute(serverId: string) {
     const date = getDateWithPrecision();
-    const vocalStats: null|IVocalStats = await VocalStats.findOne({
+    const vocalStats: null|IVocalMinutesStats = await VocalMinutesStats.findOne({
         serverId,
         date,
     });
     if (vocalStats == null) {
-        await VocalStats.create({
+        await VocalMinutesStats.create({
             serverId,
             date,
             nbMinutes: 1

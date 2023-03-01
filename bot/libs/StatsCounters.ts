@@ -1,6 +1,7 @@
-import { GuildMember, Message, VoiceState } from "discord.js";
+import { Message, VoiceState } from "discord.js";
 import StatsConfig, { IStatsConfig } from "../Models/Stats/StatsConfig";
-import VocalStats, { IVocalStats } from "../Models/Stats/VocalStats";
+import VocalConnectionsStats, { IVocalConnectionsStats } from "../Models/Stats/VocalConnectionsStats";
+import VocalMinutesStats, { IVocalMinutesStats } from "../Models/Stats/VocalMinutesStats";
 import MessagesStats, { IMessagesStats } from "../Models/Stats/MessagesStats";
 import { abortProcess, contactProcess, createProcess } from "./subProcessManager";
 
@@ -35,7 +36,34 @@ export function getDateWithPrecision(date: Date = new Date, precision: keyof typ
     return precisions[precision](date);
 }
 
-export async function countingStatsMessages(message: Message) {
+export async function countingStats(type: 'vocalMinutes'|'vocalConnections'|'messages', serverId: string) {
+    const date = getDateWithPrecision();
+
+    const [model,colToIncrement] = {
+        vocalMinutes: [VocalMinutesStats,'nbMinutes'],
+        vocalConnections: [VocalConnectionsStats, 'nbVocalConnections'],
+        messages: [MessagesStats, 'nbMessages']
+    }[type]
+
+    const statsObj: null|IMessagesStats|IVocalConnectionsStats|IVocalMinutesStats = await model.findOne({
+        serverId,
+        date
+    });
+
+    if (statsObj === null) {
+        await model.create({
+            serverId,
+            date,
+            [colToIncrement]: 1
+        });
+        return;
+    }
+
+    statsObj[colToIncrement] += 1;
+    await statsObj.save();
+}
+
+export async function countingStatsMessagesEvent(message: Message) {
     if (message.guild === null)
         return;
 
@@ -46,27 +74,11 @@ export async function countingStatsMessages(message: Message) {
     if (statsConfig === null)
         return;
 
-    const date = getDateWithPrecision();
-
-    const messageStats: null|IMessagesStats = await MessagesStats.findOne({
-        serverId: message.guild.id,
-        date
-    });
-
-    if (messageStats === null) {
-        await MessagesStats.create({
-            serverId: message.guild.id,
-            date,
-            nbMessages: 1
-        });
-        return;
-    }
-
-    messageStats.nbMessages += 1;
-    await messageStats.save();
+    createProcess("/bot/scripts/queues/stats/messageCounter.js", "messageStats", message.guild.id);
+    contactProcess(message.guild.id, "messageStats", message.guild.id);
 }
 
-export async function countingStatsVoiceConnectionsAndMinutes(oldVoiceState: VoiceState, newVoiceState: VoiceState) {
+export async function countingStatsVoiceConnectionsAndMinutesEvent(oldVoiceState: VoiceState, newVoiceState: VoiceState) {
     const statsConfig: null|IStatsConfig = await StatsConfig.findOne({
         serverId: newVoiceState.guild.id,
         listenVocal: true
@@ -74,8 +86,13 @@ export async function countingStatsVoiceConnectionsAndMinutes(oldVoiceState: Voi
     if (statsConfig === null)
         return;
 
-    countingStatsVoicesMinutes(oldVoiceState, newVoiceState);
-    countingStatsVoiceConnections(oldVoiceState, newVoiceState);
+    //countingStatsVoicesMinutes(oldVoiceState, newVoiceState);
+
+    if (newVoiceState.channelId !== null && newVoiceState.channelId !== oldVoiceState.channelId) {
+        createProcess("/bot/scripts/queues/stats/vocalCounter.js", "vocalStats", newVoiceState.guild.id);
+        contactProcess({type: "vocalConnections", serverId: newVoiceState.guild.id}, "vocalStats", newVoiceState.guild.id)
+    }
+    //countingStatsVoiceConnections(oldVoiceState, newVoiceState);
 }
 
 function countingStatsVoicesMinutes(oldVoiceState: VoiceState, newVoiceState: VoiceState) {
@@ -87,28 +104,4 @@ function countingStatsVoicesMinutes(oldVoiceState: VoiceState, newVoiceState: Vo
     if (newVoiceState.channelId !== null && (oldVoiceState.channelId === null || oldVoiceState.guild.id !== newVoiceState.guild.id)) {
         createProcess("/bot/scripts/statsVocalMinutesCounter.js", "voiceMinutesCounter", newVoiceState.member.id, [newVoiceState.guild.id], 10_000);
     }
-}
-
-async function countingStatsVoiceConnections(oldVoiceState: VoiceState, newVoiceState: VoiceState) {
-    if (newVoiceState.channelId === null || newVoiceState.channelId === oldVoiceState.channelId)
-        return;
-
-    const date = getDateWithPrecision();
-
-    const vocalStats: null|IVocalStats = await VocalStats.findOne({
-        serverId: newVoiceState.guild.id,
-        date
-    })
-
-    if (vocalStats === null) {
-        await VocalStats.create({
-            serverId: newVoiceState.guild.id,
-            date,
-            nbVocalConnections: 1
-        });
-        return;
-    }
-
-    vocalStats.nbVocalConnections += 1;
-    await vocalStats.save();
 }
