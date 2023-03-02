@@ -1,22 +1,7 @@
-import VocalMinutesStats, { IVocalMinutesStats } from "../Models/Stats/VocalMinutesStats";
-import { getDateWithPrecision } from "../libs/StatsCounters";
-
 async function addMinute(serverId: string) {
-    const date = getDateWithPrecision();
-    const vocalStats: null|IVocalMinutesStats = await VocalMinutesStats.findOne({
-        serverId,
-        date,
-    });
-    if (vocalStats == null) {
-        await VocalMinutesStats.create({
-            serverId,
-            date,
-            nbMinutes: 1
-        })
+    if (process.send === undefined)
         return;
-    }
-    vocalStats.nbMinutes += 1;
-    await vocalStats.save()
+    process.send({tag: "vocalStats", key: serverId, data: {type: "vocalMinutes", serverId}})
 }
 
 setTimeout(() => {

@@ -65,6 +65,12 @@ function createForkProcess(tag: string, key: null|string, file: string, params: 
     child.on('close', () => {
         deleteProcessRef(tag, key)
     });
+    child.on('message', (message: any) => {
+        if (message.tag === undefined || message.data === undefined)
+            return;
+        
+        contactProcess(message.data, message.tag, message.key??null)
+    })
     return {type: 'fork', abortController, child};
 }
 

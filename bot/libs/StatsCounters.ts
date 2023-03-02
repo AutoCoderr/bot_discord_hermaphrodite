@@ -86,13 +86,14 @@ export async function countingStatsVoiceConnectionsAndMinutesEvent(oldVoiceState
     if (statsConfig === null)
         return;
 
-    //countingStatsVoicesMinutes(oldVoiceState, newVoiceState);
+    countingStatsVoicesMinutes(oldVoiceState, newVoiceState);
 
-    if (newVoiceState.channelId !== null && newVoiceState.channelId !== oldVoiceState.channelId) {
-        createProcess("/bot/scripts/queues/stats/vocalCounter.js", "vocalStats", newVoiceState.guild.id);
-        contactProcess({type: "vocalConnections", serverId: newVoiceState.guild.id}, "vocalStats", newVoiceState.guild.id)
-    }
-    //countingStatsVoiceConnections(oldVoiceState, newVoiceState);
+    if (newVoiceState.channelId === null || newVoiceState.channelId === oldVoiceState.channelId)
+        return;
+
+    createProcess("/bot/scripts/queues/stats/vocalCounter.js", "vocalStats", newVoiceState.guild.id);
+    contactProcess({type: "vocalConnections", serverId: newVoiceState.guild.id}, "vocalStats", newVoiceState.guild.id)
+    
 }
 
 function countingStatsVoicesMinutes(oldVoiceState: VoiceState, newVoiceState: VoiceState) {
