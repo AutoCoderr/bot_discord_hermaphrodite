@@ -1,10 +1,9 @@
 import { CommandInteraction, EmbedBuilder, Guild, Message } from "discord.js";
-import Command from "../Classes/Command"
-import { IStatsPrecisionUnits, statsPrecisionExists } from "../libs/StatsCounters";
+import Command from "../Classes/Command";
 import { IArgsModel } from "../interfaces/CommandInterfaces";
 import StatsConfig, { defaultStatsExpiration, IStatsConfig, maxStatsExpiration, minStatsExpiration } from "../Models/Stats/StatsConfig";
 import { abortProcess } from "../libs/subProcessManager";
-import clearExpiredDatas from "../libs/stats/clearExpiredDatas";
+import {IStatsPrecisionUnits, statsPrecisionExists, clearExpiredDatas} from "../libs/stats/statsCounters";
 
 interface IStatsArgs {
     action: 'messages'|'vocal';

@@ -7,7 +7,7 @@ import { IVocalConfig, defaultDelay } from "../Models/Vocal/VocalConfig";
 import { extractUTCTime, showTime } from "../Classes/DateTimeManager";
 import Command from "../Classes/Command";
 import StatsConfig, { IStatsConfig } from "../Models/Stats/StatsConfig";
-import { IStatsPrecisionUnits, statsPrecisionExists } from "../libs/StatsCounters";
+import { IStatsPrecisionUnits, statsPrecisionExists } from "../libs/stats/statsCounters";
 
 type IConfigVocalArgs = Omit<IConfigTextAndVocalArgs, 'action'> & {
     action: IConfigTextAndVocalArgs['action'] | 'delay';

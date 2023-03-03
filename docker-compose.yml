@@ -43,6 +43,7 @@ services:
       - "27017:27017"
     networks:
       - bdd
+      - exterior
 
 networks:
   bdd:

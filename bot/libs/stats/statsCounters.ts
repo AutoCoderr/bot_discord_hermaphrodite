@@ -1,10 +1,9 @@
 import { Message, VoiceState } from "discord.js";
-import StatsConfig, { IStatsConfig } from "../../Models/Stats/StatsConfig";
+import StatsConfig, { defaultStatsExpiration, IStatsConfig } from "../../Models/Stats/StatsConfig";
 import VocalConnectionsStats, { IVocalConnectionsStats } from "../../Models/Stats/VocalConnectionsStats";
 import VocalMinutesStats, { IVocalMinutesStats } from "../../Models/Stats/VocalMinutesStats";
 import MessagesStats, { IMessagesStats } from "../../Models/Stats/MessagesStats";
-import { abortProcess, contactProcess, createProcess } from "./../subProcessManager";
-
+import { abortProcess, contactProcess, createProcess } from "../subProcessManager";
 const precisions = {
     year: (date: Date) => {
         date.setMonth(0);
@@ -51,11 +50,14 @@ export async function countingStats(type: 'vocalMinutes'|'vocalConnections'|'mes
     });
 
     if (statsObj === null) {
-        await model.create({
-            serverId,
-            date,
-            [colToIncrement]: 1
-        });
+        await Promise.all([
+            model.create({
+                serverId,
+                date,
+                [colToIncrement]: 1
+            }),
+            clearExpiredDatas(type, serverId)
+        ])
         return;
     }
 
@@ -105,4 +107,23 @@ function countingStatsVoicesMinutes(oldVoiceState: VoiceState, newVoiceState: Vo
     if (newVoiceState.channelId !== null && (oldVoiceState.channelId === null || oldVoiceState.guild.id !== newVoiceState.guild.id)) {
         createProcess("/bot/scripts/statsVocalMinutesCounter.js", "voiceMinutesCounter", newVoiceState.member.id, [newVoiceState.guild.id], 10_000);
     }
+}
+
+export async function clearExpiredDatas(type: 'vocalMinutes'|'vocalConnections'|'messages', serverId: string) {
+    const model = {
+        vocalMinutes: VocalMinutesStats,
+        vocalConnections: VocalConnectionsStats,
+        messages: MessagesStats
+    }[type];
+
+    const statsConfig = await StatsConfig.findOne({
+        serverId,
+    })
+
+    const nbDays = statsConfig[type === "messages" ? "messagesExpiration" : "vocalExpiration"] ?? defaultStatsExpiration;
+
+    return model.deleteMany({
+        serverId,
+        date: {$lt: new Date(new Date().getTime() - nbDays * 24 * 60 * 60 * 1000)}
+    })
 }
