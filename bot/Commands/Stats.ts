@@ -1,8 +1,8 @@
-import { CommandInteraction, EmbedBuilder, Guild, Message, ModalBuilder } from "discord.js";
+import { CommandInteraction, EmbedBuilder, Guild, Message } from "discord.js";
 import Command from "../Classes/Command"
 import { IStatsPrecisionUnits, statsPrecisionExists } from "../libs/StatsCounters";
-import { IArgsModel, responseResultsType, responseType } from "../interfaces/CommandInterfaces";
-import StatsConfig, { IStatsConfig } from "../Models/Stats/StatsConfig";
+import { IArgsModel } from "../interfaces/CommandInterfaces";
+import StatsConfig, { defaultStatsExpiration, IStatsConfig, maxStatsExpiration, minStatsExpiration } from "../Models/Stats/StatsConfig";
 import { abortProcess } from "../libs/subProcessManager";
 
 interface IStatsArgs {
@@ -75,7 +75,12 @@ export default class Stats extends Command<IStatsArgs> {
                 referToSubCommands: ["messages.expiration", "vocal.expiration"],
                 required: false,
                 description: "Combiens de jours d'expiration ?",
-                type: "integer"
+                type: "integer",
+                valid: (value) => value >= minStatsExpiration && value <= maxStatsExpiration,
+                errorMessage: () => ({
+                    name: "Nombre de jours invalide",
+                    value: "Le nombre de jours d'expiration doit être compris entre "+minStatsExpiration+" et "+maxStatsExpiration+" inclus"
+                })
             }
         }
     }
@@ -85,7 +90,7 @@ export default class Stats extends Command<IStatsArgs> {
     }
 
     async action(args: IStatsArgs) {
-        const {action, subAction} = args
+        const {action, subAction, nbDays} = args
 
         const statsConfig: null|IStatsConfig = await StatsConfig.findOne({
             serverId: (<Guild>this.guild).id
@@ -129,6 +134,42 @@ export default class Stats extends Command<IStatsArgs> {
                         name: "Statistique "+word+" "+(subAction === "enable" ? "activées" : "désactivées"),
                         value: "Les statistique "+word+" ont été "+(subAction === "enable" ? "activées" : "désactivées")
                     })
+                ]
+            })
+        }
+
+        if (subAction === "expiration") {
+            const col = action === "messages" ? "messagesExpiration" : "vocalExpiration";
+
+            if (nbDays === undefined) {
+                return this.response(true, {
+                    embeds: [
+                        new EmbedBuilder()
+                            .addFields({
+                                name: "Expiration des statistiques "+(action === "vocal" ? "vocales" : "textuelles"),
+                                value: "Il y a "+(statsConfig ? statsConfig[col] : defaultStatsExpiration)+" jours d'expiration concernant les statistiques "+(action === "vocal" ? "vocales" : "textuelles")
+                            })
+                    ]
+                })
+            }
+
+            if (statsConfig === null) {
+                await StatsConfig.create({
+                    serverId: (<Guild>this.guild).id,
+                    [col] : nbDays
+                })
+            } else {
+                statsConfig[col] = nbDays;
+                await statsConfig.save();
+            }
+
+            return this.response(true, {
+                embeds: [
+                    new EmbedBuilder()
+                        .addFields({
+                            name: "Expiration des statistiques "+(action === "vocal" ? "vocales" : "textuelles")+" définit à "+nbDays+" jours",
+                            value: "L'expiration des statistiques "+(action === "vocal" ? "vocales" : "textuelles")+" a été définit à "+nbDays+" jours"
+                        })
                 ]
             })
         }

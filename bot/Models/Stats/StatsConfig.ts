@@ -5,6 +5,10 @@ import IModel from '../../interfaces/IModel';
 
 const db = connect();
 
+export const defaultStatsExpiration = 90;
+export const minStatsExpiration = 30;
+export const maxStatsExpiration = 180;
+
 export interface IStatsConfig extends IModel {
     serverId: string;
 
@@ -19,10 +23,10 @@ const StatsConfigSchema: Schema = new Schema({
     serverId: { type: String, required: true },
 
     listenVocal: { type: Boolean, required: false, default: false },
-    vocalExpiration: { type: Number, required: false, default: 90 },
+    vocalExpiration: { type: Number, required: false, default: defaultStatsExpiration },
 
     listenMessages: { type: Boolean, required: false, default: false },
-    messagesExpiration: { type: Number, required: false, default: 90 },
+    messagesExpiration: { type: Number, required: false, default: defaultStatsExpiration },
 });
 
 // @ts-ignore
