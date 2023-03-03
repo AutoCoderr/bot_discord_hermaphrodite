@@ -1,9 +1,9 @@
 import { Message, VoiceState } from "discord.js";
-import StatsConfig, { IStatsConfig } from "../Models/Stats/StatsConfig";
-import VocalConnectionsStats, { IVocalConnectionsStats } from "../Models/Stats/VocalConnectionsStats";
-import VocalMinutesStats, { IVocalMinutesStats } from "../Models/Stats/VocalMinutesStats";
-import MessagesStats, { IMessagesStats } from "../Models/Stats/MessagesStats";
-import { abortProcess, contactProcess, createProcess } from "./subProcessManager";
+import StatsConfig, { IStatsConfig } from "../../Models/Stats/StatsConfig";
+import VocalConnectionsStats, { IVocalConnectionsStats } from "../../Models/Stats/VocalConnectionsStats";
+import VocalMinutesStats, { IVocalMinutesStats } from "../../Models/Stats/VocalMinutesStats";
+import MessagesStats, { IMessagesStats } from "../../Models/Stats/MessagesStats";
+import { abortProcess, contactProcess, createProcess } from "./../subProcessManager";
 
 const precisions = {
     year: (date: Date) => {

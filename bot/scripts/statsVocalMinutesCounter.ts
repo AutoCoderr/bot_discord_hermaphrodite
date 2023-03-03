@@ -3,7 +3,6 @@ async function addMinute(serverId: string) {
         return;
     process.send({tag: "vocalStats", key: serverId, data: {type: "vocalMinutes", serverId}})
 }
-
 setTimeout(() => {
     const [serverId] = process.argv.slice(2);
 

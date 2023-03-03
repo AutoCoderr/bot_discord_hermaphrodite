@@ -4,6 +4,7 @@ import { IStatsPrecisionUnits, statsPrecisionExists } from "../libs/StatsCounter
 import { IArgsModel } from "../interfaces/CommandInterfaces";
 import StatsConfig, { defaultStatsExpiration, IStatsConfig, maxStatsExpiration, minStatsExpiration } from "../Models/Stats/StatsConfig";
 import { abortProcess } from "../libs/subProcessManager";
+import clearExpiredDatas from "../libs/stats/clearExpiredDatas";
 
 interface IStatsArgs {
     action: 'messages'|'vocal';
@@ -162,6 +163,14 @@ export default class Stats extends Command<IStatsArgs> {
                 statsConfig[col] = nbDays;
                 await statsConfig.save();
             }
+
+            if (action === "messages")
+                await clearExpiredDatas("messages", (<Guild>this.guild).id)
+            else
+                await Promise.all(
+                    ["vocalMinutes","vocalConnections"]
+                        .map(type => clearExpiredDatas(<'vocalMinutes'|'vocalConnections'>type, (<Guild>this.guild).id))
+                )
 
             return this.response(true, {
                 embeds: [
