@@ -1,16 +1,13 @@
-import { Message, VoiceState } from "discord.js";
+import { Guild, Message, VoiceState } from "discord.js";
 import StatsConfig, { defaultStatsExpiration, IStatsConfig } from "../../Models/Stats/StatsConfig";
 import VocalConnectionsStats, { IVocalConnectionsStats } from "../../Models/Stats/VocalConnectionsStats";
 import VocalMinutesStats, { IVocalMinutesStats } from "../../Models/Stats/VocalMinutesStats";
 import MessagesStats, { IMessagesStats } from "../../Models/Stats/MessagesStats";
 import { abortProcess, contactProcess, createProcess } from "../subProcessManager";
+import { addMissingZero, getDateGettersAndSettersFromUnit } from "../../Classes/OtherFunctions";
 const precisions = {
-    year: (date: Date) => {
-        date.setMonth(0);
-        return precisions.month(date);
-    },
     month: (date: Date) => {
-        date.setDate(0);
+        date.setDate(1);
         return precisions.day(date)
     },
     day: (date: Date) => {
@@ -25,6 +22,22 @@ const precisions = {
     }
 }
 
+const unitsTexts = {
+    hour: "Heure",
+    day: "Jour",
+    month: "Mois"
+}
+export function getStatsUnitText(unit: keyof typeof unitsTexts) {
+    return unitsTexts[unit]
+}
+export function getAllStatsUnitTexts() {
+    return unitsTexts;
+}
+
+export function getStatsUnitIndex(unit: keyof typeof precisions) {
+    return Object.keys(precisions).indexOf(unit);
+}
+
 export function statsPrecisionExists(precision: string) {
     return precisions[precision] !== undefined
 }
@@ -33,6 +46,72 @@ export type IStatsPrecisionUnits = keyof typeof precisions;
 
 export function getDateWithPrecision(date: Date = new Date, precision: keyof typeof precisions = 'hour') {
     return precisions[precision](date);
+}
+
+
+function getDateTag(date: Date, precision: keyof typeof precisions) {
+    let tag = "";
+    switch (precision) {
+        case 'hour':
+        case 'day':
+            tag = addMissingZero(date.getDate())+"/"
+        case 'month':
+            tag += addMissingZero(date.getMonth()+1)+"/"
+        default:
+            tag += date.getFullYear()
+    }
+
+    if (precision === "hour")
+        tag += " "+addMissingZero(date.getHours())+"h"
+    
+    return tag;
+}
+
+export async function exportStatsInCsv(guild: Guild, startDate: Date, type: 'messages'|'vocal', precision: keyof typeof precisions) {
+    const models = type === "messages" ?
+        [
+            [MessagesStats, 'nbMessages', "Nombre de messages"]
+        ] :
+        [
+            [VocalConnectionsStats, 'nbVocalConnections', "Nombre de connexions vocales"],
+            [VocalMinutesStats, 'nbMinutes', "Nombre de minutes en vocal"]
+        ];
+
+    const datas = await Promise.all(models.map(([model]) => model.find({
+        serverId: guild.id,
+        date: {$gte: startDate}
+    })))
+
+    const aggregatedStats = {};
+
+    for (let i=0;i<datas.length;i++) {
+        for (const data of datas[i]) {
+            const dateTag = getDateTag(data.date, precision);
+            if (aggregatedStats[dateTag] === undefined) {
+                aggregatedStats[dateTag] = {
+                    [models[i][1]]: data[models[i][1]]
+                }
+                continue;
+            }
+            aggregatedStats[dateTag][models[i][1]] = (aggregatedStats[dateTag][models[i][1]]??0)+data[models[i][1]]
+        }
+    }
+
+    let csv = "date;"+models.map(([_,__,labelCol]) => labelCol).join(";");
+    
+    const [getter,setter] = getDateGettersAndSettersFromUnit(precision);
+
+    const currentDate = new Date();
+    while (startDate.getTime() < currentDate.getTime()) {
+        const dateTag = getDateTag(startDate, precision);
+        const stat = aggregatedStats[dateTag];
+
+        csv += "\n"+dateTag+";"+models.map(([_,col]) => (stat && stat[col]) ? stat[col] : 0).join(";");
+
+        startDate[setter](startDate[getter]()+1)
+    }
+    
+    return csv;
 }
 
 export async function countingStats(

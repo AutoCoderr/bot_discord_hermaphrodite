@@ -1,9 +1,12 @@
-import { CommandInteraction, EmbedBuilder, Guild, Message } from "discord.js";
+import { CommandInteraction, EmbedBuilder, Guild, Interaction, Message, MessagePayload } from "discord.js";
 import Command from "../Classes/Command";
 import { IArgsModel } from "../interfaces/CommandInterfaces";
 import StatsConfig, { defaultStatsExpiration, IStatsConfig, maxStatsExpiration, minStatsExpiration } from "../Models/Stats/StatsConfig";
 import { abortProcess } from "../libs/subProcessManager";
-import {IStatsPrecisionUnits, statsPrecisionExists, clearExpiredDatas} from "../libs/stats/statsCounters";
+import {IStatsPrecisionUnits, statsPrecisionExists, clearExpiredDatas, getStatsUnitIndex, getAllStatsUnitTexts, getStatsUnitText, getDateWithPrecision, exportStatsInCsv} from "../libs/stats/statsCounters";
+import { getDateGettersAndSettersFromUnit } from "../Classes/OtherFunctions";
+import { showDate } from "../Classes/DateTimeManager";
+import { extractDate } from "../Classes/DateTimeManager";
 
 interface IStatsArgs {
     action: 'messages'|'vocal';
@@ -48,28 +51,28 @@ export default class Stats extends Command<IStatsArgs> {
                     expiration: (_, parentDescription) => "Définir l'expiration des"+parentDescription.split(" ").slice(1).join(" ")
                 }
             },
-            backTime: {
-                referToSubCommands: ["messages.export", "vocal.export"],
-                description: "Jusqu'à combien de temps en arrière récupérer les statistiques (ex: 3j, 2mon) ?",
-                type: "timeUnits",
-                valid: ({unit}) => statsPrecisionExists(unit),
-                errorMessage: () => ({
-                    name: "Donnée invalide",
-                    value: "Vous ne pouvez mentionner comme unité de temps que des heures (h), jours (j,d), mois (month,mon), ou années (a,y).\n"+
-                            "Contrairement aux durées, vous ne pouvez mentionner qu'une seule unité, comme 7j ou 2h, mais pas plusieurs à la fois, comme 7j2h"
-                }),
-            },
             precision: {
                 referToSubCommands: ["messages.export", "vocal.export"],
                 required: false,
                 description: "A quel niveau de précision voulez vous exporer les statistiques ?",
                 type: "string",
-                choices: {
-                    hour: "Heure",
-                    day: "Jour",
-                    month: "Mois",
-                    year: "Année"
-                }
+                choices: getAllStatsUnitTexts()
+            },
+            backTime: {
+                referToSubCommands: ["messages.export", "vocal.export"],
+                description: "Jusqu'à combien de temps en arrière récupérer les statistiques (ex: 6h, 3j, 2mon) ?",
+                type: "timeUnits",
+                valid: ({unit}, args) => statsPrecisionExists(unit) && getStatsUnitIndex(unit) <= getStatsUnitIndex(args.precision ?? "hour"),
+                errorMessage: ({unit},args) => ({
+                    name: "Donnée invalide",
+                    value: !statsPrecisionExists(unit) ? 
+                            
+                            "Vous ne pouvez mentionner comme unité de temps que des heures (h), jours (j,d), ou mois (month,mon).\n"+
+                            "Contrairement aux durées, vous ne pouvez mentionner qu'une seule unité, comme 7j ou 2h, mais pas plusieurs à la fois, comme 7j2h" :
+                            
+                            "L'unité de temps utilisée pour savoir combiens de temps en arrière récupérer les statistiques ("+getStatsUnitText(unit)+"),\n"+
+                            "ne peut pas être plus précise que le niveau de précision de l'export ("+getStatsUnitText(args.precision ?? "hour")+")"
+                }),
             },
             nbDays: {
                 referToSubCommands: ["messages.expiration", "vocal.expiration"],
@@ -182,8 +185,29 @@ export default class Stats extends Command<IStatsArgs> {
             })
         }
 
-        console.log(args);
+        // subAction is 'export'
 
-        return this.response(true, "COUCOU ICI !")
+        const precision = args.precision ?? "hour";
+        const {backTime} = args;
+
+        const dateWithPrecision = getDateWithPrecision(new Date(), precision);
+        
+        const [getter, setter] = getDateGettersAndSettersFromUnit(backTime.unit)
+
+        dateWithPrecision[setter](dateWithPrecision[getter]() - backTime.value);
+
+        const messagePayload = new MessagePayload(<Interaction|Message>(this.interaction??this.message), {
+            content: "Voici l'export en csv de toutes les stats "+(action === "vocal" ? "vocales" : "textuelles")+
+                     " depuis le "+showDate(extractDate(dateWithPrecision), 'fr')+" "+{
+                        hour: "à l'heure",
+                        day: 'à la journée',
+                        month: 'au mois'
+                     }[precision]+" près :"
+        });
+        messagePayload.files = [{
+            name: "stats.csv",
+            data: await exportStatsInCsv(<Guild>this.guild, dateWithPrecision, action, precision)
+        }]
+        return this.response(true, messagePayload)
     }
 }

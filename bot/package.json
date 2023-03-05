@@ -6,6 +6,7 @@
   "scripts": {
     "start": "tsc && node --trace-deprecation --trace-warnings bot.js",
     "clean_database": "node --trace-deprecation --trace-warnings scripts/cleanDatabase/cleanDatabase.js",
+    "generate_fake_stats": "node --trace-deprecation --trace-warnings scripts/generateFakeStats.js",
     "watch": "tsc -w",
     "build": "tsc"
   },
