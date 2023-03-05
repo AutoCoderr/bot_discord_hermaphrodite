@@ -35,7 +35,11 @@ export function getDateWithPrecision(date: Date = new Date, precision: keyof typ
     return precisions[precision](date);
 }
 
-export async function countingStats(type: 'vocalMinutes'|'vocalConnections'|'messages', serverId: string) {
+export async function countingStats(
+    type: 'vocalMinutes'|'vocalConnections'|'messages', 
+    serverId: string, 
+    statsObjState: null|IMessagesStats|IVocalConnectionsStats|IVocalMinutesStats
+) {
     const date = getDateWithPrecision();
 
     const [model,colToIncrement] = {
@@ -44,25 +48,26 @@ export async function countingStats(type: 'vocalMinutes'|'vocalConnections'|'mes
         messages: [MessagesStats, 'nbMessages']
     }[type]
 
-    const statsObj: null|IMessagesStats|IVocalConnectionsStats|IVocalMinutesStats = await model.findOne({
+    const statsObj: null|IMessagesStats|IVocalConnectionsStats|IVocalMinutesStats = statsObjState === null ? await model.findOne({
         serverId,
         date
-    });
+    }) : statsObjState
 
-    if (statsObj === null) {
-        await Promise.all([
+    if (statsObj === null || statsObj.date.getTime() !== date.getTime()) {
+        return Promise.all([
             model.create({
                 serverId,
                 date,
                 [colToIncrement]: 1
             }),
             clearExpiredDatas(type, serverId)
-        ])
-        return;
+        ]).then(([statsObj]) => statsObj)
     }
 
     statsObj[colToIncrement] += 1;
     await statsObj.save();
+
+    return statsObj;
 }
 
 export async function countingStatsMessagesEvent(message: Message) {
