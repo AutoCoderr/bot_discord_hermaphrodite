@@ -1,16 +1,34 @@
+import IReportedData from "../interfaces/IReportedDatas"
+import { ISetTimeoutOrInterval, returnProcessError, setTimeoutCatchProcess, setIntervalCatchProcess } from "../logging/catchers"
+import CustomError from "../logging/CustomError"
+
 interface IQueue<IMessageData, IState> {
     queue: IMessageData[],
     state: null|IState
 }
 
-type IQueueFunction<IMessageData,IState> = (message: IMessageData, state: null|IState) => IState|Promise<IState>
+type IQueueFunction<IMessageData,IState> = (message: IMessageData, state: null|IState, args: {setTimeout: ISetTimeoutOrInterval, setInterval: ISetTimeoutOrInterval}) => IState|Promise<IState>
 
 async function executeQueue<IMessageData = any, IState = any>(
     func: IQueueFunction<IMessageData, IState>,
     queueObj: IQueue<IMessageData, IState>
 ) {
     while (queueObj.queue.length > 0) {
-        queueObj.state = await func(queueObj.queue[0],queueObj.state)
+        const errorsData: IReportedData = {from: "queue", queueMessageData: queueObj.queue[0], queueMessageState: queueObj.state}
+        try {
+            queueObj.state = await func(
+                queueObj.queue[0],
+                queueObj.state,
+                {
+                    setTimeout: setTimeoutCatchProcess(errorsData),
+                    setInterval: setIntervalCatchProcess(errorsData)
+                }
+            )
+        } catch (e) {
+            if (process.send === undefined)
+                return;
+            process.send(returnProcessError(new CustomError(<Error>e, errorsData)));
+        }
         queueObj.queue.shift()
     }
 }

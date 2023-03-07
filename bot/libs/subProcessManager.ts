@@ -1,4 +1,6 @@
 import {ChildProcess, fork} from "node:child_process";
+import CustomError from "../logging/CustomError";
+import reportError from "../logging/reportError";
 
 type IForkProcess = {type: 'fork', abortController: AbortController, child: ChildProcess};
 type ITimeoutProcess = {type: 'timeout', timeout: NodeJS.Timeout}
@@ -54,6 +56,43 @@ export function createProcess(file: string, tag: string, key: null|string = null
     return false;
 }
 
+function catchProcessErrors(tag: string, key: null|string , message: any): boolean {
+    if (
+        message.error && 
+        typeof(message.error.message) === "string" &&
+
+        (
+            message.error.name === undefined || 
+            typeof(message.error.name) === "string"
+        ) &&
+
+        (
+            message.error.stack === undefined || 
+            typeof(message.error.stack) === "string"
+        ) &&
+
+        (
+            message.error.data === undefined ||
+            (
+                typeof(message.error.data) === "object" &&
+                message.error.data !== null &&
+                !(message.error.data instanceof Array)
+            )
+        )
+    ) {
+        reportError(new CustomError(
+            message.error.message, 
+            {
+                ...(message.error.data ?? {}),
+                processAddr: tag+(key ? "/"+key : "")
+            }, 
+            message.error.stack ?? null
+        ))
+        return true;
+    }
+    return false;
+}
+
 function createForkProcess(tag: string, key: null|string, file: string, params: any[] = []): IForkProcess {
     const abortController = new AbortController();
     const {signal} = abortController;
@@ -66,6 +105,9 @@ function createForkProcess(tag: string, key: null|string, file: string, params: 
         deleteProcessRef(tag, key)
     });
     child.on('message', (message: any) => {
+        if (catchProcessErrors(tag,key,message))
+            return;
+
         if (message.tag === undefined || message.data === undefined)
             return;
         
