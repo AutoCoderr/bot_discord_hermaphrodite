@@ -18,6 +18,7 @@ export function abortProcess(tag: string, key: null|string = null): boolean {
         process.abortController.abort()
     } else {
         clearTimeout(process.timeout);
+        deleteProcessRef(tag, key);
     }
     return true;
 }
