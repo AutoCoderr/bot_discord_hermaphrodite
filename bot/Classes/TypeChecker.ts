@@ -1,4 +1,4 @@
-import {durationUnits} from "./DateTimeManager";
+import {durationUnits, durationUnitsMult} from "./DateTimeManager";
 import {Attachment, User} from "discord.js";
 
 export const checkTypes = {
@@ -30,17 +30,28 @@ export const checkTypes = {
         if (!checkTypes.string(field) && !checkTypes.number(field)) return false;
         field = field.toString();
         const regex = "[0-9]+( )*("+
-            Object.values(durationUnits).reduce(
-                (acc,values,i) =>
-                    acc+(i > 0 ? '|' : '')+values.join('|')
-                , '')
-            +")";
+            Object.entries(durationUnits)
+            .filter(([key,_]) => durationUnitsMult[key] !== undefined)
+            .reduce((acc,[_,values],i) =>
+                acc+(i > 0 ? '|' : '')+values.join('|')
+            , '')
+        +")";
         return new RegExp("^(( )*("+regex+"( )*)+|0+)$").test(field);
+    },
+    timeUnits: (field) => {
+        if (!checkTypes.string(field)) return false;
+
+        const regex = "[0-9]+( )*("+
+            Object.entries(durationUnits)
+            .reduce((acc,[_,values],i) =>
+                acc+(i > 0 ? '|' : '')+values.join('|')
+            , '')
+        +")";
+        return new RegExp("^( )*("+regex+"( )*)$").test(field);
     }
 };
 
-const regex: any = {};
-
+const regex: {[key: string]: string} = {};
 regex.role = "\<@&[0-9]{18,}\>";
 regex.channel = "\<#(!)?[0-9]{18,}\>";
 regex.user = "\<@(!)?[0-9]{18,}\>";

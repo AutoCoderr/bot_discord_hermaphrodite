@@ -34,12 +34,20 @@ export default interface IReportedData {
         'listeningNotifyOnReact'|
         'listeningMonitoring'|
         'initTicketMessageListening'|
-        'XPVoiceCounter'|
         'tipsSetListener'|
         'welcomeMessageSetListener'|
         'callbackButton'|
         'callbackModal'|
-        'vocalNotifTimeout',
+        'vocalNotifTimeout'|
+        'queue'|
+        'processScript'|
+        'conScript',
+
+    processAddr?: string,
+    processParams?: string[],
+    queueMessageData?: any,
+    queueMessageState?: any,
+
     guild?: Guild,
     message?: Message,
     user?: User|GuildMember,
