@@ -159,9 +159,19 @@ export const extractTypes = {
         }
         return commands;
     },
+    timeUnits: (field: string, _: Command) => {
+        const [value, u] = [/[0-9]+/g, /[a-z]+/g].map(r => (<string[]>field.match(r))[0]);
+
+        return {
+            value: parseInt(value),
+            unit: Object.keys(durationUnits).find(unit => durationUnits[unit].includes(u))
+        }
+    },
     duration: (field,_: Command) => {
         if (field === 0 || (typeof(field) == "string" && parseInt(field) === 0)) return 0;
-        const unitByName = Object.entries(durationUnits).reduce((acc,[key,values]) => ({
+        const unitByName = Object.entries(durationUnits)
+            .filter(([key,_]) => durationUnitsMult[key] !== undefined)
+            .reduce((acc,[key,values]) => ({
                 ...acc,
                 ...values.reduce((acc, value) => ({
                     ...acc,

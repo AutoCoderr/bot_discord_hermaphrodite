@@ -310,6 +310,10 @@ export function round(n, p) {
     return Math.round(n * 10**p)/10**p
 }
 
+export function rand(a: number, b: number) {
+    return a+Math.floor(Math.random()*(b-a+1))
+}
+
 export async function getMP(user: User, messageId: string): Promise<null|Message> {
     const dmChannel = user.dmChannel ?? await user.createDM().catch(() => null);
     if (dmChannel === null)
@@ -326,4 +330,12 @@ export async function deleteMP(user: User, messageIdOrMessage: string|Message) {
         return;
 
     await message.delete().catch(() => null);
+}
+
+export function getDateGettersAndSettersFromUnit(unit: 'hour'|'day'|'month') {
+    return {
+        hour: ['getHours', 'setHours'],
+        day: ['getDate', 'setDate'],
+        month: ['getMonth', 'setMonth']
+    }[unit];
 }

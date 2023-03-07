@@ -17,18 +17,17 @@ import VocalConfig, {
     minimumDelay, 
     minimumLimit as vocalMinimumLimit, 
     defaultLimit as vocalDefaultLimit,
-    defaultDelay,
     maximumDelay
 } from "../Models/Vocal/VocalConfig";
 import Command from "../Classes/Command";
 import VocalSubscribe from "../Models/Vocal/VocalSubscribe";
 import TextSubscribe from "../Models/Text/TextSubscribe";
 import config from "../config";
-import {extractDurationTime, extractUTCTime, showTime} from "../Classes/DateTimeManager";
-import {IArgsModel} from "../interfaces/CommandInterfaces";
+import {extractDurationTime, showTime} from "../Classes/DateTimeManager";
+import {IArgModel, IArgsModel} from "../interfaces/CommandInterfaces";
 
-interface configTextAndVocalArgs {
-    action: 'blacklist'|'enable'|'disable'|'defaultlimit'|'delay',
+export interface IConfigTextAndVocalArgs {
+    action: 'blacklist'|'enable'|'disable'|'defaultlimit',
     subAction: 'add'|'remove'|'clear'|'show',
     blacklistType: string,
     users: GuildMember[],
@@ -37,7 +36,7 @@ interface configTextAndVocalArgs {
     duration?: number
 }
 
-export default abstract class AbstractConfigTextAndVocal extends Command {
+export default abstract class AbstractConfigTextAndVocal<IArgs = IConfigTextAndVocalArgs> extends Command<IArgs> {
     type: null | 'vocal' | 'text' = null;
 
     static abstract = true;
@@ -66,114 +65,131 @@ export default abstract class AbstractConfigTextAndVocal extends Command {
         this.type = type;
     }
 
-    static argsModelFunction: (type: 'vocal'|'text') => IArgsModel<configTextAndVocalArgs> = (type) => ({
+    static argsModelFunction: <IArgs = IConfigTextAndVocalArgs>(
+        type: 'vocal'|'text', 
+        fieldsUpdaters?: {[key: string]: ((argModel: IArgModel<IArgs>) => IArgModel<IArgs>)},
+        additionnalFields?: IArgsModel<IArgs>['$argsByType']
+    ) => IArgsModel<IArgs> = 
+    (type, fieldsUpdaters = {}, additionnalFields = {}) => ({
         $argsByType: {
-            action: {
-                isSubCommand: true,
-                required: true,
-                type: "string",
-                description: "L'action à effectuer : blacklist, enable, disable, defaultLimit",
-                choices: {
-                    blacklist: "Gérer la blacklist",
-                    enable: "Activer l'écoute " + (type === "vocal" ? "vocale" : "textuelle") + " du serveur",
-                    disable: "Désactiver l'écoute " + (type === "vocal" ? "vocale" : "textuelle") + " du serveur",
-                    defaultlimit: "Définir ou voir la limite par défaut des écoutes " + (type === 'vocal' ? "vocales" : "textuelles"),
-                    ...(
-                        type === "vocal" ? 
-                        {
-                            delay: "Définir ou voir le délai avant envoie de la notification vocale"
-                        } : {}
-                    )
-                }
-            },
-            subAction: {
-                referToSubCommands: ['blacklist'],
-                isSubCommand: true,
-                required: (args) => args.action === "blacklist",
-                type: "string",
-                description: "L'action à effectuer sur la blacklist: add, remove, clear, show",
-                choices: {
-                    add: "Ajouter un utilisateur / rôle / channel à la blacklist",
-                    remove: "Retirer un utilisateur / rôle / channel de la blacklist",
-                    clear: "Vider la blacklist",
-                    show: "Afficher la blacklist",
-                }
-            },
-            blacklistType: {
-                referToSubCommands: ['blacklist.add', 'blacklist.remove', 'blacklist.clear', 'blacklist.show'],
-                required: (args) => args.action === "blacklist",
-                type: "string",
-                description: "Le type de blacklist: listener, channel",
-                valid: field => ['listener', 'channel'].includes(field)
-            },
-            users: {
-                referToSubCommands: ['blacklist.add', 'blacklist.remove'],
-                required: false,
-                displayExtractError: true,
-                type: "user",
-                multi: true,
-                description: "Le ou les utilisateurs à ajouter ou supprimer",
-                errorMessage: (_) => ({
-                    name: "Utilisateurs pas ou mal renseignés",
-                    value: "Les utilisateurs n'ont pas réussi à être récupéré"
-                })
-            },
-            roles: {
-                referToSubCommands: ['blacklist.add', 'blacklist.remove'],
-                displayExtractError: true,
-                required: (args, _, modelizeSlashCommand = false) => !modelizeSlashCommand && args.action === "blacklist" &&
-                    ['add', 'remove'].includes(<string>args.subAction) && args.blacklistType == 'listener' && (args.users??[]).length == 0,
-                type: 'role',
-                multi: true,
-                description: "Les roles à ajouter ou retirer de la blacklist",
-                errorMessage: (value, args) => (value === undefined && (args.users??[]).length == 0) ? {
-                    name: "Au moins l'un des deux",
-                    value: "Vous devez mentioner au moins un utilisateur ou un role à retirer ou à ajouter à la blacklist listener"
-                } : {
-                    name: "Rôle pas ou mal renseigné",
-                    value: "Les rôles n'ont pas réussi à être récupéré"
-                }
-            },
-            channels: {
-                referToSubCommands: ['blacklist.add', 'blacklist.remove'],
-                required: (args) => ['add', 'remove'].includes(<string>args.subAction) && args.blacklistType == "channel",
-                type: 'channel',
-                multi: true,
-                displayValidErrorEvenIfFound: true,
-                description: "Le ou les channels vocaux à supprimer ou ajouter",
-                valid: (channels: GuildChannel[] | GuildChannel) =>
-                    (channels instanceof Array && !channels.some(channel => !AbstractConfigTextAndVocal.types[type].channelTypes.includes(channel.type))) ||
-                    (channels instanceof GuildChannel && AbstractConfigTextAndVocal.types[type].channelTypes.includes(channels.type)),
-                errorMessage: (_) => ({
-                    name: "Channels non ou mal renseigné",
-                    value: "Ils ne peuvent être que des channels " + (type === "vocal" ? "vocaux" : "textuels")
-                })
-            },
-            duration: {
-                referToSubCommands: ['defaultlimit', ...(type === "vocal" ? ["delay"] : [])],
-                required: false,
-                type: 'duration',
-                description: (args) => args.action === "defaultlimit" ? "Re définir la limite par défaut" : "Définir le délai avant notification",
-                valid: (value: number, args) => 
-                    (args.action === "defaultlimit" && value >= AbstractConfigTextAndVocal.types[type].minimumLimit) ||
-                    (args.action === "delay" && value >= minimumDelay && value <= maximumDelay),
-                errorMessage: (value, args) => ({
-                    name: "Vous avez mal rentrez la durée",
-                    value: typeof (value) === "number" ?
-                        args.action === "defaultlimit" ?
-                            "Avez vous rentrez une valeur supérieure ou égale à " + showTime(extractDurationTime(args.action === "defaultlimit" ? AbstractConfigTextAndVocal.types[type].minimumLimit : minimumDelay), 'fr')+" ?" :
-                            "Le délai doit être situé entre "+[minimumDelay,maximumDelay].map(d => showTime(extractDurationTime(d), 'fr')).join(' et ')+" inclus" :
-                        "Syntaxe incorrecte"
-                })
-            }
+            ...Object.entries({
+                action: {
+                    isSubCommand: true,
+                    required: true,
+                    type: "string",
+                    description: "L'action à effectuer : blacklist, enable, disable, defaultLimit",
+                    choices: {
+                        blacklist: "Gérer la blacklist",
+                        enable: "Activer l'écoute " + (type === "vocal" ? "vocale" : "textuelle") + " du serveur",
+                        disable: "Désactiver l'écoute " + (type === "vocal" ? "vocale" : "textuelle") + " du serveur",
+                        defaultlimit: "Définir ou voir la limite par défaut des écoutes " + (type === 'vocal' ? "vocales" : "textuelles")
+                    }
+                },
+                subAction: {
+                    referToSubCommands: ['blacklist'],
+                    isSubCommand: true,
+                    required: (args) => args.action === "blacklist",
+                    type: "string",
+                    description: "L'action à effectuer sur la blacklist: add, remove, clear, show",
+                    choices: {
+                        add: "Ajouter un utilisateur / rôle / channel à la blacklist",
+                        remove: "Retirer un utilisateur / rôle / channel de la blacklist",
+                        clear: "Vider la blacklist",
+                        show: "Afficher la blacklist",
+                    }
+                },
+                blacklistType: {
+                    referToSubCommands: ['blacklist.add', 'blacklist.remove', 'blacklist.clear', 'blacklist.show'],
+                    required: (args) => args.action === "blacklist",
+                    type: "string",
+                    description: "Le type de blacklist: listener, channel",
+                    valid: field => ['listener', 'channel'].includes(field)
+                },
+                users: {
+                    referToSubCommands: ['blacklist.add', 'blacklist.remove'],
+                    required: false,
+                    displayExtractError: true,
+                    type: "user",
+                    multi: true,
+                    description: "Le ou les utilisateurs à ajouter ou supprimer",
+                    errorMessage: (_) => ({
+                        name: "Utilisateurs pas ou mal renseignés",
+                        value: "Les utilisateurs n'ont pas réussi à être récupéré"
+                    })
+                },
+                roles: {
+                    referToSubCommands: ['blacklist.add', 'blacklist.remove'],
+                    displayExtractError: true,
+                    required: (args, _, modelizeSlashCommand = false) => !modelizeSlashCommand && args.action === "blacklist" &&
+                        ['add', 'remove'].includes(<string>args.subAction) && args.blacklistType == 'listener' && (args.users??[]).length == 0,
+                    type: 'role',
+                    multi: true,
+                    description: "Les roles à ajouter ou retirer de la blacklist",
+                    errorMessage: (value, args) => (value === undefined && (args.users??[]).length == 0) ? {
+                        name: "Au moins l'un des deux",
+                        value: "Vous devez mentioner au moins un utilisateur ou un role à retirer ou à ajouter à la blacklist listener"
+                    } : {
+                        name: "Rôle pas ou mal renseigné",
+                        value: "Les rôles n'ont pas réussi à être récupéré"
+                    }
+                },
+                channels: {
+                    referToSubCommands: ['blacklist.add', 'blacklist.remove'],
+                    required: (args) => ['add', 'remove'].includes(<string>args.subAction) && args.blacklistType == "channel",
+                    type: 'channel',
+                    multi: true,
+                    displayValidErrorEvenIfFound: true,
+                    description: "Le ou les channels vocaux à supprimer ou ajouter",
+                    valid: (channels: GuildChannel[] | GuildChannel) =>
+                        (channels instanceof Array && !channels.some(channel => !AbstractConfigTextAndVocal.types[type].channelTypes.includes(channel.type))) ||
+                        (channels instanceof GuildChannel && AbstractConfigTextAndVocal.types[type].channelTypes.includes(channels.type)),
+                    errorMessage: (_) => ({
+                        name: "Channels non ou mal renseigné",
+                        value: "Ils ne peuvent être que des channels " + (type === "vocal" ? "vocaux" : "textuels")
+                    })
+                },
+                duration: {
+                    referToSubCommands: ['defaultlimit'],
+                    required: false,
+                    type: 'duration',
+                    description: (args) => args.action === "defaultlimit" ? "Re définir la limite par défaut" : "Définir le délai avant notification",
+                    valid: (value: number, args) => 
+                        (args.action === "defaultlimit" && value >= AbstractConfigTextAndVocal.types[type].minimumLimit) ||
+                        (args.action === "delay" && value >= minimumDelay && value <= maximumDelay),
+                    errorMessage: (value, args) => ({
+                        name: "Vous avez mal rentrez la durée",
+                        value: typeof (value) === "number" ?
+                            args.action === "defaultlimit" ?
+                                "Avez vous rentrez une valeur supérieure ou égale à " + showTime(extractDurationTime(args.action === "defaultlimit" ? AbstractConfigTextAndVocal.types[type].minimumLimit : minimumDelay), 'fr')+" ?" :
+                                "Le délai doit être situé entre "+[minimumDelay,maximumDelay].map(d => showTime(extractDurationTime(d), 'fr')).join(' et ')+" inclus" :
+                            "Syntaxe incorrecte"
+                    })
+                },
+                ...additionnalFields
+            }).reduce((acc,[field,argModel]) => ({
+                ...acc,
+                [field]: fieldsUpdaters[field] !== undefined ? fieldsUpdaters[field](<IArgModel>argModel) : argModel
+            }), {}),
+            ...additionnalFields
         }
     })
+    
+    lresponse(...args: Parameters<Command['response']>): {executed: true, configObj: null, response: ReturnType<Command['response']>} {
+        return {
+            executed: true,
+            response: super.response(...args),
+            configObj: null
+        }
+    }
 
-    async action(args: configTextAndVocalArgs) {
-        const {action, subAction, blacklistType, users, roles, channels, duration} = args;
+    async mutualizedAction(
+        args: IArgs, 
+        checkIfEnabled: null|((args: IArgs, configObj: IVocalConfig|ITextConfig) => boolean) = null
+    ): Promise<{executed: boolean, configObj: null|IVocalConfig|ITextConfig, response: null|ReturnType<Command['response']>}> {
+        const {action, subAction, blacklistType, users, roles, channels, duration} = <IConfigTextAndVocalArgs><unknown>args;
 
         if (this.type === null || AbstractConfigTextAndVocal.types[this.type] === undefined)
-            return this.response(false,
+            return this.lresponse(false,
                 this.sendErrors({
                     name: "Bad type",
                     value: "Type vocal or text not specified"
@@ -183,7 +199,7 @@ export default abstract class AbstractConfigTextAndVocal extends Command {
         const {configModel, subscribeModel, defaultLimit} = AbstractConfigTextAndVocal.types[this.type];
 
         if (this.guild == null)
-            return this.response(false,
+            return this.lresponse(false,
                 this.sendErrors({
                     name: "Missing guild",
                     value: "We couldn't find the guild"
@@ -204,13 +220,16 @@ export default abstract class AbstractConfigTextAndVocal extends Command {
                 configObj.enabled = action === "enable";
                 await configObj.save();
             }
-            return this.response(true, "L'abonnement " + (this.type === "vocal" ? "vocal" : "textuel") + " a été " + (action == "enable" ? "activé" : "désactivé") + " sur ce serveur");
+            return this.lresponse(true, "L'abonnement " + (this.type === "vocal" ? "vocal" : "textuel") + " a été " + (action == "enable" ? "activé" : "désactivé") + " sur ce serveur");
 
         }
 
         // if action is 'blacklist' or 'defaultlimit'
-        if (configObj == null || !configObj.enabled)
-            return this.response(false,
+        if (
+            (checkIfEnabled !== null && checkIfEnabled(args, configObj)) || 
+            (checkIfEnabled === null && (configObj == null || !configObj.enabled))
+        )
+            return this.lresponse(false,
                 this.sendErrors({
                     name: (this.type === "vocal" ? "Vocal" : "Textuel") + " désactivé",
                     value: "Vous devez d'abord activer l'abonnement " + (this.type === "vocal" ? "vocal" : "textuel") + " sur ce serveur avec : \n" + config.command_prefix + this.commandName + " enable"
@@ -221,44 +240,20 @@ export default abstract class AbstractConfigTextAndVocal extends Command {
             if (duration !== undefined) {
                 configObj.defaultLimit = duration;
                 await configObj.save();
-                return this.response(true, {
+                return this.lresponse(true, {
                     embeds: [
                         new EmbedBuilder().addFields({
                             name: "Valeur changée avec succès!",
-                            value: "Vous avez fixé la limite par défaut de l'écoute " +(this.type === "vocal" ? "vocale" : "textuelle") + " à " + showTime(extractUTCTime(duration), "fr_long")
+                            value: "Vous avez fixé la limite par défaut de l'écoute " +(this.type === "vocal" ? "vocale" : "textuelle") + " à " + showTime(extractDurationTime(duration), "fr_long")
                         })
                     ]
                 })
             }
-            return this.response(true, {
+            return this.lresponse(true, {
                 embeds: [
                     new EmbedBuilder().addFields({
                         name: "Voici la limite par défaut de l'écoute " +(this.type === "vocal" ? "vocale" : "textuelle"),
-                        value: "La limite par défaut est : " +showTime(extractUTCTime(configObj.defaultLimit ?? defaultLimit), "fr_long")
-                    })
-                ]
-            })
-        }
-        
-        if (action === "delay") {
-            if (duration !== undefined) {
-                (<IVocalConfig>configObj).delay = duration;
-                await configObj.save();
-                return this.response(true, {
-                    embeds: [
-                        new EmbedBuilder().addFields({
-                            name: "Valeur changée avec succès!",
-                            value: "Vous avez fixé le délai d'attente avant notification vocale à " + showTime(extractUTCTime(duration), "fr_long")
-                        })
-                    ]
-                })
-            }
-
-            return this.response(true, {
-                embeds: [
-                    new EmbedBuilder().addFields({
-                        name: "Voici le délai d'attente avant notification vocale",
-                        value: "Le délai est : " +showTime(extractUTCTime((<IVocalConfig>configObj).delay ?? defaultDelay), "fr_long")
+                        value: "La limite par défaut est : " +showTime(extractDurationTime(configObj.defaultLimit ?? defaultLimit), "fr_long")
                     })
                 ]
             })
@@ -316,7 +311,7 @@ export default abstract class AbstractConfigTextAndVocal extends Command {
                     msg += "\n" + notFoundUserId.map(id => "L'utilisateur avec l'id " + id + " est introuvable, son écoute a été supprimée").join("\n")
                 }
                 configObj.save();
-                return this.response(true, msg);
+                return this.lresponse(true, msg);
             case 'remove':
                 if (blacklistType == "channel") {
                     configObj.channelBlacklist = this.removeIdsToList(configObj.channelBlacklist, channels.map(channel => channel.id))
@@ -327,7 +322,7 @@ export default abstract class AbstractConfigTextAndVocal extends Command {
                         configObj.listenerBlacklist.roles = this.removeIdsToList(configObj.listenerBlacklist.roles, roles.map(role => role.id));
                 }
                 configObj.save();
-                return this.response(true,
+                return this.lresponse(true,
                     "Les " + (blacklistType == "channel" ? "channels" : "utilisateurs/roles") + " ont été retirés de la blacklist '" + blacklistType + "'"
                 );
             case 'clear':
@@ -338,7 +333,7 @@ export default abstract class AbstractConfigTextAndVocal extends Command {
                     configObj.listenerBlacklist.roles = [];
                 }
                 configObj.save();
-                return this.response(true, "La blacklist '" + blacklistType + "' a été vidée");
+                return this.lresponse(true, "La blacklist '" + blacklistType + "' a été vidée");
             case 'show':
                 let fields: EmbedField[];
                 if (blacklistType == "channel") {
@@ -354,9 +349,10 @@ export default abstract class AbstractConfigTextAndVocal extends Command {
                         embed.setTitle("Contenu de la blacklist '" + blacklistType + "'");
                     }
                 });
-                return this.response(true, {embeds});
+                return this.lresponse(true, {embeds});
         }
-        return this.response(false, "Aucune action spécifiée");
+
+        return {executed: false, configObj, response: null};
     }
 
     async createEmbedFieldList(lists, types): Promise<EmbedField[]> {
