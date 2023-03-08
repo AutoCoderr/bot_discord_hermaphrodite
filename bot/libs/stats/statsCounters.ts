@@ -143,8 +143,20 @@ export async function countingStats(
         ]).then(([statsObj]) => statsObj)
     }
 
-    statsObj[colToIncrement] += 1;
-    await statsObj.save();
+    try {
+        statsObj[colToIncrement] += 1;
+        await statsObj.save();
+    } catch (e) {
+        const msg = "No document found for query";
+        if ((<Error>e).message.substring(0,msg.length) === msg) {
+            return  model.create({
+                serverId,
+                date,
+                [colToIncrement]: 1
+            })
+        }
+        throw e;
+    }
 
     return statsObj;
 }
