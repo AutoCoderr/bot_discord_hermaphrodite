@@ -5,6 +5,7 @@ import VocalMinutesStats, { IVocalMinutesStats } from "../../Models/Stats/VocalM
 import MessagesStats, { IMessagesStats } from "../../Models/Stats/MessagesStats";
 import { abortProcess, contactProcess, createProcess } from "../subProcessManager";
 import { addMissingZero, getDateGettersAndSettersFromUnit } from "../../Classes/OtherFunctions";
+import VocalNewConnectionsStats, { IVocalNewConnectionsStats } from "../../Models/Stats/VocalNewConnectionsStats";
 const precisions = {
     month: (date: Date) => {
         date.setDate(1);
@@ -115,19 +116,20 @@ export async function exportStatsInCsv(guild: Guild, startDate: Date, type: 'mes
 }
 
 export async function countingStats(
-    type: 'vocalMinutes'|'vocalConnections'|'messages', 
+    type: 'vocalMinutes'|'vocalConnections'|'vocalNewConnections'|'messages', 
     serverId: string, 
-    statsObjState: null|IMessagesStats|IVocalConnectionsStats|IVocalMinutesStats
+    statsObjState: null|IMessagesStats|IVocalConnectionsStats|IVocalNewConnectionsStats|IVocalMinutesStats
 ) {
     const date = getDateWithPrecision();
 
     const [model,colToIncrement] = {
         vocalMinutes: [VocalMinutesStats,'nbMinutes'],
         vocalConnections: [VocalConnectionsStats, 'nbVocalConnections'],
+        vocalNewConnections: [VocalNewConnectionsStats, 'nbVocalNewConnections'],
         messages: [MessagesStats, 'nbMessages']
     }[type]
 
-    const statsObj: null|IMessagesStats|IVocalConnectionsStats|IVocalMinutesStats = statsObjState === null ? await model.findOne({
+    const statsObj: null|IMessagesStats|IVocalConnectionsStats|IVocalNewConnectionsStats|IVocalMinutesStats = statsObjState === null ? await model.findOne({
         serverId,
         date
     }) : statsObjState
@@ -190,8 +192,9 @@ export async function countingStatsVoiceConnectionsAndMinutesEvent(oldVoiceState
         return;
 
     createProcess("/bot/scripts/queues/stats/vocalCounter.js", "vocalStats", newVoiceState.guild.id);
-    contactProcess({type: "vocalConnections", serverId: newVoiceState.guild.id}, "vocalStats", newVoiceState.guild.id)
     
+    contactProcess({type: "vocalConnections", serverId: newVoiceState.guild.id}, "vocalStats", newVoiceState.guild.id)
+    contactProcess({type: "vocalNewConnections", serverId: newVoiceState.guild.id}, "vocalStats", newVoiceState.guild.id)
 }
 
 function countingStatsVoicesMinutes(oldVoiceState: VoiceState, newVoiceState: VoiceState) {
@@ -205,10 +208,11 @@ function countingStatsVoicesMinutes(oldVoiceState: VoiceState, newVoiceState: Vo
     }
 }
 
-export async function clearExpiredDatas(type: 'vocalMinutes'|'vocalConnections'|'messages', serverId: string) {
+export async function clearExpiredDatas(type: 'vocalMinutes'|'vocalConnections'|'vocalNewConnections'|'messages', serverId: string) {
     const model = {
         vocalMinutes: VocalMinutesStats,
         vocalConnections: VocalConnectionsStats,
+        vocalNewConnections: VocalNewConnectionsStats,
         messages: MessagesStats
     }[type];
 
