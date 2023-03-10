@@ -1,6 +1,7 @@
 import { rand } from "../Classes/OtherFunctions";
 import MessagesStats from "../Models/Stats/MessagesStats";
 import VocalConnectionsStats from "../Models/Stats/VocalConnectionsStats";
+import VocalNewConnectionsStats, { IVocalNewConnectionsStats } from "../Models/Stats/VocalNewConnectionsStats";
 import VocalMinutesStats from "../Models/Stats/VocalMinutesStats";
 import { getDateWithPrecision } from "../libs/stats/statsCounters"
 
@@ -12,22 +13,38 @@ import { getDateWithPrecision } from "../libs/stats/statsCounters"
         process.exit();
     }
 
-    const date = getDateWithPrecision(new Date(new Date().getTime() - 180 * 24 * 60 * 60 * 1000));
-
-    await Promise.all([MessagesStats, VocalConnectionsStats, VocalMinutesStats].map(model => model.deleteMany({})))
-
     const currentDate = new Date();
 
+    const date = getDateWithPrecision(new Date(currentDate.getTime() - 40 * 24 * 60 * 60 * 1000));
+
+    await Promise.all([MessagesStats, VocalConnectionsStats, VocalNewConnectionsStats, VocalMinutesStats].map(model => model.deleteMany({})))
+
+    let lastNbVocalConnections = 0;
+
     while (date.getTime() < currentDate.getTime()) {
-        await Promise.all([
-            [MessagesStats,'nbMessages'],
-            [VocalConnectionsStats, 'nbVocalConnections'],
-            [VocalMinutesStats, 'nbMinutes']
-        ].map(([model, col]) => model.create({
-            serverId,
-            date,
-            [col]: rand(0,10)
-        })))
+        const [,[,vocalConnectionsStats]] = await Promise.all([
+            [MessagesStats,'nbMessages', [0,10]],
+            [VocalNewConnectionsStats, 'nbVocalNewConnections', [0,5], (vocalNewConnectionsStat: IVocalNewConnectionsStats) =>
+                VocalConnectionsStats.create({
+                    serverId,
+                    date,
+                    nbVocalConnections: vocalNewConnectionsStat.nbVocalNewConnections+rand(0,Math.min(5,lastNbVocalConnections))
+                })
+            ],
+            [VocalMinutesStats, 'nbMinutes', [0,10]]
+        ].map(async ([model, col, [a,b], func]) => {
+            const created = await model.create({
+                serverId,
+                date,
+                [col]: rand(a,b)
+            });
+            
+            return func ?
+                [created, await func(created)] :
+                created;
+        }))
+
+        lastNbVocalConnections = vocalConnectionsStats.nbVocalConnections;
 
         date.setHours(date.getHours()+1)
     }
