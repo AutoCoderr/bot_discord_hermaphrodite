@@ -4,7 +4,7 @@ import { IArgsModel } from "../interfaces/CommandInterfaces";
 import StatsConfig, { defaultStatsExpiration, IStatsConfig, maxStatsExpiration, minStatsExpiration } from "../Models/Stats/StatsConfig";
 import { abortProcess } from "../libs/subProcessManager";
 import {IStatsPrecisionUnits, statsPrecisionExists, clearExpiredDatas, getStatsUnitIndex, getAllStatsUnitTexts, getStatsUnitText, getDateWithPrecision} from "../libs/stats/statsCounters";
-import exportStatsInCsv from "../libs/stats/exportStatsInCsv";
+import exportStatsInCsv, { getDateTag } from "../libs/stats/exportStatsInCsv";
 import { getDateGettersAndSettersFromUnit } from "../Classes/OtherFunctions";
 import { showDate } from "../Classes/DateTimeManager";
 import { extractDate } from "../Classes/DateTimeManager";
@@ -13,6 +13,7 @@ interface IStatsArgs {
     action: 'messages'|'vocal';
     subAction: 'enable'|'disable'|'are_enabled'|'export'|'expiration';
     backTime: {unit: IStatsPrecisionUnits, value: number};
+    afterOrBefore?: 'after'|'before';
     precision?: IStatsPrecisionUnits;
     nbDays?: number;
 }
@@ -59,9 +60,19 @@ export default class Stats extends Command<IStatsArgs> {
                 type: "string",
                 choices: getAllStatsUnitTexts()
             },
+            afterOrBefore: {
+                referToSubCommands: ["messages.export", "vocal.export"],
+                required: false,
+                description: "Avant ou après le temps indiqué ?",
+                type: "string",
+                choices: {
+                    after: "Après",
+                    before: "Avant"
+                },
+            },
             backTime: {
                 referToSubCommands: ["messages.export", "vocal.export"],
-                description: "Jusqu'à combien de temps en arrière récupérer les statistiques (ex: 6h, 3j, 2mon) ?",
+                description: "Combien de temps en arrière récupérer les statistiques (ex: 6h, 3j, 2mon) ?",
                 type: "timeUnits",
                 valid: ({unit}, args) => statsPrecisionExists(unit) && getStatsUnitIndex(unit) <= getStatsUnitIndex(args.precision ?? "hour"),
                 errorMessage: ({unit},args) => ({
@@ -94,7 +105,7 @@ export default class Stats extends Command<IStatsArgs> {
     }
 
     async action(args: IStatsArgs) {
-        const {action, subAction, nbDays} = args
+        const {action, subAction, nbDays, afterOrBefore} = args
 
         const statsConfig: null|IStatsConfig = await StatsConfig.findOne({
             serverId: (<Guild>this.guild).id
@@ -171,8 +182,8 @@ export default class Stats extends Command<IStatsArgs> {
                 await clearExpiredDatas("messages", (<Guild>this.guild).id)
             else
                 await Promise.all(
-                    ["vocalMinutes","vocalConnections"]
-                        .map(type => clearExpiredDatas(<'vocalMinutes'|'vocalConnections'>type, (<Guild>this.guild).id))
+                    ["vocalMinutes","vocalConnections","vocalNewConnections"]
+                        .map(type => clearExpiredDatas(<'vocalMinutes'|'vocalConnections'|'vocalNewConnections'>type, (<Guild>this.guild).id))
                 )
 
             return this.response(true, {
@@ -199,7 +210,7 @@ export default class Stats extends Command<IStatsArgs> {
 
         const messagePayload = new MessagePayload(<Interaction|Message>(this.interaction??this.message), {
             content: "Voici l'export en csv de toutes les stats "+(action === "vocal" ? "vocales" : "textuelles")+
-                     " depuis le "+showDate(extractDate(dateWithPrecision), 'fr')+" "+{
+                     (afterOrBefore === "before" ? " avant" : " depuis")+" le "+getDateTag(dateWithPrecision, precision)+" "+{
                         hour: "à l'heure",
                         day: 'à la journée',
                         month: 'au mois'
@@ -207,7 +218,7 @@ export default class Stats extends Command<IStatsArgs> {
         });
         messagePayload.files = [{
             name: "stats.csv",
-            data: await exportStatsInCsv(<Guild>this.guild, dateWithPrecision, action, precision)
+            data: await exportStatsInCsv(<Guild>this.guild, dateWithPrecision, afterOrBefore??"after", action, precision)
         }]
         return this.response(true, messagePayload)
     }

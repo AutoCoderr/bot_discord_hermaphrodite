@@ -340,3 +340,10 @@ export function getDateGettersAndSettersFromUnit(unit: IPrecision) {
         month: ['getMonth', 'setMonth']
     }[unit];
 }
+
+export function incrementUnitToDate(date: Date, unit: IPrecision, v: number) {
+    const [getter,setter] = getDateGettersAndSettersFromUnit(unit);
+    const newDate = new Date(date.getTime());
+    newDate[setter](newDate[getter]()+v)
+    return newDate;
+}

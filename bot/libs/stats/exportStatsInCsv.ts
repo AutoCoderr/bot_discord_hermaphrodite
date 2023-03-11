@@ -1,5 +1,5 @@
 import { Guild } from "discord.js";
-import { addMissingZero, getDateGettersAndSettersFromUnit } from "../../Classes/OtherFunctions";
+import { addMissingZero, getDateGettersAndSettersFromUnit, incrementUnitToDate } from "../../Classes/OtherFunctions";
 import MessagesStats, {IMessagesStats} from "../../Models/Stats/MessagesStats";
 import VocalConnectionsStats, { IVocalConnectionsStats } from "../../Models/Stats/VocalConnectionsStats";
 import VocalMinutesStats, {IVocalMinutesStats} from "../../Models/Stats/VocalMinutesStats";
@@ -62,28 +62,32 @@ const datasInfosToExportByType: {[type: string]: IStatsDataInfosToExport[]} = {
     ]
 }
 
-export default async function exportStatsInCsv(guild: Guild, startDate: Date, type: 'messages'|'vocal', precision: IPrecision) {
+export default async function exportStatsInCsv(guild: Guild, specifiedDate: Date, afterOrBefore: 'after'|'before', type: 'messages'|'vocal', precision: IPrecision) {
     const datasInfosToExport: IStatsDataInfosToExport[] = datasInfosToExportByType[type]
 
     const datas: (IAllStatsModels[]|IAllStatsModels[][])[] = await Promise.all(datasInfosToExport.map(({model,models}) => 
         model ?
             model.find({
                 serverId: guild.id,
-                date: {$gte: startDate}
+                date: {[afterOrBefore === "after" ? "$gte" : "$lt"]: specifiedDate}
             }) :
             Promise.all((<(typeof Model)[]>models).map(model =>
                 model.find({
                     serverId: guild.id,
-                    date: {$gte: startDate}
+                    date: {[afterOrBefore === "after" ? "$gte" : "$lt"]: specifiedDate}
                 })  
             ))
     ))
 
     const aggregatedStats = {};
+    let oldestDate: null|Date = null;
 
     for (let i=0;i<datas.length;i++) {
         for (const dataOrDataArray of datas[i]) {
             for (const data of (dataOrDataArray instanceof Array ? dataOrDataArray : [dataOrDataArray])) {
+                if (afterOrBefore === "before" && (oldestDate === null || data.date.getTime() < oldestDate.getTime())) {
+                    oldestDate = data.date;
+                }
                 const dateTag = getDateTag(data.date, precision);
                 const col = datasInfosToExport[i].col;
 
@@ -103,25 +107,31 @@ export default async function exportStatsInCsv(guild: Guild, startDate: Date, ty
             }
         }
     }
-
-    let csv = "Date;"+datasInfosToExport.map(({text}) => text).join(";");
     
     const [getter,setter] = getDateGettersAndSettersFromUnit(precision);
 
-    const date = getDateWithPrecision();
-    while (date.getTime() >= startDate.getTime()) {
-        const dateTag = getDateTag(date, precision);
+    const endDate: Date = afterOrBefore === "after" ? 
+                    getDateWithPrecision(new Date(), precision) : 
+                    incrementUnitToDate(specifiedDate, precision, -1);
+    const startDate: Date = afterOrBefore === "after" ? 
+                    specifiedDate : 
+                    (oldestDate ? getDateWithPrecision(oldestDate, precision) : specifiedDate);
+
+    let csv = "Date;"+datasInfosToExport.map(({text}) => text).join(";");
+
+    while (endDate.getTime() >= startDate.getTime()) {
+        const dateTag = getDateTag(endDate, precision);
         const stat = aggregatedStats[dateTag];
 
         csv += "\n"+dateTag+";"+datasInfosToExport.map(({col}) => (stat && stat[col]) ? stat[col] : 0).join(";");
 
-        date[setter](date[getter]()-1)
+        endDate[setter](endDate[getter]()-1)
     }
     
     return csv;
 }
 
-function getDateTag(date: Date, precision: IPrecision) {
+export function getDateTag(date: Date, precision: IPrecision) {
     let tag = "";
     switch (precision) {
         case 'hour':

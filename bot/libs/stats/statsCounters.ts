@@ -5,6 +5,7 @@ import VocalMinutesStats, { IVocalMinutesStats } from "../../Models/Stats/VocalM
 import MessagesStats, { IMessagesStats } from "../../Models/Stats/MessagesStats";
 import { abortProcess, contactProcess, createProcess } from "../subProcessManager";
 import VocalNewConnectionsStats, { IVocalNewConnectionsStats } from "../../Models/Stats/VocalNewConnectionsStats";
+import { incrementUnitToDate } from "../../Classes/OtherFunctions";
 
 export type IPrecision = keyof typeof precisions;
 
@@ -160,6 +161,6 @@ export async function clearExpiredDatas(type: 'vocalMinutes'|'vocalConnections'|
 
     return model.deleteMany({
         serverId,
-        date: {$lt: new Date(new Date().getTime() - nbDays * 24 * 60 * 60 * 1000)}
+        date: {$lt: incrementUnitToDate(getDateWithPrecision(), 'day', -nbDays)}
     })
 }

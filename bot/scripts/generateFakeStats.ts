@@ -15,7 +15,7 @@ import { getDateWithPrecision } from "../libs/stats/statsCounters"
 
     const currentDate = new Date();
 
-    const date = getDateWithPrecision(new Date(currentDate.getTime() - 40 * 24 * 60 * 60 * 1000));
+    const date = getDateWithPrecision(new Date(currentDate.getTime() - 120 * 24 * 60 * 60 * 1000));
 
     await Promise.all([MessagesStats, VocalConnectionsStats, VocalNewConnectionsStats, VocalMinutesStats].map(model => model.deleteMany({})))
 
