@@ -1,17 +1,18 @@
-import { CommandInteraction, EmbedBuilder, Guild, Interaction, Message, MessagePayload } from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, CommandInteraction, EmbedBuilder, Guild, Interaction, Message, MessagePayload } from "discord.js";
 import Command from "../Classes/Command";
 import { IArgsModel } from "../interfaces/CommandInterfaces";
 import StatsConfig, { defaultStatsExpiration, IStatsConfig, maxStatsExpiration, minStatsExpiration } from "../Models/Stats/StatsConfig";
 import { abortProcess } from "../libs/subProcessManager";
-import {IStatsPrecisionUnits, statsPrecisionExists, clearExpiredDatas, getStatsUnitIndex, getAllStatsUnitTexts, getStatsUnitText, getDateWithPrecision} from "../libs/stats/statsCounters";
+import {IStatsPrecisionUnits, statsPrecisionExists, getStatsUnitIndex, getAllStatsUnitTexts, getStatsUnitText, getDateWithPrecision} from "../libs/stats/statsCounters";
 import exportStatsInCsv, { getDateTag } from "../libs/stats/exportStatsInCsv";
-import { getDateGettersAndSettersFromUnit } from "../Classes/OtherFunctions";
-import { showDate } from "../Classes/DateTimeManager";
-import { extractDate } from "../Classes/DateTimeManager";
+import { incrementUnitToDate } from "../Classes/OtherFunctions";
+import { addCallbackButton } from "../libs/callbackButtons";
+import clearExpiredDatas from "../libs/stats/clearExpiredDatas";
+import purgeDatas from "../libs/stats/purgesDatas";
 
 interface IStatsArgs {
     action: 'messages'|'vocal';
-    subAction: 'enable'|'disable'|'are_enabled'|'export'|'expiration';
+    subAction: 'enable'|'disable'|'are_enabled'|'export'|'purge'|'expiration';
     backTime: {unit: IStatsPrecisionUnits, value: number};
     afterOrBefore?: 'after'|'before';
     precision?: IStatsPrecisionUnits;
@@ -50,6 +51,7 @@ export default class Stats extends Command<IStatsArgs> {
                     disable: (_, parentDescription) => "Désactiver "+parentDescription,
                     are_enabled: (_, parentDescription) => "Voir si "+parentDescription+" sont activées",
                     export: (_, parentDescription) => "Exporter "+parentDescription,
+                    purge: (_,parentDescription) => "Purger "+parentDescription,
                     expiration: (_, parentDescription) => "Définir l'expiration des"+parentDescription.split(" ").slice(1).join(" ")
                 }
             },
@@ -61,7 +63,7 @@ export default class Stats extends Command<IStatsArgs> {
                 choices: getAllStatsUnitTexts()
             },
             afterOrBefore: {
-                referToSubCommands: ["messages.export", "vocal.export"],
+                referToSubCommands: ["messages.export", "vocal.export", "messages.purge", "vocal.purge"],
                 required: false,
                 description: "Avant ou après le temps indiqué ?",
                 type: "string",
@@ -71,8 +73,8 @@ export default class Stats extends Command<IStatsArgs> {
                 },
             },
             backTime: {
-                referToSubCommands: ["messages.export", "vocal.export"],
-                description: "Combien de temps en arrière récupérer les statistiques (ex: 6h, 3j, 2mon) ?",
+                referToSubCommands: ["messages.export", "vocal.export", "messages.purge", "vocal.purge"],
+                description: (args) => "Combien de temps en arrière "+(args.subAction === "export" ? "exporter" : "purger")+" les statistiques (ex: 6h, 3j, 2mon) ?",
                 type: "timeUnits",
                 valid: ({unit}, args) => statsPrecisionExists(unit) && getStatsUnitIndex(unit) <= getStatsUnitIndex(args.precision ?? "hour"),
                 errorMessage: ({unit},args) => ({
@@ -105,13 +107,11 @@ export default class Stats extends Command<IStatsArgs> {
     }
 
     async action(args: IStatsArgs) {
-        const {action, subAction, nbDays, afterOrBefore} = args
+        const {action, subAction, nbDays, afterOrBefore, backTime} = args
 
         const statsConfig: null|IStatsConfig = await StatsConfig.findOne({
             serverId: (<Guild>this.guild).id
         })
-
-        // action is stats
 
         const enabledCol = action === "vocal" ? 'listenVocal' : 'listenMessages';
         const word = action === "vocal" ? 'vocales' : 'textuelles'
@@ -197,20 +197,62 @@ export default class Stats extends Command<IStatsArgs> {
             })
         }
 
+        if (subAction === "purge") {
+            const acceptButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "purge_"+action+"_stats_accept";
+            const denyButtonId = (Date.now() * 10 ** 4 + Math.floor(Math.random() * 10 ** 4)).toString() + "purge_"+action+"_stats_deny";
+
+            const specifiedDate = incrementUnitToDate(getDateWithPrecision(), backTime.unit, -backTime.value);
+
+            addCallbackButton(acceptButtonId, async () => {
+                await purgeDatas(action, specifiedDate, afterOrBefore ?? "after");
+
+                return this.response(true, {
+                    embeds: [
+                        new EmbedBuilder()
+                            .setFields({
+                                name: "Données purgées avec succès !",
+                                value: "Toutes les statisitiques "+(action === "vocal" ? "vocales" : "textuelles")+
+                                       " "+(afterOrBefore === "before" ? "avant" : "depuis")+" le "+getDateTag(specifiedDate, "hour")+
+                                       " ont été purgées avec succès !"
+                            })
+                    ]
+                })
+            }, [denyButtonId]);
+
+            addCallbackButton(denyButtonId, () => {
+                return this.response(true, "Opération annulée")
+            }, [acceptButtonId]);
+
+            //@ts-ignore
+            return this.response(true, {
+                content: "Voulez-vous vraiment purger les statistiques "+(action === "vocal" ? "vocales" : "textuelles")+
+                         " "+(afterOrBefore === "before" ? "avant" : "depuis")+" le "+getDateTag(specifiedDate, "hour")+" ?",
+                components: [
+                    new ActionRowBuilder()
+                        .addComponents(
+                            (<[string,boolean][]>[
+                                [acceptButtonId, true],
+                                [denyButtonId, false]
+                            ]).map(([buttonId, accept]) =>
+                                new ButtonBuilder()
+                                    .setCustomId(buttonId)
+                                    .setLabel(accept ? "Oui" : "Non")
+                                    .setStyle(accept ? ButtonStyle.Danger : ButtonStyle.Success)
+                            )
+                        )
+                ]
+            })
+        }
+
         // subAction is 'export'
 
         const precision = args.precision ?? "hour";
-        const {backTime} = args;
 
-        const dateWithPrecision = getDateWithPrecision(new Date(), precision);
-        
-        const [getter, setter] = getDateGettersAndSettersFromUnit(backTime.unit)
-
-        dateWithPrecision[setter](dateWithPrecision[getter]() - backTime.value);
+        const specifiedDate = incrementUnitToDate(getDateWithPrecision(new Date(), precision), backTime.unit, -backTime.value)
 
         const messagePayload = new MessagePayload(<Interaction|Message>(this.interaction??this.message), {
             content: "Voici l'export en csv de toutes les stats "+(action === "vocal" ? "vocales" : "textuelles")+
-                     (afterOrBefore === "before" ? " avant" : " depuis")+" le "+getDateTag(dateWithPrecision, precision)+" "+{
+                     (afterOrBefore === "before" ? " avant" : " depuis")+" le "+getDateTag(specifiedDate, precision)+" "+{
                         hour: "à l'heure",
                         day: 'à la journée',
                         month: 'au mois'
@@ -218,7 +260,7 @@ export default class Stats extends Command<IStatsArgs> {
         });
         messagePayload.files = [{
             name: "stats.csv",
-            data: await exportStatsInCsv(<Guild>this.guild, dateWithPrecision, afterOrBefore??"after", action, precision)
+            data: await exportStatsInCsv(<Guild>this.guild, specifiedDate, afterOrBefore??"after", action, precision)
         }]
         return this.response(true, messagePayload)
     }

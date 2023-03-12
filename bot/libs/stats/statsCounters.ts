@@ -1,11 +1,11 @@
 import { Message, VoiceState } from "discord.js";
-import StatsConfig, { defaultStatsExpiration, IStatsConfig } from "../../Models/Stats/StatsConfig";
+import StatsConfig, { IStatsConfig } from "../../Models/Stats/StatsConfig";
 import VocalConnectionsStats, { IVocalConnectionsStats } from "../../Models/Stats/VocalConnectionsStats";
 import VocalMinutesStats, { IVocalMinutesStats } from "../../Models/Stats/VocalMinutesStats";
 import MessagesStats, { IMessagesStats } from "../../Models/Stats/MessagesStats";
 import { abortProcess, contactProcess, createProcess } from "../subProcessManager";
 import VocalNewConnectionsStats, { IVocalNewConnectionsStats } from "../../Models/Stats/VocalNewConnectionsStats";
-import { incrementUnitToDate } from "../../Classes/OtherFunctions";
+import clearExpiredDatas from "./clearExpiredDatas";
 
 export type IPrecision = keyof typeof precisions;
 
@@ -143,24 +143,4 @@ function countingStatsVoicesMinutes(oldVoiceState: VoiceState, newVoiceState: Vo
     if (newVoiceState.channelId !== null && (oldVoiceState.channelId === null || oldVoiceState.guild.id !== newVoiceState.guild.id)) {
         createProcess("/bot/scripts/statsVocalMinutesCounter.js", "voiceMinutesCounter", newVoiceState.member.id, [newVoiceState.guild.id], 10_000);
     }
-}
-
-export async function clearExpiredDatas(type: 'vocalMinutes'|'vocalConnections'|'vocalNewConnections'|'messages', serverId: string) {
-    const model = {
-        vocalMinutes: VocalMinutesStats,
-        vocalConnections: VocalConnectionsStats,
-        vocalNewConnections: VocalNewConnectionsStats,
-        messages: MessagesStats
-    }[type];
-
-    const statsConfig = await StatsConfig.findOne({
-        serverId,
-    })
-
-    const nbDays = statsConfig[type === "messages" ? "messagesExpiration" : "vocalExpiration"] ?? defaultStatsExpiration;
-
-    return model.deleteMany({
-        serverId,
-        date: {$lt: incrementUnitToDate(getDateWithPrecision(), 'day', -nbDays)}
-    })
 }
