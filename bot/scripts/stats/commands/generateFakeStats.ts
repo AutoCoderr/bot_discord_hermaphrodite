@@ -4,12 +4,19 @@ import VocalConnectionsStats from "../../../Models/Stats/VocalConnectionsStats";
 import VocalNewConnectionsStats, { IVocalNewConnectionsStats } from "../../../Models/Stats/VocalNewConnectionsStats";
 import VocalMinutesStats from "../../../Models/Stats/VocalMinutesStats";
 import { getDateWithPrecision } from "../../../libs/stats/statsCounters"
+import client from "../../../client";
+import { Guild } from "discord.js";
 
-
-(async () => {
+client.on('ready', async () => {
     const serverId = process.argv[2];
     if (serverId === undefined) {
         console.log("You need to mention a serverId !");
+        process.exit();
+    }
+
+    const guild: undefined|Guild = client.guilds.cache.get(serverId);
+    if (guild === undefined) {
+        console.log("The guild '"+serverId+"' has not found");
         process.exit();
     }
 
@@ -51,4 +58,4 @@ import { getDateWithPrecision } from "../../../libs/stats/statsCounters"
 
     console.log("generation terminated");
     process.exit();
-})()
+})
