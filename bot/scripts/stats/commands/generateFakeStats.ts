@@ -1,9 +1,9 @@
-import { rand } from "../Classes/OtherFunctions";
-import MessagesStats from "../Models/Stats/MessagesStats";
-import VocalConnectionsStats from "../Models/Stats/VocalConnectionsStats";
-import VocalNewConnectionsStats, { IVocalNewConnectionsStats } from "../Models/Stats/VocalNewConnectionsStats";
-import VocalMinutesStats from "../Models/Stats/VocalMinutesStats";
-import { getDateWithPrecision } from "../libs/stats/statsCounters"
+import { rand } from "../../../Classes/OtherFunctions";
+import MessagesStats from "../../../Models/Stats/MessagesStats";
+import VocalConnectionsStats from "../../../Models/Stats/VocalConnectionsStats";
+import VocalNewConnectionsStats, { IVocalNewConnectionsStats } from "../../../Models/Stats/VocalNewConnectionsStats";
+import VocalMinutesStats from "../../../Models/Stats/VocalMinutesStats";
+import { getDateWithPrecision } from "../../../libs/stats/statsCounters"
 
 
 (async () => {

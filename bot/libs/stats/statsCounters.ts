@@ -111,7 +111,7 @@ export async function countingStatsMessagesEvent(message: Message) {
     if (statsConfig === null)
         return;
 
-    createProcess("/bot/scripts/queues/stats/messageCounter.js", "messageStats", message.guild.id);
+    createProcess("/bot/scripts/stats/queues/messageCounter.js", "messageStats", message.guild.id);
     contactProcess(message.guild.id, "messageStats", message.guild.id);
 }
 
@@ -128,7 +128,7 @@ export async function countingStatsVoiceConnectionsAndMinutesEvent(oldVoiceState
     if (newVoiceState.channelId === null || newVoiceState.channelId === oldVoiceState.channelId)
         return;
 
-    createProcess("/bot/scripts/queues/stats/vocalCounter.js", "vocalStats", newVoiceState.guild.id);
+    createProcess("/bot/scripts/stats/queues/vocalCounter.js", "vocalStats", newVoiceState.guild.id);
     
     contactProcess({type: "vocalConnections", serverId: newVoiceState.guild.id}, "vocalStats", newVoiceState.guild.id)
     contactProcess({type: "vocalNewConnections", serverId: newVoiceState.guild.id}, "vocalStats", newVoiceState.guild.id)
@@ -141,6 +141,6 @@ function countingStatsVoicesMinutes(oldVoiceState: VoiceState, newVoiceState: Vo
         abortProcess("voiceMinutesCounter", newVoiceState.member.id);
     }
     if (newVoiceState.channelId !== null && (oldVoiceState.channelId === null || oldVoiceState.guild.id !== newVoiceState.guild.id)) {
-        createProcess("/bot/scripts/statsVocalMinutesCounter.js", "voiceMinutesCounter", newVoiceState.member.id, [newVoiceState.guild.id], 10_000);
+        createProcess("/bot/scripts/stats/processes/statsVocalMinutesCounter.js", "voiceMinutesCounter", newVoiceState.member.id, [newVoiceState.guild.id], 10_000);
     }
 }
