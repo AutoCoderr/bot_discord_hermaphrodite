@@ -108,8 +108,9 @@ export async function countingStatsMessagesEvent(message: Message) {
         serverId: message.guild.id,
         listenMessages: true
     })
-    if (statsConfig === null)
-        return;
+    if (statsConfig === null) {
+        return abortProcess("messageStats", message.guild.id)
+    }
 
     createProcess("/bot/scripts/stats/queues/messageCounter.js", "messageStats", message.guild.id);
     contactProcess(message.guild.id, "messageStats", message.guild.id);
@@ -120,8 +121,9 @@ export async function countingStatsVoiceConnectionsAndMinutesEvent(oldVoiceState
         serverId: newVoiceState.guild.id,
         listenVocal: true
     })
-    if (statsConfig === null)
-        return;
+    if (statsConfig === null) {
+        return abortProcess("vocalStats", newVoiceState.guild.id)
+    }
 
     countingStatsVoicesMinutes(oldVoiceState, newVoiceState);
 

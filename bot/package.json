@@ -6,7 +6,9 @@
   "scripts": {
     "start": "tsc && node --trace-deprecation --trace-warnings bot.js",
     "clean_database": "node --trace-deprecation --trace-warnings scripts/cleanDatabase/cleanDatabase.js",
-    "generate_fake_stats": "node --trace-deprecation --trace-warnings scripts/stats/commands/generateFakeStats.js",
+    "stats_generate_fake_datas": "node --trace-deprecation --trace-warnings scripts/stats/commands/generateFakeStats.js",
+    "stats_enable": "node --trace-deprecation --trace-warnings scripts/stats/commands/enableOrDisableStats.js enable",
+    "stats_disable": "node --trace-deprecation --trace-warnings scripts/stats/commands/enableOrDisableStats.js disable",
     "watch": "tsc -w",
     "build": "tsc"
   },
