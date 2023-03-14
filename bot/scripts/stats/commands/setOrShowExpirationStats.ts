@@ -40,6 +40,7 @@ client.on('ready', async () => {
     const statsConfigsByServerId = await getStatsConfigsByGuildsIds(guilds.map(({id}) => id));
 
     if (action === "show") {
+        console.log("Voici l'expiration des stats "+(type === 'messages' ? 'listenMessages' : 'listenVocal')+" des serveurs mentionnés :")
         console.log("\n"+
             guilds.map(({name,id}) =>
                 name+" ("+id+") => "+(

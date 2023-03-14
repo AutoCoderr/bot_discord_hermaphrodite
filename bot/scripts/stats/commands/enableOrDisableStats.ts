@@ -1,7 +1,7 @@
 import client from "../../../client";
 import { checkAndGetGivenGuilds } from "../../../libs/commandUtils";
 import { getStatsConfigsByGuildsIds } from "../../../libs/stats/statsCommandUtils";
-import StatsConfig, { IStatsConfig } from "../../../Models/Stats/StatsConfig";
+import StatsConfig from "../../../Models/Stats/StatsConfig";
 
 function cmdError(msg, action) {
     console.log("Erreur : "+msg);
@@ -13,7 +13,7 @@ function cmdError(msg, action) {
 client.on('ready', async () => {
     const [action, type] = process.argv.slice(2);
 
-    if (!["enable","disable"].includes(action))
+    if (!["enable","disable","are_enabled"].includes(action))
         throw new Error("'action' has not been correctly given")
 
     if (!["vocal","messages"].includes(type))
@@ -23,14 +23,28 @@ client.on('ready', async () => {
 
     const guilds = checkAndGetGivenGuilds(ids, client, (msg) => cmdError(msg,action))
 
+    const statsConfigsByServerId = await getStatsConfigsByGuildsIds(guilds.map(({id}) => id));
+
+    if (action === "are_enabled") {
+        console.log("Voici les serveurs ayant leur stats "+(type === "vocal" ? "vocales" : "textuelles")+" activées ou non :")
+        console.log("\n"+
+            guilds.map(({name,id}) =>
+                name+" ("+id+") => "+(
+                    statsConfigsByServerId[id] ? 
+                        (statsConfigsByServerId[id][type === 'messages' ? 'listenMessages' : 'listenVocal'] ? "Activé" : "Désactivé") :
+                        "Désactivé"
+                    )
+            ).join("\n")
+        )
+        process.exit();
+    }
+
     console.log(
         "Les guilds suivants vont avoir leur stats "+
-        (type === "vocal" ? "vocales" : "de messages")+
+        (type === "vocal" ? "vocales" : "textuelles")+
         " "+(action === "enable" ? "activées" : "désactivées")+" :"
     );
     console.log("\n"+guilds.map(({name,id}) => name+" ("+id+")").join("\n")+"\n")
-    
-    const statsConfigsByServerId = await getStatsConfigsByGuildsIds(guilds.map(({id}) => id));
     
     await Promise.all(
         guilds.map(async guild => {
@@ -50,7 +64,7 @@ client.on('ready', async () => {
         })
     )
     console.log(
-        "Stats "+(type === "vocal" ? "vocales" : "de messages")+
+        "Stats "+(type === "vocal" ? "vocales" : "textuelles")+
         " "+(action === "enable" ? "activées" : "désactivées")+" avec succès!"
     );
     process.exit()
