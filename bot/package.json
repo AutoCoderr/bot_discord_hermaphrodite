@@ -12,6 +12,7 @@
     "stats_are_enabled": "node --trace-deprecation --trace-warnings scripts/stats/commands/enableOrDisableStats.js are_enabled",
     "stats_expiration_show": "node --trace-deprecation --trace-warnings scripts/stats/commands/setOrShowExpirationStats.js show",
     "stats_expiration_set": "node --trace-deprecation --trace-warnings scripts/stats/commands/setOrShowExpirationStats.js set",
+    "stats_export": "node --trace-deprecation --trace-warnings scripts/stats/commands/exportDatasStats.js",
     "watch": "tsc -w",
     "build": "tsc"
   },

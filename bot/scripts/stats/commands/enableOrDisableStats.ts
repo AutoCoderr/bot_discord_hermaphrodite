@@ -6,7 +6,7 @@ import StatsConfig from "../../../Models/Stats/StatsConfig";
 function cmdError(msg, action) {
     console.log("Erreur : "+msg);
     console.log("Voici la syntaxe requise :");
-    console.log("npm run stats_"+action+" <vocal|messages> <all|server_id1, server_id2, server_idn>");
+    console.log("npm run stats_"+action+" <type: vocal|messages> <servers: all|server_id1, server_id2, server_idn>");
     process.exit();
 }
 

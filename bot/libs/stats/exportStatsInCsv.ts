@@ -1,5 +1,5 @@
 import { Guild } from "discord.js";
-import { addMissingZero, getDateGettersAndSettersFromUnit, incrementUnitToDate } from "../../Classes/OtherFunctions";
+import { addMissingZero, getDateGettersAndSettersFromUnit, incrementUnitToDate, round } from "../../Classes/OtherFunctions";
 import MessagesStats, {IMessagesStats} from "../../Models/Stats/MessagesStats";
 import VocalConnectionsStats, { IVocalConnectionsStats } from "../../Models/Stats/VocalConnectionsStats";
 import VocalMinutesStats, {IVocalMinutesStats} from "../../Models/Stats/VocalMinutesStats";
@@ -15,7 +15,7 @@ type IStatsDataInfosToExport = RequireAtLeastOne<{
     models: (typeof Model)[],
     col: string,
     text: string,
-    increment?: (precision: IPrecision, data: any) => number
+    aggregate?: (precision: IPrecision, data: any) => number
 }, 'model'|'models'>
 
 const datasInfosToExportByType: {[type: string]: IStatsDataInfosToExport[]} = {
@@ -31,7 +31,7 @@ const datasInfosToExportByType: {[type: string]: IStatsDataInfosToExport[]} = {
             models: [VocalConnectionsStats,VocalNewConnectionsStats],
             col: 'nbVocalConnections', 
             text: "Nombre de connexions vocales",
-            increment: (precision, data: IVocalNewConnectionsStats|IVocalConnectionsStats) => {
+            aggregate: (precision, data: IVocalNewConnectionsStats|IVocalConnectionsStats) => {
                 if (
                     data instanceof VocalNewConnectionsStats &&
                     precision !== "hour" &&
@@ -62,48 +62,121 @@ const datasInfosToExportByType: {[type: string]: IStatsDataInfosToExport[]} = {
     ]
 }
 
-export default async function exportStatsInCsv(guild: Guild, specifiedDate: Date, afterOrBefore: 'after'|'before', type: 'messages'|'vocal', precision: IPrecision) {
+export type IAggregatedStatsByGuildId = {[guildId: string]: {[time: string]: {[col: string]: number}}};
+export type IExportedCsvs = {[key: string]: string};
+export type IExportType = 'default'|'sum'|'avg'|'max'|'min'
+
+function aggregateCsvColumn(aggregatedLine: {[col: string]: string|number}, col: string, newValue: number, exportType: IExportType, guild: Guild) {
+    const value = <null|number>(aggregatedLine[col] ?? null);
+    if (['sum','avg'].includes(exportType)) {
+        aggregatedLine[col] = (value??0)+newValue;
+        return;
+    }
+    if (value === null || (exportType === "max" && newValue > value) || (exportType === "min" && newValue < value)) {
+        aggregatedLine[col] = newValue;
+        aggregatedLine["server_"+col] = guild.name+" ("+guild.id+")"
+    }
+}
+
+function addDatasToCsv(
+    csvs: IExportedCsvs,
+    dateTag: string,
+    aggregatedStatsByGuildId: IAggregatedStatsByGuildId,
+    colsToGet: string[], 
+    exportType: IExportType,
+    guilds: Guild[]
+) {
+    if (exportType === "default") {
+        for (const {id} of guilds) {
+            csvs[id] += "\n"+dateTag+";"+
+                colsToGet.map(
+                    (col) => (aggregatedStatsByGuildId[id][dateTag] && aggregatedStatsByGuildId[id][dateTag][col]) ? 
+                                aggregatedStatsByGuildId[id][dateTag][col] : 
+                                0
+                ).join(";")
+        }
+        return;
+    }
+    const aggregatedLine = {};
+    for (const col of colsToGet) {
+        for (const guild of guilds) {
+            aggregateCsvColumn(
+                aggregatedLine, 
+                col, 
+                (aggregatedStatsByGuildId[guild.id][dateTag] && aggregatedStatsByGuildId[guild.id][dateTag][col]) ? 
+                    aggregatedStatsByGuildId[guild.id][dateTag][col] : 
+                    0, 
+                exportType, 
+                guild
+            )
+        }
+    }
+    csvs.all += "\n"+dateTag+";"+colsToGet
+        .map(col => 
+            aggregatedLine[col] ? 
+                (exportType === "avg" ? round(aggregatedLine[col]/guilds.length,2) : aggregatedLine[col]) : 
+                0
+        ).join(";")+(
+            ["max","min"].includes(exportType) ? 
+                ";"+ colsToGet.map(col => aggregatedLine["server_"+col] ?? "").join(";") : 
+                ""
+        )
+}
+
+export default async function exportStatsInCsv(
+    guilds: Guild[], 
+    exportType: IExportType,
+    specifiedDate: Date, 
+    afterOrBefore: 'after'|'before', 
+    type: 'messages'|'vocal', 
+    precision: IPrecision,
+): Promise<string|{[guildId: string]: string}> {
     const datasInfosToExport: IStatsDataInfosToExport[] = datasInfosToExportByType[type]
 
-    const datas: (IAllStatsModels[]|IAllStatsModels[][])[] = await Promise.all(datasInfosToExport.map(({model,models}) => 
-        model ?
-            model.find({
-                serverId: guild.id,
-                date: {[afterOrBefore === "after" ? "$gte" : "$lt"]: specifiedDate}
-            }) :
-            Promise.all((<(typeof Model)[]>models).map(model =>
-                model.find({
-                    serverId: guild.id,
-                    date: {[afterOrBefore === "after" ? "$gte" : "$lt"]: specifiedDate}
-                })  
+    // For each guild : a columns data list to calcul
+    // For each column data : a list of element lists, each element list corresponding to a mongoose model
+    const datas: IAllStatsModels[][][][] = await Promise.all(
+        guilds.map(guild =>
+            Promise.all(datasInfosToExport.map(({model,models}) => 
+                Promise.all((<(typeof Model)[]>(models??[model])).map(model =>
+                    model.find({
+                        serverId: guild.id,
+                        date: {[afterOrBefore === "after" ? "$gte" : "$lt"]: specifiedDate}
+                    })  
+                ))
             ))
-    ))
+        )
+    )
 
-    const aggregatedStats = {};
+    const aggregatedStatsByGuildId: IAggregatedStatsByGuildId = {};
     let oldestDate: null|Date = null;
 
     for (let i=0;i<datas.length;i++) {
-        for (const dataOrDataArray of datas[i]) {
-            for (const data of (dataOrDataArray instanceof Array ? dataOrDataArray : [dataOrDataArray])) {
-                if (afterOrBefore === "before" && (oldestDate === null || data.date.getTime() < oldestDate.getTime())) {
-                    oldestDate = data.date;
-                }
-                const dateTag = getDateTag(data.date, precision);
-                const col = datasInfosToExport[i].col;
-
-                const oldValue = (aggregatedStats[dateTag] && aggregatedStats[dateTag][col] !== undefined) ? aggregatedStats[dateTag][col] : 0
-                const newValue = oldValue + (
-                    (datasInfosToExport[i].increment !== undefined) ?
-                        (<Required<IStatsDataInfosToExport>['increment']>datasInfosToExport[i].increment)(precision, data) : 
-                        data[col]
-                    )
-                if (aggregatedStats[dateTag] === undefined) {
-                    aggregatedStats[dateTag] = {
-                        [col]: newValue
+        const guild = guilds[i];
+        aggregatedStatsByGuildId[guild.id] = {}
+        for (let j=0;j<datas[i].length;j++) {
+            for (const modelDatas of datas[i][j]) {
+                for (const data of modelDatas) {
+                    if (afterOrBefore === "before" && (oldestDate === null || data.date.getTime() < oldestDate.getTime())) {
+                        oldestDate = data.date;
                     }
-                    continue;
+                    const dateTag = getDateTag(data.date, precision);
+                    const col = datasInfosToExport[j].col;
+    
+                    const oldValue = (aggregatedStatsByGuildId[guild.id][dateTag] && aggregatedStatsByGuildId[guild.id][dateTag][col] !== undefined) ? aggregatedStatsByGuildId[guild.id][dateTag][col] : 0
+                    const newValue = oldValue + (
+                        (datasInfosToExport[j].aggregate !== undefined) ?
+                            (<Required<IStatsDataInfosToExport>['aggregate']>datasInfosToExport[j].aggregate)(precision, data) : 
+                            data[col]
+                        )
+                    if (aggregatedStatsByGuildId[guild.id][dateTag] === undefined) {
+                        aggregatedStatsByGuildId[guild.id][dateTag] = {
+                            [col]: newValue
+                        }
+                        continue;
+                    }
+                    aggregatedStatsByGuildId[guild.id][dateTag][col] = newValue;
                 }
-                aggregatedStats[dateTag][col] = newValue;
             }
         }
     }
@@ -117,30 +190,43 @@ export default async function exportStatsInCsv(guild: Guild, specifiedDate: Date
                     specifiedDate : 
                     (oldestDate ? getDateWithPrecision(oldestDate, precision) : specifiedDate);
 
-    let csv = "Date;"+datasInfosToExport.map(({text}) => text).join(";");
+    const firstLine = "Date;"+datasInfosToExport.map(({text}) => text).join(";")+(
+        ["max","min"].includes(exportType) ? 
+            ";"+datasInfosToExport.map(({text}) => "Serveur - "+text[0].toLowerCase()+text.substring(1)).join(";") : 
+            ""
+        );
+    let csvs: IExportedCsvs = (exportType === "default" ? guilds.map(({id}) => id) : ["all"])
+        .reduce((acc,key) => ({
+            ...acc,
+            [key]: firstLine
+        }), {})
+
+    const colsToGet = datasInfosToExport.map(({col}) =>col);
 
     while (endDate.getTime() >= startDate.getTime()) {
         const dateTag = getDateTag(endDate, precision);
-        const stat = aggregatedStats[dateTag];
 
-        csv += "\n"+dateTag+";"+datasInfosToExport.map(({col}) => (stat && stat[col]) ? stat[col] : 0).join(";");
+        addDatasToCsv(csvs, dateTag, aggregatedStatsByGuildId, colsToGet, exportType, guilds);
 
         endDate[setter](endDate[getter]()-1)
     }
     
-    return csv;
+    return csvs;
 }
 
-export function getDateTag(date: Date, precision: IPrecision) {
+export function getDateTag(date: Date, precision: IPrecision, lang = "fr") {
     let tag = "";
     switch (precision) {
         case 'hour':
         case 'day':
-            tag = addMissingZero(date.getDate())+"/"
+            const day = addMissingZero(date.getDate());
+            tag = lang === "fr" ? day+"/" : day
         case 'month':
-            tag += addMissingZero(date.getMonth()+1)+"/"
+            const month = addMissingZero(date.getMonth()+1);
+            tag = lang === "fr" ? tag+month+"/" : month+"-"+tag
         default:
-            tag += date.getFullYear()
+            const year = date.getFullYear()
+            tag = lang === "fr" ? tag+year : year+"-"+tag
     }
 
     if (precision === "hour")

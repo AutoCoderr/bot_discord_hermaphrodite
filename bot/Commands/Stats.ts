@@ -260,7 +260,7 @@ export default class Stats extends Command<IStatsArgs> {
         });
         messagePayload.files = [{
             name: "stats.csv",
-            data: await exportStatsInCsv(<Guild>this.guild, specifiedDate, afterOrBefore??"after", action, precision)
+            data: "wesh"//(await exportStatsInCsv(<Guild>this.guild, specifiedDate, afterOrBefore??"after", action, precision)).all
         }]
         return this.response(true, messagePayload)
     }

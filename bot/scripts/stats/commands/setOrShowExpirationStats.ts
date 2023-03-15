@@ -8,7 +8,7 @@ import StatsConfig, { defaultStatsExpiration, maxStatsExpiration, minStatsExpira
 function cmdError(msg, action) {
     console.log("Erreur : "+msg);
     console.log("Voici la syntaxe requise :");
-    console.log("npm run stats_expiration_"+action+" <vocal|messages>"+(action === "set" ? " <expiration>" : "")+" <all|server_id1, server_id2, server_idn>");
+    console.log("npm run stats_expiration_"+action+" <type: vocal|messages>"+(action === "set" ? " <expiration: integer>" : "")+" <server: all|server_id1, server_id2, server_idn>");
     process.exit();
 }
 
