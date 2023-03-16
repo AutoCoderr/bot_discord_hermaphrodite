@@ -13,6 +13,7 @@
     "stats_expiration_show": "node --trace-deprecation --trace-warnings scripts/stats/commands/setOrShowExpirationStats.js show",
     "stats_expiration_set": "node --trace-deprecation --trace-warnings scripts/stats/commands/setOrShowExpirationStats.js set",
     "stats_export": "node --trace-deprecation --trace-warnings scripts/stats/commands/exportDatasStats.js",
+    "stats_purge": "node --trace-deprecation --trace-warnings scripts/stats/commands/purgeDatasStats.js",
     "watch": "tsc -w",
     "build": "tsc"
   },

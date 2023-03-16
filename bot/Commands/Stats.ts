@@ -204,7 +204,7 @@ export default class Stats extends Command<IStatsArgs> {
             const specifiedDate = incrementUnitToDate(getDateWithPrecision(), backTime.unit, -backTime.value);
 
             addCallbackButton(acceptButtonId, async () => {
-                await purgeDatas(action, specifiedDate, afterOrBefore ?? "after");
+                await purgeDatas([<Guild>this.guild], action, specifiedDate, afterOrBefore ?? "after");
 
                 return this.response(true, {
                     embeds: [

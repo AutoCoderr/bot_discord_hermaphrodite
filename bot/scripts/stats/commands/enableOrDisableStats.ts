@@ -40,7 +40,7 @@ client.on('ready', async () => {
     }
 
     console.log(
-        "Les guilds suivants vont avoir leur stats "+
+        "Les guilds suivants vont avoir leurs stats "+
         (type === "vocal" ? "vocales" : "textuelles")+
         " "+(action === "enable" ? "activées" : "désactivées")+" :"
     );

@@ -15,7 +15,7 @@ function cmdError(msg) {
 
 
 client.on('ready', async () => {
-    const [type, exportType, precision, date, afterOrBefore] = <['vocal'|'messages',IExportType,IPrecision,Date,'after'|'before']>process.argv.slice(2);
+    const [type, exportType, precision, date, afterOrBefore] = <['vocal'|'messages',IExportType,IPrecision,string,'after'|'before']>process.argv.slice(2);
     
     if (!["vocal","messages"].includes(type))
         throw cmdError("Vous devez préciser s'il s'agit du vocal ou des messages");
