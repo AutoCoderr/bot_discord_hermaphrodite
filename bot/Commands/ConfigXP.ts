@@ -38,7 +38,7 @@ import {
     checkGradesListData,
     reDefineUsersGradeRole
 } from "../libs/XP/gradeCalculs";
-import {getTimezoneDatas} from "../libs/timezones";
+import {findTimezonesFromKeyword, getTimezoneDatas} from "../libs/timezones";
 import XPUserData, { IXPUserData } from "../Models/XP/XPUserData";
 import errorCatcher from "../logging/errorCatcher";
 import CustomError from "../logging/CustomError";
@@ -938,9 +938,7 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                 ]
             })
 
-        const {zones} = await getTimezoneDatas();
-
-        const foundZones = Object.keys(zones).filter(zone => zone.toLowerCase().replace(args.timezone, "") !== zone.toLowerCase())
+        const foundZones = await findTimezonesFromKeyword(args.timezone);
 
         if (foundZones.length === 0)
             return this.response(false, {

@@ -7,6 +7,8 @@ import VocalNewConnectionsStats, { IVocalNewConnectionsStats } from "../../Model
 import { IPrecision, getDateWithPrecision } from "./statsCounters";
 import { Model } from "mongoose";
 import { RequireAtLeastOne } from "../../interfaces/CommandInterfaces";
+import { convertDateToMomentTimeZoneFormat, removeTimeZoneFromISODate } from "../timezones";
+import moment from "moment-timezone";
 
 type IAllStatsModels = IMessagesStats|IVocalConnectionsStats|IVocalMinutesStats|IVocalNewConnectionsStats;
 
@@ -15,7 +17,7 @@ type IStatsDataInfosToExport = RequireAtLeastOne<{
     models: (typeof Model)[],
     col: string,
     text: string,
-    aggregate?: (precision: IPrecision, data: any) => number
+    aggregate?: (precision: IPrecision, data: any, date?: Date) => number
 }, 'model'|'models'>
 
 const datasInfosToExportByType: {[type: string]: IStatsDataInfosToExport[]} = {
@@ -31,12 +33,13 @@ const datasInfosToExportByType: {[type: string]: IStatsDataInfosToExport[]} = {
             models: [VocalConnectionsStats,VocalNewConnectionsStats],
             col: 'nbVocalConnections', 
             text: "Nombre de connexions vocales",
-            aggregate: (precision, data: IVocalNewConnectionsStats|IVocalConnectionsStats) => {
+            aggregate: (precision, data: IVocalNewConnectionsStats|IVocalConnectionsStats, date) => {
+                date = date??data.date;
                 if (
                     data instanceof VocalNewConnectionsStats &&
                     precision !== "hour" &&
                     (
-                        data.date.getHours() > 0 || (precision === "month" && data.date.getDate() > 1)
+                        date.getHours() > 0 || (precision === "month" && date.getDate() > 1)
                     )
                 ) {
                     return (<IVocalNewConnectionsStats>data).nbVocalNewConnections;
@@ -44,7 +47,7 @@ const datasInfosToExportByType: {[type: string]: IStatsDataInfosToExport[]} = {
                 if (
                     data instanceof VocalConnectionsStats && (
                         precision === "hour" || (
-                            data.date.getHours() === 0 && (precision === "day" || data.date.getDate() === 1 )
+                            date.getHours() === 0 && (precision === "day" || date.getDate() === 1 )
                         )
                     )
                 ) {
@@ -130,6 +133,7 @@ export default async function exportStatsInCsv(
     afterOrBefore: 'after'|'before', 
     type: 'messages'|'vocal', 
     precision: IPrecision,
+    specifiedTimezone: null|string = null
 ): Promise<string|{[guildId: string]: string}> {
     const datasInfosToExport: IStatsDataInfosToExport[] = datasInfosToExportByType[type]
 
@@ -157,16 +161,27 @@ export default async function exportStatsInCsv(
         for (let j=0;j<datas[i].length;j++) {
             for (const modelDatas of datas[i][j]) {
                 for (const data of modelDatas) {
-                    if (afterOrBefore === "before" && (oldestDate === null || data.date.getTime() < oldestDate.getTime())) {
-                        oldestDate = data.date;
+                    const date = specifiedTimezone === null ?
+                                    data.date :
+                                    new Date(
+                                        removeTimeZoneFromISODate(
+                                            moment.utc(
+                                                convertDateToMomentTimeZoneFormat(data.date)
+                                            )
+                                            .tz(specifiedTimezone)
+                                            .format()
+                                        )
+                                    )
+                    if (afterOrBefore === "before" && (oldestDate === null || date.getTime() < oldestDate.getTime())) {
+                        oldestDate = date;
                     }
-                    const dateTag = getDateTag(data.date, precision);
+                    const dateTag = getDateTag(date, precision);
                     const col = datasInfosToExport[j].col;
     
                     const oldValue = (aggregatedStatsByGuildId[guild.id][dateTag] && aggregatedStatsByGuildId[guild.id][dateTag][col] !== undefined) ? aggregatedStatsByGuildId[guild.id][dateTag][col] : 0
                     const newValue = oldValue + (
                         (datasInfosToExport[j].aggregate !== undefined) ?
-                            (<Required<IStatsDataInfosToExport>['aggregate']>datasInfosToExport[j].aggregate)(precision, data) : 
+                            (<Required<IStatsDataInfosToExport>['aggregate']>datasInfosToExport[j].aggregate)(precision, data, date) : 
                             data[col]
                         )
                     if (aggregatedStatsByGuildId[guild.id][dateTag] === undefined) {
@@ -189,6 +204,20 @@ export default async function exportStatsInCsv(
     const startDate: Date = afterOrBefore === "after" ? 
                     specifiedDate : 
                     (oldestDate ? getDateWithPrecision(oldestDate, precision) : specifiedDate);
+    
+    const [zonedEndDate, zonedStartDate] = [endDate, startDate].map(date =>
+        specifiedTimezone === null ?
+        date :
+        new Date(
+            removeTimeZoneFromISODate(
+                moment.utc(
+                    convertDateToMomentTimeZoneFormat(date)
+                )
+                .tz(specifiedTimezone)
+                .format()
+            )
+        )
+    )
 
     const firstLine = "Date;"+datasInfosToExport.map(({text}) => text).join(";")+(
         ["max","min"].includes(exportType) ? 
@@ -203,12 +232,12 @@ export default async function exportStatsInCsv(
 
     const colsToGet = datasInfosToExport.map(({col}) =>col);
 
-    while (endDate.getTime() >= startDate.getTime()) {
-        const dateTag = getDateTag(endDate, precision);
+    while (zonedEndDate.getTime() >= zonedStartDate.getTime()) {
+        const dateTag = getDateTag(zonedEndDate, precision);
 
         addDatasToCsv(csvs, dateTag, aggregatedStatsByGuildId, colsToGet, exportType, guilds);
 
-        endDate[setter](endDate[getter]()-1)
+        zonedEndDate[setter](zonedEndDate[getter]()-1)
     }
     
     return csvs;
