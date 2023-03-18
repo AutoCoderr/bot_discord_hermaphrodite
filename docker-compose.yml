@@ -6,6 +6,7 @@ services:
     volumes:
       - ./bot:/bot
       - ./logs:/logs
+      - ./exported_stats:/exported_stats
     working_dir: /bot
     depends_on:
       - mongodb

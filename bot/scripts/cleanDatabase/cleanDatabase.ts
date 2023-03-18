@@ -20,6 +20,11 @@ import textUserConfig from "../../Models/Text/TextUserConfig";
 import getToUpdateElements from "./getToUpdateElements";
 import Text from "../../Commands/Text";
 import Vocal from "../../Commands/Vocal";
+import MessagesStats from "../../Models/Stats/MessagesStats";
+import VocalConnectionsStats from "../../Models/Stats/VocalConnectionsStats";
+import VocalNewConnectionsStats from "../../Models/Stats/VocalNewConnectionsStats";
+import VocalMinutesStats from "../../Models/Stats/VocalMinutesStats";
+import StatsConfig from "../../Models/Stats/StatsConfig";
 
 //@ts-ignore
 Array.prototype.promiseReduce = async function (callback, acc) {
@@ -47,7 +52,9 @@ function checkAndDeleteUselessEntries<ModelType = any>(
     colsTypes, 
     listsTypes = {}, 
     colsExpires = {}, 
-    filtersForDelete: null|((ModelType) => boolean) = null
+    filtersForDelete: null|((ModelType) => boolean) = null,
+    groupedLoggingForDelete: boolean = false,
+    groupedLoggingForUpdate: boolean = false
 ) {
     return model.find()
         .then(elements => filterElementsToDelete(elements, colsTypes, colsExpires, filtersForDelete))
@@ -58,21 +65,35 @@ function checkAndDeleteUselessEntries<ModelType = any>(
 
             return Promise.all([
                 Promise.all((toDelete ?? []).map(element => {
-                    console.log("\nDelete " + name + " => ");
-                    console.log(element);
+                    if (!groupedLoggingForDelete) {
+                        console.log("\nDelete " + name + " => ");
+                        console.log(element);
+                        }
                     return element.remove();
-                })),
+                })).then(() => {
+                    if (groupedLoggingForDelete && toDelete && toDelete.length > 0) {
+                        console.log("\nDelete " + name + " => ");
+                        console.log(toDelete.length+" elements deleted")
+                    }
+                }),
                 getToUpdateElements(toKeep ?? [], datas, listsTypes, colsTypes)
             ])
         })
         .then(([, toUpdateElements]) =>
             Promise.all(toUpdateElements.map(element => {
-                console.log('\nUpdate ' + name + ' ' + element._id + ' with new lists\n');
-                console.log(element);
+                if (!groupedLoggingForUpdate) {
+                    console.log('\nUpdate ' + name + ' ' + element._id + ' with new lists\n');
+                    console.log(element);
+                }
                 return model.updateOne({
                     _id: element._id
                 }, element)
-            }))
+            })).then(() => {
+                if (groupedLoggingForUpdate && toUpdateElements.length > 0) {
+                    console.log("\nUpdate " + name + " => ");
+                    console.log(toUpdateElements.length+" elements updated")
+                }
+            })
         )
 }
 
@@ -174,6 +195,21 @@ async function cleanDatabase() {
         }),
         checkAndDeleteUselessEntries(WelcomeMessage, "welcomeMessage", {
             server: ['serverId'],
+        }),
+        checkAndDeleteUselessEntries(MessagesStats, "messagesStats", {
+            server: ['serverId']
+        }, {}, {}, null, true),
+        checkAndDeleteUselessEntries(VocalConnectionsStats, "vocalConnectionsStats", {
+            server: ['serverId']
+        }, {}, {}, null, true),
+        checkAndDeleteUselessEntries(VocalNewConnectionsStats, "vocalNewConnectionsStats", {
+            server: ['serverId']
+        }, {}, {}, null, true),
+        checkAndDeleteUselessEntries(VocalMinutesStats, "vocalMinutesStats", {
+            server: ['serverId']
+        }, {}, {}, null, true),
+        checkAndDeleteUselessEntries(StatsConfig, "statsConfig", {
+            server: ['serverId']
         })
     ]).catch(e => {
         console.log("ERROR");

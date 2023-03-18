@@ -6,7 +6,14 @@
   "scripts": {
     "start": "tsc && node --trace-deprecation --trace-warnings bot.js",
     "clean_database": "node --trace-deprecation --trace-warnings scripts/cleanDatabase/cleanDatabase.js",
-    "generate_fake_stats": "node --trace-deprecation --trace-warnings scripts/generateFakeStats.js",
+    "stats_generate_fake_datas": "node --trace-deprecation --trace-warnings scripts/stats/commands/generateFakeStats.js",
+    "stats_enable": "node --trace-deprecation --trace-warnings scripts/stats/commands/enableOrDisableStats.js enable",
+    "stats_disable": "node --trace-deprecation --trace-warnings scripts/stats/commands/enableOrDisableStats.js disable",
+    "stats_are_enabled": "node --trace-deprecation --trace-warnings scripts/stats/commands/enableOrDisableStats.js are_enabled",
+    "stats_expiration_show": "node --trace-deprecation --trace-warnings scripts/stats/commands/setOrShowExpirationStats.js show",
+    "stats_expiration_set": "node --trace-deprecation --trace-warnings scripts/stats/commands/setOrShowExpirationStats.js set",
+    "stats_export": "node --trace-deprecation --trace-warnings scripts/stats/commands/exportDatasStats.js",
+    "stats_purge": "node --trace-deprecation --trace-warnings scripts/stats/commands/purgeDatasStats.js",
     "watch": "tsc -w",
     "build": "tsc"
   },

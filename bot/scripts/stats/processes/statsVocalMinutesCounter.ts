@@ -1,5 +1,5 @@
-import { getDateWithPrecision } from "../libs/stats/statsCounters";
-import {tryCatchProcess} from "../logging/catchers";
+import { getDateWithPrecision } from "../../../libs/stats/statsCounters";
+import {tryCatchProcess} from "../../../logging/catchers";
 
 let lastDate: Date = getDateWithPrecision();
 

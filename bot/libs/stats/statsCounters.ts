@@ -1,11 +1,14 @@
-import { Guild, Message, VoiceState } from "discord.js";
-import StatsConfig, { defaultStatsExpiration, IStatsConfig } from "../../Models/Stats/StatsConfig";
+import { Message, VoiceState } from "discord.js";
+import StatsConfig, { IStatsConfig } from "../../Models/Stats/StatsConfig";
 import VocalConnectionsStats, { IVocalConnectionsStats } from "../../Models/Stats/VocalConnectionsStats";
 import VocalMinutesStats, { IVocalMinutesStats } from "../../Models/Stats/VocalMinutesStats";
 import MessagesStats, { IMessagesStats } from "../../Models/Stats/MessagesStats";
 import { abortProcess, contactProcess, createProcess } from "../subProcessManager";
-import { addMissingZero, getDateGettersAndSettersFromUnit } from "../../Classes/OtherFunctions";
 import VocalNewConnectionsStats, { IVocalNewConnectionsStats } from "../../Models/Stats/VocalNewConnectionsStats";
+import clearExpiredDatas from "./clearExpiredDatas";
+
+export type IPrecision = keyof typeof precisions;
+
 const precisions = {
     month: (date: Date) => {
         date.setDate(1);
@@ -35,84 +38,18 @@ export function getAllStatsUnitTexts() {
     return unitsTexts;
 }
 
-export function getStatsUnitIndex(unit: keyof typeof precisions) {
+export function getStatsUnitIndex(unit: IPrecision) {
     return Object.keys(precisions).indexOf(unit);
 }
 
-export function statsPrecisionExists(precision: string) {
+export function statsPrecisionExists(precision: IPrecision) {
     return precisions[precision] !== undefined
 }
 
 export type IStatsPrecisionUnits = keyof typeof precisions;
 
-export function getDateWithPrecision(date: Date = new Date, precision: keyof typeof precisions = 'hour') {
+export function getDateWithPrecision(date: Date = new Date(), precision: IPrecision = 'hour') {
     return precisions[precision](date);
-}
-
-
-function getDateTag(date: Date, precision: keyof typeof precisions) {
-    let tag = "";
-    switch (precision) {
-        case 'hour':
-        case 'day':
-            tag = addMissingZero(date.getDate())+"/"
-        case 'month':
-            tag += addMissingZero(date.getMonth()+1)+"/"
-        default:
-            tag += date.getFullYear()
-    }
-
-    if (precision === "hour")
-        tag += " "+addMissingZero(date.getHours())+"h"
-    
-    return tag;
-}
-
-export async function exportStatsInCsv(guild: Guild, startDate: Date, type: 'messages'|'vocal', precision: keyof typeof precisions) {
-    const models = type === "messages" ?
-        [
-            [MessagesStats, 'nbMessages', "Nombre de messages"]
-        ] :
-        [
-            [VocalConnectionsStats, 'nbVocalConnections', "Nombre de connexions vocales"],
-            [VocalMinutesStats, 'nbMinutes', "Nombre de minutes en vocal"]
-        ];
-
-    const datas = await Promise.all(models.map(([model]) => model.find({
-        serverId: guild.id,
-        date: {$gte: startDate}
-    })))
-
-    const aggregatedStats = {};
-
-    for (let i=0;i<datas.length;i++) {
-        for (const data of datas[i]) {
-            const dateTag = getDateTag(data.date, precision);
-            if (aggregatedStats[dateTag] === undefined) {
-                aggregatedStats[dateTag] = {
-                    [models[i][1]]: data[models[i][1]]
-                }
-                continue;
-            }
-            aggregatedStats[dateTag][models[i][1]] = (aggregatedStats[dateTag][models[i][1]]??0)+data[models[i][1]]
-        }
-    }
-
-    let csv = "date;"+models.map(([_,__,labelCol]) => labelCol).join(";");
-    
-    const [getter,setter] = getDateGettersAndSettersFromUnit(precision);
-
-    const currentDate = new Date();
-    while (startDate.getTime() < currentDate.getTime()) {
-        const dateTag = getDateTag(startDate, precision);
-        const stat = aggregatedStats[dateTag];
-
-        csv += "\n"+dateTag+";"+models.map(([_,col]) => (stat && stat[col]) ? stat[col] : 0).join(";");
-
-        startDate[setter](startDate[getter]()+1)
-    }
-    
-    return csv;
 }
 
 export async function countingStats(
@@ -171,10 +108,11 @@ export async function countingStatsMessagesEvent(message: Message) {
         serverId: message.guild.id,
         listenMessages: true
     })
-    if (statsConfig === null)
-        return;
+    if (statsConfig === null) {
+        return abortProcess("messageStats", message.guild.id)
+    }
 
-    createProcess("/bot/scripts/queues/stats/messageCounter.js", "messageStats", message.guild.id);
+    createProcess("/bot/scripts/stats/queues/messageCounter.js", "messageStats", message.guild.id);
     contactProcess(message.guild.id, "messageStats", message.guild.id);
 }
 
@@ -183,15 +121,16 @@ export async function countingStatsVoiceConnectionsAndMinutesEvent(oldVoiceState
         serverId: newVoiceState.guild.id,
         listenVocal: true
     })
-    if (statsConfig === null)
-        return;
+    if (statsConfig === null) {
+        return abortProcess("vocalStats", newVoiceState.guild.id)
+    }
 
     countingStatsVoicesMinutes(oldVoiceState, newVoiceState);
 
     if (newVoiceState.channelId === null || newVoiceState.channelId === oldVoiceState.channelId)
         return;
 
-    createProcess("/bot/scripts/queues/stats/vocalCounter.js", "vocalStats", newVoiceState.guild.id);
+    createProcess("/bot/scripts/stats/queues/vocalCounter.js", "vocalStats", newVoiceState.guild.id);
     
     contactProcess({type: "vocalConnections", serverId: newVoiceState.guild.id}, "vocalStats", newVoiceState.guild.id)
     contactProcess({type: "vocalNewConnections", serverId: newVoiceState.guild.id}, "vocalStats", newVoiceState.guild.id)
@@ -204,26 +143,6 @@ function countingStatsVoicesMinutes(oldVoiceState: VoiceState, newVoiceState: Vo
         abortProcess("voiceMinutesCounter", newVoiceState.member.id);
     }
     if (newVoiceState.channelId !== null && (oldVoiceState.channelId === null || oldVoiceState.guild.id !== newVoiceState.guild.id)) {
-        createProcess("/bot/scripts/statsVocalMinutesCounter.js", "voiceMinutesCounter", newVoiceState.member.id, [newVoiceState.guild.id], 10_000);
+        createProcess("/bot/scripts/stats/processes/statsVocalMinutesCounter.js", "voiceMinutesCounter", newVoiceState.member.id, [newVoiceState.guild.id], 10_000);
     }
-}
-
-export async function clearExpiredDatas(type: 'vocalMinutes'|'vocalConnections'|'vocalNewConnections'|'messages', serverId: string) {
-    const model = {
-        vocalMinutes: VocalMinutesStats,
-        vocalConnections: VocalConnectionsStats,
-        vocalNewConnections: VocalNewConnectionsStats,
-        messages: MessagesStats
-    }[type];
-
-    const statsConfig = await StatsConfig.findOne({
-        serverId,
-    })
-
-    const nbDays = statsConfig[type === "messages" ? "messagesExpiration" : "vocalExpiration"] ?? defaultStatsExpiration;
-
-    return model.deleteMany({
-        serverId,
-        date: {$lt: new Date(new Date().getTime() - nbDays * 24 * 60 * 60 * 1000)}
-    })
 }
