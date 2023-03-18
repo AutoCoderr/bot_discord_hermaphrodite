@@ -74,7 +74,7 @@ client.on('ready', async () => {
     const folderName = (new Date().toISOString())+"_"+
                         type+"_"+getDateTag(specifiedDate, precision,"en")+"_"+
                         (specifiedTimezone ? specifiedTimezone.replace(/\//g, "-") : "utc")+"_"+afterOrBefore+"_"+precision+"_"+exportType;
-    const path = __dirname+"/../../../exported_stats/"+folderName
+    const path = __dirname+"/../../../../exported_stats/"+folderName
 
     if (!(await fs.access(path).then(() => true).catch(() => false))) {
         await fs.mkdir(path);
