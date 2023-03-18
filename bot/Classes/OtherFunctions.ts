@@ -15,6 +15,7 @@ import HistoryExec from "../Commands/HistoryExec";
 import HistoryCmd from "../Commands/HistoryCmd";
 import ListNotifyOnReact from "../Commands/ListNotifyOnReact";
 import {IArgsModel} from "../interfaces/CommandInterfaces";
+import { IPrecision } from "../libs/stats/statsCounters";
 
 export function addMissingZero(number, n = 2) {
     number = number.toString();
@@ -332,10 +333,17 @@ export async function deleteMP(user: User, messageIdOrMessage: string|Message) {
     await message.delete().catch(() => null);
 }
 
-export function getDateGettersAndSettersFromUnit(unit: 'hour'|'day'|'month') {
+export function getDateGettersAndSettersFromUnit(unit: IPrecision) {
     return {
         hour: ['getHours', 'setHours'],
         day: ['getDate', 'setDate'],
         month: ['getMonth', 'setMonth']
     }[unit];
+}
+
+export function incrementUnitToDate(date: Date, unit: IPrecision, v: number) {
+    const [getter,setter] = getDateGettersAndSettersFromUnit(unit);
+    const newDate = new Date(date.getTime());
+    newDate[setter](newDate[getter]()+v)
+    return newDate;
 }

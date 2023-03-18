@@ -29,6 +29,10 @@ export async function getTimezoneDatas(): Promise<ITimezoneData> {
     return <ITimezoneData>datas;
 }
 
+export function findTimezonesFromKeyword(keyword: string): Promise<string[]> {
+    return getTimezoneDatas().then(({zones}) => Object.keys(zones).filter(zone => zone.toLowerCase().replace(keyword, "") !== zone.toLowerCase()))
+}
+
 
 export function convertTimeNumberToMomentTimeZoneFormat(n: number) {
     const currentDate = new Date();
@@ -39,6 +43,19 @@ export function convertTimeNumberToMomentTimeZoneFormat(n: number) {
         currentDate.getMilliseconds();
 
     return convertNumberToMomentTimeZoneFormat(currentDateNumber+n);
+}
+export function removeTimeZoneFromISODate(s: string, d: null|string = null) {
+    if (d === null) {
+        for (const d of ["-","+"]) {
+            const s2 = removeTimeZoneFromISODate(s,d);
+            if (s2)
+                return s2
+        }
+        return s;
+    }
+    const splittedS1 = s.split("T");
+    const splittedS2 = splittedS1[1].split(d);
+    return splittedS2.length > 1 ? splittedS1[0]+"T"+splittedS2[0] : null
 }
 export function convertNumberToMomentTimeZoneFormat(n: number) {
     return convertDateToMomentTimeZoneFormat(new Date(n));
