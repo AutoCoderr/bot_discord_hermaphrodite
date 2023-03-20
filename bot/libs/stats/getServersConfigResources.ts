@@ -25,6 +25,12 @@ interface IGroupedConfigByResourcesByModel {
     }
 }
 
+interface IExportedServerConfigResources {
+    [key: IConfigResourceKey]: {
+        [guildId: string]: boolean
+    }
+}
+
 export const configResourcesKeys: {[key: string]: IConfigResource} = {
     text: {
         model: TextConfig
@@ -59,7 +65,7 @@ export const configResourcesKeys: {[key: string]: IConfigResource} = {
     }
 }
 
-export default async function getServerConfigResources(keys: null|(keyof typeof configResourcesKeys)[], guilds: Guild[]) {
+export default async function getServerConfigResources(keys: null|(keyof typeof configResourcesKeys)[], guilds: Guild[]): Promise<IExportedServerConfigResources> {
     const keysGroupedByModel: IGroupedConfigByResourcesByModel = (keys??Object.keys(configResourcesKeys)).reduce((acc,key) => {
         const collectionName = configResourcesKeys[key].model.collection.collectionName;
         return {

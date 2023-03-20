@@ -5,7 +5,7 @@ import getServerConfigResources, { IConfigResourceKey, configResourcesKeys } fro
 function cmdError(msg) {
     console.log("Erreur : "+msg);
     console.log("Voici la syntaxe requise :");
-    console.log("npm run stats_show_servers <servers: all|server_id1, server_id2, server_idn> [/ key1, key2, key2]");
+    console.log("npm run stats_show_servers <servers: all|server_id1, server_id2, server_idn> [/ <keys: all|key1, key2, key2> ]");
     console.log("Les clés possibles : "+Object.keys(configResourcesKeys).join(", "))
     process.exit();
 }
@@ -22,14 +22,20 @@ client.on('ready', async () => {
 
     const guilds = checkAndGetGivenGuilds(ids, client, cmdError);
 
-    //console.log({ids,keys})
-    /*const {ids, keyss} = process.argv.slice(2).reduce(({ids,keyss,inKeys},arg) => ({
-        ids: inKeys ? [] : [...ids, arg],
-        keyss: [],
-        inKeys: true
-    }), <[ids: string[], keyss: IConfigResourceKey[], inKeys: boolean]>)*/
+    const serverConfigs = await getServerConfigResources((keys.length === 1 && keys[0] === "all" ? null : keys),guilds);
 
-    console.log(await getServerConfigResources((keys.length === 1 && keys[0] === "all" ? null : keys),guilds))
+    console.log("Voici les différents serveurs :"+(keys.length > 0 ? "\n\n" : "\n"));
+    console.log(
+        guilds.map(({id,name}) => 
+            name+" ("+id+")"+ (
+                keys.length > 0 ?
+                    " => \n"+Object.entries(serverConfigs).map(([key,servers]) =>
+                        "\t"+key+" : "+(servers[id] ? "activé" : "désactivés")
+                    ).join("\n") :
+                    ""
+            )
+        ).join(keys.length > 0 ? "\n\n" : "\n")
+    )
 
     process.exit();
 });
