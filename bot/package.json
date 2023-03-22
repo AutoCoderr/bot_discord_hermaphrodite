@@ -9,11 +9,12 @@
     "stats_generate_fake_datas": "node --trace-deprecation --trace-warnings scripts/stats/commands/generateFakeStats.js",
     "stats_enable": "node --trace-deprecation --trace-warnings scripts/stats/commands/enableOrDisableStats.js enable",
     "stats_disable": "node --trace-deprecation --trace-warnings scripts/stats/commands/enableOrDisableStats.js disable",
-    "stats_are_enabled": "node --trace-deprecation --trace-warnings scripts/stats/commands/enableOrDisableStats.js are_enabled",
     "stats_expiration_show": "node --trace-deprecation --trace-warnings scripts/stats/commands/setOrShowExpirationStats.js show",
     "stats_expiration_set": "node --trace-deprecation --trace-warnings scripts/stats/commands/setOrShowExpirationStats.js set",
     "stats_export": "node --trace-deprecation --trace-warnings scripts/stats/commands/exportDatasStats.js",
     "stats_purge": "node --trace-deprecation --trace-warnings scripts/stats/commands/purgeDatasStats.js",
+    "stats_show_servers": "node --trace-deprecation --trace-warnings scripts/stats/commands/showServers.js",
+    "stats_show_percent_uses": "node --trace-deprecation --trace-warnings scripts/stats/commands/showPercentUses.js",
     "watch": "tsc -w",
     "build": "tsc"
   },

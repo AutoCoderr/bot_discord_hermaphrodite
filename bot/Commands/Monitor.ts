@@ -172,13 +172,12 @@ export default class Monitor extends Command {
                 description: "L'id du message à supprimer ou rafraichir",
                 required: (args) => ["refresh","remove"].includes(args.action),
                 moreDatas: (args) => args.channel
-            }
-        },
+            },
 
-        $argsByName: {
+
+
             showUserCount: {
                 referToSubCommands: ["add"],
-                fields: ["-uc", "--user-count", "--show-user-count"],
                 type: "boolean",
                 description: "Pour afficher ou non le nombre d'utilisateurs",
                 default: true,
@@ -186,7 +185,6 @@ export default class Monitor extends Command {
             },
             showDescription: {
                 referToSubCommands: ["add"],
-                fields: ["-d", "--description", "--show-description"],
                 type: "boolean",
                 description: "Pour afficher ou non la description",
                 default: true,
@@ -194,7 +192,6 @@ export default class Monitor extends Command {
             },
             showIcon: {
                 referToSubCommands: ["add"],
-                fields: ["-i", "--icon", "--show-icon"],
                 type: "boolean",
                 description: "Pour afficher ou non l'icone",
                 default: true,
@@ -202,7 +199,6 @@ export default class Monitor extends Command {
             },
             showOnlineUserCount: {
                 referToSubCommands: ["add"],
-                fields: ["-ouc", "--online-user-count", "--show-online-user-count"],
                 type: "boolean",
                 description: "Pour afficher ou non le nombre d'utilisateurs connectées",
                 default: true,
@@ -210,7 +206,6 @@ export default class Monitor extends Command {
             },
             showMemberMax: {
                 referToSubCommands: ["add"],
-                fields: ["-mm", "--member-max", "--show-member-max"],
                 type: "boolean",
                 description: "Pour afficher ou non le nombre maximum de membres",
                 default: false,
@@ -218,14 +213,12 @@ export default class Monitor extends Command {
             },
             showRoleMembersCount: {
                 referToSubCommands: ["add"],
-                fields: ["-rmc", "--role-members-count", "--show-role-members-count"],
                 type: "roles",
                 description: "Pour afficher le nombre de membres d'un/des rôles spécifiés (exemple: "+config.command_prefix+"monitor -rmc @moderateurs)",
                 required: false
             },
             showEmojiCount: {
                 referToSubCommands: ["add"],
-                fields: ["-ec", "--emoji-count", "--show-emoji-count"],
                 type: "boolean",
                 description: "Pour afficher ou non le nombre d'emotes",
                 default: false,
@@ -233,7 +226,6 @@ export default class Monitor extends Command {
             },
             showChannelCount: {
                 referToSubCommands: ["add"],
-                fields: ["-cc", "--channel-count", "--show-channel-count"],
                 type: "boolean",
                 description: "Pour afficher ou non le nombre de channels",
                 default: false,
