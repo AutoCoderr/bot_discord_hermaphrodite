@@ -25,7 +25,7 @@ interface IGroupedConfigByResourcesByModel {
     }
 }
 
-interface IExportedServerConfigResources {
+export interface IExportedServerConfigResources {
     [key: IConfigResourceKey]: {
         [guildId: string]: boolean
     }

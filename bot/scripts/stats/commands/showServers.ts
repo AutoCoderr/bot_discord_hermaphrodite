@@ -1,6 +1,6 @@
 import client from "../../../client";
 import { checkAndGetGivenGuilds } from "../../../libs/commandUtils";
-import getServerConfigResources, { IConfigResourceKey, configResourcesKeys } from "../../../libs/stats/getServersConfigResources";
+import getServerConfigResources, { IConfigResourceKey, IExportedServerConfigResources, configResourcesKeys } from "../../../libs/stats/getServersConfigResources";
 
 function cmdError(msg) {
     console.log("Erreur : "+msg);
@@ -22,14 +22,14 @@ client.on('ready', async () => {
 
     const guilds = checkAndGetGivenGuilds(ids, client, cmdError);
 
-    const serverConfigs = await getServerConfigResources((keys.length === 1 && keys[0] === "all" ? null : keys),guilds);
+    const serverConfigs: null|IExportedServerConfigResources = keys.length > 0 ? await getServerConfigResources((keys.length === 1 && keys[0] === "all" ? null : keys),guilds) : null;
 
     console.log("Voici les différents serveurs :"+(keys.length > 0 ? "\n\n" : "\n"));
     console.log(
         guilds.map(({id,name}) => 
             name+" ("+id+")"+ (
                 keys.length > 0 ?
-                    " => \n"+Object.entries(serverConfigs).map(([key,servers]) =>
+                    " => \n"+Object.entries(<IExportedServerConfigResources>serverConfigs).map(([key,servers]) =>
                         "\t"+key+" : "+(servers[id] ? "activé" : "désactivés")
                     ).join("\n") :
                     ""
