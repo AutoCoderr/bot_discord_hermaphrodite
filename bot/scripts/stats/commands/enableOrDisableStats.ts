@@ -13,7 +13,7 @@ function cmdError(msg, action) {
 client.on('ready', async () => {
     const [action, type] = process.argv.slice(2);
 
-    if (!["enable","disable","are_enabled"].includes(action))
+    if (!["enable","disable"].includes(action))
         throw new Error("'action' has not been correctly given")
 
     if (!["vocal","messages"].includes(type))
@@ -24,20 +24,6 @@ client.on('ready', async () => {
     const guilds = checkAndGetGivenGuilds(ids, client, (msg) => cmdError(msg,action))
 
     const statsConfigsByServerId = await getStatsConfigsByGuildsIds(guilds.map(({id}) => id));
-
-    if (action === "are_enabled") {
-        console.log("Voici les serveurs ayant leur stats "+(type === "vocal" ? "vocales" : "textuelles")+" activées ou non :")
-        console.log("\n"+
-            guilds.map(({name,id}) =>
-                name+" ("+id+") => "+(
-                    statsConfigsByServerId[id] ? 
-                        (statsConfigsByServerId[id][type === 'messages' ? 'listenMessages' : 'listenVocal'] ? "Activé" : "Désactivé") :
-                        "Désactivé"
-                    )
-            ).join("\n")
-        )
-        process.exit();
-    }
 
     console.log(
         "Les guilds suivants vont avoir leurs stats "+

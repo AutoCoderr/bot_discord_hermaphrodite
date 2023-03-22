@@ -18,6 +18,7 @@ import countingFirstMessagesXPs from "./libs/XP/XPCounting/countingFirstMessages
 import {findAndExecCallbackButton} from "./libs/callbackButtons";
 import { findAndExecCallbackModal } from "./libs/callbackModals";
 import { countingStatsMessagesEvent, countingStatsVoiceConnectionsAndMinutesEvent } from "./libs/stats/statsCounters";
+import StatsConfig from "./Models/Stats/StatsConfig";
 
 export default function init(bot) {
     client.on('ready', () => {
