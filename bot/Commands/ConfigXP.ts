@@ -27,7 +27,6 @@ import {extractDurationTime, extractUTCTime, showTime} from "../Classes/DateTime
 import {
     warningNothingRoleCanBeAssignedMessage, warningSpecificRolesCantBeAssignedMessage, resetUsers, checkParametersData
 } from "../libs/XP/XPOtherFunctions";
-import client from "../client";
 import AbstractXP from "./AbstractXP";
 import {findTipByLevel, setTipByLevel} from "../libs/XP/tips/tipsManager";
 import {checkTipsListData} from "../libs/XP/tips/tipsOtherFunctions";
@@ -38,7 +37,7 @@ import {
     checkGradesListData,
     reDefineUsersGradeRole
 } from "../libs/XP/gradeCalculs";
-import {findTimezonesFromKeyword, getTimezoneDatas} from "../libs/timezones";
+import {findTimezonesFromKeyword} from "../libs/timezones";
 import XPUserData, { IXPUserData } from "../Models/XP/XPUserData";
 import errorCatcher from "../logging/errorCatcher";
 import CustomError from "../logging/CustomError";
@@ -1610,7 +1609,7 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                     if (response.author.id !== this.member.id || response.channelId !== this.channel.id)
                         return;
 
-                    client.off('messageCreate', listener);
+                    this.client.off('messageCreate', listener);
                     clearTimeout(timeout);
 
                     const messageCanBeDeleted = userHasChannelPermissions(<GuildMember>(<Guild>this.guild).members.me, this.channel, PermissionFlagsBits.ManageMessages)
@@ -1656,10 +1655,10 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
                 resolve(this.response(false, "Une erreur est survenue"))
             })
 
-            client.on('messageCreate', listener);
+            this.client.on('messageCreate', listener);
 
             timeout = setTimeout(() => {
-                client.off('messageCreate', listener);
+                this.client.off('messageCreate', listener);
                 resolve(this.response(false, "Délai dépassé"));
             }, 15 * 60 * 1000)
         })

@@ -2,7 +2,7 @@ import config from "../config";
 import {addMissingZero, splitFieldsEmbed} from "./OtherFunctions";
 import History, {IHistory} from "../Models/History";
 import {isNumber} from "./OtherFunctions";
-import {
+import Discord, {
     ApplicationCommand,
     CommandInteractionOptionResolver,
     Guild,
@@ -42,10 +42,12 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
 
     commandOrigin: 'slash'|'custom';
 
+    client: Discord.Client;
+
     commandName: string;
     guild: null|Guild;
     channel: TextChannel;
-    member: |GuildMember;
+    member: GuildMember;
     argsModel: IArgsModel<IArgs, getCommandTypeArg<C>>;
 
     interaction: null|CommandInteraction = null;
@@ -57,6 +59,7 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
     constructor(messageOrInteraction: Message|CommandInteraction, commandOrigin: 'slash'|'custom', commandName: string, argsModel: IArgsModel<IArgs,getCommandTypeArg<C>>) {
         const {guild, channel, member} = messageOrInteraction;
         this.guild = guild;
+        this.client = (<Guild>guild).client;
         this.channel = <TextChannel>channel;
         this.member = <GuildMember>member;
         this.commandName = commandName;
@@ -76,7 +79,7 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
         return this.writtenCommand.split(" ")[0].toLowerCase() == config.command_prefix+this.commandName.toLowerCase();
     }
 
-    async executeCommand(bot, slashCommand = false): Promise<false | Omit<responseType, "success">> {
+    async executeCommand(slashCommand = false): Promise<false | Omit<responseType, "success">> {
         if (this.writtenCommand === null || await this.match()) {
 
             if (this.writtenCommand && !(await this.checkPermissions()))
@@ -101,7 +104,7 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
                 args = result;
             }
 
-            const {success, result, callback} = await this.action(args, bot)
+            const {success, result, callback} = await this.action(args)
                 .catch(e => {
                     throw new CustomError(e, {commandArguments: args});
                 })
@@ -908,7 +911,7 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
         return new EmbedBuilder();
     }
 
-    async action(args: IArgs,bot): Promise<responseType> { // To be overloaded
+    async action(args: IArgs): Promise<responseType> { // To be overloaded
         return this.response(true, 'Hello');
     }
 }

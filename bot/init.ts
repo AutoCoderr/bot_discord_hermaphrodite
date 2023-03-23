@@ -1,6 +1,6 @@
 import {existingCommands} from "./Classes/CommandsDescription";
 import {getExistingCommands} from "./Classes/CommandsDescription";
-import client from "./client";
+import {connectClients} from "./clients";
 import {GuildMember, Interaction, VoiceState} from "discord.js";
 import {initSlashCommands, initSlashCommandsOnGuild, listenSlashCommands} from "./slashCommands";
 import {listenInviteButtons, listenAskInviteBackButtons} from "./Classes/TextAndVocalFunctions";
@@ -18,13 +18,12 @@ import countingFirstMessagesXPs from "./libs/XP/XPCounting/countingFirstMessages
 import {findAndExecCallbackButton} from "./libs/callbackButtons";
 import { findAndExecCallbackModal } from "./libs/callbackModals";
 import { countingStatsMessagesEvent, countingStatsVoiceConnectionsAndMinutesEvent } from "./libs/stats/statsCounters";
-import StatsConfig from "./Models/Stats/StatsConfig";
 
-export default function init(bot) {
-    client.on('ready', () => {
+export default function init() {
+    connectClients().then((listenEvents) => {
         getExistingCommands().then(() => {
             //@ts-ignore
-            existingCommands.NotifyOnReact.applyNotifyOnReactAtStarting(bot)
+            existingCommands.NotifyOnReact.applyNotifyOnReactAtStarting()
                 .catch(e => {
                     reportError(new CustomError(e, {from: "listeningNotifyOnReact"}));
                 })
@@ -44,11 +43,11 @@ export default function init(bot) {
                     reportError(new CustomError(e, {from: "initSlashCommands"}));
                 });
 
-            client.on('guildCreate', guild => initSlashCommandsOnGuild(guild).catch(e => {
+            listenEvents('guildCreate', (guild) => initSlashCommandsOnGuild(guild).catch(e => {
                 reportError(new CustomError(e, {from: "guildCreate", guild}));
             }));
 
-            client.on('interactionCreate', async (interaction: Interaction) => {
+            listenEvents('interactionCreate', async (interaction: Interaction) => {
                 try {
                     if (interaction.isButton()) {
                         if (await findAndExecCallbackButton(interaction)) {
@@ -100,7 +99,7 @@ export default function init(bot) {
                 }
             });
 
-            client.on('voiceStateUpdate', async (oldState: VoiceState, newState: VoiceState) => {
+            listenEvents('voiceStateUpdate', async (oldState: VoiceState, newState: VoiceState) => {
                 //@ts-ignore
                 existingCommands.Vocal.listenVoiceChannelsConnects(oldState, newState)
                     .catch(e => {
@@ -117,7 +116,7 @@ export default function init(bot) {
                 countingStatsVoiceConnectionsAndMinutesEvent(oldState, newState);
             })
 
-            client.on("messageCreate", async message => {
+            listenEvents("messageCreate", async (message) => {
                 try {
                     await Promise.all([
                         listenCustomCommands(message),
@@ -143,5 +142,9 @@ export default function init(bot) {
                 }
             })
         })
+    }).catch(e => {
+        reportError(new CustomError(e, {
+            from: 'initClients'
+        }))
     });
 }

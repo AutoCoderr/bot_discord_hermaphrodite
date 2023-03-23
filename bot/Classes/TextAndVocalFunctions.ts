@@ -9,7 +9,6 @@ import {
 } from "discord.js";
 import TextInvite, {ITextInvite, TextInviteTimeoutWithoutMessageId} from "../Models/Text/TextInvite";
 import TextAskInviteBack, {ITextAskInviteBack, TextAskInviteBackTimeoutWithoutMessageId} from "../Models/Text/TextAskInviteBack";
-import client from "../client";
 import Vocal from "../Commands/Vocal";
 import VocalUserConfig, {IVocalUserConfig} from "../Models/Vocal/VocalUserConfig";
 import VocalSubscribe from "../Models/Vocal/VocalSubscribe";
@@ -33,7 +32,7 @@ interface getDatasButtonFunctionResponse {
 
 export async function getDatasButton(button: ITextInvite | ITextAskInviteBack, interaction: ButtonInteraction, type: 'text' | 'vocal'): Promise<false | getDatasButtonFunctionResponse> {
     let server: Guild | undefined = undefined;
-    if ((server = client.guilds.cache.get(button.serverId)) === undefined) {
+    if ((server = interaction.client.guilds.cache.get(button.serverId)) === undefined) {
         await interaction.editReply({content: "Le serveur associé à cette invitation semble inaccessible au bot"});
         return false;
     }

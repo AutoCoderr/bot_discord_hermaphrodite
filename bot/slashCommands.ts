@@ -292,7 +292,7 @@ export async function listenSlashCommands(interaction: CommandInteraction) {
         if (CommandClass.commandName.toLowerCase() === commandName) {
             const command = <Command>(new CommandClass(interaction, 'slash'));
             try {
-                const response = await command.executeCommand(client, true);
+                const response = await command.executeCommand(true);
 
                 await getAndDisplaySlashCommandsResponse(interaction, response);
                 return;

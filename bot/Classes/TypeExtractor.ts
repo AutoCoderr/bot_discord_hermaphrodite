@@ -10,7 +10,6 @@ import {
     VoiceChannel,
     ChannelType, Attachment, User
 } from "discord.js";
-import client from "../client";
 import {existingCommands} from "./CommandsDescription";
 import Command from "./Command";
 import {isNumber, userHasChannelPermissions} from "./OtherFunctions";
@@ -78,10 +77,10 @@ export const extractTypes = {
         }
         return messageToGet ? {message: messageToGet,channel} : false;
     },
-    emote: (field, _: Command): GuildEmoji|false => {
+    emote: (field, command: Command): GuildEmoji|false => {
         if (new RegExp("^[^\u0000-\u007F]+$").test(field)) return field;
         const emoteId = field.split(":")[2].split(">")[0];
-        const emote = client.emojis.cache.get(emoteId);
+        const emote = command.client.emojis.cache.get(emoteId);
         return emote ? emote : false;
     },
     user: async (field: string|User, command: Command): Promise<GuildMember|false> => {

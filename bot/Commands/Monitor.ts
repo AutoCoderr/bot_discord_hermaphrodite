@@ -1,20 +1,20 @@
 import Command from "../Classes/Command";
-import {
-    CommandInteractionOptionResolver, EmbedBuilder,
+import Discord, {
+    EmbedBuilder,
     Guild,
     GuildChannel,
     GuildMember,
     Message,
     PartialGuildMember, Presence,
-    Role, TextChannel, User,
-    ChannelType, CommandInteraction
+    Role, TextChannel,
+    ChannelType, CommandInteraction, ClientUser
 } from "discord.js";
 import config from "../config";
 import MonitoringMessage, {IMonitoringMessage} from "../Models/MonitoringMessage";
 import {splitFieldsEmbed} from "../Classes/OtherFunctions";
-import client from "../client";
 import CustomError from "../logging/CustomError";
 import {IArgsModel} from "../interfaces/CommandInterfaces";
+import { findGuildOnClients } from "../clients";
 
 interface messageChannelAndGuild {
     message: Message;
@@ -38,7 +38,7 @@ export default class Monitor extends Command {
                     value: guild.memberCount.toString()
                 });
             },
-            listen: (callback: Function) => {
+            listen: (client: Discord.Client, callback: Function) => {
                 const listener = (member: GuildMember|PartialGuildMember) => callback(member.guild);
                 client.on('guildMemberAdd', listener);
                 client.on('guildMemberRemove', listener);
@@ -65,7 +65,7 @@ export default class Monitor extends Command {
                     value: onlineUserCount
                 });
             },
-            listen: (callback: Function) => {
+            listen: (client: Discord.Client, callback: Function) => {
                 client.on('presenceUpdate',(oldPresence, newPresence) =>
                     (oldPresence instanceof Presence && newPresence instanceof Presence &&
                         (oldPresence.status == "online" || newPresence.status == "online") &&
@@ -129,7 +129,7 @@ export default class Monitor extends Command {
     };
 
     static nbListeners = Object.keys(Monitor.datasCanBeDisplayed).filter(data => typeof(Monitor.datasCanBeDisplayed[data].listen) == "function").length;
-    static listeneds = {};
+    static listenedsByClientId = {};
 
     static argsModel: IArgsModel = {
         $argsByType: {
@@ -291,7 +291,7 @@ export default class Monitor extends Command {
                     channelId: channel.id,
                     messageId: createdMessage.id
                 });
-                Monitor.startMonitoringMessageEvent(monitoringMessage);
+                Monitor.startMonitoringMessageEvent(this.client, monitoringMessage);
                 return this.response(true, "Un message de monitoring a été créé sur le channel <#"+channel.id+">");
             case "refresh":
                 for (const message of messages) {
@@ -362,7 +362,7 @@ export default class Monitor extends Command {
 
     static async checkMonitoringMessageExist(monitoringMessage: IMonitoringMessage, guild: null|undefined|Guild = null, channel: null|undefined|TextChannel = null) {
         if (guild == null) {
-            guild = client.guilds.cache.get(monitoringMessage.serverId);
+            guild = findGuildOnClients(monitoringMessage.serverId);
         }
 
         if (!channel && guild) {
@@ -415,13 +415,17 @@ export default class Monitor extends Command {
         return Embed;
     }
 
-    static startMonitoringMessageEvent(monitoringMessage: IMonitoringMessage) {
-        if (Object.keys(this.listeneds).length == this.nbListeners) return;
+    static startMonitoringMessageEvent(client: Discord.Client, monitoringMessage: IMonitoringMessage) {
+        const clientId = (<ClientUser>client.user).id
+        if (this.listenedsByClientId[clientId] === undefined)
+            this.listenedsByClientId[clientId] = {}
+
+        if (Object.keys(this.listenedsByClientId[(<ClientUser>client.user).id]).length == this.nbListeners) return;
         for (const data of monitoringMessage.datas) {
             const dataName = typeof(data) == "string" ? data : data.data;
-            if (!this.listeneds[dataName] && typeof(this.datasCanBeDisplayed[dataName].listen) == "function") {
-                this.listeneds[dataName] = true;
-                this.datasCanBeDisplayed[dataName].listen(async (guild: Guild) => {
+            if (!this.listenedsByClientId[clientId][dataName] && typeof(this.datasCanBeDisplayed[dataName].listen) == "function") {
+                this.listenedsByClientId[clientId][dataName] = true;
+                this.datasCanBeDisplayed[dataName].listen(client, async (guild: Guild) => {
                     const monitoringMessages: Array<IMonitoringMessage> = await MonitoringMessage.find({
                         serverId: guild.id,
                         $or: [
@@ -434,7 +438,7 @@ export default class Monitor extends Command {
                     }
                 });
             }
-            if (Object.keys(this.listeneds).length == this.nbListeners) return;
+            if (Object.keys(this.listenedsByClientId[clientId]).length == this.nbListeners) return;
         }
     }
 
@@ -445,9 +449,8 @@ export default class Monitor extends Command {
             try {
                 const exist = await this.checkMonitoringMessageExist(monitoringMessage);
                 if (exist) {
-                    this.startMonitoringMessageEvent(monitoringMessage);
+                    this.startMonitoringMessageEvent(exist.guild.client, monitoringMessage);
                     await this.refreshMonitor(monitoringMessage, exist);
-                    if (Object.keys(this.listeneds).length == this.nbListeners) break;
                 }
             } catch (e) {
                 throw new CustomError(<Error>e, {monitoringMessage});

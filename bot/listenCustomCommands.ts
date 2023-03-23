@@ -1,6 +1,5 @@
 import config from "./config";
 import {Message, MessageCreateOptions, MessagePayload, ModalBuilder} from "discord.js";
-import client from "./client";
 import {existingCommands} from "./Classes/CommandsDescription";
 import CustomError from "./logging/CustomError";
 import Command from "./Classes/Command";
@@ -29,7 +28,7 @@ export async function listenCustomCommands(message: Message) {
             const commandClass = existingCommands[commandName];
             if (commandClass.customCommand) {
                 const command = <Command>(new commandClass(message, 'custom'));
-                await command.executeCommand(client)
+                await command.executeCommand()
                     .then(response => getAndDisplayCustomCommandsResponse(message, <TResponse>response))
                     .catch(e => {
                         message.channel.send("Une erreur interne est survenue");

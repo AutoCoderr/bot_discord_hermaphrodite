@@ -13,11 +13,11 @@ import Discord, {
     ChannelType, EmbedBuilder, EmbedField, CommandInteraction
 } from "discord.js";
 import {splitFieldsEmbed} from "../Classes/OtherFunctions";
-import client from "../client";
 import {checkTypes} from "../Classes/TypeChecker";
 import reportError from "../logging/reportError";
 import CustomError from "../logging/CustomError";
 import {IArgsModel} from "../interfaces/CommandInterfaces";
+import { findGuildOnClients, getReadyClients } from "../clients";
 
 
 const toDenyToEveryone: Array<PermissionResolvable> = [
@@ -504,7 +504,7 @@ export default class ConfigTicket extends Command {
         message.awaitReactions({ max: 1 , filter})
             .then(async (collected) => {
                 if (!userWhoReact) return;
-                if (userWhoReact.id == (<ClientUser>client.user).id) {
+                if (getReadyClients().some(client => userWhoReact.id === client.user.id)) {
                     ConfigTicket.listenMessageTicket(message, emoteKey, _idConfigTicket, _idMessageToListen);
                     return;
                 }
@@ -593,7 +593,7 @@ export default class ConfigTicket extends Command {
 
         for (const ticketConfig of ticketConfigs) {
             try {
-                const guild = client.guilds.cache.get(ticketConfig.serverId);
+                const guild = findGuildOnClients(ticketConfig.serverId);
                 if (!guild) {
                     console.log("server " + ticketConfig.serverId + " does not exist");
                     await TicketConfig.deleteOne({_id: ticketConfig._id});

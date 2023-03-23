@@ -1,5 +1,5 @@
 import { Guild, GuildMember } from "discord.js";
-import client from "../client";
+import { findGuildOnClients } from "../clients";
 import XPData from "../Models/XP/XPData";
 
 const enabledXPServersById: {[id: string]: boolean} = {};
@@ -15,7 +15,7 @@ export async function serverHasXPsEnabled(serverId: string) {
 
 export async function getGuildById(serverId: string) {
     if (guildsById[serverId] === undefined) {
-        guildsById[serverId] = client.guilds.cache.get(serverId) ?? null
+        guildsById[serverId] = findGuildOnClients(serverId) ?? null
     }
     return guildsById[serverId];
 }

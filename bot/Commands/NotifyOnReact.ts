@@ -3,22 +3,19 @@ import Command from "../Classes/Command";
 import StoredNotifyOnReact, { IStoredNotifyOnReact } from "../Models/StoredNotifyOnReact";
 import {
     ClientUser, CommandInteraction,
-    CommandInteractionOptionResolver, EmbedBuilder, Emoji,
+    EmbedBuilder, Emoji,
     Guild,
     GuildChannel,
     GuildEmoji,
-    GuildMember,
     Message,
-    Snowflake,
-    TextChannel,
-    User
+    Snowflake
 } from "discord.js";
 import {existingCommands} from "../Classes/CommandsDescription";
 import {checkTypes} from "../Classes/TypeChecker";
-import client from "../client";
 import CustomError from "../logging/CustomError";
 import reportError from "../logging/reportError";
 import {IArgsModel} from "../interfaces/CommandInterfaces";
+import { findGuildOnClients, getReadyClients } from "../clients";
 
 export default class NotifyOnReact extends Command {
     static listenings = {}; /* example : {
@@ -151,7 +148,7 @@ export default class NotifyOnReact extends Command {
         return messageToListen.awaitReactions({ max: 1 , filter})
             .then(_ => {
                 if (!userWhoReact) return;
-                if (userWhoReact.id === (<ClientUser>client.user).id) {
+                if (getReadyClients().some(client => userWhoReact.id === (<ClientUser>client.user).id)) {
                     return this.reactingAndNotifyOnMessage(messageToListen, channelToWrite, messageToWrite, emoteKey, channelToListen);
                 }
                 if (!this.listenings[serverId]) {
@@ -231,7 +228,7 @@ export default class NotifyOnReact extends Command {
         StoredNotifyOnReact.create(storedNotifyOnReact);
     }
 
-    static async applyNotifyOnReactAtStarting(bot) { // Detect notifyOnReacts storeds in the database and apply them
+    static async applyNotifyOnReactAtStarting() { // Detect notifyOnReacts storeds in the database and apply them
         console.log("Detect stored notifyOnReacts in the database and apply them")
         const channelsListened = {};
         const channelsWhereEmoteNotFound = {};
@@ -241,7 +238,7 @@ export default class NotifyOnReact extends Command {
                 const emoteNameOrId: string = <string>(emoteName ?? emoteId); //@ts-ignore
                 const deleteNotif = () => existingCommands.CancelNotifyOnReact.deleteNotifyOnReactInBdd(serverId, channelToListenId, messageToListenId, emoteNameOrId);
 
-                const server: Guild | undefined = bot.guilds.cache.get(serverId);
+                const server: Guild | undefined = findGuildOnClients(serverId);
                 if (server == undefined) continue;
 
                 const channelToListen = server.channels.cache.get(channelToListenId);

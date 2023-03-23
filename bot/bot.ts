@@ -1,7 +1,6 @@
-import client from "./client";
 import init from "./init";
 
-init(client);
+init();
 
 
 // @ts-ignore

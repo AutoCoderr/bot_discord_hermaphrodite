@@ -4,5 +4,5 @@ module.exports = {
     password_mongo: "password",
     database_mongo: "db",
     command_prefix: "%",
-    token: "please_enter_your_token"
+    tokens: ["token1","token2"]
 }

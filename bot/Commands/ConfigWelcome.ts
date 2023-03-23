@@ -13,7 +13,6 @@ import {
 import {userHasChannelPermissions} from "../Classes/OtherFunctions";
 import CustomError from "../logging/CustomError";
 import {IArgsModel,responseType} from "../interfaces/CommandInterfaces";
-import client from "../client";
 import errorCatcher from "../logging/errorCatcher";
 
 export default class ConfigWelcome extends Command {
@@ -55,7 +54,7 @@ export default class ConfigWelcome extends Command {
                         return;
 
                     clearTimeout(timeout);
-                    client.off('messageCreate', listener);
+                    this.client.off('messageCreate', listener);
 
                     const messageCanBeDeleted = userHasChannelPermissions(<GuildMember>(<Guild>this.guild).members.me, this.channel, PermissionFlagsBits.ManageMessages)
 
@@ -114,10 +113,10 @@ export default class ConfigWelcome extends Command {
             });
 
 
-            client.on('messageCreate', listener);
+            this.client.on('messageCreate', listener);
 
             timeout = setTimeout(() => {
-                client.off('messageCreate', listener);
+                this.client.off('messageCreate', listener);
                 resolve(this.response(false, "Délai dépassé"));
             }, 15 * 60 * 1000)
         })

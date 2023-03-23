@@ -11,10 +11,9 @@ import {IXPUserData} from "../../Models/XP/XPUserData";
 import XPNotificationAskButton, {
     IXPNotificationAskButton
 } from "../../Models/XP/XPNotificationAskButton";
-import {deleteMP, getMP} from "../../Classes/OtherFunctions";
+import {getMP} from "../../Classes/OtherFunctions";
 import {getXPUserConfig} from "./XPCounting/countingOtherFunctions";
 import {getTimezoneDatas} from "../timezones";
-import client from "../../client";
 
 async function deleteNotificationButtons(serverId: string, user: User|GuildMember) {
     const buttons: IXPNotificationAskButton[] = await XPNotificationAskButton.find({
@@ -45,7 +44,7 @@ export async function listenXPNotificationAskButtons(interaction: ButtonInteract
     if (button === null)
         return false;
 
-    const guild: undefined|Guild = client.guilds.cache.get(button.serverId);
+    const guild: undefined|Guild = interaction.client.guilds.cache.get(button.serverId);
 
     if (guild === undefined)
         return !deleteNotificationButtons(button.serverId, interaction.user) && false;

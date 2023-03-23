@@ -3,21 +3,18 @@ import Command from "../Classes/Command";
 import {forEachNotifyOnReact} from "../Classes/OtherFunctions";
 import { existingCommands } from "../Classes/CommandsDescription";
 import StoredNotifyOnReact from "../Models/StoredNotifyOnReact";
-import Discord, {
+import {
     ClientUser, CommandInteraction,
-    CommandInteractionOptionResolver, EmbedBuilder, Emoji,
+    EmbedBuilder, Emoji,
     Guild,
     GuildChannel,
     GuildEmoji,
-    GuildMember,
     Message,
-    MessageReaction, Snowflake,
-    TextChannel,
-    User
+    MessageReaction, Snowflake
 } from "discord.js";
 import {checkTypes} from "../Classes/TypeChecker";
-import client from "../client";
 import {IArgsModel} from "../interfaces/CommandInterfaces";
+import { getReadyClients } from "../clients";
 
 export default class CancelNotifyOnReact extends Command {
     static description = "Pour désactiver l'écoute d'une réaction sur un ou plusieurs messages.";
@@ -100,8 +97,9 @@ export default class CancelNotifyOnReact extends Command {
 
                     let emote: Emoji|null = checkTypes.id(emoteKey) ? (<Guild>this.guild).emojis.cache.get(emoteKey)??null : null
                     const reaction: null|MessageReaction = message.reactions.cache.find(reaction => (reaction.emoji.id??reaction.emoji.name) === emoteKey)??null;
-                    if (reaction)
-                        await reaction.users.remove(<ClientUser>client.user);
+                    if (reaction) {
+                        await Promise.all(getReadyClients().map(client => reaction.users.remove(<ClientUser>client.user) ))
+                    }
 
                     if (checkTypes.id(emoteKey) && emote === null && reaction) {
                         emote = reaction.emoji;
@@ -126,7 +124,7 @@ export default class CancelNotifyOnReact extends Command {
             }
             const reaction = message.reactions.cache.find(reaction => reaction.emoji.id === (<Emoji>emote).id);
             if (reaction) {
-                await reaction.users.remove(<ClientUser>client.user);
+                await Promise.all(getReadyClients().map(client => reaction.users.remove(<ClientUser>client.user) ))
             }
             Embed.addFields({
                 name: "sur '#" +channel.name + "' (" + message.content + ") " + (emote instanceof Emoji ? ':' + emote.name + ':' : emoteKey),
