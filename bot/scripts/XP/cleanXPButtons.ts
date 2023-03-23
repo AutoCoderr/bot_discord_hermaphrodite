@@ -2,6 +2,7 @@ import { deleteMP, getMP } from "../../Classes/OtherFunctions";
 import client from "../../client";
 import { getMemberById, serverHasXPsEnabled } from "../../libs/cacheForScripts";
 import { askForNotifications } from "../../libs/XP/XPCounting/countingOtherFunctions";
+import { tryCatchCron } from "../../logging/catchers";
 import XPNotificationAskButton, { IXPNotificationAskButton, XPNotificationAskButtonTimeout } from "../../Models/XP/XPNotificationAskButton"
 import XPTipsUsefulAskButton, { IXPTipsUsefulAskButton, XPTipsUsefulAskButtonTimeout } from "../../Models/XP/XPTipsUsefulAskButton";
 
@@ -31,8 +32,8 @@ function getPromiseArrayFromButton(button: IXPNotificationAskButton|IXPTipsUsefu
     ]
 }
 
-client.on('ready', async () => {
-    try  {
+client.on('ready', () => {
+    tryCatchCron(async () => {
         const currentDate = new Date()
 
         const XPNotificationAskButtons: IXPNotificationAskButton[] = await XPNotificationAskButton.find({
@@ -78,10 +79,7 @@ client.on('ready', async () => {
 
         if ([XPNotificationAskButtons,XPTipsUsefulAskButtons].reduce((acc,l) => acc+l.length, 0) > 0)
             console.log("All cleaned");
-
-    } catch(e) {
-        console.log("ERROR ->");
-        console.log(e);
-    }
-    process.exit();
+        
+        process.exit();
+    })
 })

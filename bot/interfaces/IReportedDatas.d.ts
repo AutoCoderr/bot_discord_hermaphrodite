@@ -41,7 +41,7 @@ export default interface IReportedData {
         'vocalNotifTimeout'|
         'queue'|
         'processScript'|
-        'conScript',
+        'cronScript',
 
     processAddr?: string,
     processParams?: string[],

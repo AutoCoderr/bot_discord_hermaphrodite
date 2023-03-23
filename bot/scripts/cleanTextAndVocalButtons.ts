@@ -1,6 +1,7 @@
 import { deleteMP } from "../Classes/OtherFunctions";
 import client from "../client";
 import { getMemberById } from "../libs/cacheForScripts";
+import { tryCatchCron } from "../logging/catchers";
 import TextAskInviteBack, { ITextAskInviteBack, TextAskInviteBackTimeout } from "../Models/Text/TextAskInviteBack";
 import TextInvite, { ITextInvite, TextInviteTimeout } from "../Models/Text/TextInvite";
 import VocalAskInviteBack, { IVocalAskInviteBack, VocalAskInviteBackTimeout } from "../Models/Vocal/VocalAskInviteBack";
@@ -10,8 +11,8 @@ interface IMessageIdDefined {
     messageId: string
 }
 
-client.on('ready', async () => {
-    try {
+client.on('ready', () => {
+    tryCatchCron(async () => {
         const currentDate = new Date();
         const [
             expiredVocalInvites,
@@ -70,10 +71,6 @@ client.on('ready', async () => {
         if ([expiredVocalInvites, expiredVocalAskInvitesBack, expiredTextInvites, expiredTextAskInvitesBack].reduce((acc,l) => acc+l.length, 0) > 0)
             console.log("All cleaned");
 
-    } catch(e) {
-        console.log("ERROR ->");
-        console.log(e);
-    }
-
-    process.exit();
+        process.exit();
+    })
 })

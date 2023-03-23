@@ -3,6 +3,7 @@ import XPUserData from "../../Models/XP/XPUserData";
 import {getTimezoneDatas} from "../../libs/timezones";
 import {addMissingZero} from "../../Classes/OtherFunctions";
 import moment from "moment-timezone";
+import { tryCatchCron } from "../../logging/catchers";
 
 const date = new Date();
 
@@ -18,37 +19,32 @@ function getTimezonesOffset() {
     return [`+${addMissingZero(Math.floor(gobalMinutes/60))}:${addMissingZero(gobalMinutes%60)}`]   
 }
 
-(async () => {
-    try {
-        const timezonesOffets = getTimezonesOffset();
-
+tryCatchCron(async () => {
+    const timezonesOffets = getTimezonesOffset();
         
-        const {zones} = await getTimezoneDatas();
-        const timezones = Object.keys(zones)
-            .filter(zone => {
-                const zonedDate = moment.utc(date.toISOString()).tz(zone).format();
-                return timezonesOffets.some(timezoneOffset => zonedDate.substring(zonedDate.length-timezoneOffset.length) === timezoneOffset)
-            })
-
-        console.log("Concerned timezones offset :")
-        console.log(timezonesOffets);
-        console.log("Reset today XP of all users on bellow timezones :");
-        console.log(timezones);
-        const XPServerIds = await XPData.find({
-            timezone: { $in: timezones }
+    const {zones} = await getTimezoneDatas();
+    const timezones = Object.keys(zones)
+        .filter(zone => {
+            const zonedDate = moment.utc(date.toISOString()).tz(zone).format();
+            return timezonesOffets.some(timezoneOffset => zonedDate.substring(zonedDate.length-timezoneOffset.length) === timezoneOffset)
         })
-            .then(XPServerConfigs => 
-                XPServerConfigs
-                    .map(XPServerConfig => XPServerConfig.serverId)
-            )
-        console.log(XPServerIds.length+" servers concerned");
 
-        const {modifiedCount} = await XPUserData.updateMany({ serverId: {$in: XPServerIds} }, { $set: { todayXP: 0 } });
-        console.log(modifiedCount+" users had their todayXPs reset");
-    } catch (e) {
-        console.log("ERROR ->");
-        console.log(e);
-    }
+    console.log("Concerned timezones offset :")
+    console.log(timezonesOffets);
+    console.log("Reset today XP of all users on bellow timezones :");
+    console.log(timezones);
+    const XPServerIds = await XPData.find({
+        timezone: { $in: timezones }
+    })
+        .then(XPServerConfigs => 
+            XPServerConfigs
+                .map(XPServerConfig => XPServerConfig.serverId)
+        )
+    console.log(XPServerIds.length+" servers concerned");
+
+    const {modifiedCount} = await XPUserData.updateMany({ serverId: {$in: XPServerIds} }, { $set: { todayXP: 0 } });
+    console.log(modifiedCount+" users had their todayXPs reset");
+
     process.exit()
-})();
+})
 

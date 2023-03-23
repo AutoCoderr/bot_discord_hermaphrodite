@@ -16,15 +16,13 @@ import WelcomeMessage from "../../Models/WelcomeMessage";
 import filterElementsToDelete from "./filterElementsToDelete";
 
 import client from "../../client";
-import textUserConfig from "../../Models/Text/TextUserConfig";
 import getToUpdateElements from "./getToUpdateElements";
-import Text from "../../Commands/Text";
-import Vocal from "../../Commands/Vocal";
 import MessagesStats from "../../Models/Stats/MessagesStats";
 import VocalConnectionsStats from "../../Models/Stats/VocalConnectionsStats";
 import VocalNewConnectionsStats from "../../Models/Stats/VocalNewConnectionsStats";
 import VocalMinutesStats from "../../Models/Stats/VocalMinutesStats";
 import StatsConfig from "../../Models/Stats/StatsConfig";
+import { tryCatchCron } from "../../logging/catchers";
 
 //@ts-ignore
 Array.prototype.promiseReduce = async function (callback, acc) {
@@ -97,128 +95,121 @@ function checkAndDeleteUselessEntries<ModelType = any>(
         )
 }
 
-async function cleanDatabase() {
-    await Promise.all([
-        checkAndDeleteUselessEntries<ITextAskInviteBack>(TextAskInviteBack, "textAskInviteBack", {
-            server: ['serverId'],
-            member: ['requesterId', 'requestedId']
-        }, {
-            channel: ['channelsId']
-        }, {
-            timestamp: TextAskInviteBackTimeoutWithoutMessageId
-        }, (elem) => elem.messageId === undefined),
-        checkAndDeleteUselessEntries<IVocalAskInviteBack>(VocalAskInviteBack, "vocalAskInviteBack", {
-            server: ['serverId'],
-            member: ['requesterId', 'requestedId']
-        }, {}, {
-            timestamp: VocalAskInviteBackTimeoutWithoutMessageId
-        }, (elem) => elem.messageId === undefined),
-        checkAndDeleteUselessEntries(TextConfig, "textConfig", {
-            server: ['serverId']
-        }, {
-            channel: ['channelBlacklist'],
-            member: ['listenerBlacklist.users'],
-            role: ['listenerBlacklist.roles']
-        }),
-        checkAndDeleteUselessEntries(VocalConfig, "vocalConfig", {
-            server: ['serverId']
-        }, {
-            channel: ['channelBlacklist'],
-            member: ['listenerBlacklist.users'],
-            role: ['listenerBlacklist.roles']
-        }),
-        checkAndDeleteUselessEntries<ITextInvite>(TextInvite, "textInvite", {
-            server: ['serverId'],
-            member: ['requesterId', 'requestedId']
-        }, {
-            channel: ['channelsId']
-        }, {
-            timestamp: TextInviteTimeoutWithoutMessageId
-        }, (elem) => elem.messageId === undefined),
-        checkAndDeleteUselessEntries<IVocalInvite>(VocalInvite, "vocalInvite", {
-            server: ['serverId'],
-            member: ['requesterId', 'requestedId']
-        }, {}, {
-            timestamp: VocalInviteTimeoutWithoutMessageId
-        }, (elem) => elem.messageId === undefined),
-        checkAndDeleteUselessEntries(TextSubscribe, "textSubscribe", {
-            server: ['serverId'],
-            member: ['listenerId', 'listenedId'],
-            channel: ['channelId']
-        }),
-        checkAndDeleteUselessEntries(VocalSubscribe, "vocalSubscribe", {
-            server: ['serverId'],
-            member: ['listenerId', 'listenedId'],
-        }),
-        checkAndDeleteUselessEntries(TextUserConfig, "textUserConfig", {
-            server: ['serverId'],
-            member: ['userId']
-        }, {
-            channel: [{col: 'blocking', attr: 'channelId'}],
-            member: [{col: 'blocking', attr: 'userId'}]
-        }),
-        checkAndDeleteUselessEntries(VocalUserConfig, "vocalUserConfig", {
-            server: ['serverId'],
-            member: ['userId']
-        }, {
-            member: ['blocked.users'],
-            role: ['blocked.roles']
-        }),
-        checkAndDeleteUselessEntries(History, "history", {
-            server: ['serverId'],
-            member: ['userId'],
-            channel: ['channelId']
-        }),
-        checkAndDeleteUselessEntries(MonitoringMessage, "monitoringMessage", {
-            server: ['serverId'],
-            channel: ['channelId'],
-            message: ['messageId']
-        }),
-        checkAndDeleteUselessEntries(StoredNotifyOnReact, "storedNotifyOnReact", {
-            server: ['serverId'],
-            emote: ['emoteId'],
-            channel: ['channelToListenId', 'channelToWriteId'],
-            message: [{col: 'messageToListenId', needed: 'channelToListenId'}]
-        }),
-        checkAndDeleteUselessEntries(TicketConfig, "ticketConfig", {
-            server: ['serverId'],
-            channel: ['categoryId'],
-            role: ['moderatorId']
-        }, {
-            member: ['blacklist', { col:'ticketChannels', attr: 'userId' }],
-            channel: [
-                { col: 'ticketChannels', attr: 'channelId' },
-                { col: 'messagesToListen', attr: 'channelId' }
-            ],
-            message: [{ col: 'messagesToListen', attr: 'messageId', needed: '$item.channelId' }],
-            emote: [{ col: 'messagesToListen', attr: 'emoteId' }]
-        }),
-        checkAndDeleteUselessEntries(WelcomeMessage, "welcomeMessage", {
-            server: ['serverId'],
-        }),
-        checkAndDeleteUselessEntries(MessagesStats, "messagesStats", {
-            server: ['serverId']
-        }, {}, {}, null, true),
-        checkAndDeleteUselessEntries(VocalConnectionsStats, "vocalConnectionsStats", {
-            server: ['serverId']
-        }, {}, {}, null, true),
-        checkAndDeleteUselessEntries(VocalNewConnectionsStats, "vocalNewConnectionsStats", {
-            server: ['serverId']
-        }, {}, {}, null, true),
-        checkAndDeleteUselessEntries(VocalMinutesStats, "vocalMinutesStats", {
-            server: ['serverId']
-        }, {}, {}, null, true),
-        checkAndDeleteUselessEntries(StatsConfig, "statsConfig", {
-            server: ['serverId']
-        })
-    ]).catch(e => {
-        console.log("ERROR");
-        console.log(e)
-    })
-
-    process.exit();
-}
-
 client.on('ready', () => {
-    cleanDatabase();
+    tryCatchCron(() =>
+        Promise.all([
+            checkAndDeleteUselessEntries<ITextAskInviteBack>(TextAskInviteBack, "textAskInviteBack", {
+                server: ['serverId'],
+                member: ['requesterId', 'requestedId']
+            }, {
+                channel: ['channelsId']
+            }, {
+                timestamp: TextAskInviteBackTimeoutWithoutMessageId
+            }, (elem) => elem.messageId === undefined),
+            checkAndDeleteUselessEntries<IVocalAskInviteBack>(VocalAskInviteBack, "vocalAskInviteBack", {
+                server: ['serverId'],
+                member: ['requesterId', 'requestedId']
+            }, {}, {
+                timestamp: VocalAskInviteBackTimeoutWithoutMessageId
+            }, (elem) => elem.messageId === undefined),
+            checkAndDeleteUselessEntries(TextConfig, "textConfig", {
+                server: ['serverId']
+            }, {
+                channel: ['channelBlacklist'],
+                member: ['listenerBlacklist.users'],
+                role: ['listenerBlacklist.roles']
+            }),
+            checkAndDeleteUselessEntries(VocalConfig, "vocalConfig", {
+                server: ['serverId']
+            }, {
+                channel: ['channelBlacklist'],
+                member: ['listenerBlacklist.users'],
+                role: ['listenerBlacklist.roles']
+            }),
+            checkAndDeleteUselessEntries<ITextInvite>(TextInvite, "textInvite", {
+                server: ['serverId'],
+                member: ['requesterId', 'requestedId']
+            }, {
+                channel: ['channelsId']
+            }, {
+                timestamp: TextInviteTimeoutWithoutMessageId
+            }, (elem) => elem.messageId === undefined),
+            checkAndDeleteUselessEntries<IVocalInvite>(VocalInvite, "vocalInvite", {
+                server: ['serverId'],
+                member: ['requesterId', 'requestedId']
+            }, {}, {
+                timestamp: VocalInviteTimeoutWithoutMessageId
+            }, (elem) => elem.messageId === undefined),
+            checkAndDeleteUselessEntries(TextSubscribe, "textSubscribe", {
+                server: ['serverId'],
+                member: ['listenerId', 'listenedId'],
+                channel: ['channelId']
+            }),
+            checkAndDeleteUselessEntries(VocalSubscribe, "vocalSubscribe", {
+                server: ['serverId'],
+                member: ['listenerId', 'listenedId'],
+            }),
+            checkAndDeleteUselessEntries(TextUserConfig, "textUserConfig", {
+                server: ['serverId'],
+                member: ['userId']
+            }, {
+                channel: [{col: 'blocking', attr: 'channelId'}],
+                member: [{col: 'blocking', attr: 'userId'}]
+            }),
+            checkAndDeleteUselessEntries(VocalUserConfig, "vocalUserConfig", {
+                server: ['serverId'],
+                member: ['userId']
+            }, {
+                member: ['blocked.users'],
+                role: ['blocked.roles']
+            }),
+            checkAndDeleteUselessEntries(History, "history", {
+                server: ['serverId'],
+                member: ['userId'],
+                channel: ['channelId']
+            }),
+            checkAndDeleteUselessEntries(MonitoringMessage, "monitoringMessage", {
+                server: ['serverId'],
+                channel: ['channelId'],
+                message: ['messageId']
+            }),
+            checkAndDeleteUselessEntries(StoredNotifyOnReact, "storedNotifyOnReact", {
+                server: ['serverId'],
+                emote: ['emoteId'],
+                channel: ['channelToListenId', 'channelToWriteId'],
+                message: [{col: 'messageToListenId', needed: 'channelToListenId'}]
+            }),
+            checkAndDeleteUselessEntries(TicketConfig, "ticketConfig", {
+                server: ['serverId'],
+                channel: ['categoryId'],
+                role: ['moderatorId']
+            }, {
+                member: ['blacklist', { col:'ticketChannels', attr: 'userId' }],
+                channel: [
+                    { col: 'ticketChannels', attr: 'channelId' },
+                    { col: 'messagesToListen', attr: 'channelId' }
+                ],
+                message: [{ col: 'messagesToListen', attr: 'messageId', needed: '$item.channelId' }],
+                emote: [{ col: 'messagesToListen', attr: 'emoteId' }]
+            }),
+            checkAndDeleteUselessEntries(WelcomeMessage, "welcomeMessage", {
+                server: ['serverId'],
+            }),
+            checkAndDeleteUselessEntries(MessagesStats, "messagesStats", {
+                server: ['serverId']
+            }, {}, {}, null, true),
+            checkAndDeleteUselessEntries(VocalConnectionsStats, "vocalConnectionsStats", {
+                server: ['serverId']
+            }, {}, {}, null, true),
+            checkAndDeleteUselessEntries(VocalNewConnectionsStats, "vocalNewConnectionsStats", {
+                server: ['serverId']
+            }, {}, {}, null, true),
+            checkAndDeleteUselessEntries(VocalMinutesStats, "vocalMinutesStats", {
+                server: ['serverId']
+            }, {}, {}, null, true),
+            checkAndDeleteUselessEntries(StatsConfig, "statsConfig", {
+                server: ['serverId']
+            })
+        ]).then(() => process.exit())
+    )
 })
