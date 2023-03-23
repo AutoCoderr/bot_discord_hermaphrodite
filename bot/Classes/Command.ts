@@ -40,6 +40,8 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
 
     static customCommand: boolean = true;
 
+    static defaultMemberPermission: null|bigint = null;
+
     commandOrigin: 'slash'|'custom';
 
     commandName: string;

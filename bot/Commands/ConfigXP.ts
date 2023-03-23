@@ -38,7 +38,7 @@ import {
     checkGradesListData,
     reDefineUsersGradeRole
 } from "../libs/XP/gradeCalculs";
-import {findTimezonesFromKeyword, getTimezoneDatas} from "../libs/timezones";
+import {findTimezonesFromKeyword} from "../libs/timezones";
 import XPUserData, { IXPUserData } from "../Models/XP/XPUserData";
 import errorCatcher from "../logging/errorCatcher";
 import CustomError from "../logging/CustomError";
@@ -97,11 +97,13 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
     static display = true;
     static abstract = false;
     static description = "Configurer le système d'XP"
-    static commandName = "configXP";
+    static commandName = "XPConfig";
 
     static customCommand = false;
 
     static slashCommandIdByGuild: {[guildId: string]: string} = {};
+
+    static defaultMemberPermission = PermissionFlagsBits.Administrator;
 
     excededXPLimit: IFieldLimit|null = null;
     excededDurationLimit: IFieldLimit|null = null;

@@ -19,9 +19,11 @@ import errorCatcher from "../logging/errorCatcher";
 export default class ConfigWelcome extends Command {
     static display = true;
     static description = "Pour activer, désactiver, ou définir le message privé à envoyer aux nouveaux arrivants."
-    static commandName = "configWelcome";
+    static commandName = "welcomeConfig";
 
     static slashCommandIdByGuild: {[guildId: string]: string} = {};
+
+    static defaultMemberPermission = PermissionFlagsBits.Administrator;
 
     static argsModel: IArgsModel = {
         $argsByOrder: [

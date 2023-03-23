@@ -1,8 +1,8 @@
 import Command from "../Classes/Command";
 import config from "../config";
 import TicketConfig, {ITicketConfig} from "../Models/TicketConfig";
-import Discord, {
-    CategoryChannel, ClientUser, CommandInteractionOptionResolver, Emoji,
+import {
+    CategoryChannel, ClientUser, Emoji,
     Guild,
     GuildChannel,
     GuildEmoji,
@@ -42,9 +42,11 @@ const toAllowToAuthorAndModerators: Array<PermissionResolvable> = [
 export default class ConfigTicket extends Command {
     static display = true;
     static description = "Pour définir la catégorie pour les channels des tickets, activer, ou désactiver les ticket.";
-    static commandName = "configTicket";
+    static commandName = "ticketConfig";
 
     static slashCommandIdByGuild: {[guildId: string]: string} = {};
+
+    static defaultMemberPermission = PermissionFlagsBits.Administrator;
 
     static argsModel: IArgsModel = {
         $argsByType: {

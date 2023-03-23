@@ -1,5 +1,5 @@
 import {
-    CommandInteraction, EmbedBuilder, Guild, Message
+    CommandInteraction, EmbedBuilder, Guild, Message, PermissionFlagsBits
 } from "discord.js";
 import AbstractConfigTextAndVocal, { IConfigTextAndVocalArgs } from "./AbstractConfigTextAndVocal";
 import {IArgsModel} from "../interfaces/CommandInterfaces";
@@ -16,9 +16,11 @@ type IConfigVocalArgs = Omit<IConfigTextAndVocalArgs, 'action'> & {
 export default class ConfigVocal extends AbstractConfigTextAndVocal<IConfigVocalArgs> {
     static display = true;
     static description = "Pour configurer l'option d'abonnement vocal";
-    static commandName = "configVocal";
+    static commandName = "vocalConfig";
 
     static slashCommandIdByGuild: {[guildId: string]: string} = {};
+
+    static defaultMemberPermission = PermissionFlagsBits.Administrator;
 
     static abstract = false;
 

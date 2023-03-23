@@ -18,6 +18,7 @@ services:
     build: ./docker/crontab
     volumes:
       - ./bot:/bot
+      - ./logs:/logs
       - ./script_logs:/script_logs
       - ./cronjobs:/cronjobs
       - ./crontab:/etc/cron.d/crontab
