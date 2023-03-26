@@ -1,17 +1,15 @@
 import config from "../config";
 import Command from "../Classes/Command";
-import StoredNotifyOnReact, { IStoredNotifyOnReact } from "../Models/StoredNotifyOnReact";
+import StoredNotifyOnReact, { IStoredNotifyOnReact, maximumStoredNotifyMessageSize, minimumStoredNotifyMessageSize } from "../Models/StoredNotifyOnReact";
 import {
     ClientUser, CommandInteraction,
-    CommandInteractionOptionResolver, EmbedBuilder, Emoji,
+    EmbedBuilder, Emoji,
     Guild,
     GuildChannel,
     GuildEmoji,
     GuildMember,
     Message,
-    Snowflake,
-    TextChannel,
-    User
+    Snowflake
 } from "discord.js";
 import {existingCommands} from "../Classes/CommandsDescription";
 import {checkTypes} from "../Classes/TypeChecker";
@@ -19,6 +17,10 @@ import client from "../client";
 import CustomError from "../logging/CustomError";
 import reportError from "../logging/reportError";
 import {IArgsModel} from "../interfaces/CommandInterfaces";
+
+const messageVariables: {[key: string]: [(userWhoReact: GuildMember) => string, number]} = {
+    user: [(userWhoReact) => "<@"+userWhoReact.id+">", 23]
+}
 
 export default class NotifyOnReact extends Command {
     static listenings = {}; /* example : {
@@ -57,6 +59,17 @@ export default class NotifyOnReact extends Command {
                 fields: ["--message", "-m"],
                 type: "string",
                 description: "Le message à afficher dés qu'une réaction sur le message est detectée",
+                valid: (value) => {
+                    const length = Object.entries(messageVariables).reduce((acc,[key,[,size]]) => {
+                        const nbOccurs = (value.match(new RegExp("\\$"+key))??[]).length
+                        return acc - nbOccurs*(key.length+1) + nbOccurs*size
+                    }, value.length);
+                    return length >= minimumStoredNotifyMessageSize && length <= maximumStoredNotifyMessageSize;
+                },
+                errorMessage: () => ({
+                    name: "Message rentré incorrect",
+                    value: "La taille du message doit être située entre "+[minimumStoredNotifyMessageSize,maximumStoredNotifyMessageSize].join(" et ")+" caractères inclus."
+                }),
                 required: true
             },
             channelToWrite: {
@@ -190,13 +203,9 @@ export default class NotifyOnReact extends Command {
                     }
                     return;
                 }
-                const variables: Object = {
-                    user: "<@"+userWhoReact.id+">"
-                }
                 let toWrite = messageToWrite;
-                for (let key in variables) {
-                    const regex = new RegExp("\\$( )*"+key+"( )*\\$");
-                    toWrite = toWrite.replace(regex, variables[key]);
+                for (let key in messageVariables) {
+                    toWrite = toWrite.replace(new RegExp("\\$"+key), messageVariables[key][0](userWhoReact));
                 }
                 channelToWrite.send(toWrite);
 

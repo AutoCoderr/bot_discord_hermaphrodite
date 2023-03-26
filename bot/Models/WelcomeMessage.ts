@@ -3,6 +3,9 @@ import { connect } from "../Mongo";
 
 const db = connect();
 
+export const minimumWelcomeMessageSize = 2;
+export const maximumWelcomeMessageSize = 1970;
+
 export interface IWelcomeMessage {
     enabled: boolean;
     message: string

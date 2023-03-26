@@ -8,6 +8,10 @@ const db = connect();
 
 export const defaultLimit = 5*60*1000; // By default 5 minutes for the limit, can be changed by admin
 export const minimumLimit = 2*60*1000; // At least 2 minutes for the limit
+export const maximumLimit = 7 * 24 * 60 * 60 * 1000; // Maximum 7 days for the limit
+
+export const minimumKeywordSize = 1;
+export const maximumKeywordSize = 100;
 
 export interface ITextConfig extends IModel {
     enabled: boolean;

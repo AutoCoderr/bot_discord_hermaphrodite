@@ -9,15 +9,15 @@ import {
 import {splitFieldsEmbed} from "../Classes/OtherFunctions";
 import TextConfig, {
     ITextConfig, 
-    minimumLimit as textMinimumLimit, 
+    minimumLimit as textMinimumLimit,
+    maximumLimit as textMaximumLimit,
     defaultLimit as textDefaultLimit
 } from "../Models/Text/TextConfig";
 import VocalConfig, {
-    IVocalConfig, 
-    minimumDelay, 
-    minimumLimit as vocalMinimumLimit, 
-    defaultLimit as vocalDefaultLimit,
-    maximumDelay
+    IVocalConfig,
+    minimumLimit as vocalMinimumLimit,
+    maximumLimit as vocalMaximumLimit, 
+    defaultLimit as vocalDefaultLimit
 } from "../Models/Vocal/VocalConfig";
 import Command from "../Classes/Command";
 import VocalSubscribe from "../Models/Vocal/VocalSubscribe";
@@ -49,6 +49,7 @@ export default abstract class AbstractConfigTextAndVocal<IArgs = IConfigTextAndV
             subscribeModel: VocalSubscribe,
             channelTypes: [ChannelType.GuildVoice],
             minimumLimit: vocalMinimumLimit,
+            maximumLimit: vocalMaximumLimit,
             defaultLimit: vocalDefaultLimit
         },
         text: {
@@ -56,6 +57,7 @@ export default abstract class AbstractConfigTextAndVocal<IArgs = IConfigTextAndV
             subscribeModel: TextSubscribe,
             channelTypes: [ChannelType.GuildText,ChannelType.GuildPublicThread],
             minimumLimit: textMinimumLimit,
+            maximumLimit: textMaximumLimit,
             defaultLimit: textDefaultLimit
         }
     }
@@ -102,8 +104,11 @@ export default abstract class AbstractConfigTextAndVocal<IArgs = IConfigTextAndV
                     referToSubCommands: ['blacklist.add', 'blacklist.remove', 'blacklist.clear', 'blacklist.show'],
                     required: (args) => args.action === "blacklist",
                     type: "string",
-                    description: "Le type de blacklist: listener, channel",
-                    valid: field => ['listener', 'channel'].includes(field)
+                    choices: {
+                        listener: "Listener",
+                        channel: "Channel"
+                    },
+                    description: "Le type de blacklist: listener, channel"
                 },
                 users: {
                     referToSubCommands: ['blacklist.add', 'blacklist.remove'],
@@ -152,25 +157,27 @@ export default abstract class AbstractConfigTextAndVocal<IArgs = IConfigTextAndV
                     referToSubCommands: ['defaultlimit'],
                     required: false,
                     type: 'duration',
-                    description: (args) => args.action === "defaultlimit" ? "Re définir la limite par défaut" : "Définir le délai avant notification",
-                    valid: (value: number, args) => 
-                        (args.action === "defaultlimit" && value >= AbstractConfigTextAndVocal.types[type].minimumLimit) ||
-                        (args.action === "delay" && value >= minimumDelay && value <= maximumDelay),
-                    errorMessage: (value, args) => ({
+                    description: "Re définir la limite par défaut (30s, 2h, 2j)",
+                    valid: (value: number, args) =>  (
+                        args.action === "defaultlimit" && 
+                        value >= AbstractConfigTextAndVocal.types[type].minimumLimit && 
+                        value <= AbstractConfigTextAndVocal.types[type].maximumLimit
+                    ),
+                    errorMessage: (value) => ({
                         name: "Vous avez mal rentrez la durée",
                         value: typeof (value) === "number" ?
-                            args.action === "defaultlimit" ?
-                                "Avez vous rentrez une valeur supérieure ou égale à " + showTime(extractDurationTime(args.action === "defaultlimit" ? AbstractConfigTextAndVocal.types[type].minimumLimit : minimumDelay), 'fr')+" ?" :
-                                "Le délai doit être situé entre "+[minimumDelay,maximumDelay].map(d => showTime(extractDurationTime(d), 'fr')).join(' et ')+" inclus" :
-                            "Syntaxe incorrecte"
+                                "La limite par défaut doit être située entre "+
+                                    ['minimumLimit','maximumLimit'].map(field =>
+                                        showTime(extractDurationTime(AbstractConfigTextAndVocal.types[type][field]), 'fr_long')    
+                                    ).join(" et ")+" inclus." :
+                                "Syntaxe incorrecte"
                     })
                 },
                 ...additionnalFields
             }).reduce((acc,[field,argModel]) => ({
                 ...acc,
                 [field]: fieldsUpdaters[field] !== undefined ? fieldsUpdaters[field](<IArgModel>argModel) : argModel
-            }), {}),
-            ...additionnalFields
+            }), {})
         }
     })
     

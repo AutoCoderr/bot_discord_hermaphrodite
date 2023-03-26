@@ -1,6 +1,6 @@
 import config from "../config";
 import Command from "../Classes/Command";
-import WelcomeMessage, {IWelcomeMessage} from "../Models/WelcomeMessage";
+import WelcomeMessage, {IWelcomeMessage, minimumWelcomeMessageSize, maximumWelcomeMessageSize} from "../Models/WelcomeMessage";
 import {
     CommandInteraction,
     EmbedBuilder,
@@ -73,10 +73,15 @@ export default class ConfigWelcome extends Command {
                         return;
                     }
 
-                    if (response.content.length > 1945) {
+                    if (response.content.length < minimumWelcomeMessageSize || response.content.length > maximumWelcomeMessageSize) {
                         if (messageCanBeDeleted)
                             await response.delete();
-                        return resolve(this.response(true, messageCanBeDeletedMessage+"Vous ne pouvez pas dépasser 1945 caractères. Vous en avez rentré "+response.content.length+"\nRéessayez :", this.getMessageSettingCallback()));
+                        return resolve(this.response(
+                            true, 
+                            messageCanBeDeletedMessage+
+                            "Le message doit avoir une longueur située entre "+[minimumWelcomeMessageSize,maximumWelcomeMessageSize].join(" et ")+" caractères inclus.\n"+
+                            "Réessayez :", this.getMessageSettingCallback()
+                        ));
                     }
 
                     let welcomeMessage: IWelcomeMessage = await WelcomeMessage.findOne({serverId: (<Guild>this.guild).id});

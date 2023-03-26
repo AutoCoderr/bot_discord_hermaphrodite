@@ -3,17 +3,14 @@ import Command from "../Classes/Command";
 import {forEachNotifyOnReact} from "../Classes/OtherFunctions";
 import { existingCommands } from "../Classes/CommandsDescription";
 import StoredNotifyOnReact from "../Models/StoredNotifyOnReact";
-import Discord, {
+import {
     ClientUser, CommandInteraction,
-    CommandInteractionOptionResolver, EmbedBuilder, Emoji,
+    EmbedBuilder, Emoji,
     Guild,
     GuildChannel,
     GuildEmoji,
-    GuildMember,
     Message,
     MessageReaction, Snowflake,
-    TextChannel,
-    User
 } from "discord.js";
 import {checkTypes} from "../Classes/TypeChecker";
 import client from "../client";
