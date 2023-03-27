@@ -47,8 +47,6 @@ export default class Text extends Command {
     static description = "Pour recevoir des notifications lorsque les personnes abonnées parlent sur un channel textuel";
     static commandName = "text";
 
-    static customCommand = false;
-
     static slashCommandIdByGuild: {[guildId: string]: string} = {};
 
     static argsModel: IArgsModel = {

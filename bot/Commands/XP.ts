@@ -22,8 +22,6 @@ export default class XP extends AbstractXP<IXPArgs> {
     static description = "Commandes pour la système d'XP"
     static commandName = "XP";
 
-    static customCommand = false
-
     static slashCommandIdByGuild: {[guildId: string]: string} = {};
 
     static argsModel: IArgsModel<IXPArgs> = {

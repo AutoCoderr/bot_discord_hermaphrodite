@@ -20,8 +20,6 @@ export default class XPA extends AbstractXP<IXPAArgs> {
     static commandName = "XPA";
     static abstract = false;
 
-    static customCommand = false
-
     static slashCommandIdByGuild: {[guildId: string]: string} = {};
 
 

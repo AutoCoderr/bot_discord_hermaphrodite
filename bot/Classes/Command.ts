@@ -38,7 +38,7 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
 
     static abstract: boolean = false;
 
-    static customCommand: boolean = true;
+    static customCommand: boolean = false;
 
     static defaultMemberPermission: null|bigint = null;
 

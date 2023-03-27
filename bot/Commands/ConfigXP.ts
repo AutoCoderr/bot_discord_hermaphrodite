@@ -99,8 +99,6 @@ export default class ConfigXP extends AbstractXP<IConfigXPArgs> {
     static description = "Configurer le système d'XP"
     static commandName = "XPConfig";
 
-    static customCommand = false;
-
     static slashCommandIdByGuild: {[guildId: string]: string} = {};
 
     static defaultMemberPermission = PermissionFlagsBits.Administrator;
