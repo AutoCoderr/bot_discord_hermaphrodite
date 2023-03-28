@@ -1,8 +1,6 @@
 import {existingCommands} from "./CommandsDescription";
-import History from "../Models/History";
 import {
     EmbedBuilder, EmbedField,
-    Guild,
     GuildChannel,
     GuildMember,
     Message, PermissionResolvable,
@@ -11,8 +9,6 @@ import {
 } from "discord.js";
 import Command from "./Command";
 import CancelNotifyOnReact from "../Commands/CancelNotifyOnReact";
-import HistoryExec from "../Commands/HistoryExec";
-import HistoryCmd from "../Commands/HistoryCmd";
 import ListNotifyOnReact from "../Commands/ListNotifyOnReact";
 import {IArgsModel} from "../interfaces/CommandInterfaces";
 import { IPrecision } from "../libs/stats/statsCounters";
@@ -88,36 +84,6 @@ export function getArgsModelHistory(): IArgsModel {
     };
 }
 
-
-export async function getHistory(currentCommand: HistoryCmd | HistoryExec, args: { commands: typeof Command[], sort: string, limit: number, channels: GuildChannel[], users: GuildMember[] }) {
-    let {commands, sort, limit, channels, users} = args;
-
-    let where: any = {serverId: (<Guild>currentCommand.guild).id};
-    if (users != undefined) {
-        where.userId = {$in: users.map(user => user.id)};
-    }
-    if (channels != undefined) {
-        where.channelId = {$in: channels.map(channel => channel.id)};
-    }
-    if (commands != undefined) {
-        where.commandName = {$in: []};
-        for (const command of commands) {
-            where.commandName.$in.push(command.commandName);
-        }
-    } else {
-        where.commandName = {$nin: []};
-        for (let aCommand in existingCommands) {
-            if (!await existingCommands[aCommand].staticCheckPermissions(currentCommand.member, currentCommand.guild)) {
-                where.commandName.$nin.push(aCommand);
-            }
-        }
-    }
-
-    if (sort == "dsc") sort = "desc";
-
-    return await History.find(where).limit(limit).sort({dateTime: sort});
-}
-
 export async function forEachNotifyOnReact(callback, channel: undefined | GuildChannel, message: undefined | Message, embed: EmbedBuilder, command: CancelNotifyOnReact | ListNotifyOnReact) {
     if (command.guild == null) {
         callback(false);
@@ -156,8 +122,6 @@ export async function forEachNotifyOnReact(callback, channel: undefined | GuildC
                             name: "Message introuvable, écoutes supprimées",
                             value: "Le message " + messageId + " est introuvable, écoutes supprimées"
                         });
-                        // @ts-ignore
-                        existingCommands.CancelNotifyOnReact.deleteNotifyOnReactInBdd(serverId, channel.id, messageId);
 
                         delete listenings[channel.id][messageId];
                         continue;
@@ -187,8 +151,6 @@ export async function forEachNotifyOnReact(callback, channel: undefined | GuildC
                     name: "Channel introuvable, écoutes supprimées",
                     value: "Le channel " + channelId + " est introuvable, écoutes supprimées"
                 });
-                // @ts-ignore
-                existingCommands.CancelNotifyOnReact.deleteNotifyOnReactInBdd(serverId, channelId);
 
                 delete listenings[channelId];
                 continue;
@@ -202,8 +164,6 @@ export async function forEachNotifyOnReact(callback, channel: undefined | GuildC
                         name: "Message introuvable, écoutes supprimées",
                         value: "Le message " + messageId + " est introuvable, écoutes supprimées"
                     });
-                    // @ts-ignore
-                    existingCommands.CancelNotifyOnReact.deleteNotifyOnReactInBdd(serverId, channel.id, messageId);
 
                     delete listenings[channelId][messageId];
                     continue;

@@ -23,16 +23,17 @@ import {IArgsModel} from "../interfaces/CommandInterfaces";
 const messageVariables: {[key: string]: [(userWhoReact: GuildMember) => string, number]} = {
     user: [(userWhoReact) => "<@"+userWhoReact.id+">", 23]
 }
-
-interface IListenings<IData> {
-    [guildId: string] : {
-        [channelId: string]: {
-            [messageId: string]: IData
-        }
+export interface IListeningsOnAServer<IData> {
+    [channelId: string]: {
+        [messageId: string]: IData
     }
 }
 
-interface IListeningData {
+interface IListenings<IData> {
+    [server: string]: IListeningsOnAServer<IData>
+}
+
+export interface IListeningData {
     [emoteKey: string]: {
         messageToWrite: string,
         channelToWrite: TextChannel
@@ -99,6 +100,7 @@ export default class NotifyOnReact extends Command {
     constructor(messageOrInteraction: Message|CommandInteraction, commandOrigin: 'slash'|'custom') {
         super(messageOrInteraction, commandOrigin, NotifyOnReact.commandName, NotifyOnReact.argsModel);
         this.listenings = NotifyOnReact.listenings;
+        this.listenedMessages = NotifyOnReact.listenedMessages;
     }
 
     listenings: IListenings<IListeningData>;
@@ -162,7 +164,7 @@ export default class NotifyOnReact extends Command {
     static async reactingAndNotifyOnMessage(messageToListen: Message, channelToListen: GuildChannel) {
         const serverId = (<Guild>messageToListen.guild).id;
 
-        NotifyOnReact.setListeningData(
+        this.setListeningData(
             this.listenedMessages,
             serverId,
             channelToListen.id,
@@ -233,7 +235,7 @@ export default class NotifyOnReact extends Command {
         messageId: string,
     ): boolean {
         if (!object[serverId]) {
-            delete this.listenings[serverId];
+            delete object[serverId];
             return true;
         }
         if (!object[serverId][channelId]) {
@@ -255,7 +257,7 @@ export default class NotifyOnReact extends Command {
             if (Object.keys(object[serverId][channelId]).length == 0) {
                 delete object[serverId][channelId];
             }
-            if (Object.keys(this.listenings[serverId]).length == 0) {
+            if (Object.keys(object[serverId]).length == 0) {
                 delete object[serverId];
             }
             return true;
@@ -277,8 +279,7 @@ export default class NotifyOnReact extends Command {
             object[serverId][channelId] = {};
         }
         
-        const value = typeof(valueOrFunction) === "function" ? valueOrFunction(object[serverId][channelId][messageId]) : valueOrFunction
-        object[serverId][channelId][messageId] = value
+        object[serverId][channelId][messageId] = typeof(valueOrFunction) === "function" ? valueOrFunction(object[serverId][channelId][messageId]) : valueOrFunction
     }
 
     static saveNotifyOnReact(messageToListen, channelToWrite, messageToWrite, emoteId, channelToListen) {
