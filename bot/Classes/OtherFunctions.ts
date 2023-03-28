@@ -94,7 +94,7 @@ export async function forEachNotifyOnReact(callback, channel: undefined | GuildC
     let listenings = existingCommands.NotifyOnReact.listenings[serverId];
 
     if (typeof (listenings) == "undefined") {
-        callback(false);
+        await callback(false);
     } else if (channel != undefined) {
         if (typeof (listenings[channel.id]) != "undefined") {
             if (message != undefined) {
@@ -103,13 +103,13 @@ export async function forEachNotifyOnReact(callback, channel: undefined | GuildC
                     for (let emoteKey in listenings[channel.id][message.id]) {
                         if (listenings[channel.id][message.id][emoteKey]) {
                             const contentMessage = message.content.substring(0, Math.min(20, message.content.length)) + "...";
-                            callback(true, channel, message, contentMessage, emoteKey);
+                            await callback(true, channel, message, contentMessage, emoteKey);
                             nbListeneds += 1;
                         }
                     }
                 }
                 if (nbListeneds == 0) {
-                    callback(false);
+                    await callback(false);
                 }
             } else { // Si un channel a été spécifié, mais pas de message, regarde tout les messages de ce channel
                 let nbListeneds = 0;
@@ -130,17 +130,17 @@ export async function forEachNotifyOnReact(callback, channel: undefined | GuildC
                     for (let emoteKey in listenings[channel.id][messageId]) {
                         if (listenings[channel.id][messageId][emoteKey]) {
                             nbListeneds += 1;
-                            callback(true, channel, messageListened, contentMessage, emoteKey);
+                            await callback(true, channel, messageListened, contentMessage, emoteKey);
                         }
                     }
                 }
                 if (nbListeneds == 0) {
-                    callback(false);
+                    await callback(false);
                 }
 
             }
         } else {
-            callback(false);
+            await callback(false);
         }
     } else { // Si rien n'a été spécifié en argument, regarde sur tout les messaqes de tout les channels
         let nbListeneds = 0;
@@ -172,13 +172,13 @@ export async function forEachNotifyOnReact(callback, channel: undefined | GuildC
                 for (let emoteKey in listenings[channelId][messageId]) {
                     if (listenings[channelId][messageId][emoteKey]) {
                         nbListeneds += 1;
-                        callback(true, channel, messageListened, contentMessage, emoteKey);
+                        await callback(true, channel, messageListened, contentMessage, emoteKey);
                     }
                 }
             }
         }
         if (nbListeneds == 0) {
-            callback(false);
+            await callback(false);
         }
     }
 }

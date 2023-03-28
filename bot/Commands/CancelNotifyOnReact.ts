@@ -119,10 +119,10 @@ export default class CancelNotifyOnReact extends Command {
             if (emote instanceof Emoji) {
                 await CancelNotifyOnReact.deleteNotifyOnReactInBdd(this.guild.id,channel.id,message.id,emote.name);
             }
-            const reaction = message.reactions.cache.find(reaction => reaction.emoji.id === (<Emoji>emote).id);
-            if (reaction) {
+
+            const reaction: null|MessageReaction = message.reactions.cache.find(reaction => (reaction.emoji.id??reaction.emoji.name) === emoteKey)??null;
+            if (reaction)
                 await reaction.users.remove(<ClientUser>client.user);
-            }
             Embed.addFields({
                 name: "sur '#" +channel.name + "' (" + message.content + ") " + (emote instanceof Emoji ? ':' + emote.name + ':' : emoteKey),
                 value: "Cette écoute de réaction a été supprimée"
