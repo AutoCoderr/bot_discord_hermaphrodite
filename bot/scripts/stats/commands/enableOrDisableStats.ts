@@ -6,7 +6,7 @@ import StatsConfig from "../../../Models/Stats/StatsConfig";
 function cmdError(msg, action) {
     console.log("Erreur : "+msg);
     console.log("Voici la syntaxe requise :");
-    console.log("npm run stats_"+action+" <type: vocal|messages> <servers: all|server_id1, server_id2, server_idn>");
+    console.log("npm run stats_"+action+" <type: vocal|messages> <servers: default|all|server_id1, server_id2, server_idn>");
     process.exit();
 }
 
@@ -21,16 +21,27 @@ client.on('ready', async () => {
 
     const ids = process.argv.slice(4);
 
-    const guilds = checkAndGetGivenGuilds(ids, client, (msg) => cmdError(msg,action))
+    const guilds = checkAndGetGivenGuilds(ids, client, (msg) => cmdError(msg,action), true)
 
     const statsConfigsByServerId = await getStatsConfigsByGuildsIds(guilds.map(({id}) => id));
 
-    console.log(
-        "Les guilds suivants vont avoir leurs stats "+
-        (type === "vocal" ? "vocales" : "textuelles")+
-        " "+(action === "enable" ? "activées" : "désactivées")+" :"
-    );
-    console.log("\n"+guilds.map(({name,id}) => name+" ("+id+")").join("\n")+"\n")
+    const isDefault = guilds[0] && guilds[0].id === "default";
+
+    if (isDefault) {
+        console.log(
+            "Tout les nouveaux serveurs auront par défaut leurs stats "+
+            (type === "vocal" ? "vocales" : "textuelles")+
+            " "+(action === "enable" ? "activées" : "désactivées")
+        )
+    } else {
+        console.log(
+            "Les guilds suivants vont avoir leurs stats "+
+            (type === "vocal" ? "vocales" : "textuelles")+
+            " "+(action === "enable" ? "activées" : "désactivées")+" :"
+        );
+        console.log("\n"+guilds.map(({name,id}) => name+" ("+id+")").join("\n")+"\n")
+    }
+        
     
     const enabledCol = type === 'messages' ? 'listenMessages' : 'listenVocal';
     const activePeriodCol = type === 'messages' ? 'messagesActivePeriods' : 'vocalActivePeriods';
@@ -44,7 +55,7 @@ client.on('ready', async () => {
                     await StatsConfig.create({
                         serverId: guild.id,
                         [enabledCol]: true,
-                        [activePeriodCol]: [{
+                        [activePeriodCol]: isDefault ? [] : [{
                             startDate: new Date()
                         }]
                     })
@@ -55,21 +66,21 @@ client.on('ready', async () => {
                 return;
 
             statsConfig[enabledCol] = action === "enable";
-            if (action === "enable") {
+            if (action === "enable" && !isDefault) {
                 statsConfig[activePeriodCol] = [
                     {
                         startDate: new Date()
                     },
                     ...(statsConfig[activePeriodCol]??[])
                 ]
-            } else {
+            } else if (!isDefault){
                 statsConfig[activePeriodCol][0].endDate = new Date();
             }
             await statsConfig.save();
         })
     )
     console.log(
-        "Stats "+(type === "vocal" ? "vocales" : "textuelles")+
+        (isDefault ? "Valeur par défaut des stats " : "Stats")+(type === "vocal" ? "vocales" : "textuelles")+
         " "+(action === "enable" ? "activées" : "désactivées")+" avec succès!"
     );
     process.exit()
