@@ -32,6 +32,9 @@ client.on('ready', async () => {
     );
     console.log("\n"+guilds.map(({name,id}) => name+" ("+id+")").join("\n")+"\n")
     
+    const enabledCol = type === 'messages' ? 'listenMessages' : 'listenVocal';
+    const activePeriodCol = type === 'messages' ? 'messagesActivePeriods' : 'vocalActivePeriods';
+    
     await Promise.all(
         guilds.map(async guild => {
             const statsConfig = statsConfigsByServerId[guild.id] ?? null;
@@ -40,12 +43,28 @@ client.on('ready', async () => {
                 if (action === "enable")
                     await StatsConfig.create({
                         serverId: guild.id,
-                        [type === 'messages' ? 'listenMessages' : 'listenVocal']: action === "enable"
+                        [enabledCol]: true,
+                        [activePeriodCol]: [{
+                            startDate: new Date()
+                        }]
                     })
                 return;
             }
 
-            statsConfig[type === 'messages' ? 'listenMessages' : 'listenVocal'] = action === "enable";
+            if ((action === "enable") === statsConfig[enabledCol])
+                return;
+
+            statsConfig[enabledCol] = action === "enable";
+            if (action === "enable") {
+                statsConfig[activePeriodCol] = [
+                    {
+                        startDate: new Date()
+                    },
+                    ...(statsConfig[activePeriodCol]??[])
+                ]
+            } else {
+                statsConfig[activePeriodCol][0].endDate = new Date();
+            }
             await statsConfig.save();
         })
     )
