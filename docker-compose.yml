@@ -7,7 +7,10 @@ services:
       - ./bot:/bot
       - ./logs:/logs
       - ./exported_stats:/exported_stats
+      - ./npm_cache:/npm_cache
     working_dir: /bot
+    environment:
+      npm_config_cache: /npm_cache
     depends_on:
       - mongodb
     networks:

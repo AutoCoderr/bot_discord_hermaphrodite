@@ -9,7 +9,7 @@ import { Model } from "mongoose";
 import { RequireAtLeastOne } from "../../interfaces/CommandInterfaces";
 import { convertDateToMomentTimeZoneFormat, removeTimeZoneFromISODate } from "../timezones";
 import moment from "moment-timezone";
-import StatsConfig, { IStatsConfig } from "../../Models/Stats/StatsConfig";
+import StatsConfig, { IStatsActivePeriod, IStatsConfig } from "../../Models/Stats/StatsConfig";
 
 type IAllStatsModels = IMessagesStats|IVocalConnectionsStats|IVocalMinutesStats|IVocalNewConnectionsStats;
 
@@ -18,7 +18,14 @@ type IStatsDataInfosToExport = RequireAtLeastOne<{
     models: (typeof Model)[],
     col: string,
     text: string,
-    aggregate?: (precision: IPrecision, data: any, date?: Date) => number
+    aggregate?: (
+        precision: IPrecision, 
+        data: any, 
+        date: Date, 
+        state: {
+            activePeriodIndexByServerId: {[serverId: string]: number},
+            statsConfigsByServerId: {[id: string]: IStatsConfig|null}
+        }) => number
 }, 'model'|'models'>
 
 const datasInfosToExportByType: {[type: string]: IStatsDataInfosToExport[]} = {
@@ -34,8 +41,7 @@ const datasInfosToExportByType: {[type: string]: IStatsDataInfosToExport[]} = {
             models: [VocalConnectionsStats,VocalNewConnectionsStats],
             col: 'nbVocalConnections', 
             text: "Nombre de connexions vocales",
-            aggregate: (precision, data: IVocalNewConnectionsStats|IVocalConnectionsStats, date) => {
-                date = date??data.date;
+            aggregate: (precision, data: IVocalNewConnectionsStats|IVocalConnectionsStats, date, {activePeriodIndexByServerId, statsConfigsByServerId}) => {
                 if (
                     data instanceof VocalNewConnectionsStats &&
                     precision !== "hour" &&
@@ -68,7 +74,44 @@ const datasInfosToExportByType: {[type: string]: IStatsDataInfosToExport[]} = {
 
 export type IAggregatedStatsByGuildId = {[guildId: string]: {[time: string]: {[col: string]: number}}};
 export type IExportedCsvs = {[key: string]: string};
-export type IExportType = 'default'|'sum'|'avg'|'max'|'min'
+export type IExportType = 'default'|'sum'|'avg'|'max'|'min';
+
+function completeCoefFromOtherPeriods(startDate: Date, periodIndex: number, activePeriods: IStatsActivePeriod[]) {
+    let coef = 0;
+    while (
+        periodIndex < activePeriods.length &&
+        (<Date>activePeriods[periodIndex].endDate).getTime() > startDate.getTime()
+    ) {
+        coef += (<Date>activePeriods[periodIndex].endDate).getTime() - Math.max(startDate.getTime(),activePeriods[periodIndex].startDate.getTime());
+        periodIndex += 1;
+    }
+    return coef;
+}
+
+export function calculCoefActivationByPrecision(startDate: Date, precision: IPrecision, periodIndex: null|number, activePeriods: IStatsActivePeriod[]): {coef: number, periodIndex: null|number} {
+    const endDate = incrementUnitToDate(startDate, precision, 1);
+    while (
+        periodIndex === null || 
+        endDate.getTime() < activePeriods[periodIndex].startDate.getTime()
+    ) {
+        if (activePeriods.length <= (periodIndex??-1)+1)
+            return {coef: 0, periodIndex};
+
+        periodIndex = periodIndex !== null ? periodIndex+1 : 0;
+    }
+
+    return {
+        periodIndex,
+        coef: (
+            (
+            activePeriods[periodIndex].endDate &&
+            endDate.getTime() > (<Date>activePeriods[periodIndex].endDate).getTime()    
+        ) ? 
+            completeCoefFromOtherPeriods(startDate, periodIndex, activePeriods) :
+            (Math.min(endDate.getTime(),new Date().getTime()) - Math.max(startDate.getTime(),activePeriods[periodIndex].startDate.getTime())) + completeCoefFromOtherPeriods(startDate, periodIndex+1,activePeriods)
+        )/(endDate.getTime()-startDate.getTime())
+    }
+}
 
 function aggregateCsvColumn(aggregatedLine: {[col: string]: string|number}, col: string, newValue: number, exportType: IExportType, guild: Guild) {
     const value = <null|number>(aggregatedLine[col] ?? null);
@@ -157,11 +200,14 @@ export default async function exportStatsInCsv(
 ): Promise<string|{[guildId: string]: string}> {
     const datasInfosToExport: IStatsDataInfosToExport[] = datasInfosToExportByType[type];
 
-    const statsConfigs: (IStatsConfig|null)[] = await Promise.all(
+    const statsConfigsByServerId: {[id: string]: IStatsConfig|null} = await Promise.all(
         guilds.map(guild =>
             StatsConfig.findOne({serverId: guild.id})    
         )
-    );
+    ).then(statsConfigs => statsConfigs.reduce((acc,statsConfig,i) => ({
+        ...acc,
+        [guilds[i].id]: statsConfig
+    }), {}))
 
     // For each guild : a columns data list to calcul
     // For each column data : a list of element lists, each element list corresponding to a mongoose model
@@ -177,6 +223,8 @@ export default async function exportStatsInCsv(
             ))
         )
     )
+
+    let activePeriodIndexByServerId: {[serverId: string]: number} = {};
 
     const aggregatedStatsByGuildId: IAggregatedStatsByGuildId = {};
     let oldestDate: null|Date = null;
@@ -207,7 +255,9 @@ export default async function exportStatsInCsv(
                     const oldValue = (aggregatedStatsByGuildId[guild.id][dateTag] && aggregatedStatsByGuildId[guild.id][dateTag][col] !== undefined) ? aggregatedStatsByGuildId[guild.id][dateTag][col] : 0
                     const newValue = oldValue + (
                         (datasInfosToExport[j].aggregate !== undefined) ?
-                            (<Required<IStatsDataInfosToExport>['aggregate']>datasInfosToExport[j].aggregate)(precision, data, date) : 
+                            (<Required<IStatsDataInfosToExport>['aggregate']>datasInfosToExport[j].aggregate)(
+                                precision, data, date, {activePeriodIndexByServerId, statsConfigsByServerId}
+                            ) : 
                             data[col]
                         )
                     if (aggregatedStatsByGuildId[guild.id][dateTag] === undefined) {
@@ -248,28 +298,29 @@ export default async function exportStatsInCsv(
 
     const colsToGet = datasInfosToExport.map(({col}) =>col);
 
-    const activePeriodIndexByGuild: {[serverId: string]: number} = {};
+    activePeriodIndexByServerId = {};
+
     const activePeriodCol = type === 'messages' ? 'messagesActivePeriods' : 'vocalActivePeriods';
 
     while (endDate.getTime() >= startDate.getTime()) {
-        const enabledGuildsOrNot: boolean[] = guilds.map((guild,i) => {
-            const statsConfig: null|IStatsConfig = statsConfigs[i];
+        const enabledGuildsOrNot: boolean[] = guilds.map(guild => {
+            const statsConfig: null|IStatsConfig = statsConfigsByServerId[guild.id];
             if (statsConfig === null)
                 return false;
         
             while (
-                activePeriodIndexByGuild[guild.id] === undefined || 
-                endDate.getTime() < statsConfig[activePeriodCol][activePeriodIndexByGuild[guild.id]].startDate.getTime()
+                activePeriodIndexByServerId[guild.id] === undefined || 
+                endDate.getTime() < statsConfig[activePeriodCol][activePeriodIndexByServerId[guild.id]].startDate.getTime()
             ) {
-                if (statsConfig[activePeriodCol].length <= (activePeriodIndexByGuild[guild.id]??-1)+1)
+                if (statsConfig[activePeriodCol].length <= (activePeriodIndexByServerId[guild.id]??-1)+1)
                     return false;
 
-                activePeriodIndexByGuild[guild.id] = activePeriodIndexByGuild[guild.id] !== undefined ? activePeriodIndexByGuild[guild.id]+1 : 0;
+                activePeriodIndexByServerId[guild.id] = activePeriodIndexByServerId[guild.id] !== undefined ? activePeriodIndexByServerId[guild.id]+1 : 0;
             }
 
             if (
-                statsConfig[activePeriodCol][activePeriodIndexByGuild[guild.id]].endDate && 
-                endDate.getTime() > (<Date>statsConfig[activePeriodCol][activePeriodIndexByGuild[guild.id]].endDate).getTime()
+                statsConfig[activePeriodCol][activePeriodIndexByServerId[guild.id]].endDate && 
+                endDate.getTime() > (<Date>statsConfig[activePeriodCol][activePeriodIndexByServerId[guild.id]].endDate).getTime()
             )
                 return false;
             
