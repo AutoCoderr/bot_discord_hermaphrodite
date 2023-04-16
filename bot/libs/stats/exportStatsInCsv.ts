@@ -13,6 +13,10 @@ import StatsConfig, { IStatsActivePeriod, IStatsConfig } from "../../Models/Stat
 
 type IAllStatsModels = IMessagesStats|IVocalConnectionsStats|IVocalMinutesStats|IVocalNewConnectionsStats;
 
+type IAggregateState = {
+    activePeriodIndexByServerId: {[serverId: string]: number},
+    statsConfigsByServerId: {[id: string]: IStatsConfig|null}
+};
 type IStatsDataInfosToExport = RequireAtLeastOne<{
     model: typeof Model,
     models: (typeof Model)[],
@@ -20,12 +24,9 @@ type IStatsDataInfosToExport = RequireAtLeastOne<{
     text: string,
     aggregate?: (
         precision: IPrecision, 
-        data: any, 
+        data: {date: Date, datas: any}, 
         date: Date, 
-        state: {
-            activePeriodIndexByServerId: {[serverId: string]: number},
-            statsConfigsByServerId: {[id: string]: IStatsConfig|null}
-        }) => number
+        state: IAggregateState) => [number,IAggregateState]
 }, 'model'|'models'>
 
 const datasInfosToExportByType: {[type: string]: IStatsDataInfosToExport[]} = {
@@ -38,30 +39,34 @@ const datasInfosToExportByType: {[type: string]: IStatsDataInfosToExport[]} = {
     ],
     vocal: [
         {
-            models: [VocalConnectionsStats,VocalNewConnectionsStats],
+            models: [VocalNewConnectionsStats,VocalConnectionsStats],
             col: 'nbVocalConnections', 
             text: "Nombre de connexions vocales",
-            aggregate: (precision, data: IVocalNewConnectionsStats|IVocalConnectionsStats, date, {activePeriodIndexByServerId, statsConfigsByServerId}) => {
-                if (
-                    data instanceof VocalNewConnectionsStats &&
-                    precision !== "hour" &&
-                    (
-                        date.getHours() > 0 || (precision === "month" && date.getDate() > 1)
-                    )
-                ) {
-                    return (<IVocalNewConnectionsStats>data).nbVocalNewConnections;
-                }
-                if (
-                    data instanceof VocalConnectionsStats && (
-                        precision === "hour" || (
-                            date.getHours() === 0 && (precision === "day" || date.getDate() === 1 )
+            aggregate: (precision, {date: UTCDate, datas: [newConnectionObj,connectionObj]}: {date: Date, datas: [IVocalNewConnectionsStats,IVocalConnectionsStats]}, date, {activePeriodIndexByServerId, statsConfigsByServerId}) => {
+                const {coef, periodIndex} = (
+                    precision === "hour" || (
+                        date.getHours() === 0 && (precision === "day" || date.getDate() === 1 )
+                    ) ? 
+                        {
+                            coef: 0,
+                            periodIndex: activePeriodIndexByServerId[newConnectionObj.serverId]??null
+                        } :
+                        calculCoefActivationByPrecision(
+                            incrementUnitToDate(UTCDate, "hour", -1), 
+                            "hour", 
+                            activePeriodIndexByServerId[newConnectionObj.serverId]??null,
+                            (<IStatsConfig>statsConfigsByServerId[newConnectionObj.serverId]).vocalActivePeriods
                         )
-                    )
-                ) {
-                    return (<IVocalConnectionsStats>data).nbVocalConnections;
-                }
+                )
+                if (periodIndex !== null)
+                    activePeriodIndexByServerId[newConnectionObj.serverId] = periodIndex;
 
-                return 0;
+                const value = newConnectionObj.nbVocalNewConnections+(connectionObj.nbVocalConnections-newConnectionObj.nbVocalNewConnections)*(1-coef);
+                
+                return [
+                    value,
+                    {activePeriodIndexByServerId, statsConfigsByServerId}
+                ];
             }
         },
         {
@@ -210,16 +215,36 @@ export default async function exportStatsInCsv(
     }), {}))
 
     // For each guild : a columns data list to calcul
-    // For each column data : a list of element lists, each element list corresponding to a mongoose model
-    const datas: IAllStatsModels[][][][] = await Promise.all(
+    // For each column data : A list of datas, grouped by hour. Stored datas are related to all mentionnel models for a column
+
+    const datas: ({date: Date, datas: IAllStatsModels[]})[][][] = await Promise.all(
         guilds.map(guild =>
             Promise.all(datasInfosToExport.map(({model,models}) => 
                 Promise.all((<(typeof Model)[]>(models??[model])).map(model =>
                     model.find({
                         serverId: guild.id,
                         date: {[afterOrBefore === "after" ? "$gte" : "$lt"]: specifiedDate}
-                    })  
-                ))
+                    }).sort({
+                        date: -1
+                    })
+                )).then(datass => 
+                        <({date: Date, datas: IAllStatsModels[]})[]>
+                        Object.values(datass.reduce((acc,datas) => 
+                            datas.reduce((acc,data) => {
+                                const dateTag = getDateTag(data.date, "hour");
+                                return {
+                                    ...acc,
+                                    [dateTag]: {
+                                        date: <Date>data.date,
+                                        datas: [
+                                            ...(acc[dateTag] ? acc[dateTag].datas : []),
+                                            data
+                                        ]
+                                    }
+                                }
+                            },acc)
+                        , {}))
+                )
             ))
         )
     )
@@ -233,41 +258,40 @@ export default async function exportStatsInCsv(
         const guild = guilds[i];
         aggregatedStatsByGuildId[guild.id] = {}
         for (let j=0;j<datas[i].length;j++) {
-            for (const modelDatas of datas[i][j]) {
-                for (const data of modelDatas) {
-                    const date = specifiedTimezone === null ?
-                                    data.date :
-                                    new Date(
-                                        removeTimeZoneFromISODate(
-                                            moment.utc(
-                                                convertDateToMomentTimeZoneFormat(data.date)
-                                            )
-                                            .tz(specifiedTimezone)
-                                            .format()
+            for (const data of datas[i][j]) {
+                const date = specifiedTimezone === null ?
+                                data.date :
+                                new Date(
+                                    removeTimeZoneFromISODate(
+                                        moment.utc(
+                                            convertDateToMomentTimeZoneFormat(data.date)
                                         )
+                                        .tz(specifiedTimezone)
+                                        .format()
                                     )
-                    if (afterOrBefore === "before" && (oldestDate === null || date.getTime() < oldestDate.getTime())) {
-                        oldestDate = date;
-                    }
-                    const dateTag = getDateTag(date, precision);
-                    const col = datasInfosToExport[j].col;
-    
-                    const oldValue = (aggregatedStatsByGuildId[guild.id][dateTag] && aggregatedStatsByGuildId[guild.id][dateTag][col] !== undefined) ? aggregatedStatsByGuildId[guild.id][dateTag][col] : 0
-                    const newValue = oldValue + (
-                        (datasInfosToExport[j].aggregate !== undefined) ?
-                            (<Required<IStatsDataInfosToExport>['aggregate']>datasInfosToExport[j].aggregate)(
-                                precision, data, date, {activePeriodIndexByServerId, statsConfigsByServerId}
-                            ) : 
-                            data[col]
-                        )
-                    if (aggregatedStatsByGuildId[guild.id][dateTag] === undefined) {
-                        aggregatedStatsByGuildId[guild.id][dateTag] = {
-                            [col]: newValue
-                        }
-                        continue;
-                    }
-                    aggregatedStatsByGuildId[guild.id][dateTag][col] = newValue;
+                                )
+                if (afterOrBefore === "before" && (oldestDate === null || date.getTime() < oldestDate.getTime())) {
+                    oldestDate = date;
                 }
+                const dateTag = getDateTag(date, precision);
+                const col = datasInfosToExport[j].col;
+    
+                const oldValue = (aggregatedStatsByGuildId[guild.id][dateTag] && aggregatedStatsByGuildId[guild.id][dateTag][col] !== undefined) ? aggregatedStatsByGuildId[guild.id][dateTag][col] : 0
+
+                const newValue = oldValue + (
+                    (datasInfosToExport[j].aggregate !== undefined) ?
+                        (<Required<IStatsDataInfosToExport>['aggregate']>datasInfosToExport[j].aggregate)(
+                            precision, data, date, {activePeriodIndexByServerId, statsConfigsByServerId}
+                        )[0] : data.datas.reduce((acc,data) => acc+data[col] ,0)
+                )
+
+                if (aggregatedStatsByGuildId[guild.id][dateTag] === undefined) {
+                    aggregatedStatsByGuildId[guild.id][dateTag] = {
+                        [col]: newValue
+                    }
+                    continue;
+                }
+                aggregatedStatsByGuildId[guild.id][dateTag][col] = newValue;
             }
         }
     }
