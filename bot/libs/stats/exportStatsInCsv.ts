@@ -96,7 +96,8 @@ function completeCoefFromOtherPeriods(startDate: Date, periodIndex: number, acti
 export function calculCoefActivationByPrecision(startDate: Date, precision: IPrecision, periodIndex: null|number, activePeriods: IStatsActivePeriod[]): {coef: number, periodIndex: null|number} {
     const endDate = incrementUnitToDate(startDate, precision, 1);
     while (
-        periodIndex === null || 
+        periodIndex === null ||
+        activePeriods.length <= periodIndex ||
         endDate.getTime() < activePeriods[periodIndex].startDate.getTime()
     ) {
         if (activePeriods.length <= (periodIndex??-1)+1)
@@ -118,15 +119,24 @@ export function calculCoefActivationByPrecision(startDate: Date, precision: IPre
     }
 }
 
-function aggregateCsvColumn(aggregatedLine: {[col: string]: string|number}, col: string, newValue: number, exportType: IExportType, guild: Guild) {
+function aggregateCsvColumn(aggregatedLine: {[col: string]: string|number}, col: string, newValue: number, exportType: IExportType, guild: Guild, coef: number) {
+    if (coef === 0)
+        return;
     const value = <null|number>(aggregatedLine[col] ?? null);
-    if (['sum','avg'].includes(exportType)) {
+    if (exportType === "sum") {
         aggregatedLine[col] = (value??0)+newValue;
         return;
     }
-    if (value === null || (exportType === "max" && newValue > value) || (exportType === "min" && newValue < value)) {
+    if (exportType === "avg") {
+        aggregatedLine[col] = (value??0)+(newValue*coef);
+        return;
+    }
+    const ponderedNewValue = newValue/coef;
+    const ponderedValue = value !== null ? value/(<number>aggregatedLine["server_coef_"+col]) : null;
+    if (ponderedValue === null || (exportType === "max" && ponderedNewValue > ponderedValue) || (exportType === "min" && ponderedNewValue < ponderedValue)) {
         aggregatedLine[col] = newValue;
-        aggregatedLine["server_"+col] = guild.name+" ("+guild.id+")"
+        aggregatedLine["server_"+col] = guild.name+" ("+guild.id+") ("+coef+")"
+        aggregatedLine["server_coef_"+col] = coef
     }
 }
 
@@ -137,29 +147,27 @@ function addDatasToCsv(
     colsToGet: string[], 
     exportType: IExportType,
     guilds: Guild[],
-    enabledGuildsOrNot: boolean[]
+    activeCoefsByGuild: number[]
 ) {
     if (exportType === "default") {
         for (let i=0;i<guilds.length;i++) {
             const {id} = guilds[i];
-            const enabled = enabledGuildsOrNot[i];
+            const coef = activeCoefsByGuild[i];
 
             csvs[id] += "\n"+dateTag+";"+
                 colsToGet.map(
-                    (col) => enabled ?
+                    (col) => coef > 0 ?
                                 (aggregatedStatsByGuildId[id][dateTag] && aggregatedStatsByGuildId[id][dateTag][col]) ? 
                                 aggregatedStatsByGuildId[id][dateTag][col] : 
                                 0 :
                              "-"
-                ).join(";")
+                ).join(";")+";"+coef
         }
         return;
     }
     const aggregatedLine = {};
     for (const col of colsToGet) {
         for (let i=0;i<guilds.length;i++) {
-            if (!enabledGuildsOrNot[i])
-                continue;
             const guild = guilds[i];
             aggregateCsvColumn(
                 aggregatedLine, 
@@ -168,41 +176,54 @@ function addDatasToCsv(
                     aggregatedStatsByGuildId[guild.id][dateTag][col] : 
                     0, 
                 exportType, 
-                guild
+                guild,
+                activeCoefsByGuild[i]
             )
         }
     }
+
+    const sumCoefs = activeCoefsByGuild.reduce((acc,n) => acc+n ,0)
+
     csvs.all += "\n"+dateTag+";"+colsToGet
         .map(col => 
             aggregatedLine[col] ? 
                 (
                     exportType === "avg" ? 
                         round(
-                            aggregatedLine[col]/enabledGuildsOrNot.filter(enabled => enabled).length,
+                            aggregatedLine[col]/sumCoefs,
                             2
                         ) : 
                         aggregatedLine[col]
                 ) : 
-                0
+                (sumCoefs > 0 ? 0 : "-")
         ).join(";")+(
             ["max","min"].includes(exportType) ? 
-                ";"+ colsToGet.map(col => aggregatedLine["server_"+col] ?? "").join(";") : 
+                ";"+ colsToGet.map(col => aggregatedLine["server_"+col] ?? "-").join(";") : 
                 ""
-        )+(["avg","sum"].includes(exportType) ? 
-                ";"+enabledGuildsOrNot.filter(enabled => enabled).length :
-                ""
-        )
+        )+";"+sumCoefs
 }
 
 export default async function exportStatsInCsv(
     guilds: Guild[], 
     exportType: IExportType,
-    specifiedDate: Date, 
+    localSpecifiedDate: Date, 
     afterOrBefore: 'after'|'before', 
     type: 'messages'|'vocal', 
     precision: IPrecision,
     specifiedTimezone: null|string = null
 ): Promise<string|{[guildId: string]: string}> {
+
+    const specifiedDate = specifiedTimezone === null ? 
+            localSpecifiedDate :
+            new Date(
+                moment.tz(
+                    convertDateToMomentTimeZoneFormat(localSpecifiedDate),
+                    specifiedTimezone
+                )
+                .utc()
+                .format()
+            )
+
     const datasInfosToExport: IStatsDataInfosToExport[] = datasInfosToExportByType[type];
 
     const statsConfigsByServerId: {[id: string]: IStatsConfig|null} = await Promise.all(
@@ -298,21 +319,14 @@ export default async function exportStatsInCsv(
     
     const [getter,setter] = getDateGettersAndSettersFromUnit(precision);
 
-    const endDate: Date = afterOrBefore === "after" ? 
-                    getDateWithPrecision(new Date(), precision) : 
-                    incrementUnitToDate(specifiedDate, precision, -1);
-    const startDate: Date = afterOrBefore === "after" ? 
-                    specifiedDate : 
-                    (oldestDate ? getDateWithPrecision(oldestDate, precision) : specifiedDate);
-
     const firstLine = "Date;"+datasInfosToExport.map(({text}) => text).join(";")+(
         ["max","min"].includes(exportType) ? 
             ";"+datasInfosToExport.map(({text}) => "Serveur - "+text[0].toLowerCase()+text.substring(1)).join(";") : 
             ""
         )+(
-            ["avg","sum"].includes(exportType) ?
-              ";Serveurs actifs" :
-              ""
+            exportType === "default" ?
+              ";Coeficient" :
+              ";Serveurs totaux"
         );
     let csvs: IExportedCsvs = (exportType === "default" ? guilds.map(({id}) => id) : ["all"])
         .reduce((acc,key) => ({
@@ -326,49 +340,64 @@ export default async function exportStatsInCsv(
 
     const activePeriodCol = type === 'messages' ? 'messagesActivePeriods' : 'vocalActivePeriods';
 
-    while (endDate.getTime() >= startDate.getTime()) {
-        const enabledGuildsOrNot: boolean[] = guilds.map(guild => {
-            const statsConfig: null|IStatsConfig = statsConfigsByServerId[guild.id];
-            if (statsConfig === null)
-                return false;
-        
-            while (
-                activePeriodIndexByServerId[guild.id] === undefined || 
-                endDate.getTime() < statsConfig[activePeriodCol][activePeriodIndexByServerId[guild.id]].startDate.getTime()
-            ) {
-                if (statsConfig[activePeriodCol].length <= (activePeriodIndexByServerId[guild.id]??-1)+1)
-                    return false;
+    const now = new Date();
+    const localNow = specifiedTimezone === null ?
+                        now :
+                        new Date(
+                            removeTimeZoneFromISODate(
+                                moment.utc(
+                                    convertDateToMomentTimeZoneFormat(now)
+                                )
+                                .tz(specifiedTimezone)
+                                .format()
+                            )
+                        )
 
-                activePeriodIndexByServerId[guild.id] = activePeriodIndexByServerId[guild.id] !== undefined ? activePeriodIndexByServerId[guild.id]+1 : 0;
-            }
+    const localEndDate: Date = afterOrBefore === "after" ? 
+                    getDateWithPrecision(localNow, precision) : 
+                    incrementUnitToDate(getDateWithPrecision(localSpecifiedDate, precision), precision, -1);
+    
+    
+    const localStartDate: Date = (afterOrBefore === "before" && oldestDate) ? 
+                            getDateWithPrecision(oldestDate, precision) : 
+                            getDateWithPrecision(localSpecifiedDate, precision);
 
-            if (
-                statsConfig[activePeriodCol][activePeriodIndexByServerId[guild.id]].endDate && 
-                endDate.getTime() > (<Date>statsConfig[activePeriodCol][activePeriodIndexByServerId[guild.id]].endDate).getTime()
+    while (localEndDate.getTime() >= localStartDate.getTime()) {
+        const UTCEndDate = specifiedTimezone === null ? 
+            localEndDate :
+            new Date(
+                moment.tz(
+                    convertDateToMomentTimeZoneFormat(localEndDate),
+                    specifiedTimezone
+                )
+                .utc()
+                .format()
             )
-                return false;
+        const activeCoefsByGuild: number[] = guilds.map(guild => {
+            if (statsConfigsByServerId[guild.id] === null)
+                return 0
+
+            const {coef, periodIndex} = calculCoefActivationByPrecision(
+                UTCEndDate, 
+                precision, 
+                activePeriodIndexByServerId[guild.id]??null,
+                (<IStatsConfig>statsConfigsByServerId[guild.id])[activePeriodCol]
+            )
+
+            if (periodIndex !== null)
+                activePeriodIndexByServerId[guild.id] = periodIndex;
             
-            return true;
+            return coef
         })
 
         const dateTag = getDateTag(
-            specifiedTimezone === null ?
-            endDate :
-                new Date(
-                    removeTimeZoneFromISODate(
-                        moment.utc(
-                            convertDateToMomentTimeZoneFormat(endDate)
-                        )
-                        .tz(specifiedTimezone)
-                        .format()
-                    )
-                ), 
+            localEndDate, 
             precision
         );
 
-        addDatasToCsv(csvs, dateTag, aggregatedStatsByGuildId, colsToGet, exportType, guilds, enabledGuildsOrNot);
+        addDatasToCsv(csvs, dateTag, aggregatedStatsByGuildId, colsToGet, exportType, guilds, activeCoefsByGuild);
 
-        endDate[setter](endDate[getter]()-1)
+        localEndDate[setter](localEndDate[getter]()-1)
     }
     
     return csvs;
