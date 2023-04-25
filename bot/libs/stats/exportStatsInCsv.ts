@@ -135,7 +135,7 @@ function aggregateCsvColumn(aggregatedLine: {[col: string]: string|number}, col:
     const ponderedValue = value !== null ? value/(<number>aggregatedLine["server_coef_"+col]) : null;
     if (ponderedValue === null || (exportType === "max" && ponderedNewValue > ponderedValue) || (exportType === "min" && ponderedNewValue < ponderedValue)) {
         aggregatedLine[col] = newValue;
-        aggregatedLine["server_"+col] = guild.name+" ("+guild.id+") ("+coef+")"
+        aggregatedLine["server_"+col] = guild.name+" ("+guild.id+") ("+round(coef,2)+")"
         aggregatedLine["server_coef_"+col] = coef
     }
 }
@@ -158,10 +158,10 @@ function addDatasToCsv(
                 colsToGet.map(
                     (col) => coef > 0 ?
                                 (aggregatedStatsByGuildId[id][dateTag] && aggregatedStatsByGuildId[id][dateTag][col]) ? 
-                                aggregatedStatsByGuildId[id][dateTag][col] : 
+                                round(aggregatedStatsByGuildId[id][dateTag][col], 2) : 
                                 0 :
                              "-"
-                ).join(";")+";"+coef
+                ).join(";")+";"+round(coef,2)
         }
         return;
     }
@@ -193,14 +193,14 @@ function addDatasToCsv(
                             aggregatedLine[col]/sumCoefs,
                             2
                         ) : 
-                        aggregatedLine[col]
+                        round(aggregatedLine[col], 2)
                 ) : 
                 (sumCoefs > 0 ? 0 : "-")
         ).join(";")+(
             ["max","min"].includes(exportType) ? 
                 ";"+ colsToGet.map(col => aggregatedLine["server_"+col] ?? "-").join(";") : 
                 ""
-        )+";"+sumCoefs
+        )+";"+round(sumCoefs,2)
 }
 
 export default async function exportStatsInCsv(
