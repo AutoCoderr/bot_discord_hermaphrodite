@@ -19,11 +19,14 @@ export default async function setDefaultStatsOnNewGuild(guild: Guild) {
                                 [{
                                     startDate: new Date()
                                 }] : [],
+        vocalExpiration: defaultStatsConfig.vocalExpiration,
+                                
 
         listenMessages: defaultStatsConfig.listenMessages,
         messagesActivePeriods: defaultStatsConfig.listenMessages ?
                                 [{
                                     startDate: new Date()
                                 }] : [],
+        messagesExpiration: defaultStatsConfig.messagesExpiration,
     })
 }

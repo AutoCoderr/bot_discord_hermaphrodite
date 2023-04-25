@@ -8,7 +8,7 @@ import StatsConfig, { defaultStatsExpiration, maxStatsExpiration, minStatsExpira
 function cmdError(msg, action) {
     console.log("Erreur : "+msg);
     console.log("Voici la syntaxe requise :");
-    console.log("npm run stats_expiration_"+action+" <type: vocal|messages>"+(action === "set" ? " <expiration: integer>" : "")+" <server: all|server_id1, server_id2, server_idn>");
+    console.log("npm run stats_expiration_"+action+" <type: vocal|messages>"+(action === "set" ? " <expiration: integer>" : "")+" <server: default|all|server_id1, server_id2, server_idn>");
     process.exit();
 }
 
@@ -35,12 +35,25 @@ client.on('ready', async () => {
     
     const ids = process.argv.slice(action === "set" ? 5 : 4);
 
-    const guilds = checkAndGetGivenGuilds(ids, client, (msg) => cmdError(msg,action));
+    const guilds = checkAndGetGivenGuilds(ids, client, (msg) => cmdError(msg,action), true);
 
     const statsConfigsByServerId = await getStatsConfigsByGuildsIds(guilds.map(({id}) => id));
 
+    const isDefault = guilds.length === 1 && guilds[0].id === "default";
+
     if (action === "show") {
-        console.log("Voici l'expiration des stats "+(type === 'messages' ? 'listenMessages' : 'listenVocal')+" des serveurs mentionnés :")
+        if (isDefault) {
+            console.log("Voici l'expiration par défaut des stats "+(type === 'messages' ? 'textuelles' : 'vocales')+" : \n");
+            console.log((
+                statsConfigsByServerId.default ? 
+                    statsConfigsByServerId.default[type === "vocal" ? "vocalExpiration" : "messagesExpiration"] :
+                    defaultStatsExpiration
+                )+" jours"
+            )
+            process.exit()
+        }
+
+        console.log("Voici l'expiration des stats "+(type === 'messages' ? 'de messages' : 'vocales')+" des serveurs mentionnés :")
         console.log("\n"+
             guilds.map(({name,id}) =>
                 name+" ("+id+") => "+(
@@ -53,11 +66,17 @@ client.on('ready', async () => {
         process.exit();
     }
 
+
     console.log(
-        "Les guilds suivants vont avoir leur expiration de stats "+
-        (type === "vocal" ? "vocales" : "de messages")+" définis à "+parsedExpiration+" jours :"
+        isDefault ?
+            "La valeur d'expiration par défaut des stats "+(type === "vocal" ? "vocales" : "de messages")+
+            " va être défini à "+parsedExpiration+" jours" :
+
+            "Les guilds suivants vont avoir leur expiration de stats "+
+            (type === "vocal" ? "vocales" : "de messages")+" définis à "+parsedExpiration+" jours :"
     );
-    console.log("\n"+guilds.map(({name,id}) => name+" ("+id+")").join("\n")+"\n")
+    if (!isDefault)
+        console.log("\n"+guilds.map(({name,id}) => name+" ("+id+")").join("\n")+"\n")
 
     await Promise.all(
         guilds.map(async guild => {
@@ -72,6 +91,9 @@ client.on('ready', async () => {
                 statsConfig[type === 'messages' ? 'messagesExpiration' : 'vocalExpiration'] = parsedExpiration;
                 await statsConfig.save();
             }
+
+            if (isDefault)
+                return;
 
             if (type === "messages")
                 await clearExpiredDatas("messages", guild.id)
