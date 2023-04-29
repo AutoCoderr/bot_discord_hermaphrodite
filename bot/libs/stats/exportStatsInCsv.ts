@@ -42,26 +42,35 @@ const datasInfosToExportByType: {[type: string]: IStatsDataInfosToExport[]} = {
             models: [VocalNewConnectionsStats,VocalConnectionsStats],
             col: 'nbVocalConnections', 
             text: "Nombre de connexions vocales",
-            aggregate: (precision, {date: UTCDate, datas: [newConnectionObj,connectionObj]}: {date: Date, datas: [IVocalNewConnectionsStats,IVocalConnectionsStats]}, date, {activePeriodIndexByServerId, statsConfigsByServerId}) => {
+            aggregate: (precision, {date: UTCDate, datas}: {date: Date, datas: (IVocalNewConnectionsStats|IVocalConnectionsStats)[]}, date, {activePeriodIndexByServerId, statsConfigsByServerId}) => {
+                const {connectionObj,newConnectionObj} = <{connectionObj: null|IVocalConnectionsStats, newConnectionObj: null|IVocalNewConnectionsStats}>getDatasToAggregate(datas, {
+                    connectionObj: data => data instanceof VocalConnectionsStats,
+                    newConnectionObj: data => data instanceof VocalNewConnectionsStats
+                });
+
+                const serverId = connectionObj ? connectionObj.serverId : (<IVocalNewConnectionsStats>newConnectionObj).serverId
                 const {coef, periodIndex} = (
                     precision === "hour" || (
                         date.getHours() === 0 && (precision === "day" || date.getDate() === 1 )
                     ) ? 
                         {
                             coef: 0,
-                            periodIndex: activePeriodIndexByServerId[newConnectionObj.serverId]??null
+                            periodIndex: activePeriodIndexByServerId[serverId]??null
                         } :
                         calculCoefActivationByPrecision(
                             incrementUnitToDate(UTCDate, "hour", -1), 
                             "hour", 
-                            activePeriodIndexByServerId[newConnectionObj.serverId]??null,
-                            (<IStatsConfig>statsConfigsByServerId[newConnectionObj.serverId]).vocalActivePeriods
+                            activePeriodIndexByServerId[serverId]??null,
+                            (<IStatsConfig>statsConfigsByServerId[serverId]).vocalActivePeriods
                         )
                 )
                 if (periodIndex !== null)
-                    activePeriodIndexByServerId[newConnectionObj.serverId] = periodIndex;
+                    activePeriodIndexByServerId[serverId] = periodIndex;
 
-                const value = newConnectionObj.nbVocalNewConnections+(connectionObj.nbVocalConnections-newConnectionObj.nbVocalNewConnections)*(1-coef);
+                const nbVocalNewConnections = newConnectionObj ? newConnectionObj.nbVocalNewConnections : 0;
+                const nbVocalConnections = connectionObj ? connectionObj.nbVocalConnections : 0
+
+                const value = nbVocalNewConnections+(nbVocalConnections-nbVocalNewConnections)*(1-coef);
                 
                 return [
                     value,
@@ -75,6 +84,21 @@ const datasInfosToExportByType: {[type: string]: IStatsDataInfosToExport[]} = {
             text: "Nombre de minutes en vocal"
         }
     ]
+}
+
+function getDatasToAggregate(datas: any[], model: {[key: string]: (data: any) => boolean}) {
+    return datas.reduce(
+        (acc,data) => 
+            Object.entries(model).reduce((acc,[key,isOk]) => ({
+                ...acc,
+                [key]: (acc[key] === null && isOk(data)) ? data : acc[key]
+            }), acc), 
+            Object.keys(model)
+                .reduce((acc,key) => ({
+                    ...acc,
+                    [key]: null
+            }), {})
+        )
 }
 
 export type IAggregatedStatsByGuildId = {[guildId: string]: {[time: string]: {[col: string]: number}}};
