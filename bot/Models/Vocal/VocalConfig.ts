@@ -8,6 +8,7 @@ const db = connect();
 
 export const defaultLimit = 0; // By default 0 for the limit, can be changed by admin
 export const minimumLimit = 0; // Minimum value for the limit
+export const maximumLimit = 7 * 24 * 60 * 60 * 1000; // Maximum 7 days for the limit
 
 export const minimumDelay = 0 /// Minimum value for delay
 export const maximumDelay = 5 * 60 * 1000 /// Maximum value of 5 minutes

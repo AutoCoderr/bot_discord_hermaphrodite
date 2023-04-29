@@ -8,17 +8,17 @@ import {
 } from "discord.js";
 import config from "../config";
 import VocalSubscribe, {IVocalSubscribe} from "../Models/Vocal/VocalSubscribe";
-import VocalConfig, {defaultDelay, IVocalConfig, minimumLimit} from "../Models/Vocal/VocalConfig";
+import VocalConfig, {defaultDelay, IVocalConfig, minimumLimit, maximumLimit} from "../Models/Vocal/VocalConfig";
 import VocalUserConfig, {IVocalUserConfig} from "../Models/Vocal/VocalUserConfig";
 import VocalInvite, { VocalInviteTimeoutWithoutMessageId } from "../Models/Vocal/VocalInvite";
 import {splitFieldsEmbed} from "../Classes/OtherFunctions";
 import {
-    extractUTCTime,
     extractTime,
     extractDate,
     durationUnits,
     showTime,
-    showDate
+    showDate,
+    extractDurationTime
 } from "../Classes/DateTimeManager";
 import {IArgsModel} from "../interfaces/CommandInterfaces";
 import CustomError from "../logging/CustomError";
@@ -111,13 +111,16 @@ export default class Vocal extends Command {
                 type: 'duration',
                 description: "Le temps durant lequel on souhaite ne pas recevoir de notif (ex: 30s, 5m, 3h, 2j)",
                 valid: (time, args) => (args.action === 'mute' && time > 0) ||
-                    (args.action === 'limit' && time >= minimumLimit),
-                errorMessage: (value,args) => ({
+                    (args.action === 'limit' && time >= minimumLimit && time <= maximumLimit),
+                errorMessage: (value) => ({
                     name: "Vous avez mal rentrez le temps",
-                    ...(typeof(value) === "number" ?
-                            {value: "Êtes vous sur qu'il est supérieur "+(args.action === 'limit' ? "ou égal à "+showTime(extractUTCTime(minimumLimit), 'fr') : "à 0")+" ?"} :
-                            {value: "Vous n'avez pas respecté la syntaxe"}
-                    )
+                    value: typeof(value) === "number" ?
+                        "La limite doit être située entre "+
+                        [minimumLimit,maximumLimit]
+                            .map(v => showTime(extractDurationTime(v), "fr_long"))
+                            .join(" et ")+" inclus" :
+                        
+                        "Vous n'avez pas respecté la syntaxe"
                 })
             }
         }
@@ -525,7 +528,7 @@ export default class Vocal extends Command {
 
             ownUserConfig.save();
 
-            return this.response(true, "Vous ne recevrez plus de notification pendant" + showTime(extractUTCTime(time), 'fr_long'));
+            return this.response(true, "Vous ne recevrez plus de notification pendant" + showTime(extractDurationTime(time), 'fr_long'));
         }
 
         if (action == 'unmute') {
@@ -552,7 +555,7 @@ export default class Vocal extends Command {
             return this.response(true,
                 (time == 0) ?
                     "Il n'y aura maintenant aucun répit entre les notifications" :
-                    "Il y aura maintenant un répit de" + showTime(extractUTCTime(time), 'fr_long') + " entre chaque notification"
+                    "Il y aura maintenant un répit de" + showTime(extractDurationTime(time), 'fr_long') + " entre chaque notification"
             );
         }
 
@@ -650,14 +653,14 @@ export default class Vocal extends Command {
             let sinceTimeMuted;
             let remaningTimeMuted;
             if (muted) {
-                sinceTimeMuted = extractUTCTime(now - ownUserConfig.lastMute.getTime());
-                remaningTimeMuted = extractUTCTime(ownUserConfig.mutedFor - now + ownUserConfig.lastMute.getTime());
+                sinceTimeMuted = extractDurationTime(now - ownUserConfig.lastMute.getTime());
+                remaningTimeMuted = extractDurationTime(ownUserConfig.mutedFor - now + ownUserConfig.lastMute.getTime());
             }
 
             fieldLines.push(muted ? "Vous êtes mute depuis" + showTime(sinceTimeMuted, 'fr_long') +
                 ".\nIl reste" + showTime(remaningTimeMuted, 'fr_long') + "." : "Vous n'êtes pas mute");
 
-            fieldLines.push((ownUserConfig.limit > 0 ? "Vous avez" + showTime(extractUTCTime(ownUserConfig.limit), 'fr_long') : "Vous n'avez pas") +
+            fieldLines.push((ownUserConfig.limit > 0 ? "Vous avez" + showTime(extractDurationTime(ownUserConfig.limit), 'fr_long') : "Vous n'avez pas") +
                 " de répit entre chaque notification");
 
             fieldLines.push("L'écoute est " + (ownUserConfig.listening ? "activée" : "désactivée"));

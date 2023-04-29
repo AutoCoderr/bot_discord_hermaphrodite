@@ -8,7 +8,6 @@ import TextSubscribe from "../../Models/Text/TextSubscribe";
 import VocalSubscribe from "../../Models/Vocal/VocalSubscribe";
 import TextUserConfig from "../../Models/Text/TextUserConfig";
 import VocalUserConfig from "../../Models/Vocal/VocalUserConfig";
-import History from "../../Models/History";
 import MonitoringMessage from "../../Models/MonitoringMessage";
 import StoredNotifyOnReact from "../../Models/StoredNotifyOnReact";
 import TicketConfig from "../../Models/TicketConfig";
@@ -162,11 +161,6 @@ client.on('ready', () => {
             }, {
                 member: ['blocked.users'],
                 role: ['blocked.roles']
-            }),
-            checkAndDeleteUselessEntries(History, "history", {
-                server: ['serverId'],
-                member: ['userId'],
-                channel: ['channelId']
             }),
             checkAndDeleteUselessEntries(MonitoringMessage, "monitoringMessage", {
                 server: ['serverId'],

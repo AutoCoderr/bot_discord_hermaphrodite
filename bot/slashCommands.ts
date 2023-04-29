@@ -3,7 +3,9 @@ import {
     ApplicationCommand, CommandInteraction,
     Guild,
     MessagePayload,
-    ApplicationCommandOptionType
+    ApplicationCommandOptionType,
+    SlashCommandBuilder,
+    PermissionFlagsBits
 } from "discord.js";
 import Command from "./Classes/Command";
 import {existingCommands} from "./Classes/CommandsDescription";
@@ -30,7 +32,8 @@ interface IOptionCommand<> {
     noSubCommandGroup?: boolean;
     args?: { [attr: string]: string };
     options?: IOptionCommand[];
-    defaultPermission?: boolean;
+    default_permission?: boolean;
+    default_member_permissions?: bigint;
     choices?: {name: string, value: string|number}[]
 }
 
@@ -118,7 +121,8 @@ async function generateSlashCommandFromModel(command: typeof Command): Promise<I
     let slashCommandModel: IOptionCommand = {
         name: <string>command.commandName?.toLowerCase(),
         description: <string>command.description,
-        defaultPermission: false
+        default_member_permissions: command.defaultMemberPermission ?? undefined,
+        default_permission: false
     };
     const subCommands = {};
     for (const attr in command.argsModel) {

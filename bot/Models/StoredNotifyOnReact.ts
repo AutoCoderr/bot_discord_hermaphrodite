@@ -3,6 +3,9 @@ import { connect } from "../Mongo";
 
 const db = connect();
 
+export const minimumStoredNotifyMessageSize = 2;
+export const maximumStoredNotifyMessageSize = 2000;
+
 export interface IStoredNotifyOnReact {
     emoteName?: string;
     emoteId?: string;

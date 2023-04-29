@@ -1,6 +1,5 @@
 import config from "../config";
 import {addMissingZero, splitFieldsEmbed} from "./OtherFunctions";
-import History, {IHistory} from "../Models/History";
 import {isNumber} from "./OtherFunctions";
 import {
     ApplicationCommand,
@@ -38,7 +37,9 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
 
     static abstract: boolean = false;
 
-    static customCommand: boolean = true;
+    static customCommand: boolean = false;
+
+    static defaultMemberPermission: null|bigint = null;
 
     commandOrigin: 'slash'|'custom';
 
@@ -106,8 +107,6 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
                     throw new CustomError(e, {commandArguments: args});
                 })
 
-            if (success && this.commandOrigin === "custom")
-                this.saveHistory();
             return {result, callback};
         }
         return false;
@@ -252,39 +251,6 @@ export default class Command<IArgs = {[key: string]: any}, C extends null|Comman
                         " | ( "+(arg.default != undefined ? "Par défaut : "+arg.default+" ; " : "")+"type attendu : " + arg.type + " )"
                 })
             );
-    }
-
-    saveHistory() {
-        if (this.writtenCommand == null ||
-            (this.member instanceof GuildMember && this.member.user.bot) ||
-            (this.member instanceof User && this.member.bot)) return; // Do nothing if the message is typed by a bot
-
-        const date = new Date();
-
-        const year = addMissingZero(date.getFullYear(), 4),
-            month = addMissingZero(date.getMonth()+1),
-            day = addMissingZero(date.getDate()),
-            hour = addMissingZero(date.getHours()),
-            minute = addMissingZero(date.getMinutes()),
-            seconds = addMissingZero(date.getSeconds());
-
-        const commandName = this.writtenCommand.slice(1).split(" ")[0],
-            command = this.writtenCommand.slice(1),
-            dateTime = year+"-"+month+"-"+day+" "+hour+":"+minute+":"+seconds,
-            channelId = this.channel.id,
-            userId = this.member.id,
-            serverId = this.guild != null ? this.guild.id : "nothing";
-
-        const history: IHistory = {
-            commandName,
-            command,
-            dateTime,
-            channelId,
-            userId,
-            serverId
-        }
-
-        History.create(history);
     }
 
     checkPermissions(): Promise<boolean> {

@@ -1,8 +1,6 @@
 import {existingCommands} from "./CommandsDescription";
-import History from "../Models/History";
 import {
     EmbedBuilder, EmbedField,
-    Guild,
     GuildChannel,
     GuildMember,
     Message, PermissionResolvable,
@@ -11,8 +9,6 @@ import {
 } from "discord.js";
 import Command from "./Command";
 import CancelNotifyOnReact from "../Commands/CancelNotifyOnReact";
-import HistoryExec from "../Commands/HistoryExec";
-import HistoryCmd from "../Commands/HistoryCmd";
 import ListNotifyOnReact from "../Commands/ListNotifyOnReact";
 import {IArgsModel} from "../interfaces/CommandInterfaces";
 import { IPrecision } from "../libs/stats/statsCounters";
@@ -88,36 +84,6 @@ export function getArgsModelHistory(): IArgsModel {
     };
 }
 
-
-export async function getHistory(currentCommand: HistoryCmd | HistoryExec, args: { commands: typeof Command[], sort: string, limit: number, channels: GuildChannel[], users: GuildMember[] }) {
-    let {commands, sort, limit, channels, users} = args;
-
-    let where: any = {serverId: (<Guild>currentCommand.guild).id};
-    if (users != undefined) {
-        where.userId = {$in: users.map(user => user.id)};
-    }
-    if (channels != undefined) {
-        where.channelId = {$in: channels.map(channel => channel.id)};
-    }
-    if (commands != undefined) {
-        where.commandName = {$in: []};
-        for (const command of commands) {
-            where.commandName.$in.push(command.commandName);
-        }
-    } else {
-        where.commandName = {$nin: []};
-        for (let aCommand in existingCommands) {
-            if (!await existingCommands[aCommand].staticCheckPermissions(currentCommand.member, currentCommand.guild)) {
-                where.commandName.$nin.push(aCommand);
-            }
-        }
-    }
-
-    if (sort == "dsc") sort = "desc";
-
-    return await History.find(where).limit(limit).sort({dateTime: sort});
-}
-
 export async function forEachNotifyOnReact(callback, channel: undefined | GuildChannel, message: undefined | Message, embed: EmbedBuilder, command: CancelNotifyOnReact | ListNotifyOnReact) {
     if (command.guild == null) {
         callback(false);
@@ -128,7 +94,7 @@ export async function forEachNotifyOnReact(callback, channel: undefined | GuildC
     let listenings = existingCommands.NotifyOnReact.listenings[serverId];
 
     if (typeof (listenings) == "undefined") {
-        callback(false);
+        await callback(false);
     } else if (channel != undefined) {
         if (typeof (listenings[channel.id]) != "undefined") {
             if (message != undefined) {
@@ -137,13 +103,13 @@ export async function forEachNotifyOnReact(callback, channel: undefined | GuildC
                     for (let emoteKey in listenings[channel.id][message.id]) {
                         if (listenings[channel.id][message.id][emoteKey]) {
                             const contentMessage = message.content.substring(0, Math.min(20, message.content.length)) + "...";
-                            callback(true, channel, message, contentMessage, emoteKey);
+                            await callback(true, channel, message, contentMessage, emoteKey);
                             nbListeneds += 1;
                         }
                     }
                 }
                 if (nbListeneds == 0) {
-                    callback(false);
+                    await callback(false);
                 }
             } else { // Si un channel a été spécifié, mais pas de message, regarde tout les messages de ce channel
                 let nbListeneds = 0;
@@ -156,8 +122,6 @@ export async function forEachNotifyOnReact(callback, channel: undefined | GuildC
                             name: "Message introuvable, écoutes supprimées",
                             value: "Le message " + messageId + " est introuvable, écoutes supprimées"
                         });
-                        // @ts-ignore
-                        existingCommands.CancelNotifyOnReact.deleteNotifyOnReactInBdd(serverId, channel.id, messageId);
 
                         delete listenings[channel.id][messageId];
                         continue;
@@ -166,17 +130,17 @@ export async function forEachNotifyOnReact(callback, channel: undefined | GuildC
                     for (let emoteKey in listenings[channel.id][messageId]) {
                         if (listenings[channel.id][messageId][emoteKey]) {
                             nbListeneds += 1;
-                            callback(true, channel, messageListened, contentMessage, emoteKey);
+                            await callback(true, channel, messageListened, contentMessage, emoteKey);
                         }
                     }
                 }
                 if (nbListeneds == 0) {
-                    callback(false);
+                    await callback(false);
                 }
 
             }
         } else {
-            callback(false);
+            await callback(false);
         }
     } else { // Si rien n'a été spécifié en argument, regarde sur tout les messaqes de tout les channels
         let nbListeneds = 0;
@@ -187,8 +151,6 @@ export async function forEachNotifyOnReact(callback, channel: undefined | GuildC
                     name: "Channel introuvable, écoutes supprimées",
                     value: "Le channel " + channelId + " est introuvable, écoutes supprimées"
                 });
-                // @ts-ignore
-                existingCommands.CancelNotifyOnReact.deleteNotifyOnReactInBdd(serverId, channelId);
 
                 delete listenings[channelId];
                 continue;
@@ -202,8 +164,6 @@ export async function forEachNotifyOnReact(callback, channel: undefined | GuildC
                         name: "Message introuvable, écoutes supprimées",
                         value: "Le message " + messageId + " est introuvable, écoutes supprimées"
                     });
-                    // @ts-ignore
-                    existingCommands.CancelNotifyOnReact.deleteNotifyOnReactInBdd(serverId, channel.id, messageId);
 
                     delete listenings[channelId][messageId];
                     continue;
@@ -212,13 +172,13 @@ export async function forEachNotifyOnReact(callback, channel: undefined | GuildC
                 for (let emoteKey in listenings[channelId][messageId]) {
                     if (listenings[channelId][messageId][emoteKey]) {
                         nbListeneds += 1;
-                        callback(true, channel, messageListened, contentMessage, emoteKey);
+                        await callback(true, channel, messageListened, contentMessage, emoteKey);
                     }
                 }
             }
         }
         if (nbListeneds == 0) {
-            callback(false);
+            await callback(false);
         }
     }
 }

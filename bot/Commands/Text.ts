@@ -1,6 +1,5 @@
 import Command from "../Classes/Command";
 import {
-    CommandInteractionOptionResolver,
     Guild,
     GuildChannel,
     GuildMember, Message,
@@ -11,7 +10,7 @@ import {
     ButtonStyle, CommandInteraction
 } from "discord.js";
 import config from "../config";
-import TextConfig, {ITextConfig, minimumLimit} from "../Models/Text/TextConfig";
+import TextConfig, {ITextConfig, maximumKeywordSize, minimumKeywordSize, minimumLimit, maximumLimit} from "../Models/Text/TextConfig";
 import TextUserConfig, {ITextUserConfig} from "../Models/Text/TextUserConfig";
 import TextSubscribe from "../Models/Text/TextSubscribe";
 import TextInvite from "../Models/Text/TextInvite";
@@ -22,7 +21,7 @@ import {
     userBlockingUsOrChannelText,
     findWordInText, memberExistsAndHasChannelPermission
 } from "../Classes/TextAndVocalFunctions";
-import {extractDate, extractTime, extractUTCTime, showDate, showTime} from "../Classes/DateTimeManager";
+import {extractDate, extractDurationTime, extractTime, showDate, showTime} from "../Classes/DateTimeManager";
 import {IArgsModel, responseType} from "../interfaces/CommandInterfaces";
 
 interface argsType {
@@ -47,8 +46,6 @@ export default class Text extends Command {
     static display = true;
     static description = "Pour recevoir des notifications lorsque les personnes abonnées parlent sur un channel textuel";
     static commandName = "text";
-
-    static customCommand = false;
 
     static slashCommandIdByGuild: {[guildId: string]: string} = {};
 
@@ -143,6 +140,11 @@ export default class Text extends Command {
                 required: false,
                 type: 'string',
                 multi: true,
+                valid: (keyWords: string[]) => !keyWords.some(keyWord => keyWord.length < minimumKeywordSize || keyWord.length > maximumKeywordSize),
+                errorMessage: () => ({
+                    name: "Mots clés trop longs",
+                    value: "La taille d'un mot clé doit être située entre "+[minimumKeywordSize,maximumKeywordSize].join(" et ")+" caractères inclus"
+                }),
                 description: "Le ou les mots clé à définir, retirer, ou ajouter"
             },
             time: {
@@ -152,13 +154,16 @@ export default class Text extends Command {
                 description: "Le temps durant lequel on souhaite ne pas recevoir de notif (ex: 30s, 5m, 3h, 2j)",
                 valid: (time, args) =>
                     (args.action === "mute" && time > 0) ||
-                    (args.action === "limit" && time >= minimumLimit),
-                errorMessage: (value,args) => ({
+                    (args.action === "limit" && time >= minimumLimit && time <= maximumLimit),
+                errorMessage: (value) => ({
                     name: "Vous avez mal rentrez le temps",
-                    ...(typeof(value) === "number" ?
-                            {value: "Êtes vous sur qu'il est supérieur "+(args.action === "limit" ? "ou égal à "+showTime(extractUTCTime(minimumLimit), 'fr') : "à 0")+" ?"} :
-                            {value: "Vous n'avez pas respecté la syntaxe"}
-                    )
+                    value: typeof(value) === "number" ?
+                        "La limite doit être située entre "+
+                        [minimumLimit,maximumLimit]
+                            .map(v => showTime(extractDurationTime(v), "fr_long"))
+                            .join(" et ")+" inclus" :
+                            
+                        "Vous n'avez pas respecté la syntaxe"
                 })
             }
         }
@@ -550,8 +555,8 @@ export default class Text extends Command {
         let sinceTimeMuted;
         let remainingTimeMuted;
         if (muted && ownUserConfig.mutedFor) {
-            sinceTimeMuted = extractUTCTime(now - ownUserConfig.lastMute.getTime());
-            remainingTimeMuted = extractUTCTime(ownUserConfig.mutedFor - now + ownUserConfig.lastMute.getTime());
+            sinceTimeMuted = extractDurationTime(now - ownUserConfig.lastMute.getTime());
+            remainingTimeMuted = extractDurationTime(ownUserConfig.mutedFor - now + ownUserConfig.lastMute.getTime());
         }
 
         fieldLines.push(muted ? "Vous êtes mute "+(
@@ -560,7 +565,7 @@ export default class Text extends Command {
                     "pour une durée inderterminée"
             ) : "Vous n'êtes pas mute");
 
-        fieldLines.push("Vous avez" + showTime(extractUTCTime(ownUserConfig.limit), 'fr_long') +
+        fieldLines.push("Vous avez" + showTime(extractDurationTime(ownUserConfig.limit), 'fr_long') +
             " de répit entre chaque notification");
 
 
@@ -642,7 +647,7 @@ export default class Text extends Command {
 
         embed.addFields({
             name: "Vous vous êtes mute",
-            value: "Vous vous êtes mute pour " +(time ? showTime(extractUTCTime(time), 'fr_long') : "une durée indéterminée")
+            value: "Vous vous êtes mute pour " +(time ? showTime(extractDurationTime(time), 'fr_long') : "une durée indéterminée")
         })
     }
 
@@ -667,7 +672,7 @@ export default class Text extends Command {
     ) {
         embed.addFields({
             name: "Vous avez changé votre limite",
-            value: "Il y aura maintenant un répit de" +showTime(extractUTCTime(<number>time), 'fr_long') + " entre chaque notification"
+            value: "Il y aura maintenant un répit de" +showTime(extractDurationTime(<number>time), 'fr_long') + " entre chaque notification"
         })
         ownUserConfig.limit = time;
         ownUserConfig.save();
