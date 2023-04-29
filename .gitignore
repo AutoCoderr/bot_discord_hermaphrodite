@@ -7,3 +7,4 @@
 script_logs/**/*.log
 logs/**/*.json
 exported_stats/**/*.csv
+npm_cache

@@ -22,6 +22,7 @@ import { IXPData } from "../Models/XP/XPData";
 
 export default interface IReportedData {
     from?: 'guildCreate'|
+        'setDefaultStats'|
         'initSlashCommands'|
         'messageCreate'|
         'customCommand'|
