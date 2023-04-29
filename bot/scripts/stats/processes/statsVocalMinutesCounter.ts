@@ -1,11 +1,19 @@
+import StatsConfig, { IStatsConfig } from "../../../Models/Stats/StatsConfig";
 import { getDateWithPrecision } from "../../../libs/stats/statsCounters";
 import {tryCatchProcess} from "../../../logging/catchers";
 
 let lastDate: Date = getDateWithPrecision();
 
-function addMinute(serverId: string) {
-    if (process.send === undefined)
-        return;
+async function addMinute(serverId: string) {
+    if (
+        process.send === undefined ||
+        (await StatsConfig.findOne({
+            serverId,
+            listenVocal: true
+        })) === null
+    )
+        process.exit();
+
     const newDate = getDateWithPrecision();
     if (lastDate.getTime() !== newDate.getTime()) {
         lastDate = newDate;
