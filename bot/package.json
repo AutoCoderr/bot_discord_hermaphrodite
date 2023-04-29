@@ -15,6 +15,7 @@
     "stats_purge": "node --trace-deprecation --trace-warnings scripts/stats/commands/purgeDatasStats.js",
     "stats_show_servers": "node --trace-deprecation --trace-warnings scripts/stats/commands/showServers.js",
     "stats_show_percent_uses": "node --trace-deprecation --trace-warnings scripts/stats/commands/showPercentUses.js",
+    "stats_define_active_period": "node --trace-deprecation --trace-warnings scripts/stats/commands/defineArbitraryActivePeriods.js",
     "watch": "tsc -w",
     "build": "tsc",
     "test": "npx tsc && npx jest --forceExit"

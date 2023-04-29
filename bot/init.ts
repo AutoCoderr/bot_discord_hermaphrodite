@@ -18,7 +18,6 @@ import countingFirstMessagesXPs from "./libs/XP/XPCounting/countingFirstMessages
 import {findAndExecCallbackButton} from "./libs/callbackButtons";
 import { findAndExecCallbackModal } from "./libs/callbackModals";
 import { countingStatsMessagesEvent, countingStatsVoiceConnectionsAndMinutesEvent } from "./libs/stats/statsCounters";
-import StatsConfig from "./Models/Stats/StatsConfig";
 import setDefaultStatsOnNewGuild from "./libs/stats/setDefaultStatsOnNewGuild";
 
 export default function init(bot) {
