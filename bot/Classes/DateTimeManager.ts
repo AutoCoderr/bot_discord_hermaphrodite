@@ -69,7 +69,7 @@ export function extractUTCDate(date: Date|number) {
 
 export function showTime(time: {d: number, h: number, m: number, s: number}, format: 'fr_long'|'fr'|'classic'): string {
     const {d,h,m,s} = time;
-    if (d+h+m+s === 0)
+    if (format !== "classic" && d+h+m+s === 0)
         return '0';
     switch (format) {
         case 'fr_long':
@@ -93,7 +93,7 @@ export function showTime(time: {d: number, h: number, m: number, s: number}, for
     }
 }
 
-export function showDate(date: {year: number, month: number, day: number}, format: string): string {
+export function showDate(date: {year: number, month: number, day: number}, format: 'fr'|'en'): string {
     const {year,month,day} = date;
     switch (format) {
         case 'en':

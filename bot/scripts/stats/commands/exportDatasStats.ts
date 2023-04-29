@@ -55,16 +55,7 @@ client.on('ready', async () => {
     const csvs = await exportStatsInCsv(
         guilds,
         exportType,
-        specifiedTimezone === null ? 
-            specifiedDate :
-            new Date(
-                moment.tz(
-                    convertDateToMomentTimeZoneFormat(specifiedDate),
-                    specifiedTimezone
-                )
-                .utc()
-                .format()
-            ),
+        specifiedDate,
         afterOrBefore,
         type,
         precision,

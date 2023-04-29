@@ -22,6 +22,7 @@ import { IXPData } from "../Models/XP/XPData";
 
 export default interface IReportedData {
     from?: 'guildCreate'|
+        'setDefaultStats'|
         'initSlashCommands'|
         'messageCreate'|
         'customCommand'|
@@ -41,7 +42,7 @@ export default interface IReportedData {
         'vocalNotifTimeout'|
         'queue'|
         'processScript'|
-        'conScript',
+        'cronScript',
 
     processAddr?: string,
     processParams?: string[],

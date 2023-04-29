@@ -18,7 +18,7 @@ import countingFirstMessagesXPs from "./libs/XP/XPCounting/countingFirstMessages
 import {findAndExecCallbackButton} from "./libs/callbackButtons";
 import { findAndExecCallbackModal } from "./libs/callbackModals";
 import { countingStatsMessagesEvent, countingStatsVoiceConnectionsAndMinutesEvent } from "./libs/stats/statsCounters";
-import StatsConfig from "./Models/Stats/StatsConfig";
+import setDefaultStatsOnNewGuild from "./libs/stats/setDefaultStatsOnNewGuild";
 
 export default function init(bot) {
     client.on('ready', () => {
@@ -44,9 +44,18 @@ export default function init(bot) {
                     reportError(new CustomError(e, {from: "initSlashCommands"}));
                 });
 
-            client.on('guildCreate', guild => initSlashCommandsOnGuild(guild).catch(e => {
-                reportError(new CustomError(e, {from: "guildCreate", guild}));
-            }));
+            client.on('guildCreate', async guild => {
+                try {
+                    await initSlashCommandsOnGuild(guild);
+                } catch (e) {
+                    reportError(new CustomError(<Error>e, {from: "guildCreate", guild}));
+                }
+                try {
+                    await setDefaultStatsOnNewGuild(guild);
+                } catch(e) {
+                    reportError(new CustomError(<Error>e, {from: "setDefaultStats", guild}));
+                }
+            });
 
             client.on('interactionCreate', async (interaction: Interaction) => {
                 try {
