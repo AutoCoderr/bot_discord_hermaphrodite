@@ -2,7 +2,7 @@ import {existingCommands} from "./Classes/CommandsDescription";
 import {getExistingCommands} from "./Classes/CommandsDescription";
 import client from "./client";
 import {GuildMember, Interaction, VoiceState} from "discord.js";
-import {initSlashCommands, initSlashCommandsOnGuild, listenSlashCommands} from "./slashCommands";
+import {generateCreatedCommandsLog, initSlashCommands, initSlashCommandsOnGuild, listenSlashCommands, saveCreatedCommandsLog} from "./slashCommands";
 import {listenInviteButtons, listenAskInviteBackButtons} from "./Classes/TextAndVocalFunctions";
 import {listenCustomCommands} from "./listenCustomCommands";
 import CustomError from "./logging/CustomError";
@@ -46,7 +46,8 @@ export default function init(bot) {
 
             client.on('guildCreate', async guild => {
                 try {
-                    await initSlashCommandsOnGuild(guild);
+                    const createdOrNotCommands = await initSlashCommandsOnGuild(guild);
+                    await saveCreatedCommandsLog(generateCreatedCommandsLog([guild],[createdOrNotCommands]), true)
                 } catch (e) {
                     reportError(new CustomError(<Error>e, {from: "guildCreate", guild}));
                 }

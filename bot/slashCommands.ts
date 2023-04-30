@@ -3,9 +3,7 @@ import {
     ApplicationCommand, CommandInteraction,
     Guild,
     MessagePayload,
-    ApplicationCommandOptionType,
-    SlashCommandBuilder,
-    PermissionFlagsBits
+    ApplicationCommandOptionType
 } from "discord.js";
 import Command from "./Classes/Command";
 import {existingCommands} from "./Classes/CommandsDescription";
@@ -13,6 +11,7 @@ import {getterNameBySlashType, slashCommandsTypeDefinitions} from "./Classes/sla
 import CustomError from "./logging/CustomError";
 import {IArgModel, ISlashCommandsDefinition, responseType} from "./interfaces/CommandInterfaces";
 import { compareTwoObjects } from "./Classes/OtherFunctions";
+import fs from "fs/promises";
 
 type IOptionCommandType = ApplicationCommandOptionType.Boolean |
 ApplicationCommandOptionType.Channel |
@@ -48,11 +47,72 @@ export async function initSlashCommands() {
 
     const slashCommandsDefinition = await getSlashCommandsDefinition();
 
-    return Promise.all(guilds.map(guild => initSlashCommandsOnGuild(guild, slashCommandsDefinition)
+    const createdOrNotCommandsByGuild: (boolean|null|Error)[][] = await Promise.all(guilds.map(guild => initSlashCommandsOnGuild(guild, slashCommandsDefinition)
         .catch(e => {
             throw new CustomError(e, {guild})
         })
     ));
+
+    await saveCreatedCommandsLog(generateCreatedCommandsLog(guilds, createdOrNotCommandsByGuild), false);
+}
+
+export async function saveCreatedCommandsLog(createdOrNotCommandsByGuild: ICommandsCreatedLog, serverJoin: boolean) {
+    createdOrNotCommandsByGuild.new_servers = serverJoin;
+    return fs.writeFile(
+        "/logs/commands_creating/"+(new Date().toISOString())+(serverJoin ? "_new_servers" : "_restart")+".json", 
+        JSON.stringify(createdOrNotCommandsByGuild, null, "\t")
+    )
+}
+
+
+type ICommandCreatedLog = {[commandName: string]: string|(string|[string,string,string[]])[]}
+interface ICommandsCreatedLog {
+    new_servers?: boolean,
+    created?: ICommandCreatedLog,
+    keept?: ICommandCreatedLog,
+    error?: ICommandCreatedLog
+}
+export function generateCreatedCommandsLog(guilds: Guild[], createdOrNotCommandsByGuild: (boolean|null|Error)[][]): ICommandsCreatedLog {
+    const commands = Object.values(existingCommands);
+    return createdOrNotCommandsByGuild.reduce((acc,createdsOrNot,i) => 
+        createdsOrNot.reduce((acc,createdOrNot,j) => {
+            if (createdOrNot === null)
+                return acc;
+            const col = createdOrNot === true ?
+                "created" :
+                createdOrNot === false ?
+                    "keept" :
+                    "in_error";
+            const command = <typeof Command>commands[j];
+            const guild = guilds[i]
+            if (command.commandName === null)
+                return acc;
+            return {
+                ...acc,
+                [col]: {
+                    ...(acc[col] ?? {}),
+                    [command.commandName]: (
+                        col !== "in_error" && 
+                        acc[col] && 
+                        acc[col][command.commandName] && 
+                        acc[col][command.commandName].length === guilds.length-1
+                    ) ? "all" :
+                    [
+                        ...(acc[col] ? (acc[col][command.commandName]??[]) : []),
+                        (
+                            createdOrNot instanceof Error ?
+                                [
+                                    guild.id+" ("+guild.name+")",
+                                    createdOrNot.message,
+                                    createdOrNot.stack?.split("\n")
+                                ] :
+                            guild.id+" ("+guild.name+")"
+                        )
+                    ]
+                }
+            }
+        }, acc)
+    , {})
 }
 
 function getSlashCommandsDefinition(): Promise<ISlashCommandsDefinition> {
@@ -73,7 +133,7 @@ function getSlashCommandsDefinition(): Promise<ISlashCommandsDefinition> {
     )
 }
 
-export async function initSlashCommandsOnGuild(guild: Guild, slashCommandsDefinitions: null|ISlashCommandsDefinition = null) {
+export async function initSlashCommandsOnGuild(guild: Guild, slashCommandsDefinitions: null|ISlashCommandsDefinition = null): Promise<(boolean|null|Error)[]> {
     console.log(guild.name+" : Creating slash commands");
 
     slashCommandsDefinitions = slashCommandsDefinitions ?? await getSlashCommandsDefinition();
@@ -87,62 +147,68 @@ export async function initSlashCommandsOnGuild(guild: Guild, slashCommandsDefini
         }), {})
     );
 
-    await Promise.all([
-        ...(<Array<typeof Command>>Object.values(existingCommands)).map(async command => {
-            if (!command.commandName || !(<ISlashCommandsDefinition>slashCommandsDefinitions)[command.commandName.toLowerCase()])
-                return null;
-
-            const existingSlashCommand = existingSlashCommands[command.commandName.toLowerCase()]
-
-            if (existingSlashCommand)
-                command.slashCommandIdByGuild[guild.id] = existingSlashCommand.id
-
-            const newSlashCommandDefinition = (<ISlashCommandsDefinition>slashCommandsDefinitions)[command.commandName.toLowerCase()];
-
-            let slashCommand: null|ApplicationCommand = null;
-
-            if (
-                !existingSlashCommand || 
-                !compareTwoObjects(
-                    existingSlashCommand,
-                    newSlashCommandDefinition, 
-                    (p) => ["name","description","options", ...(p === 0 ? ["defaultMemberPermissions"] : ["type","required","choices"])],
-                    {
-                        defaultMemberPermissions: [
-                            "default_member_permissions", 
-                            v => v ?? null,
-                            v => v ? v.bitfield : v
-                        ],
-                        options: ["options", (v,_,p) => (v === undefined && p === 0) ? [] : v,null]
-                    }
-                )
-            ) {
-                try {
-                    slashCommand = await commands?.create((<ISlashCommandsDefinition>slashCommandsDefinitions)[command.commandName.toLowerCase()]);
-                } catch (e) {
-                    console.log("Can't create command slash '"+command.commandName+"' on server '"+guild.name+"'");
-                    console.log((<any>e).message)
+    const [createdsOrNot] = await <Promise<[(boolean|null|Error)[],any[]]>>Promise.all([
+        Promise.all(
+            (<Array<typeof Command>>Object.values(existingCommands)).map(async command => {
+                if (!command.commandName || !(<ISlashCommandsDefinition>slashCommandsDefinitions)[command.commandName.toLowerCase()])
                     return null;
+    
+                const existingSlashCommand = existingSlashCommands[command.commandName.toLowerCase()]
+    
+                if (existingSlashCommand)
+                    command.slashCommandIdByGuild[guild.id] = existingSlashCommand.id
+    
+                const newSlashCommandDefinition = (<ISlashCommandsDefinition>slashCommandsDefinitions)[command.commandName.toLowerCase()];
+    
+                let slashCommand: null|ApplicationCommand = null;
+
+                const toCreate = !existingSlashCommand || 
+                                !compareTwoObjects(
+                                    existingSlashCommand,
+                                    newSlashCommandDefinition, 
+                                    (p) => ["name","description","options", ...(p === 0 ? ["defaultMemberPermissions"] : ["type","required","choices"])],
+                                    {
+                                        defaultMemberPermissions: [
+                                            "default_member_permissions", 
+                                            v => v ?? null,
+                                            v => v ? v.bitfield : v
+                                        ],
+                                        options: ["options", (v,_,p) => (v === undefined && p === 0) ? [] : v,null]
+                                    }
+                                )
+    
+                if (toCreate) {
+                    try {
+                        slashCommand = await commands?.create((<ISlashCommandsDefinition>slashCommandsDefinitions)[command.commandName.toLowerCase()]);
+                    } catch (e) {
+                        console.log("Can't create command slash '"+command.commandName+"' on server '"+guild.name+"'");
+                        console.log((<any>e).message)
+                        return e;
+                    }
+                    
+                } else {
+                    slashCommand = existingSlashCommand
                 }
+    
                 
-            } else {
-                slashCommand = existingSlashCommand
-            }
-
-            
-
-            if (slashCommandsByGuildAndName[guild.id] === undefined)
-                slashCommandsByGuildAndName[guild.id] = {}
-            slashCommandsByGuildAndName[guild.id][<string>command.commandName] = slashCommand;
-
-            command.slashCommandIdByGuild[guild.id] = slashCommand.id;
-            return null;
-        }),
-        ...Object.entries(existingSlashCommands).map(([name, slashCommand]) =>
-            !(<ISlashCommandsDefinition>slashCommandsDefinitions)[name] ? (<ApplicationCommand>slashCommand).delete().catch(() => null) : null
+    
+                if (slashCommandsByGuildAndName[guild.id] === undefined)
+                    slashCommandsByGuildAndName[guild.id] = {}
+                slashCommandsByGuildAndName[guild.id][<string>command.commandName] = slashCommand;
+    
+                command.slashCommandIdByGuild[guild.id] = slashCommand.id;
+                return toCreate;
+            })
+        ),
+        Promise.all(
+            Object.entries(existingSlashCommands).map(([name, slashCommand]) =>
+                !(<ISlashCommandsDefinition>slashCommandsDefinitions)[name] ? (<ApplicationCommand>slashCommand).delete().catch(() => null) : null
+            )
         )
     ])
     console.log(guild.name+" : Slash commands created")
+
+    return createdsOrNot;
 }
 
 async function generateSlashCommandFromModel(command: typeof Command): Promise<IOptionCommand> {
