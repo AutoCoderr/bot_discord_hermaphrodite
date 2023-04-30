@@ -307,3 +307,66 @@ export function incrementUnitToDate(date: Date, unit: IPrecision, v: number) {
     newDate[setter](newDate[getter]()+v)
     return newDate;
 }
+
+
+export function compareTwoObjects(
+    A: any, 
+    B: any, 
+    getFieldsToCompare: null|((p: number) => string[]) = null,
+    fieldsConvertor: null |
+                        {
+                            [field: string]: string |
+                                            [
+                                                string,
+                                                null|((v: any, vParent: any, p: number) => any),
+                                                null|((v: any, vParent: any, p: number) => any)
+                                            ]
+                        } = null,
+    p = 0
+): boolean {
+    if (
+        typeof(A) !== typeof(B) ||
+        (A instanceof Array) !== (B instanceof Array) ||
+        (A === null) !== (B === null)
+    )
+        return false;
+
+    if (A === null)
+        return true;
+
+    if (A instanceof Array) {
+        if (A.length !== B.length) {
+            return false;
+        }
+        
+        if (A.some((e,i) => !compareTwoObjects(e,B[i],getFieldsToCompare,fieldsConvertor,p+1)))
+            return false;
+        
+        return true;
+    }
+
+    if (typeof(A) === "object") {
+        const fields = getFieldsToCompare === null ? Object.keys(A).sort() : getFieldsToCompare(p);
+        if (getFieldsToCompare === null && fields.join(";") !== Object.keys(B).sort().join(";"))
+            return false;
+        
+        if (fields.some(field => {
+            const convertor = (fieldsConvertor && fieldsConvertor[field]) ? fieldsConvertor[field] : null;
+            const BKey = typeof(convertor) === "string" ? 
+                            convertor :
+                            convertor instanceof Array ?
+                                convertor[0] :
+                                field;
+            const BValue = (convertor instanceof Array && convertor[1] !== null) ? convertor[1](B[BKey],B,p) : B[BKey];
+
+            const AValue = (convertor instanceof Array && convertor[2] !== null) ? convertor[2](A[field],A,p) : A[field];
+
+            return !compareTwoObjects(AValue,BValue, getFieldsToCompare, fieldsConvertor, p+1)
+        }))
+            return false;
+
+        return true;
+    }
+
+    return A === B;
+}

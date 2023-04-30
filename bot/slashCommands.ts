@@ -12,6 +12,7 @@ import {existingCommands} from "./Classes/CommandsDescription";
 import {getterNameBySlashType, slashCommandsTypeDefinitions} from "./Classes/slashCommandsTypeDefinitions";
 import CustomError from "./logging/CustomError";
 import {IArgModel, ISlashCommandsDefinition, responseType} from "./interfaces/CommandInterfaces";
+import { compareTwoObjects } from "./Classes/OtherFunctions";
 
 type IOptionCommandType = ApplicationCommandOptionType.Boolean |
 ApplicationCommandOptionType.Channel |
@@ -79,7 +80,7 @@ export async function initSlashCommandsOnGuild(guild: Guild, slashCommandsDefini
 
     const commands = guild.commands;
 
-    const existingSlashCommands = await commands.fetch().then(commands =>
+    const existingSlashCommands: {[name: string]: ApplicationCommand} = await commands.fetch().then(commands =>
         commands.reduce((acc, command) => ({
             ...acc,
             [command.name]: command
@@ -91,23 +92,50 @@ export async function initSlashCommandsOnGuild(guild: Guild, slashCommandsDefini
             if (!command.commandName || !(<ISlashCommandsDefinition>slashCommandsDefinitions)[command.commandName.toLowerCase()])
                 return null;
 
-            if (existingSlashCommands[command.commandName.toLowerCase()])
-                command.slashCommandIdByGuild[guild.id] = existingSlashCommands[command.commandName.toLowerCase()].id
+            const existingSlashCommand = existingSlashCommands[command.commandName.toLowerCase()]
 
-            let createdSlashCommand: null|ApplicationCommand = null
-            try {
-                createdSlashCommand = await commands?.create((<ISlashCommandsDefinition>slashCommandsDefinitions)[command.commandName.toLowerCase()]);
-            } catch (e) {
-                console.log("Can't create command slash '"+command.commandName+"' on server '"+guild.name+"'");
-                console.log((<any>e).message)
-                return null;
+            if (existingSlashCommand)
+                command.slashCommandIdByGuild[guild.id] = existingSlashCommand.id
+
+            const newSlashCommandDefinition = (<ISlashCommandsDefinition>slashCommandsDefinitions)[command.commandName.toLowerCase()];
+
+            let slashCommand: null|ApplicationCommand = null;
+
+            if (
+                !existingSlashCommand || 
+                !compareTwoObjects(
+                    existingSlashCommand,
+                    newSlashCommandDefinition, 
+                    (p) => ["name","description","options", ...(p === 0 ? ["defaultMemberPermissions"] : ["type","required","choices"])],
+                    {
+                        defaultMemberPermissions: [
+                            "default_member_permissions", 
+                            v => v ?? null,
+                            v => v ? v.bitfield : v
+                        ],
+                        options: ["options", (v,_,p) => (v === undefined && p === 0) ? [] : v,null]
+                    }
+                )
+            ) {
+                try {
+                    slashCommand = await commands?.create((<ISlashCommandsDefinition>slashCommandsDefinitions)[command.commandName.toLowerCase()]);
+                } catch (e) {
+                    console.log("Can't create command slash '"+command.commandName+"' on server '"+guild.name+"'");
+                    console.log((<any>e).message)
+                    return null;
+                }
+                
+            } else {
+                slashCommand = existingSlashCommand
             }
+
+            
 
             if (slashCommandsByGuildAndName[guild.id] === undefined)
                 slashCommandsByGuildAndName[guild.id] = {}
-            slashCommandsByGuildAndName[guild.id][<string>command.commandName] = createdSlashCommand;
+            slashCommandsByGuildAndName[guild.id][<string>command.commandName] = slashCommand;
 
-            command.slashCommandIdByGuild[guild.id] = createdSlashCommand.id;
+            command.slashCommandIdByGuild[guild.id] = slashCommand.id;
             return null;
         }),
         ...Object.entries(existingSlashCommands).map(([name, slashCommand]) =>
@@ -339,5 +367,3 @@ export function getCustomType(argModel) {
 export function getSlashTypeGetterName(argModel) {
     return getterNameBySlashType[getSlashType(argModel)]
 }
-
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
